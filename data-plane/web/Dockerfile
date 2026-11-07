@@ -6,7 +6,7 @@
 # plus `@metap/theme-enterprise` via `link:../../../metap-themes/packages/enterprise`
 # (real pnpm symlinks to sibling repos, not published packages), so the sibling repos have to be
 # visible in the same build context at the same relative nesting they have on disk
-# (`design-system/`, `platform-ui/`, `metap-themes/`, `metap-demo-waf/data-plane/web/`, all under
+# (`design-system/`, `platform-ui/`, `metap-themes/`, `waap/data-plane/web/`, all under
 # 1 root) for `pnpm install` to resolve them. The root `../../../.dockerignore`
 # (metap-org/.dockerignore, new alongside this file) keeps that wide context from also shipping
 # every sibling repo's `target/`/`node_modules/`/`.git` — read that file's own comment before
@@ -49,22 +49,22 @@ WORKDIR /workspace
 # source) is too late and re-triggers [ERR_PNPM_IGNORED_BUILDS] (found live, 2026-09-01).
 COPY design-system/package.json design-system/pnpm-lock.yaml design-system/pnpm-workspace.yaml design-system/
 COPY platform-ui/package.json platform-ui/pnpm-lock.yaml platform-ui/
-COPY metap-demo-waf/data-plane/web/package.json metap-demo-waf/data-plane/web/pnpm-lock.yaml metap-demo-waf/data-plane/web/
+COPY waap/data-plane/web/package.json waap/data-plane/web/pnpm-lock.yaml waap/data-plane/web/
 
 RUN cd design-system && pnpm install --frozen-lockfile
 RUN cd platform-ui && pnpm install --frozen-lockfile
-RUN cd metap-demo-waf/data-plane/web && pnpm install --frozen-lockfile
+RUN cd waap/data-plane/web && pnpm install --frozen-lockfile
 
 COPY design-system/ design-system/
 COPY platform-ui/ platform-ui/
 COPY metap-themes/packages/enterprise/ metap-themes/packages/enterprise/
-COPY metap-demo-waf/data-plane/web/ metap-demo-waf/data-plane/web/
+COPY waap/data-plane/web/ waap/data-plane/web/
 
 RUN cd design-system && pnpm build
-RUN cd metap-demo-waf/data-plane/web && pnpm build
+RUN cd waap/data-plane/web && pnpm build
 
 # ---- runtime -----------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
-COPY --from=build /workspace/metap-demo-waf/data-plane/web/dist /usr/share/nginx/html
-COPY metap-demo-waf/data-plane/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /workspace/waap/data-plane/web/dist /usr/share/nginx/html
+COPY waap/data-plane/web/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

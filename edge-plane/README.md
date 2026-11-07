@@ -7,11 +7,15 @@ This is the part of the product that actually protects a site. Everything else c
 
 ## Deliberately not built on `metap`
 
-No `metap` dependency appears anywhere in this tree, and that is a design decision rather than an
-omission (`../data-plane/docs/04-architecture-boundary.md`): a metadata-driven CRUD platform is
+Nothing from `metap`'s platform (metadata, CRUD, permission, DB access) appears anywhere in this
+tree, and that is a design decision rather than an omission (`../data-plane/docs/04-architecture-boundary.md`): a metadata-driven CRUD platform is
 the right tool for config that changes shape as the business learns, and the wrong tool for a
 fixed-shape, high-volume, latency-sensitive request path. It also means an edge node has no way to
 reach the portal's database or schema even by accident.
+
+The one exception, since 2026-11-07: `metap`'s `pkg/kit/*` — standard-library-only utilities
+(env parsing, signal handling, HTTP serve/client) with no platform knowledge. `go/.golangci.yml`
+(depguard, run in CI) rejects any other `github.com/metap-org/metap/...` import.
 
 What it *is*: a plain hyper 1.x server, an `ArcSwap` snapshot of compiled rules, and a short
 dependency list.
@@ -75,7 +79,7 @@ Each of these is a real gap, not a rough edge that will quietly work out:
 
 ```bash
 cp .env.example .env
-cargo run -p waf-edge --release   # release: this is the one binary where throughput matters
+go build -o waf-edge ./cmd/waf-edge && ./waf-edge   # from edge-plane/
 curl -H 'Host: shop.example.com' http://localhost:8080/
 curl http://localhost:8080/__edge/health
 ```

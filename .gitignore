@@ -1,0 +1,4 @@
+
+# Binaries built in place (e.g. `go build -o waf-edge ./cmd/waf-edge` per edge-plane/README.md).
+/edge-plane/waf-edge
+/control-plane/waf-config-distributor

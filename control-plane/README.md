@@ -52,7 +52,7 @@ layout is a published contract for a process that does not depend on `metap` at 
 
 ```bash
 cp .env.example .env      # then set CONTROL_SERVICE_EMAIL / CONTROL_SERVICE_PASSWORD
-cargo run -p waf-config-distributor
+go run ./cmd/waf-config-distributor   # from control-plane/
 ```
 
 Needs `../data-plane`'s services running (at least `zones-service` and `alerting-service`), plus

@@ -1,0 +1,239 @@
+```sql postgres://metap:metap@localhost:5433/metap
+
+-- all schema only
+SELECT DISTINCT table_schema
+FROM information_schema.tables
+ORDER BY table_schema;
+
+-- 
+SELECT schemaname, relname AS table_name, n_live_tup AS approx_rows,
+       pg_size_pretty(pg_total_relation_size(relid)) AS total_size
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(relid) DESC
+LIMIT 50;
+
+
+-- Tables in the metadata schema ("metadata" is a schema, not a table)
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'metadata'
+ORDER BY table_name;
+
+
+-- Applied migrations, newest first
+SELECT version, description, installed_on
+FROM public.metap_go_migrations
+ORDER BY version DESC
+LIMIT 10;
+
+
+-- Tenants and their routed hostnames
+SELECT t.id, t.product, t.tier, t.strategy, t.status, t.schema_name, t.created_at,
+       array_agg(h.hostname) FILTER (WHERE h.hostname IS NOT NULL) AS hostnames
+FROM control.tenants t
+LEFT JOIN control.tenant_hostnames h ON h.tenant_id = t.id
+GROUP BY t.id
+ORDER BY t.created_at DESC;
+
+
+-- Users and roles per tenant
+SELECT u.tenant_id, u.email, u.auth_provider, array_agg(r.role ORDER BY r.role) AS roles, u.created_at
+FROM metadata.users u
+LEFT JOIN metadata.user_roles r ON r.tenant_id = u.tenant_id AND r.user_id = u.id
+GROUP BY u.tenant_id, u.id
+ORDER BY u.tenant_id, u.email;
+
+
+-- Zones overview (live rows only)
+SELECT z.tenant_id,
+       z.data->>'hostname'       AS hostname,
+       z.data->>'status'         AS status,
+       z.data->>'protectionMode' AS protection_mode,
+       (z.data->>'configVersion')::bigint AS config_version,
+       z.data->>'originAddress'  AS origin,
+       d.data->>'apexDomain'     AS apex_domain,
+       d.data->>'verificationStatus' AS domain_verification,
+       z.updated_at
+FROM waf.waf_zones z
+LEFT JOIN waf.waf_domains d ON d.id = z."domainId" AND NOT d.deleted
+WHERE NOT z.deleted
+ORDER BY z.updated_at DESC;
+
+
+-- Per-zone config counts — zones with nothing to enforce stand out
+SELECT z.data->>'hostname' AS hostname,
+       (SELECT count(*) FROM waf.waf_ddos_policies p WHERE p."zoneId" = z.id AND NOT p.deleted)   AS ddos_policies,
+       (SELECT count(*) FROM waf.waf_firewall_rules r WHERE r."zoneId" = z.id AND NOT r.deleted)  AS firewall_rules,
+       (SELECT count(*) FROM waf.waf_ip_access_lists l WHERE l."zoneId" = z.id AND NOT l.deleted) AS ip_access_lists
+FROM waf.waf_zones z
+WHERE NOT z.deleted
+ORDER BY hostname;
+
+
+-- Firewall rules of one zone in evaluation order (first match wins) — set the hostname
+SELECT (r.data->>'priority')::bigint AS priority, r.data->>'name' AS name, r.data->>'ruleType' AS rule_type,
+       r.data->>'action' AS action, (r.data->>'enabled')::boolean AS enabled,
+       r.data->'matchCondition' AS match_condition,
+       r.data->>'rateLimitThreshold' AS rl_threshold, r.data->>'rateLimitWindow' AS rl_window
+FROM waf.waf_firewall_rules r
+JOIN waf.waf_zones z ON z.id = r."zoneId"
+WHERE NOT r.deleted AND z.data->>'hostname' = 'example.com'
+ORDER BY priority;
+
+
+-- DDoS policies — more than one live policy per zone means the unique guard is broken
+SELECT z.data->>'hostname' AS hostname, count(*) AS live_policies,
+       array_agg(p.data->>'sensitivity' || '/' || (p.data->>'action')) AS sensitivity_action
+FROM waf.waf_ddos_policies p
+JOIN waf.waf_zones z ON z.id = p."zoneId"
+WHERE NOT p.deleted
+GROUP BY hostname
+ORDER BY live_policies DESC;
+
+-- Generated-column drift: real reference column disagrees with data->> (missing sync trigger, see CLAUDE.md incident #8). Should return 0 rows.
+SELECT 'waf_ddos_policies' AS tbl, id FROM waf.waf_ddos_policies WHERE "zoneId" IS DISTINCT FROM (data->>'zoneId')::uuid
+UNION ALL SELECT 'waf_firewall_rules', id FROM waf.waf_firewall_rules WHERE "zoneId" IS DISTINCT FROM (data->>'zoneId')::uuid
+UNION ALL SELECT 'waf_ip_access_lists', id FROM waf.waf_ip_access_lists WHERE "zoneId" IS DISTINCT FROM (data->>'zoneId')::uuid
+UNION ALL SELECT 'waf_zones', id FROM waf.waf_zones WHERE "domainId" IS DISTINCT FROM (data->>'domainId')::uuid
+UNION ALL SELECT 'waf_scan_findings', id FROM waf.waf_scan_findings WHERE "scanJobId" IS DISTINCT FROM (data->>'scanJobId')::uuid
+UNION ALL SELECT 'waf_alert_notifications', id FROM waf.waf_alert_notifications WHERE "alertPolicyId" IS DISTINCT FROM (data->>'alertPolicyId')::uuid;
+
+
+-- Sync triggers that keep those columns filled — expect 6 rows
+SELECT tgrelid::regclass AS table_name, tgname, tgenabled
+FROM pg_trigger
+WHERE NOT tgisinternal AND tgrelid::regclass::text LIKE 'waf.%'
+ORDER BY 1;
+
+
+-- Indexes on WAF tables (check the partial unique indexes: WHERE deleted = false)
+SELECT tablename, indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'waf'
+ORDER BY tablename, indexname;
+
+
+-- Reconciler backfill ledger
+SELECT tenant_id, entity_name, op_id, completed, updated_at
+FROM metadata.reconciler_backfill_progress
+ORDER BY updated_at DESC;
+
+
+-- Required extensions (pg_trgm backs every searchable field, see CLAUDE.md incident #7)
+SELECT extname, extversion FROM pg_extension ORDER BY extname;
+
+
+-- Security events, last 24h, by zone and action
+SELECT z.data->>'hostname' AS hostname, e.data->>'action' AS action, count(*) AS events,
+       max((e.data->>'occurredAt')::timestamptz) AS last_seen
+FROM waf.waf_security_events e
+LEFT JOIN waf.waf_zones z ON z.id = (e.data->>'zoneId')::uuid
+WHERE NOT e.deleted AND (e.data->>'occurredAt')::timestamptz > now() - interval '24 hours'
+GROUP BY hostname, action
+ORDER BY events DESC;
+
+
+-- Top source IPs, last hour
+SELECT e.data->>'sourceIp' AS source_ip, count(*) AS events,
+       array_agg(DISTINCT e.data->>'triggeredBy') AS triggered_by,
+       array_agg(DISTINCT e.data->>'requestPath') FILTER (WHERE e.data->>'requestPath' IS NOT NULL) AS paths
+FROM waf.waf_security_events e
+WHERE NOT e.deleted AND (e.data->>'occurredAt')::timestamptz > now() - interval '1 hour'
+GROUP BY source_ip
+ORDER BY events DESC
+LIMIT 20;
+
+
+-- Open incidents (not resolved)
+SELECT i.data->>'title' AS title, i.data->>'severity' AS severity, i.status,
+       (i.data->>'eventCount')::int AS event_count, i.data->>'assignedTo' AS assigned_to,
+       z.data->>'hostname' AS hostname, i.created_at, i.updated_at
+FROM waf.waf_incidents i
+LEFT JOIN waf.waf_zones z ON z.id = (i.data->>'zoneId')::uuid
+WHERE NOT i.deleted AND i.status IS DISTINCT FROM 'resolved'
+ORDER BY i.created_at DESC;
+
+
+-- Scan findings still needing remediation, by severity
+SELECT f.data->>'severity' AS severity, f.data->>'remediationStatus' AS remediation, count(*) AS findings,
+       max((f.data->>'lastSeenAt')::timestamptz) AS last_seen
+FROM waf.waf_scan_findings f
+WHERE NOT f.deleted AND f.data->>'remediationStatus' IN ('open', 'confirmed')
+GROUP BY severity, remediation
+ORDER BY findings DESC;
+
+
+-- Scan jobs and their last run
+SELECT z.data->>'hostname' AS hostname, j.data->>'scanType' AS scan_type, j.data->>'schedule' AS schedule,
+       j.status, j.data->>'lastRunAt' AS last_run_at
+FROM waf.waf_scan_jobs j
+LEFT JOIN waf.waf_zones z ON z.id = (j.data->>'zoneId')::uuid
+WHERE NOT j.deleted
+ORDER BY last_run_at DESC NULLS LAST;
+
+-- Alert deliveries that failed
+SELECT p.data->>'name' AS policy, n.data->>'channel' AS channel, n.data->>'deliveryStatus' AS delivery,
+       n.data->>'triggeredAt' AS triggered_at
+FROM waf.waf_alert_notifications n
+LEFT JOIN waf.waf_alert_policies p ON p.id = n."alertPolicyId"
+WHERE NOT n.deleted AND n.data->>'deliveryStatus' IS DISTINCT FROM 'sent'
+ORDER BY triggered_at DESC NULLS LAST
+LIMIT 50;
+
+
+-- Outbox: events not yet published to RabbitMQ (a growing backlog means outbox-publisher is down)
+SELECT topic, count(*) AS pending, max(attempts) AS max_attempts, min(created_at) AS oldest,
+       (array_agg(last_error ORDER BY created_at DESC) FILTER (WHERE last_error IS NOT NULL))[1] AS latest_error
+FROM metadata.outbox_events
+WHERE published_at IS NULL
+GROUP BY topic
+ORDER BY pending DESC;
+
+
+-- Latest audit trail entries
+SELECT occurred_at, tenant_id, entity, record_id, action, transition_action, actor_user_id, reason, version_after
+FROM metadata.audit_trail_entries
+ORDER BY occurred_at DESC
+LIMIT 50;
+
+
+-- Latest workflow transitions
+SELECT created_at, tenant_id, entity, record_id, action, from_state, to_state, actor
+FROM metadata.workflow_events
+ORDER BY created_at DESC
+LIMIT 50;
+
+
+-- Permission policies per entity
+SELECT tenant_id, entity, action, roles, effect, subject, field, condition
+FROM metadata.policies
+ORDER BY tenant_id, entity, action;
+
+
+-- Row counts and size of every WAF table
+SELECT c.relname AS table_name, s.n_live_tup AS live_rows, s.n_dead_tup AS dead_rows,
+       pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+WHERE n.nspname = 'waf' AND c.relkind = 'r'
+ORDER BY pg_total_relation_size(c.oid) DESC;
+
+
+-- Running queries longer than 5s
+SELECT pid, datname, usename, state, now() - query_start AS running_for, left(query, 200) AS query
+FROM pg_stat_activity
+WHERE state <> 'idle' AND now() - query_start > interval '5 seconds'
+ORDER BY running_for DESC;
+
+
+-- Databases on this server — metap_t_* are testkit leftovers (safe to drop), metap_tpl_* is the test template
+SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size, datistemplate
+FROM pg_database
+ORDER BY datname;
+
+
+
+
+
+```

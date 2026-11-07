@@ -1,0 +1,22 @@
+# Architecture guard only: `golangci-lint run ./...` from edge-plane/go.
+version: "2"
+linters:
+  default: none
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # edge-plane is not built on metap (see cmd/waf-edge/main.go's package doc): from the
+        # metap module it may import only pkg/kit/* — standard-library-only utilities with no
+        # metadata/CRUD/permission/DB knowledge. Anything else from metap means the work
+        # belongs in control-plane instead.
+        metap-kit-only:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: github.com/metap-org/metap
+              desc: "edge-plane may import only github.com/metap-org/metap/pkg/kit/* from metap"
+          allow:
+            - github.com/metap-org/metap/pkg/kit

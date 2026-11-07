@@ -17,9 +17,9 @@ tách theo data layer — xem lý do kỹ thuật ở doc-comment mỗi service'
 
 | Service | Sở hữu | Port (HTTP / gRPC opt-in) |
 |---|---|---|
-| [`services/zones-service`](services/zones-service/README.md) | `waf.zones`, `waf.ddos_policies`, `waf.firewall_rules` | 3000 / 3001 |
-| [`services/scanning-service`](services/scanning-service/README.md) | `waf.scan_jobs`, `waf.scan_findings` | 3010 / 3011 |
-| [`services/alerting-service`](services/alerting-service/README.md) | `waf.security_events`, `waf.incidents`, `waf.alert_policies`, `waf.alert_notifications` | 3020 / 3021 |
+| `zones-service` (`cmd/zones-service`, logic ở `zonesservice/`) | `waf.domains`, `waf.zones`, `waf.ddos_policies`, `waf.firewall_rules`, `waf.ip_access_lists` | 3000 / 3001 |
+| `scanning-service` (`cmd/scanning-service`, `scanningservice/`) | `waf.scan_jobs`, `waf.scan_findings` | 3010 / 3011 |
+| `alerting-service` (`cmd/alerting-service`, `alertingservice/`) | `waf.security_events`, `waf.incidents`, `waf.alert_policies`, `waf.alert_notifications` | 3020 / 3021 |
 
 `zoneId` ở `scanning-service`/`alerting-service` là **`String` thuần, không phải `Reference`**
 (cùng workaround `waf.security_events.triggeredById` đã dùng cho case polymorphic) — đăng ký
@@ -130,49 +130,61 @@ admin, `Plan`/`Subscription`
 (`docs/12-billing-plans.md`, chưa build) — cùng Traefik/reverse-proxy thật cho production
 (`web/`'s dev-server routing chỉ dùng được lúc `pnpm dev`), Admin Portal backend riêng.
 
-## Development
+## Chạy local (Go, cập nhật 2026-11-08)
+
+Module Go nằm thẳng ở `data-plane/` (`go.mod`, module `github.com/metap-org/waap/data-plane`) —
+không còn `data-plane/go/`, không còn `services/*` Rust. Postgres/RabbitMQ dùng chung với
+`../../metap`.
 
 ```bash
-# 1 lần cho cả 3 service — Postgres/RabbitMQ dùng chung với ../metap (docker compose up -d
-# postgres rabbitmq ở đó nếu chưa chạy). Key JWT dùng chung, đặt ở data-plane/keys/.
-cargo run --manifest-path ../../metap/crates/metap-dev-tools/Cargo.toml -- gen-keys keys           # RSA fallback
-cargo run --manifest-path ../../metap/crates/metap-dev-tools/Cargo.toml -- gen-jwks-key keys       # EdDSA trust root (mặc định dùng cái này, xem README's auth section)
-cargo run --manifest-path ../../metap/crates/metap-dev-tools/Cargo.toml -- provision-tenant <tenantId> schema <email> <password>
-cargo run --manifest-path ../../metap/crates/metap-dev-tools/Cargo.toml -- mint-token <tenantId> <userId>
+# 0. Hạ tầng dùng chung (từ ../../metap)
+(cd ../../metap && docker compose up -d postgres rabbitmq)
+export DATABASE_URL=postgres://metap:metap@localhost:5433/metap
 
-# Mỗi service: copy .env.example riêng rồi chạy (từ data-plane/, workspace root)
-cp services/zones-service/.env.example services/zones-service/.env
-cp services/scanning-service/.env.example services/scanning-service/.env
-cp services/alerting-service/.env.example services/alerting-service/.env
+# 1. DB + key + tenant + user — chỉ 1 lần cho 1 DB mới (dev-tools nằm ở ../../metap)
+cd ../../metap
+go run ./cmd/db-migrate                                            # migrations nhúng sẵn trong binary
+go run ./cmd/dev-tools gen-keys ../waap/data-plane/keys            # RSA keypair (gitignored)
+go run ./cmd/dev-tools provision-tenant <tenantId> schema admin@waap.local <password>   # user đăng nhập portal
+go run ./cmd/dev-tools create-user <tenantId> gateway@waap.local <password>             # service account cho gateway
+go run ./cmd/dev-tools seed-admin <tenantId> <userId-vừa-tạo>
+cd ../waap/data-plane
+cp .env.example .env    # điền WAF_SERVICE_EMAIL/WAF_SERVICE_PASSWORD = service account ở trên
 
-cargo run -p zones-service      # http://localhost:3000
-cargo run -p scanning-service   # http://localhost:3010
-cargo run -p alerting-service   # http://localhost:3020
+# 2a. Cả stack bằng Docker: image production (Dockerfile Go dùng chung, chọn binary bằng SERVICE)
+docker compose up -d --build                 # 3 service + graphql-gateway + web (nginx, :8081)
+
+# 2b. Hoặc dev loop: `go run` từ source mount vào container + Vite dev server (:5173)
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml restart zones-service   # sau khi sửa code Go
+
+# 2c. Hoặc chạy thẳng trên host (mỗi lệnh 1 terminal)
+export RABBITMQ_URL=amqp://metap:metap@localhost:5672 GRPC_ENABLED=true \
+  AUTH_JWT_PRIVATE_KEY_PATH=keys/dev-jwt-private.pem AUTH_JWT_PUBLIC_KEY_PATH=keys/dev-jwt-public.pem
+PORT=3000 go run ./cmd/zones-service        # HTTP :3000, gRPC :3001
+PORT=3010 go run ./cmd/scanning-service     # HTTP :3010, gRPC :3011
+PORT=3020 go run ./cmd/alerting-service     # HTTP :3020, gRPC :3021
+UPSTREAM_1_NAME=zones UPSTREAM_1_GRPC_ADDR=localhost:3001 UPSTREAM_1_LOGIN_URL=http://localhost:3000/auth/login \
+UPSTREAM_2_NAME=scanning UPSTREAM_2_GRPC_ADDR=localhost:3011 UPSTREAM_2_LOGIN_URL=http://localhost:3010/auth/login \
+UPSTREAM_3_NAME=alerting UPSTREAM_3_GRPC_ADDR=localhost:3021 UPSTREAM_3_LOGIN_URL=http://localhost:3020/auth/login \
+UPSTREAM_1_SERVICE_EMAIL=... UPSTREAM_1_SERVICE_PASSWORD=...  # (lặp lại cho 2, 3)
+  go run ./cmd/waf-graphql-gateway         # :4000
 ```
 
-### Dev nhanh — tự build lại khi sửa code (`cargo-watch`)
+Login portal bằng user tạo ở `provision-tenant`. Tài khoản đó là `admin` của tenant (deny-by-default
+không áp lên admin); user khác trong tenant cần policy trước khi làm được gì.
 
-Tương tự `../../metap-demo-crm/README.md` — mỗi service chạy `cargo watch` riêng (workspace này
-có 3 package), theo dõi thêm `../../metap/crates` vì đó là path dependency:
+Test: `go test ./...` (unit, không cần hạ tầng) và `go test -tags integration ./...` (cần Postgres
+ở `localhost:5433`, mỗi test 1 DB riêng do `metap`'s `pkg/testkit` tạo).
 
-```bash
-cargo install cargo-watch   # 1 lần, nếu chưa có
-cargo watch --watch services/zones-service/src --watch ../../metap/crates -x 'run -p zones-service'
-cargo watch --watch services/scanning-service/src --watch ../../metap/crates -x 'run -p scanning-service'
-cargo watch --watch services/alerting-service/src --watch ../../metap/crates -x 'run -p alerting-service'
-```
-
-### Frontend (`web/`)
+### Frontend (`web/`) chạy trên host
 
 ```bash
 cd web
 pnpm install   # link:../../../platform-ui + link:../../../design-system — 2 repo sibling này
                # phải tồn tại ở đúng vị trí, xem package.json
-pnpm dev       # http://localhost:5173, proxy /api /metadata /auth /admin /health sang :3000
+pnpm dev       # http://localhost:5173, proxy /graphql /metadata /auth /admin /health sang backend
 ```
-
-Login bằng user local đã tạo lúc `provision-tenant` ở trên (email/password đã đặt lúc đó) — không
-cần bước riêng.
 
 ## `SettingsPage` moved off `/admin/config*` onto GraphQL (2026-09-26)
 
@@ -185,48 +197,19 @@ else to migrate here. `/graphql` was already proxied in `vite.config.ts` (this p
 UI has used GraphQL since Phase 93). `tsc -b`/`oxlint`/`prettier --check` clean; not yet verified
 through a real browser.
 
-## Docker (2026-09-01)
+## Docker
 
-`docker-compose.yml` (thư mục này) orchestrate 5 container: `zones-service`, `scanning-service`,
-`alerting-service`, `graphql-gateway`, `web` — build từ 5 Dockerfile (3 service's
-`services/*/Dockerfile`, `../../metap/crates/metap-graphql-gateway/Dockerfile`, `web/Dockerfile`).
-**Không tự chạy Postgres/RabbitMQ riêng** — 3 service backend trỏ vào cùng instance dev dùng
-chung với `../../metap` (`docker compose up -d postgres rabbitmq` từ đó, cổng host 5433/5672)
-qua `host.docker.internal` (đúng pattern `../../metap/docker-compose.yml`'s `prometheus`/`k6` đã
-dùng để với tới `crm-server` chạy trên host — xem comment đầu file `docker-compose.yml` này).
-
-**Mọi build đều dùng `context: ../../` (root `metap-org`), không phải `.`/`data-plane/`** — kể cả
-3 service backend, vì `metap = { path = "../../../../metap/crates/metap" }` trong mỗi
-`services/*/Cargo.toml` trỏ ra ngoài `data-plane/`, cần context rộng hơn mới thấy được (xem
-comment đầu mỗi `services/*/Dockerfile` cho chi tiết cách COPY giữ nguyên cấu trúc lồng nhau giữa
-`metap/` và `metap-demo-waf/data-plane/` để path dependency đó resolve đúng trong image — **vẫn
-giữ path dependency, không đổi sang `git`**, để build local vẫn lấy code chưa commit ở
-`../../metap` thay vì 1 ref đã push). `graphql-gateway` build trong workspace `../../metap` của
-chính nó, không cross-repo. `../../.dockerignore` (root `metap-org`, lần đầu tiên có file này)
-giữ context rộng đó không kéo theo `target/`/`node_modules/`/`.git` của các repo khác (tổng
-`target/` 4 repo Rust ~49GB lúc viết file này).
-
-**`web`** — build production (nginx + static assets), khác hẳn `pnpm dev` ở mục Frontend phía
-trên (`pnpm dev` vẫn chạy trên host, không đổi gì). Cùng lý do cần context root: `web/
-package.json`'s `link:../../../platform-ui`/`link:../../../design-system` cần thấy 2 sibling repo
-đó. `web/nginx.conf` viết lại đúng logic route-theo-entity của `vite.config.ts`'s middleware
-dev-only — có 1 gap chưa giải được, ghi rõ trong comment đầu `nginx.conf`: `/metadata/entities`
-(không kèm tên entity) chỉ proxy về `zones-service`, không gộp được cả 3 service như middleware
-dev (nginx thuần không tự gộp JSON từ 3 upstream).
-
-```bash
-cp .env.example .env
-# tạo 1 service-account user thật (xem .env.example's comment cho lệnh create-user/seed-admin đầy
-# đủ), điền email/password vào WAF_SERVICE_EMAIL/WAF_SERVICE_PASSWORD
-docker compose up -d --build
-```
-
-Lần build đầu sẽ lâu (`zones-service`/`scanning-service`/`alerting-service` mỗi cái tự build lại
-toàn bộ `metap/crates` do context/COPY layer đổi cùng đợt sửa context — không cache được từ lần
-build cũ khi context còn hẹp) — lần build sau nhanh hơn nhờ Docker cache mỗi `metap/`/
-`metap-demo-waf` COPY layer riêng.
-
-Mỗi service's `Cargo.toml`'s `metap` dependency là **path dependency** vào
-`../../../../metap/crates/metap` (local dev, dùng code hiện có trên máy thay vì phụ thuộc branch
-đã push) — đổi sang `git` dependency khi cần build ở CI/deploy, xem comment trong từng
-`Cargo.toml`.
+- `Dockerfile` (thư mục này) là recipe Go dùng chung cho cả 4 binary — `--build-arg
+  SERVICE=zones-service|scanning-service|alerting-service|waf-graphql-gateway`; image runtime là
+  `alpine:3` + 1 binary tĩnh (~75MB). `web/Dockerfile` build production frontend (nginx).
+- **Mọi build dùng `context: ../../` (root `metap-org`)**: `go.mod` có `replace
+  github.com/metap-org/metap => ../../metap`, nên `metap/` phải nằm trong context (vẫn lấy code
+  chưa commit ở `../../metap`, không phải 1 ref đã push); `web/` cần `design-system/`,
+  `platform-ui/`, `metap-themes/`. `../../.dockerignore` giữ context đó không kéo theo
+  `node_modules/`/`.git`/`target/`.
+- Không tự chạy Postgres/RabbitMQ — 3 service trỏ vào instance dùng chung của `../../metap` qua
+  `host.docker.internal` (cổng host 5433/5672).
+- `web/nginx.conf` còn 1 gap ghi trong comment đầu file: `/metadata/entities` (không kèm tên
+  entity) chỉ proxy về `zones-service`, không gộp được cả 3 service như dev server của Vite.
+- Lịch sử: bản Rust (2026-09-01) có 5 Dockerfile riêng (`services/*/Dockerfile`, gateway generic
+  của `metap`) và `cargo watch` cho dev — đã thay hết bằng bản Go ở trên ngày 2026-11-08.

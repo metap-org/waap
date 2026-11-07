@@ -1,0 +1,13 @@
+# mockery v3, testify template — same conventions as ../../../metap/.mockery.yml.
+template: testify
+formatter: goimports
+dir: "{{.InterfaceDir}}/portsmock"
+filename: mocks.go
+pkgname: portsmock
+structname: "{{.InterfaceName}}"
+packages:
+  github.com/metap-org/waap/control-plane/ports:
+    interfaces:
+      ConfigSource: {}
+      EventSink: {}
+      RuleSink: {}
