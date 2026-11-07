@@ -1,0 +1,7 @@
+{
+  "epochKey": "waf:ruleset-epoch",
+  "schemaVersion": 3,
+  "zoneIndexKey": "waf:zones",
+  "zoneKey": "waf:zone:shop.example.com",
+  "zoneVersionKey": "waf:zone-version:shop.example.com"
+}

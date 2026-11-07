@@ -1,258 +1,131 @@
-# metap-demo-waf/data-plane/docker-compose.dev.yml — one-command HOT-RELOAD dev loop for all 5
-# data-plane pieces: the 3 pillar services (zones-service/scanning-service/alerting-service),
-# `graphql-gateway` (BFF aggregating the 3, source lives in `../../metap/crates/metap-graphql-gateway`
-# — a `metap` workspace member, NOT under `data-plane/`'s own `services/`), and `web` (the React
-# portal, Vite dev server). Same shape/rationale as `../../metap-demo-crm/docker-compose.dev.yml`
-# for the Rust services — read that file's top comment for the full explanation, not repeated
-# here. Shares its `rust-dev`/`web-dev` templates via `extends:` from
-# `../../docker-compose.dev.base.yml` (2 levels up — this file sits 1 directory deeper than
-# metap-demo-crm/metap-demo-jira, same as `.cargo/config.toml`'s `target-dir` in this repo).
+# Dev loop for the WAF Customer Portal: the 3 Go services + graphql-gateway via `go run` from the
+# mounted source, plus the Vite dev server. Same prerequisites as docker-compose.yml (shared
+# Postgres/RabbitMQ from ../../metap, ./keys/jwks, ./.env — see README.md "Chạy local").
 #
-# `data-plane/` is a Cargo *workspace* (no root package, see `Cargo.toml`'s own comment) — each
-# service below sets `working_dir` to its own `services/<name>` member dir (same as `cargo run -p
-# <name>` from the workspace root would target) and watches 4 levels up
-# (`services/<name>` -> `services` -> `data-plane` -> `metap-demo-waf` -> `/workspace`) into
-# `../../../../metap/crates` for the path-dependency reason `../../metap-demo-crm/docker-compose.dev.yml`
-# documents. (First version of this file had this off by one — `../../../metap/crates` — and
-# `cargo watch` failed to canonicalize it; verified fixed live 2026-09-03.)
-#
-# Usage: docker compose -f metap-demo-waf/data-plane/docker-compose.dev.yml up
-#   (or list only the services you want, e.g. `up zones-service scanning-service alerting-service`
-#   to skip graphql-gateway/web — graphql-gateway `depends_on` the 3 pillar services being
-#   healthy, so `up graphql-gateway` alone also brings them up first.)
-#
-# Prerequisites: same as README.md's "Development" section — Postgres/RabbitMQ running (shared
-# with `../../metap`), JWT keys in `./keys/`, a tenant/user provisioned, `graphql-gateway/.env`
-# with real `WAF_SERVICE_EMAIL`/`WAF_SERVICE_PASSWORD`. Each service's own `.env` (copied from its
-# `.env.example`) is loaded via `env_file:` below.
-#
-# Port note: `zones-service` and `../../metap-demo-crm/docker-compose.dev.yml`'s `crm-server` both
-# default to host port 3000 (each repo's own `.env`/`.env.example` picked that independently —
-# same clash exists running both with plain `cargo run` on the host). Don't `up` both at once
-# unless you first change one's `PORT`/published port.
-#
-# Explicit `name:` (required) — this file lives in the SAME directory as `./docker-compose.yml`
-# (the production compose file), and Compose derives a project name from the directory basename
-# ("data-plane") when none is set. Without this, both files resolve to the same project name AND
-# the same default image tag (`{project}-{service}`) — `docker compose up` on this file then
-# silently reuses the production image/container instead of building from `../../Dockerfile.dev`,
-# and the container fails at start (wrong ENTRYPOINT for the bind-mounted working_dir here).
-# Found live 2026-09-03 exactly this way — fixed by giving this project its own name.
-name: metap-demo-waf-data-plane-dev
+# `go run` builds from the bind-mounted metap-org root, so a code change is picked up by
+# `docker compose -f docker-compose.dev.yml restart <service>` (seconds; the Go build cache lives in
+# the go-cache volume). There is no file-watching auto-reload. Don't run this and
+# docker-compose.yml at the same time — they publish the same host ports.
+name: waap-data-plane-dev
+
+x-go: &go
+  image: golang:1.26
+  working_dir: /workspace/waap/data-plane
+  volumes:
+    - ../../:/workspace
+    - go-cache:/root/.cache/go-build
+    - go-mod:/go/pkg/mod
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+x-service-env: &service-env
+  DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
+  RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
+  CORS_ORIGINS: http://localhost:5173
+  GRPC_ENABLED: "true"
+
+x-health: &health
+  interval: 5s
+  timeout: 3s
+  retries: 60 # the first `go run` compiles everything
+  start_period: 20s
 
 services:
   zones-service:
-    extends:
-      file: ../../docker-compose.dev.base.yml
-      service: rust-dev
-    working_dir: /workspace/metap-demo-waf/data-plane/services/zones-service
-    env_file:
-      - path: services/zones-service/.env
-        required: false
+    <<: *go
+    command: go run ./cmd/zones-service
+    ports: ["3000:3000", "3001:3001"]
     environment:
-      DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
-      RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
-      # Overrides `.env`'s host-dev default (`http://localhost:3000/...`) — inside this compose
-      # project's own bridge network, every sibling container (including this one, for
-      # uniformity) reaches this service by its service DNS name, not `localhost`.
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      # `routes.rs`'s `zone_delete_guard` calls these directly (server-to-server, not through the
-      # browser/Vite proxy — unrelated to `web`'s own same-named env vars below, which point
-      # `vite.config.ts`'s dev-server proxy instead) to check cross-service references before
-      # allowing a zone delete. Missing here, it silently fell back to `.env`'s host-dev default
-      # (`http://localhost:3010`/`:3020`) — meaningless inside this container's own network
-      # namespace, so every delete failed with "Could not verify cross-service references...
-      # error sending request" (found live, 2026-09-04).
-      SCANNING_URL: http://scanning-service:3010
-      ALERTING_URL: http://alerting-service:3020
-    ports:
-      - "3000:3000"
-      - "3001:3001"
-    # `--watch ../../../../metap-lowcode/crates` added alongside `metap/crates` (2026-09-15) —
-    # this service now also merges `presenter::lowcode_router()` (`presenter`/`application`/
-    # `domain`/`infra`, see `services/zones-service/Cargo.toml`'s own comment for why in-process
-    # rather than as a separate `lowcode-admin-api` service), so a change there should rebuild
-    # this container too, same as a `metap/crates` change already does. Same depth as
-    # `../../../../metap/crates` — `zones-service` sits 4 levels under `/workspace`, same as
-    # `metap-lowcode` does.
-    command: cargo watch --watch src --watch ../../../../metap/crates --watch ../../../../metap-lowcode/crates -x run
-    # Lets `graphql-gateway` below `depends_on: condition: service_healthy` instead of just
-    # "container started" — cargo-watch's first build takes minutes, and graphql-gateway only
-    # discovers upstream schemas ONCE at its own boot (no retry loop), so starting it before the
-    # 3 pillar services are actually answering HTTP would fail every time otherwise.
+      <<: *service-env
+      PORT: "3000"
+      # The token issuer: signs every token and publishes /.well-known/jwks.json.
+      JWKS_KEYS_DIR: /workspace/waap/data-plane/keys/jwks
+      SCANNING_GRPC_ADDR: scanning-service:3011
+      ALERTING_GRPC_ADDR: alerting-service:3021
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-
-  # No HTTP of its own — the ticker `presenter::lowcode_router()`'s `publish` handler (merged into
-  # `zones-service` above) enqueues into via `metap_reconciler::orchestrator::enqueue_deployment`
-  # whenever a low-code entity is first published. Without this running, a publish succeeds
-  # (the entity appears in `zones-service`'s own live registry immediately, `apply_registry`) but
-  # its dedicated table never actually gets created, so every request against it 500s until this
-  # picks the job up (`RECONCILER_POLL_MS`, default 5s). See `services/zones-service/Cargo.toml`'s
-  # comment on the `presenter` dependency for why the low-code admin API itself is *not* run as
-  # its own service (`../../../metap-lowcode/services/lowcode-admin-api`) the way this ticker is.
-  reconciler-orchestrator:
-    extends:
-      file: ../../docker-compose.dev.base.yml
-      service: rust-dev
-    working_dir: /workspace/metap-lowcode/services/reconciler-orchestrator
-    environment:
-      DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
-      RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
-      # `metap_infra::load_config` requires these unconditionally (empty-string-is-invalid) even
-      # though this ticker has no HTTP surface and never verifies/mints a JWT itself — just needs
-      # 2 real PEM files to parse at boot, so it points at the same dev keypair the 3 pillar
-      # services already have on disk rather than generating its own unused one.
-      AUTH_JWT_PUBLIC_KEY_PATH: ../../../metap-demo-waf/data-plane/keys/dev-jwt-public.pem
-      AUTH_JWT_PRIVATE_KEY_PATH: ../../../metap-demo-waf/data-plane/keys/dev-jwt-private.pem
-    command: cargo watch --watch src --watch ../../../metap/crates --watch ../../crates -x run
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3000/health"]
 
   scanning-service:
-    extends:
-      file: ../../docker-compose.dev.base.yml
-      service: rust-dev
-    working_dir: /workspace/metap-demo-waf/data-plane/services/scanning-service
-    env_file:
-      - path: services/scanning-service/.env
-        required: false
+    <<: *go
+    command: go run ./cmd/scanning-service
+    ports: ["3010:3010", "3011:3011"]
     environment:
-      DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
-      RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
+      <<: *service-env
+      PORT: "3010"
       JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-    ports:
-      - "3010:3010"
-      - "3011:3011"
-    command: cargo watch --watch src --watch ../../../../metap/crates -x run
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3010/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3010/health"]
 
   alerting-service:
-    extends:
-      file: ../../docker-compose.dev.base.yml
-      service: rust-dev
-    working_dir: /workspace/metap-demo-waf/data-plane/services/alerting-service
-    env_file:
-      - path: services/alerting-service/.env
-        required: false
+    <<: *go
+    command: go run ./cmd/alerting-service
+    ports: ["3020:3020", "3021:3021"]
     environment:
-      DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
-      RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
+      <<: *service-env
+      PORT: "3020"
       JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-    ports:
-      - "3020:3020"
-      - "3021:3021"
-    command: cargo watch --watch src --watch ../../../../metap/crates -x run
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3020/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3020/health"]
 
-  # Runs THIS repo's own `waf-graphql-gateway` binary (`./graphql-gateway/src/main.rs`), not
-  # `metap`'s generic `metap-graphql-gateway` — found live, 2026-09-04: this file used to point
-  # `working_dir` at `/workspace/metap` and run the generic binary directly, silently bypassing
-  # the WAF-specific one entirely (built in Phase 73, `docs/roadmap/73-waf-graphql-protocol.md` —
-  # `aggregate`/`verifyZoneDns`/6 more custom fields, all already implemented and verified there).
-  # The generic binary has none of those fields — every custom-field query the frontend sent it
-  # failed with "Unknown field", which is what led to briefly, unnecessarily re-implementing
-  # `aggregate` as a *generic* `RecordBackend` capability in `metap` core instead of just fixing
-  # this one line (that core change stays — it's a real capability, verified, zero regressions —
-  # but it wasn't the fix this container needed). `waf-graphql-gateway` is a thin wrapper around
-  # the same `metap_graphql_gateway::{config, server}` modules (see its own `Cargo.toml`), so
-  # every env var below (`JWKS_URL`/`COOKIE_AUTH_ENABLED`/`UPSTREAM_*`) still applies unchanged.
-  #
-  # Owns no Postgres/RabbitMQ (pure BFF, see `../../metap/CLAUDE.md`'s own bullet) — no
-  # DATABASE_URL/RABBITMQ_URL override needed here, unlike the 3 pillar services above.
   graphql-gateway:
-    extends:
-      file: ../../docker-compose.dev.base.yml
-      service: rust-dev
-    working_dir: /workspace/metap-demo-waf/data-plane/graphql-gateway
-    env_file:
-      - path: graphql-gateway/.env
-        required: false
+    <<: *go
+    command: go run ./cmd/waf-graphql-gateway
+    ports: ["4000:4000"]
     environment:
-      # Overrides graphql-gateway/.env's own UPSTREAM_*/JWKS_URL values, which are written for
-      # the HOST dev loop (`http://localhost:3000`) — inside this compose project the 3 pillar
-      # services are reachable by their own service DNS name on the shared default network.
-      # `JWKS_URL` set (not `AUTH_JWT_PUBLIC_KEY_PATH`) — this gateway verifies against the same
-      # `metap-jwks` trust root the 3 services mint/verify with (`GatewayConfig::from_env`'s doc
-      # comment: the 2 are mutually exclusive), so it needs no PEM/`./keys` volume at all anymore.
+      PORT: "4000"
+      CORS_ORIGINS: http://localhost:5173
       JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      COOKIE_AUTH_ENABLED: "true"
-      UPSTREAM_1_GRPC_ADDR: http://zones-service:3001
-      UPSTREAM_1_METADATA_URL: http://zones-service:3000/metadata/entities
+      # Every service account logs in at the issuer; REST_URL says where each upstream really is.
+      UPSTREAM_1_NAME: zones
+      UPSTREAM_1_GRPC_ADDR: zones-service:3001
       UPSTREAM_1_LOGIN_URL: http://zones-service:3000/auth/login
-      UPSTREAM_2_GRPC_ADDR: http://scanning-service:3011
-      UPSTREAM_2_METADATA_URL: http://scanning-service:3010/metadata/entities
-      UPSTREAM_2_LOGIN_URL: http://scanning-service:3010/auth/login
-      UPSTREAM_3_GRPC_ADDR: http://alerting-service:3021
-      UPSTREAM_3_METADATA_URL: http://alerting-service:3020/metadata/entities
-      UPSTREAM_3_LOGIN_URL: http://alerting-service:3020/auth/login
-    ports:
-      - "4000:4000"
+      UPSTREAM_1_REST_URL: http://zones-service:3000
+      UPSTREAM_1_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL:?set WAF_SERVICE_EMAIL in .env}
+      UPSTREAM_1_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD:?set WAF_SERVICE_PASSWORD in .env}
+      UPSTREAM_2_NAME: scanning
+      UPSTREAM_2_GRPC_ADDR: scanning-service:3011
+      UPSTREAM_2_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_2_REST_URL: http://scanning-service:3010
+      UPSTREAM_2_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
+      UPSTREAM_2_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
+      UPSTREAM_3_NAME: alerting
+      UPSTREAM_3_GRPC_ADDR: alerting-service:3021
+      UPSTREAM_3_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_3_REST_URL: http://alerting-service:3020
+      UPSTREAM_3_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
+      UPSTREAM_3_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
     depends_on:
-      zones-service:
-        condition: service_healthy
-      scanning-service:
-        condition: service_healthy
-      alerting-service:
-        condition: service_healthy
-    command: cargo watch --watch src --watch ../../../metap/crates -x 'run -p waf-graphql-gateway'
+      zones-service: { condition: service_healthy }
+      scanning-service: { condition: service_healthy }
+      alerting-service: { condition: service_healthy }
 
-  # Vite dev server (hot-reload — NOT the production `nginx`/static-build path `./Dockerfile`
-  # uses). `./web/vite.config.ts`'s dev-server proxy targets (ZONES/SCANNING/ALERTING/GATEWAY)
-  # are env-overridable (2026-09-03) specifically for this: normal bridge networking + port-mapped
-  # `ports:` below, pointed at the pillar/gateway services' own service DNS names — no
-  # `network_mode: host` needed anymore (an earlier version of this file used that instead, to
-  # work around the proxy targets being hardcoded to `http://localhost:*`; keeping proper network
-  # isolation was worth the small app-source change instead). Plain `pnpm dev` on the host is
-  # unaffected — those env vars are unset there, so `vite.config.ts` falls back to its original
-  # `localhost` defaults. Runs its own `pnpm install` chain every start (design-system needs
-  # `pnpm build` before `web` can consume its `dist/`, same 3-project order `./Dockerfile`'s build
-  # stage already documents) — the resulting `node_modules` land on the HOST filesystem too (bind
-  # mount, not a container-only layer); since Linux (WSL2) container and host share the same
-  # kernel/ABI this is safe, but it does mean this can overwrite `node_modules` you already have
-  # from running `pnpm install` on the host directly.
+  # Vite dev server (hot reload). design-system is consumed through its built dist/, so it is
+  # built first; platform-ui is consumed from source.
   web:
     extends:
       file: ../../docker-compose.dev.base.yml
       service: web-dev
-    working_dir: /workspace/metap-demo-waf/data-plane/web
+    working_dir: /workspace/waap/data-plane/web
     environment:
       ZONES_URL: http://zones-service:3000
       SCANNING_URL: http://scanning-service:3010
       ALERTING_URL: http://alerting-service:3020
       GATEWAY_URL: http://graphql-gateway:4000
-    ports:
-      - "5173:5173"
+    ports: ["5173:5173"]
     depends_on:
-      zones-service:
-        condition: service_healthy
-      scanning-service:
-        condition: service_healthy
-      alerting-service:
-        condition: service_healthy
+      zones-service: { condition: service_healthy }
+      scanning-service: { condition: service_healthy }
+      alerting-service: { condition: service_healthy }
     command: >
       sh -c '
         cd /workspace/design-system && pnpm install --frozen-lockfile && pnpm build &&
         cd /workspace/platform-ui && pnpm install --frozen-lockfile &&
-        cd /workspace/metap-demo-waf/data-plane/web && pnpm install --frozen-lockfile && pnpm exec vite --host 0.0.0.0
+        cd /workspace/waap/data-plane/web && pnpm install --frozen-lockfile && pnpm exec vite --host 0.0.0.0
       '
 
-# `extends:` only pulls in the referenced service's own config, not ../../docker-compose.dev.base.yml's
-# top-level `volumes:` section — this named volume must be (re)declared here too. Separate cache
-# from ../../metap-demo-crm's/../../metap-demo-jira's own (no shared project name across these 3
-# files) — only means a cold crates.io index fetch the first time each is `up`, not a correctness
-# issue.
 volumes:
-  metap-cargo-registry-dev:
+  go-cache:
+  go-mod:

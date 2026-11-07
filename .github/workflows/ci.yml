@@ -3,11 +3,11 @@ name: CI
 # metap-demo-waf has no CI of its own yet — this is the first workflow added, mirroring
 # ../metap's own ci.yml job shape (build/vet/test/fmt, a separate govulncheck job per Go
 # module, a separate Semgrep job) now that all 3 planes are Go-only (see root CLAUDE.md's
-# "Rust removed from all 3 planes" note). data-plane/go and control-plane/go each
-# `replace github.com/metap-org/metap-go => ../../../metap/go` — both jobs need a sibling
-# checkout of metap-org/metap at that same relative path. edge-plane/go has zero metap-go
-# dependency (the hard rule this repo enforces for that plane) so its job needs no sibling
-# checkout at all.
+# "Rust removed from all 3 planes" note). data-plane and control-plane each
+# `replace github.com/metap-org/metap => ../../../metap` — both jobs need a sibling
+# checkout of metap-org/metap at that same relative path. edge-plane does too since
+# 2026-11-07, but may import only metap's standard-library-only pkg/kit/* (depguard-enforced,
+# edge-plane/.golangci.yml) — never the metadata/CRUD platform.
 
 on:
   push:
@@ -20,29 +20,46 @@ concurrency:
 
 jobs:
   data-plane-go:
-    name: data-plane/go — build, vet, unit tests, fmt
+    name: data-plane — build, vet, unit tests, fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          path: metap-demo-waf
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: metap-demo-waf/data-plane/go/go.mod
-          cache-dependency-path: metap-demo-waf/data-plane/go/go.sum
-      - working-directory: metap-demo-waf/data-plane/go
+          go-version-file: waap/data-plane/go.mod
+          cache-dependency-path: waap/data-plane/go.sum
+      - working-directory: waap/data-plane
         run: go build ./...
-      - working-directory: metap-demo-waf/data-plane/go
+      - working-directory: waap/data-plane
         run: go vet ./...
-      # Unit tests only — no DATABASE_URL set, so every e2e test that dials a real Postgres
-      # skips itself cleanly (same testPool-style helper convention ../metap/go uses).
-      - working-directory: metap-demo-waf/data-plane/go
+      # Unit tests only — integration tests carry `//go:build integration` (metap's pkg/testkit
+      # convention) and need real Postgres: `go test -tags integration ./...` locally.
+      - working-directory: waap/data-plane
         run: go test ./...
-      - working-directory: metap-demo-waf/data-plane/go
+      - working-directory: waap/data-plane
+        run: go vet -tags integration ./...
+      - working-directory: waap/data-plane
         run: |
           files=$(gofmt -l .)
           if [ -n "$files" ]; then
@@ -51,46 +68,76 @@ jobs:
           fi
 
   data-plane-go-security:
-    name: data-plane/go — dependency vulnerability audit
+    name: data-plane — dependency vulnerability audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          path: metap-demo-waf
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: metap-demo-waf/data-plane/go/go.mod
-          cache-dependency-path: metap-demo-waf/data-plane/go/go.sum
+          go-version-file: waap/data-plane/go.mod
+          cache-dependency-path: waap/data-plane/go.sum
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - working-directory: metap-demo-waf/data-plane/go
+      - working-directory: waap/data-plane
         run: govulncheck ./...
 
   control-plane-go:
-    name: control-plane/go — build, vet, unit tests, fmt
+    name: control-plane — build, vet, unit tests, fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          path: metap-demo-waf
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: metap-demo-waf/control-plane/go/go.mod
-          cache-dependency-path: metap-demo-waf/control-plane/go/go.sum
-      - working-directory: metap-demo-waf/control-plane/go
+          go-version-file: waap/control-plane/go.mod
+          cache-dependency-path: waap/control-plane/go.sum
+      - working-directory: waap/control-plane
         run: go build ./...
-      - working-directory: metap-demo-waf/control-plane/go
+      - working-directory: waap/control-plane
         run: go vet ./...
-      - working-directory: metap-demo-waf/control-plane/go
+      - working-directory: waap/control-plane
         run: go test ./...
-      - working-directory: metap-demo-waf/control-plane/go
+      - working-directory: waap/control-plane
         run: |
           files=$(gofmt -l .)
           if [ -n "$files" ]; then
@@ -99,39 +146,80 @@ jobs:
           fi
 
   control-plane-go-security:
-    name: control-plane/go — dependency vulnerability audit
+    name: control-plane — dependency vulnerability audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          path: metap-demo-waf
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: metap-demo-waf/control-plane/go/go.mod
-          cache-dependency-path: metap-demo-waf/control-plane/go/go.sum
+          go-version-file: waap/control-plane/go.mod
+          cache-dependency-path: waap/control-plane/go.sum
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - working-directory: metap-demo-waf/control-plane/go
+      - working-directory: waap/control-plane
         run: govulncheck ./...
 
   edge-plane-go:
-    name: edge-plane/go — build, vet, unit tests, fmt (zero metap-go dependency)
+    name: edge-plane — build, vet, unit tests, fmt, metap-kit-only guard
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: edge-plane/go
+        working-directory: waap/edge-plane
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
+      - uses: actions/checkout@v4
+        with:
+          repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
+          path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: edge-plane/go/go.mod
-          cache-dependency-path: edge-plane/go/go.sum
+          go-version-file: waap/edge-plane/go.mod
+          cache-dependency-path: waap/edge-plane/go.sum
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
+      # depguard (.golangci.yml): from metap, only pkg/kit/* may be imported.
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: waap/edge-plane
       - run: |
           files=$(gofmt -l .)
           if [ -n "$files" ]; then
@@ -140,17 +228,38 @@ jobs:
           fi
 
   edge-plane-go-security:
-    name: edge-plane/go — dependency vulnerability audit
+    name: edge-plane — dependency vulnerability audit
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: edge-plane/go
+        working-directory: waap/edge-plane
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
+      - uses: actions/checkout@v4
+        with:
+          repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
+          path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: edge-plane/go/go.mod
-          cache-dependency-path: edge-plane/go/go.sum
+          go-version-file: waap/edge-plane/go.mod
+          cache-dependency-path: waap/edge-plane/go.sum
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
 

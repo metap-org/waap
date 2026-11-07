@@ -1,11 +1,11 @@
 name: CodeQL
 
-# Covers all 3 Go modules (data-plane/go, control-plane/go, edge-plane/go) in one CodeQL
+# Covers all 3 Go modules (data-plane, control-plane, edge-plane) in one CodeQL
 # database — CodeQL's Go extractor just needs every build command to run between `init` and
-# `analyze`, it doesn't need one module per job. data-plane/go and control-plane/go each
-# `replace github.com/metap-org/metap-go => ../../../metap/go`, so both need a sibling
-# checkout of metap-org/metap at that same relative path; edge-plane/go has zero metap-go
-# dependency.
+# `analyze`, it doesn't need one module per job. data-plane and control-plane each
+# `replace github.com/metap-org/metap => ../../../metap`, so both need a sibling
+# checkout of metap-org/metap at that same relative path; edge-plane too since 2026-11-07
+# (it imports only metap's pkg/kit/*).
 on:
   push:
     branches: [main, master]
@@ -24,33 +24,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          path: metap-demo-waf
+          path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: metap-demo-waf/data-plane/go/go.mod
-          cache-dependency-path: metap-demo-waf/data-plane/go/go.sum
+          go-version-file: waap/data-plane/go.mod
+          cache-dependency-path: waap/data-plane/go.sum
       - uses: github/codeql-action/init@v3
         with:
           languages: go
-          config-file: ./metap-demo-waf/.github/codeql/codeql-config.yml
+          config-file: ./waap/.github/codeql/codeql-config.yml
           # The actual git checkout isn't at github.workspace's root here (two sibling repos
-          # checked out side by side, metap-demo-waf/ and metap/, so data-plane/go's and
-          # control-plane/go's `replace` into ../../../metap/go resolves correctly) — without
+          # checked out side by side, waap/ and metap/, so data-plane's and
+          # control-plane's `replace` into ../../../metap resolves correctly) — without
           # this, codeql-action/analyze can fall back to treating the workspace root as the git
           # repo, find no .git there, and fail with "configuration error" (seen live on a sibling
           # repo's identically-shaped workflow — metap-org/metap-lowcode PR #8 — even though this
           # exact job happened to pass once before this was added).
-          checkout_path: ${{ github.workspace }}/metap-demo-waf
-      - working-directory: metap-demo-waf/data-plane/go
+          checkout_path: ${{ github.workspace }}/waap
+      - working-directory: waap/data-plane
         run: go build ./...
-      - working-directory: metap-demo-waf/control-plane/go
+      - working-directory: waap/control-plane
         run: go build ./...
-      - working-directory: metap-demo-waf/edge-plane/go
+      - working-directory: waap/edge-plane
         run: go build ./...
       - uses: github/codeql-action/analyze@v3
         with:
-          checkout_path: ${{ github.workspace }}/metap-demo-waf
+          checkout_path: ${{ github.workspace }}/waap

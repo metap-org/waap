@@ -1,0 +1,18 @@
+
+```sql postgres://metap:metap@localhost:5433/metap
+
+SELECT DISTINCT table_schema
+FROM information_schema.tables
+ORDER BY table_schema;
+
+
+SELECT table_catalog, table_schema, table_name, table_type
+FROM information_schema.tables
+WHERE table_schema = 'metadata'
+ORDER BY table_name;
+
+
+SELECT * FROM oauth_authorization_codes;
+SELECT * FROM cron_jobs;
+
+```
