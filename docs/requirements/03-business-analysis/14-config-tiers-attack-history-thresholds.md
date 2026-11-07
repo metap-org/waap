@@ -1,8 +1,8 @@
 # 3.14 Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo
 
-> **Trạng thái: chủ dự án đã quyết hướng (2026-11-07), phần chi tiết và luồng chưa viết.** Trang này ghi lại
+> **Trạng thái: chủ dự án đã quyết hướng (2026-11-07); các đề xuất của Claude được chốt làm quyết định làm việc, "có vấn đề gì tính sau" (2026-11-07). Phần chi tiết và luồng chưa viết.** Trang này ghi lại
 > các tính năng sẽ có để không bị quên. Theo yêu cầu của chủ dự án, **luồng vẽ và phân tích cụ thể làm sau**
-> ([§5](#5-luồng-cần-vẽ-chưa-viết)). Phần "đề xuất của Claude" ở [§3](#3-đề-xuất-của-claude-chờ-duyệt) chưa phải quyết định.
+> ([§5](#5-luồng-cần-vẽ-chưa-viết)). Phần "đề xuất của Claude" ở [§3](#3-đề-xuất-của-claude-đã-chốt-làm-quyết-định-làm-việc-đổi-sau-được) chưa phải quyết định.
 
 ## 1. Phạm vi
 
@@ -22,8 +22,8 @@ global, website), lịch sử tấn công chia theo loại, và cảnh báo có 
 | **Website** | Rule của riêng một website | Chỉ áp cho website đó; số rule theo gói subscription |
 
 - **Tầng trên ghi đè tầng dưới.** Global thắng website.
-- **Whitelist luôn được ưu tiên** trong các cặp whitelist, blacklist. Ranh giới của ưu tiên này chờ chốt ở [OQ-163](#4-cần-chủ-dự-án-chốt).
-- Tầng nào ai được sửa: chủ dự án giao Claude phân tích ([§3.1](#31-ai-sửa-tầng-nào)).
+- **Whitelist luôn được ưu tiên** trong các cặp whitelist, blacklist. Ranh giới của ưu tiên này: [OQ-163](#4-đã-chốt-theo-đề-xuất-của-claude).
+- Tầng nào ai được sửa: chủ dự án giao Claude phân tích ([§3.1](#31-ai-sửa-tầng-nào)); đã chốt theo đề xuất.
 
 ### 2.2 Lịch sử tấn công
 
@@ -51,7 +51,7 @@ global, website), lịch sử tấn công chia theo loại, và cảnh báo có 
 | OQ-118 | Thao tác nào cần người duyệt thuộc **nghiệp vụ phân quyền**, có tính năng rồi mới tính. Không chặn các việc trên |
 | OQ-158 | Một phần: ngưỡng riêng từng loại có mặc định (low, medium, high), template có và chỉnh được, ngưỡng ở tầng zone. Còn mở: kênh Zalo, Telegram |
 
-## 3. Đề xuất của Claude (chờ duyệt)
+## 3. Đề xuất của Claude (đã chốt làm quyết định làm việc, đổi sau được)
 
 ### 3.1 Ai sửa tầng nào
 
@@ -135,13 +135,15 @@ Chủ dự án giao "m tự quyết", nên ghi như quyết định, đổi lạ
 Người nhận theo vai trò và theo zone (ghi đè được ở cấp zone); mọi kênh của cảnh báo high lỗi thì gửi email tới
 liên hệ bảo mật của account (đã có ở 5.8.11).
 
-## 4. Cần chủ dự án chốt
+## 4. Đã chốt theo đề xuất của Claude
 
-| ID | Câu hỏi | Ghi chú |
+Chủ dự án: "làm theo đề xuất của bro trước, có vấn đề gì tính sau; phần cần chốt mày cũng đề xuất luôn". Ba câu dưới đây chốt theo đề xuất, ghi là quyết định làm việc và có thể đảo.
+
+| ID | Câu hỏi | Quyết định làm việc |
 |---|---|---|
-| OQ-163 | "Whitelist luôn ưu tiên" có thắng cả **rule khẩn của NCC** (chặn 0-day, CVE) không? Và nó chỉ thắng blacklist, hay cũng bỏ qua WAF, rate limit, DDoS? | Mâu thuẫn với hai quy tắc đã ghi: [BR-33](../02-requirements.md#4-quy-tắc-nghiệp-vụ) (block của NCC thắng allow của khách) và [BR-28](../02-requirements.md#4-quy-tắc-nghiệp-vụ) (Trust không bỏ qua WAF, rate limit, DDoS). Đề xuất: whitelist thắng blacklist cùng tầng hoặc thấp hơn; rule khẩn của NCC không bị whitelist của khách đè (vì whitelist một IP bị chiếm sẽ mở lỗ hổng 0-day); whitelist của **global** thì thắng |
-| OQ-164 | Có tầng **account (tổ chức)** cho khách không (một bộ rule dùng cho nhiều website của cùng khách, như agency 50 site)? | Ba tầng anh nêu đều của NCC hoặc của một website. Tài liệu cũ có kế thừa org → nhóm zone → zone (FR-5-18, Mở rộng). Cần chốt giữ, bỏ hay gộp vào tầng website |
-| OQ-165 | Tập rule custom của NCC gán theo **node, cluster** được: khách có thấy và chọn không, hay chỉ NCC gán? | Gán theo node liên quan hạ tầng (cell, PoP); đề xuất chỉ NCC gán, khách chỉ thấy kết quả |
+| OQ-163 | "Whitelist luôn ưu tiên" có thắng cả **rule khẩn của NCC** (chặn 0-day, CVE) không? Và nó chỉ thắng blacklist, hay cũng bỏ qua WAF, rate limit, DDoS? | **Chốt:** whitelist thắng blacklist cùng tầng; whitelist của website **không** thắng tầng trên (global, system) và không bỏ qua WAF, rate limit, DDoS (giữ [BR-28](../02-requirements.md#4-quy-tắc-nghiệp-vụ)); **rule khẩn của NCC không bị whitelist nào đè** (whitelist một IP bị chiếm sẽ mở lỗ hổng 0-day), chỉ support đặt log-only có hạn cho một zone ([FR-12-07](../02-requirements.md#f12-vận-hành-ncc)); whitelist của **global** thắng blacklist của website và CRS, có audit. Bảng đủ 7 trường hợp có trong prototype portal, màn "Ba tầng cấu hình" |
+| OQ-164 | Có tầng **account (tổ chức)** cho khách không (một bộ rule dùng cho nhiều website của cùng khách, như agency 50 site)? | Ba tầng anh nêu đều của NCC hoặc của một website. Tài liệu cũ có kế thừa org → nhóm zone → zone (FR-5-18, Mở rộng). **Chốt:** MVP **không có tầng account**; tầng website chỉ là tập rule của một website. Khách nhiều site dùng **mẫu policy** (PolicyTemplate, sao chép hoặc liên kết vào từng website) ở mức Mở rộng; mẫu không thêm tầng ưu tiên mới, rule trong mẫu vẫn tính vào trần theo gói của từng website |
+| OQ-165 | Tập rule custom của NCC gán theo **node, cluster** được: khách có thấy và chọn không, hay chỉ NCC gán? | Gán theo node liên quan hạ tầng (cell, PoP); **Chốt:** chỉ NCC gán; khách chỉ thấy tập nào đang áp cho website của mình, không thấy nội dung rule |
 
 ## 5. Luồng cần vẽ (chưa viết)
 

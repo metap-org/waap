@@ -301,7 +301,7 @@ Mọi thay đổi ảnh hưởng tới traffic đi qua nhóm này. Persona chín
 | F5.7.1 | Tầng system: bộ rule managed mặc định cho mọi website; cập nhật phát toàn fleet theo canary | C | MVP | **RulesetRelease** |
 | F5.7.2 | Tầng global: cấu hình chung và tập rule custom của NCC, gán cho domain, cluster hoặc node | M | MR | **RuleSet**, **RuleSetAssignment** |
 | F5.7.3 | Tầng website: rule của riêng website, số lượng theo gói | M | MVP | CustomRule, Entitlements |
-| F5.7.4 | Ưu tiên giữa tầng: tầng trên ghi đè tầng dưới; whitelist ưu tiên (ranh giới chờ OQ-163) | C | MVP | — |
+| F5.7.4 | Ưu tiên giữa tầng: tầng trên ghi đè tầng dưới; whitelist ưu tiên theo OQ-163 | C | MVP | — |
 | F5.7.5 | Hiện cho khách rule nào áp lên website của họ và đến từ tầng nào | M | MVP | — |
 
 ## F6 Phân phối cấu hình và fleet

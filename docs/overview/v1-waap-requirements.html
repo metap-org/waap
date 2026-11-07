@@ -1536,7 +1536,7 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 </tr>
 <tr>
 <td>F5.7.4</td>
-<td>Ưu tiên giữa tầng: tầng trên ghi đè tầng dưới; whitelist ưu tiên (ranh giới chờ OQ-163)</td>
+<td>Ưu tiên giữa tầng: tầng trên ghi đè tầng dưới; whitelist ưu tiên theo OQ-163</td>
 <td>C</td>
 <td>MVP</td>
 <td>—</td>
@@ -4694,7 +4694,7 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 </tr>
 <tr>
 <td>BR-37</td>
-<td>Giữa các tầng cấu hình: tầng trên ghi đè tầng dưới (system trên global trên website). Whitelist ưu tiên trong các cặp whitelist, blacklist; ranh giới với rule khẩn của NCC và với <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-28</a>, <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-33</a> chờ chốt (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-cần-chủ-dự-án-chốt">OQ-163</a>)</td>
+<td>Giữa các tầng cấu hình: tầng trên ghi đè tầng dưới (system trên global trên website). Whitelist ưu tiên trong các cặp whitelist, blacklist cùng tầng; whitelist của website không thắng tầng trên và không bỏ qua WAF, rate limit, DDoS (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-28</a>); rule khẩn của NCC không bị whitelist nào đè (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-33</a>); whitelist của global thắng blacklist của website và CRS (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-đã-chốt-theo-đề-xuất-của-claude">OQ-163</a>)</td>
 <td>F5.7.4</td>
 </tr>
 <tr>
@@ -5284,7 +5284,7 @@ xuất chờ duyệt.</li>
 <td><a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14</a></td>
 <td>Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo</td>
 <td>OQ-163…OQ-165</td>
-<td>Đã quyết hướng (ba tầng, hai loại đợt tấn công, ngưỡng ba mức); luồng chưa vẽ</td>
+<td>Đã quyết hướng và chốt OQ-163…165 theo đề xuất của Claude (ba tầng, hai loại đợt tấn công, ngưỡng ba mức); luồng chưa vẽ</td>
 </tr>
 </tbody>
 </table>
@@ -12870,9 +12870,9 @@ cửa sổ dedup mặc định 30 phút.</p>
 </section>
 <section class="doc" id="f-03-business-analysis-14-config-tiers-attack-history-thresholds"><div class="path">03-business-analysis/14-config-tiers-attack-history-thresholds.md</div><h1 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--314-cấu-hình-nhiều-tầng-lịch-sử-tấn-công-ngưỡng-cảnh-báo">3.14 Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo</h1>
 <blockquote>
-<p><strong>Trạng thái: chủ dự án đã quyết hướng (2026-11-07), phần chi tiết và luồng chưa viết.</strong> Trang này ghi lại
+<p><strong>Trạng thái: chủ dự án đã quyết hướng (2026-11-07); các đề xuất của Claude được chốt làm quyết định làm việc, &quot;có vấn đề gì tính sau&quot; (2026-11-07). Phần chi tiết và luồng chưa viết.</strong> Trang này ghi lại
 các tính năng sẽ có để không bị quên. Theo yêu cầu của chủ dự án, <strong>luồng vẽ và phân tích cụ thể làm sau</strong>
-(<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--5-luồng-cần-vẽ-chưa-viết">§5</a>). Phần &quot;đề xuất của Claude&quot; ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--3-đề-xuất-của-claude-chờ-duyệt">§3</a> chưa phải quyết định.</p>
+(<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--5-luồng-cần-vẽ-chưa-viết">§5</a>). Phần &quot;đề xuất của Claude&quot; ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--3-đề-xuất-của-claude-đã-chốt-làm-quyết-định-làm-việc-đổi-sau-được">§3</a> chưa phải quyết định.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--1-phạm-vi">1. Phạm vi</h2>
 <p>Ba nhóm nghiệp vụ lộ ra khi chủ dự án xem prototype portal Management Plane: cấu hình có nhiều tầng (system,
@@ -12909,8 +12909,8 @@ global, website), lịch sử tấn công chia theo loại, và cảnh báo có 
 </table>
 <ul>
 <li><strong>Tầng trên ghi đè tầng dưới.</strong> Global thắng website.</li>
-<li><strong>Whitelist luôn được ưu tiên</strong> trong các cặp whitelist, blacklist. Ranh giới của ưu tiên này chờ chốt ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-cần-chủ-dự-án-chốt">OQ-163</a>.</li>
-<li>Tầng nào ai được sửa: chủ dự án giao Claude phân tích (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--31-ai-sửa-tầng-nào">§3.1</a>).</li>
+<li><strong>Whitelist luôn được ưu tiên</strong> trong các cặp whitelist, blacklist. Ranh giới của ưu tiên này: <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-đã-chốt-theo-đề-xuất-của-claude">OQ-163</a>.</li>
+<li>Tầng nào ai được sửa: chủ dự án giao Claude phân tích (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--31-ai-sửa-tầng-nào">§3.1</a>); đã chốt theo đề xuất.</li>
 </ul>
 <h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--22-lịch-sử-tấn-công">2.2 Lịch sử tấn công</h3>
 <ul>
@@ -12953,7 +12953,7 @@ cũng xem được. Phần gói cần phân tích thêm (<a href="#f-03-business
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--3-đề-xuất-của-claude-chờ-duyệt">3. Đề xuất của Claude (chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--3-đề-xuất-của-claude-đã-chốt-làm-quyết-định-làm-việc-đổi-sau-được">3. Đề xuất của Claude (đã chốt làm quyết định làm việc, đổi sau được)</h2>
 <h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--31-ai-sửa-tầng-nào">3.1 Ai sửa tầng nào</h3>
 <table>
 <thead>
@@ -13191,30 +13191,31 @@ ngưỡng số event hoặc số rule khác nhau thì mở đợt; im lặng 30 
 </table>
 <p>Người nhận theo vai trò và theo zone (ghi đè được ở cấp zone); mọi kênh của cảnh báo high lỗi thì gửi email tới
 liên hệ bảo mật của account (đã có ở 5.8.11).</p>
-<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-cần-chủ-dự-án-chốt">4. Cần chủ dự án chốt</h2>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-đã-chốt-theo-đề-xuất-của-claude">4. Đã chốt theo đề xuất của Claude</h2>
+<p>Chủ dự án: &quot;làm theo đề xuất của bro trước, có vấn đề gì tính sau; phần cần chốt mày cũng đề xuất luôn&quot;. Ba câu dưới đây chốt theo đề xuất, ghi là quyết định làm việc và có thể đảo.</p>
 <table>
 <thead>
 <tr>
 <th>ID</th>
 <th>Câu hỏi</th>
-<th>Ghi chú</th>
+<th>Quyết định làm việc</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>OQ-163</td>
 <td>&quot;Whitelist luôn ưu tiên&quot; có thắng cả <strong>rule khẩn của NCC</strong> (chặn 0-day, CVE) không? Và nó chỉ thắng blacklist, hay cũng bỏ qua WAF, rate limit, DDoS?</td>
-<td>Mâu thuẫn với hai quy tắc đã ghi: <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-33</a> (block của NCC thắng allow của khách) và <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-28</a> (Trust không bỏ qua WAF, rate limit, DDoS). Đề xuất: whitelist thắng blacklist cùng tầng hoặc thấp hơn; rule khẩn của NCC không bị whitelist của khách đè (vì whitelist một IP bị chiếm sẽ mở lỗ hổng 0-day); whitelist của <strong>global</strong> thì thắng</td>
+<td><strong>Chốt:</strong> whitelist thắng blacklist cùng tầng; whitelist của website <strong>không</strong> thắng tầng trên (global, system) và không bỏ qua WAF, rate limit, DDoS (giữ <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-28</a>); <strong>rule khẩn của NCC không bị whitelist nào đè</strong> (whitelist một IP bị chiếm sẽ mở lỗ hổng 0-day), chỉ support đặt log-only có hạn cho một zone (<a href="#f-02-requirements--f12-vận-hành-ncc">FR-12-07</a>); whitelist của <strong>global</strong> thắng blacklist của website và CRS, có audit. Bảng đủ 7 trường hợp có trong prototype portal, màn &quot;Ba tầng cấu hình&quot;</td>
 </tr>
 <tr>
 <td>OQ-164</td>
 <td>Có tầng <strong>account (tổ chức)</strong> cho khách không (một bộ rule dùng cho nhiều website của cùng khách, như agency 50 site)?</td>
-<td>Ba tầng anh nêu đều của NCC hoặc của một website. Tài liệu cũ có kế thừa org → nhóm zone → zone (FR-5-18, Mở rộng). Cần chốt giữ, bỏ hay gộp vào tầng website</td>
+<td>Ba tầng anh nêu đều của NCC hoặc của một website. Tài liệu cũ có kế thừa org → nhóm zone → zone (FR-5-18, Mở rộng). <strong>Chốt:</strong> MVP <strong>không có tầng account</strong>; tầng website chỉ là tập rule của một website. Khách nhiều site dùng <strong>mẫu policy</strong> (PolicyTemplate, sao chép hoặc liên kết vào từng website) ở mức Mở rộng; mẫu không thêm tầng ưu tiên mới, rule trong mẫu vẫn tính vào trần theo gói của từng website</td>
 </tr>
 <tr>
 <td>OQ-165</td>
 <td>Tập rule custom của NCC gán theo <strong>node, cluster</strong> được: khách có thấy và chọn không, hay chỉ NCC gán?</td>
-<td>Gán theo node liên quan hạ tầng (cell, PoP); đề xuất chỉ NCC gán, khách chỉ thấy kết quả</td>
+<td>Gán theo node liên quan hạ tầng (cell, PoP); <strong>Chốt:</strong> chỉ NCC gán; khách chỉ thấy tập nào đang áp cho website của mình, không thấy nội dung rule</td>
 </tr>
 </tbody>
 </table>
