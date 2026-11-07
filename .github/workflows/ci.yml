@@ -26,9 +26,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
@@ -59,9 +74,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
@@ -78,9 +108,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
@@ -107,9 +152,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
@@ -129,9 +189,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
@@ -162,9 +237,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: waap
+      # Build against the metap branch with the same name when one exists (a change spanning
+      # both repos is then testable before metap's side merges), else metap's master. The
+      # branch name comes in through env, never ${{ }} interpolation, so it can't inject shell.
+      - id: metap-ref
+        shell: bash
+        working-directory: .
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/metap-org/metap.git "$branch" >/dev/null; then
+            echo "ref=$branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=master" >> "$GITHUB_OUTPUT"
+          fi
+          echo "metap ref: $(tail -1 "$GITHUB_OUTPUT")"
       - uses: actions/checkout@v4
         with:
           repository: metap-org/metap
+          ref: ${{ steps.metap-ref.outputs.ref }}
           path: metap
       - uses: actions/setup-go@v5
         with:
