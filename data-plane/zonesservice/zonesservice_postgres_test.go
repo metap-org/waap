@@ -132,7 +132,7 @@ func TestGuardedZonesBackendCreateZoneAutoResolvesDomainID(t *testing.T) {
 	cleanupEntityRows(t, pool, tenantID)
 
 	state, _ := newTestState(t, pool, registry)
-	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "", "localhost:1", "localhost:1")
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "localhost:1", "localhost:1")
 	rc := adminContext(tenantID, userID)
 	ctx := context.Background()
 	apex := freshApex(t)
@@ -180,7 +180,7 @@ func TestGuardedZonesBackendRejectsInvalidMatchCondition(t *testing.T) {
 	cleanupEntityRows(t, pool, tenantID)
 
 	state, _ := newTestState(t, pool, registry)
-	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "", "localhost:1", "localhost:1")
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "localhost:1", "localhost:1")
 	rc := adminContext(tenantID, userID)
 
 	data := crud.JsonObject{
@@ -203,7 +203,7 @@ func TestGuardedZonesBackendRejectsInvalidIPAccessListValue(t *testing.T) {
 	cleanupEntityRows(t, pool, tenantID)
 
 	state, _ := newTestState(t, pool, registry)
-	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "", "localhost:1", "localhost:1")
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "localhost:1", "localhost:1")
 	rc := adminContext(tenantID, userID)
 
 	data := crud.JsonObject{"type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, "not-an-ip")}

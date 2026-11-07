@@ -24,7 +24,7 @@ func newGuarded(t *testing.T) (*GuardedZonesBackend, *crudmock.RecordBackend) {
 	t.Helper()
 	inner := crudmock.NewRecordBackend(t)
 	// Cross-service addresses are never dialled by these tests (only Delete uses them).
-	return NewGuardedZonesBackend(inner, "", "127.0.0.1:1", "127.0.0.1:1"), inner
+	return NewGuardedZonesBackend(inner, "127.0.0.1:1", "127.0.0.1:1"), inner
 }
 
 func testRC() *permission.RequestContext {
@@ -162,4 +162,16 @@ func TestUnguardedEntitiesPassStraightThrough(t *testing.T) {
 	require.NoError(t, err)
 	_, err = g.Update(context.Background(), "waf.zones", id, 3, data, rc, nil)
 	require.NoError(t, err)
+}
+
+// Without the caller's own token there is no identity to run the cross-service reference check
+// as, so the delete is refused (fail closed) instead of skipping the check.
+func TestDeleteZoneWithoutACallerTokenIsRefusedNotUnchecked(t *testing.T) {
+	g, _ := newGuarded(t) // inner.Delete must not be reached
+	rc := testRC()        // ForwardedBearerToken empty
+
+	res, err := g.Delete(context.Background(), "waf.zones", uuid.New(), 1, rc, nil)
+	require.NoError(t, err)
+	assert.EqualValues(t, 503, res.Status)
+	assert.Equal(t, "reference_check_unavailable", res.ErrorCode)
 }

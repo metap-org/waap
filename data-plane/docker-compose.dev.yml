@@ -1,6 +1,6 @@
 # Dev loop for the WAF Customer Portal: the 3 Go services + graphql-gateway via `go run` from the
 # mounted source, plus the Vite dev server. Same prerequisites as docker-compose.yml (shared
-# Postgres/RabbitMQ from ../../metap, ./keys, ./.env — see README.md "Chạy local").
+# Postgres/RabbitMQ from ../../metap, ./keys/jwks, ./.env — see README.md "Chạy local").
 #
 # `go run` builds from the bind-mounted metap-org root, so a code change is picked up by
 # `docker compose -f docker-compose.dev.yml restart <service>` (seconds; the Go build cache lives in
@@ -22,8 +22,6 @@ x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
   CORS_ORIGINS: http://localhost:5173
-  AUTH_JWT_PUBLIC_KEY_PATH: /workspace/waap/data-plane/keys/dev-jwt-public.pem
-  AUTH_JWT_PRIVATE_KEY_PATH: /workspace/waap/data-plane/keys/dev-jwt-private.pem
   GRPC_ENABLED: "true"
 
 x-health: &health
@@ -40,6 +38,8 @@ services:
     environment:
       <<: *service-env
       PORT: "3000"
+      # The token issuer: signs every token and publishes /.well-known/jwks.json.
+      JWKS_KEYS_DIR: /workspace/waap/data-plane/keys/jwks
       SCANNING_GRPC_ADDR: scanning-service:3011
       ALERTING_GRPC_ADDR: alerting-service:3021
     healthcheck:
@@ -53,6 +53,7 @@ services:
     environment:
       <<: *service-env
       PORT: "3010"
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
     healthcheck:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3010/health"]
@@ -64,6 +65,7 @@ services:
     environment:
       <<: *service-env
       PORT: "3020"
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
     healthcheck:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3020/health"]
@@ -75,20 +77,24 @@ services:
     environment:
       PORT: "4000"
       CORS_ORIGINS: http://localhost:5173
-      AUTH_JWT_PUBLIC_KEY_PATH: /workspace/waap/data-plane/keys/dev-jwt-public.pem
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      # Every service account logs in at the issuer; REST_URL says where each upstream really is.
       UPSTREAM_1_NAME: zones
       UPSTREAM_1_GRPC_ADDR: zones-service:3001
       UPSTREAM_1_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_1_REST_URL: http://zones-service:3000
       UPSTREAM_1_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL:?set WAF_SERVICE_EMAIL in .env}
       UPSTREAM_1_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD:?set WAF_SERVICE_PASSWORD in .env}
       UPSTREAM_2_NAME: scanning
       UPSTREAM_2_GRPC_ADDR: scanning-service:3011
-      UPSTREAM_2_LOGIN_URL: http://scanning-service:3010/auth/login
+      UPSTREAM_2_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_2_REST_URL: http://scanning-service:3010
       UPSTREAM_2_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
       UPSTREAM_2_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
       UPSTREAM_3_NAME: alerting
       UPSTREAM_3_GRPC_ADDR: alerting-service:3021
-      UPSTREAM_3_LOGIN_URL: http://alerting-service:3020/auth/login
+      UPSTREAM_3_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_3_REST_URL: http://alerting-service:3020
       UPSTREAM_3_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
       UPSTREAM_3_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
     depends_on:

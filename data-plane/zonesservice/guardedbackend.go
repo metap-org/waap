@@ -11,17 +11,13 @@
 // zoneDeleteGuard's cross-service reference check dials each sibling's own gRPC port directly
 // (SCANNING_GRPC_ADDR/ALERTING_GRPC_ADDR), with no service-account credential of its own —
 // instead of logging in as a fixed user (which would only ever see one tenant's rows in this
-// Schema-strategy shared table, wrong for every other tenant), it mints a fresh, short-lived
-// token for the same tenant_id/user_id already on the incoming RequestContext, via the same
-// jwtPrivateKeyPEM dispatch AppState.MintToken uses internally. That token rides as
-// RequestContext.ForwardedBearerToken, which GrpcBackend already prefers over any of its own
-// stored credentials. The sibling's own GrpcRecordService then resolves that token's real roles
-// independently, so the check runs with the real caller's own permissions, not a blanket service
-// identity.
-//
-// Divergence from the Rust original: no functionId is forwarded on the minted cross-service
-// token — this Go port's peripherals.MintJWT has no functionId parameter at all (a pre-existing
-// Go-port limitation, not introduced here).
+// Schema-strategy shared table, wrong for every other tenant), it forwards the caller's own token
+// — metap's HTTP/gRPC auth puts it on RequestContext.ForwardedBearerToken, which GrpcBackend
+// prefers over any stored credential. The sibling's GrpcRecordService resolves that token's real
+// roles independently, so the check runs with the caller's own permissions, not a blanket service
+// identity. (This used to mint a fresh 30s token with the shared RSA key; with a single JWKS
+// issuer no service but the issuer holds a signing key, so forwarding is the only option — and
+// also keeps the caller's functionId/scope, which the minted token dropped.)
 //
 // Lazy, cached connection (crossServiceLink): grpc.NewClient never actually dials eagerly in Go
 // (unlike Rust's tonic Endpoint::connect), so unlike the Rust original there is no real
@@ -40,7 +36,6 @@ import (
 
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/grpcapi"
-	"github.com/metap-org/metap/pkg/peripherals"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/metap/pkg/runtime"
@@ -111,15 +106,14 @@ func (l *crossServiceLink) get() crud.RecordBackend {
 }
 
 type GuardedZonesBackend struct {
-	inner            crud.RecordBackend
-	jwtPrivateKeyPEM string
-	scanning         *crossServiceLink
-	alerting         *crossServiceLink
+	inner    crud.RecordBackend
+	scanning *crossServiceLink
+	alerting *crossServiceLink
 }
 
-func NewGuardedZonesBackend(inner crud.RecordBackend, jwtPrivateKeyPEM, scanningGRPCAddr, alertingGRPCAddr string) *GuardedZonesBackend {
+func NewGuardedZonesBackend(inner crud.RecordBackend, scanningGRPCAddr, alertingGRPCAddr string) *GuardedZonesBackend {
 	return &GuardedZonesBackend{
-		inner: inner, jwtPrivateKeyPEM: jwtPrivateKeyPEM,
+		inner:    inner,
 		scanning: newCrossServiceLink(scanningGRPCAddr), alerting: newCrossServiceLink(alertingGRPCAddr),
 	}
 }
@@ -184,25 +178,15 @@ func validateIPAccessList(data crud.JsonObject) *crud.ServiceResult[crud.RecordD
 // comment for the identity-forwarding mechanism. Returns the blocking entity name, or "" when
 // clear to delete; result is non-nil only on an error the caller should return as-is.
 func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.UUID, rc *permission.RequestContext) (string, *crud.ServiceResult[crud.RecordDto], error) {
-	tenantID, err := uuid.Parse(rc.TenantID)
-	if err != nil {
-		return "", nil, fmt.Errorf("RequestContext.TenantID is not a UUID: %w", err)
-	}
-	userID := uuid.Nil
-	if rc.UserID != "" {
-		userID, err = uuid.Parse(rc.UserID)
-		if err != nil {
-			return "", nil, fmt.Errorf("RequestContext.UserID is not a UUID: %w", err)
-		}
-	}
-	// Short-lived on purpose — this token exists only to make the next 1-3 gRPC calls below,
-	// never stored, never returned to any caller.
-	forwardedToken, err := peripherals.MintJWT(b.jwtPrivateKeyPEM, tenantID, userID, 30)
-	if err != nil {
-		return "", nil, err
+	// The sibling services run the check as the caller, with the caller's own token (set on
+	// rc by metap's HTTP/gRPC auth). No token means we cannot ask on the caller's behalf, and an
+	// unchecked delete could orphan scan jobs/incidents — refuse rather than guess.
+	if rc.ForwardedBearerToken == "" {
+		result := crud.ResultErrWithMessage[crud.RecordDto](503, "reference_check_unavailable",
+			"Could not verify cross-service references (no caller token to forward); refusing to delete.")
+		return "", &result, nil
 	}
 	forwardedRC := *rc
-	forwardedRC.ForwardedBearerToken = forwardedToken
 
 	checks := []struct {
 		link   *crossServiceLink

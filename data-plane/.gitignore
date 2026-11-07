@@ -2,3 +2,5 @@
 .env
 **/keys/*.pem
 **/keys/dev-jwks-*
+# Every local key/secret (RSA pems, the JWKS key dir) — never committed.
+/keys/

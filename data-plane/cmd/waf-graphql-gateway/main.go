@@ -8,9 +8,9 @@
 // cross-service calls); the 8 custom business-action mutations forward to each service's REST
 // endpoint instead, since those have no gRPC equivalent.
 //
-// Same disclosed divergence as the 3 WAF Go services: no JWKS trust-root dual-dispatch — this
-// gateway decode-verifies against the SAME static RSA keypair file the 3 services use
-// (AUTH_JWT_PUBLIC_KEY_PATH), not a separate gateway-specific key and not metap-jwks.
+// Auth: verifies every caller's token against the token issuer's JWKS (JWKS_URL — zones-service
+// in this product), and forwards that same token upstream; it never signs anything. Legacy RS256
+// tokens also verify while AUTH_JWT_PUBLIC_KEY_PATH is set (cutover).
 package main
 
 import (
@@ -18,15 +18,18 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/metap-org/metap/pkg/grpcapi"
+	"github.com/metap-org/metap/pkg/jwks"
 	"github.com/metap-org/metap/pkg/runtime"
 
 	"github.com/metap-org/waap/data-plane/graphqlgateway"
@@ -36,6 +39,7 @@ type upstreamConfig struct {
 	name            string
 	grpcAddr        string
 	loginURL        string
+	restURL         string
 	serviceEmail    string
 	servicePassword string
 }
@@ -49,7 +53,14 @@ func loadUpstream(n int) (upstreamConfig, bool) {
 	loginURL, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_LOGIN_URL", n))
 	email, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_SERVICE_EMAIL", n))
 	password, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_SERVICE_PASSWORD", n))
-	return upstreamConfig{name: name, grpcAddr: stripScheme(grpcAddr), loginURL: loginURL, serviceEmail: email, servicePassword: password}, true
+	// UPSTREAM_N_REST_URL: the upstream's own REST base for custom mutations. Defaults to the
+	// login URL's host, which is only right while every upstream issues its own tokens — with a
+	// single JWKS issuer every LOGIN_URL points at the issuer, so set REST_URL explicitly.
+	restURL, ok := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_REST_URL", n))
+	if !ok {
+		restURL = restBaseFromLoginURL(loginURL)
+	}
+	return upstreamConfig{name: name, grpcAddr: stripScheme(grpcAddr), loginURL: loginURL, restURL: strings.TrimSuffix(restURL, "/"), serviceEmail: email, servicePassword: password}, true
 }
 
 // stripScheme: UPSTREAM_N_GRPC_ADDR is written as a URL (http://localhost:3001) in
@@ -66,6 +77,29 @@ func stripScheme(addr string) string {
 // per-upstream env var that would just repeat UPSTREAM_N_LOGIN_URL's own host.
 func restBaseFromLoginURL(loginURL string) string {
 	return strings.TrimSuffix(loginURL, "/auth/login")
+}
+
+// buildVerifier: JWKS_URL (the issuer's /.well-known/jwks.json) verifies EdDSA tokens;
+// AUTH_JWT_PUBLIC_KEY_PATH additionally (or, without JWKS_URL, only) verifies legacy RS256 ones.
+func buildVerifier(ctx context.Context) (*jwks.TokenVerifier, error) {
+	var publicKey *rsa.PublicKey
+	if path, ok := runtime.Optional("AUTH_JWT_PUBLIC_KEY_PATH"); ok {
+		key, err := readRSAPublicKey(path)
+		if err != nil {
+			return nil, fmt.Errorf("reading AUTH_JWT_PUBLIC_KEY_PATH: %w", err)
+		}
+		publicKey = key
+	}
+	jwksURL, ok := runtime.Optional("JWKS_URL")
+	if !ok {
+		if publicKey == nil {
+			return nil, errors.New("set JWKS_URL (or AUTH_JWT_PUBLIC_KEY_PATH for static RSA)")
+		}
+		return &jwks.TokenVerifier{Kind: jwks.VerifierStatic, PublicKey: publicKey, Leeway: 20 * time.Second}, nil
+	}
+	client := jwks.NewJwksClient(jwksURL, time.Duration(runtime.EnvOr("JWKS_CACHE_TTL_SECONDS", 300))*time.Second)
+	client.SpawnBackgroundRefresh(ctx, time.Duration(runtime.EnvOr("JWKS_REFRESH_SECONDS", 60))*time.Second)
+	return &jwks.TokenVerifier{Kind: jwks.VerifierAuto, Keys: client, PublicKey: publicKey, Leeway: 20 * time.Second}, nil
 }
 
 func readRSAPublicKey(path string) (*rsa.PublicKey, error) {
@@ -91,18 +125,13 @@ func main() {
 		host = "0.0.0.0"
 	}
 	port := runtime.EnvOr("PORT", 4000)
-	publicKeyPath, ok := runtime.Optional("AUTH_JWT_PUBLIC_KEY_PATH")
-	if !ok {
-		slog.Error("AUTH_JWT_PUBLIC_KEY_PATH is required")
-		os.Exit(1)
-	}
-	publicKey, err := readRSAPublicKey(publicKeyPath)
+	ctx := context.Background()
+	verifier, err := buildVerifier(ctx)
 	if err != nil {
-		slog.Error("reading AUTH_JWT_PUBLIC_KEY_PATH", "error", err)
+		slog.Error("configuring token verification", "error", err)
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
 	httpClient := runtime.DefaultHTTPClient()
 
 	var upstreams []upstreamConfig
@@ -164,9 +193,9 @@ func main() {
 	}
 
 	rest := graphqlgateway.RestURLs{
-		Zones:    restBaseFromLoginURL(byName["zones"].loginURL),
-		Scanning: restBaseFromLoginURL(byName["scanning"].loginURL),
-		Alerting: restBaseFromLoginURL(byName["alerting"].loginURL),
+		Zones:    byName["zones"].restURL,
+		Scanning: byName["scanning"].restURL,
+		Alerting: byName["alerting"].restURL,
 	}
 
 	schema, err := graphqlgateway.BuildSchema(entities, rest)
@@ -175,7 +204,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	server := graphqlgateway.NewServer(schema, publicKey)
+	server := graphqlgateway.NewServer(schema, verifier)
 
 	corsOrigins, _ := runtime.Optional("CORS_ORIGINS")
 	var origins []string

@@ -11,25 +11,23 @@
 package graphqlgateway
 
 import (
-	"crypto/rsa"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/graphql-go/graphql"
 
-	"github.com/metap-org/metap/pkg/peripherals"
+	"github.com/metap-org/metap/pkg/jwks"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/runtime"
 )
 
 type Server struct {
-	schema    graphql.Schema
-	publicKey *rsa.PublicKey
+	schema   graphql.Schema
+	verifier *jwks.TokenVerifier
 }
 
-func NewServer(schema graphql.Schema, publicKey *rsa.PublicKey) *Server {
-	return &Server{schema: schema, publicKey: publicKey}
+func NewServer(schema graphql.Schema, verifier *jwks.TokenVerifier) *Server {
+	return &Server{schema: schema, verifier: verifier}
 }
 
 type graphqlRequestBody struct {
@@ -58,7 +56,7 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if _, err := peripherals.DecodeAccessToken(token, s.publicKey, 20*time.Second); err != nil {
+	if _, err := jwks.DecodeWithVerifier(r.Context(), token, s.verifier, nil); err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
 			"errors": []map[string]string{{"message": "invalid or expired token"}},
 		})

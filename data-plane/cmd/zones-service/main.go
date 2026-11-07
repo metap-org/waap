@@ -42,7 +42,7 @@ func main() {
 		// The gRPC API (what waf-graphql-gateway calls) goes through the zone/firewall/IP-list
 		// guards and the cross-service zone-delete check.
 		WrapBackend: func(state *httpserver.AppState) (crud.RecordBackend, error) {
-			return zonesservice.NewGuardedZonesBackend(state.Crud, state.JWTPrivateKeyPEM,
+			return zonesservice.NewGuardedZonesBackend(state.Crud,
 				env.String("SCANNING_GRPC_ADDR", "localhost:3011"),
 				env.String("ALERTING_GRPC_ADDR", "localhost:3021"),
 			), nil

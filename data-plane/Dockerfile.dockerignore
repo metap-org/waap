@@ -1,0 +1,13 @@
+# BuildKit uses this instead of the context root's .dockerignore for ./Dockerfile only. Same
+# exclusions as ../../.dockerignore, plus every key directory: the JWKS issuer's private keys
+# (keys/jwks/*.key) must never be baked into an image layer — they are mounted at runtime.
+**/target
+/.shared-target
+**/node_modules
+**/.git
+**/.env
+**/dist
+**/.DS_Store
+**/keys/*.pem
+**/keys
+**/.env

@@ -144,7 +144,7 @@ export DATABASE_URL=postgres://metap:metap@localhost:5433/metap
 # 1. DB + key + tenant + user — chỉ 1 lần cho 1 DB mới (dev-tools nằm ở ../../metap)
 cd ../../metap
 go run ./cmd/db-migrate                                            # migrations nhúng sẵn trong binary
-go run ./cmd/dev-tools gen-keys ../waap/data-plane/keys            # RSA keypair (gitignored)
+go run ./cmd/dev-tools gen-jwks-key ../waap/data-plane/keys/jwks   # key Ed25519 của issuer (gitignored)
 go run ./cmd/dev-tools provision-tenant <tenantId> schema admin@waap.local <password>   # user đăng nhập portal
 go run ./cmd/dev-tools create-user <tenantId> gateway@waap.local <password>             # service account cho gateway
 go run ./cmd/dev-tools seed-admin <tenantId> <userId-vừa-tạo>
@@ -159,17 +159,43 @@ docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml restart zones-service   # sau khi sửa code Go
 
 # 2c. Hoặc chạy thẳng trên host (mỗi lệnh 1 terminal)
-export RABBITMQ_URL=amqp://metap:metap@localhost:5672 GRPC_ENABLED=true \
-  AUTH_JWT_PRIVATE_KEY_PATH=keys/dev-jwt-private.pem AUTH_JWT_PUBLIC_KEY_PATH=keys/dev-jwt-public.pem
-PORT=3000 go run ./cmd/zones-service        # HTTP :3000, gRPC :3001
-PORT=3010 go run ./cmd/scanning-service     # HTTP :3010, gRPC :3011
-PORT=3020 go run ./cmd/alerting-service     # HTTP :3020, gRPC :3021
-UPSTREAM_1_NAME=zones UPSTREAM_1_GRPC_ADDR=localhost:3001 UPSTREAM_1_LOGIN_URL=http://localhost:3000/auth/login \
-UPSTREAM_2_NAME=scanning UPSTREAM_2_GRPC_ADDR=localhost:3011 UPSTREAM_2_LOGIN_URL=http://localhost:3010/auth/login \
-UPSTREAM_3_NAME=alerting UPSTREAM_3_GRPC_ADDR=localhost:3021 UPSTREAM_3_LOGIN_URL=http://localhost:3020/auth/login \
-UPSTREAM_1_SERVICE_EMAIL=... UPSTREAM_1_SERVICE_PASSWORD=...  # (lặp lại cho 2, 3)
-  go run ./cmd/waf-graphql-gateway         # :4000
+export RABBITMQ_URL=amqp://metap:metap@localhost:5672 GRPC_ENABLED=true
+JWKS=http://localhost:3000/.well-known/jwks.json
+PORT=3000 JWKS_KEYS_DIR=keys/jwks go run ./cmd/zones-service    # issuer — HTTP :3000, gRPC :3001
+PORT=3010 JWKS_URL=$JWKS go run ./cmd/scanning-service           # HTTP :3010, gRPC :3011
+PORT=3020 JWKS_URL=$JWKS go run ./cmd/alerting-service           # HTTP :3020, gRPC :3021
+JWKS_URL=$JWKS \
+UPSTREAM_1_NAME=zones    UPSTREAM_1_GRPC_ADDR=localhost:3001 UPSTREAM_1_REST_URL=http://localhost:3000 \
+UPSTREAM_2_NAME=scanning UPSTREAM_2_GRPC_ADDR=localhost:3011 UPSTREAM_2_REST_URL=http://localhost:3010 \
+UPSTREAM_3_NAME=alerting UPSTREAM_3_GRPC_ADDR=localhost:3021 UPSTREAM_3_REST_URL=http://localhost:3020 \
+UPSTREAM_1_LOGIN_URL=http://localhost:3000/auth/login UPSTREAM_1_SERVICE_EMAIL=... UPSTREAM_1_SERVICE_PASSWORD=... \
+  go run ./cmd/waf-graphql-gateway       # :4000 (lặp LOGIN_URL/EMAIL/PASSWORD cho upstream 2, 3 — cùng trỏ về :3000)
 ```
+
+### Token: một issuer duy nhất (JWKS)
+
+`zones-service` là **issuer duy nhất**: giữ key Ed25519 (`JWKS_KEYS_DIR`), ký mọi token (login,
+refresh, OAuth2) và publish `/.well-known/jwks.json`. `scanning-service`, `alerting-service`,
+`waf-graphql-gateway` chỉ verify qua `JWKS_URL`, không giữ private key nào — `/auth/login` ở đó
+trả `501 not_token_issuer`, nên mọi login (portal, gateway service account, control-plane) đều
+trỏ về `:3000`. Gọi chéo giữa service (vd. `zones-service` hỏi `scanning-service` trước khi xoá
+Zone) chuyển tiếp token gốc của người gọi, không tự ký token mới.
+
+Xoay key, không cần restart (issuer đọc lại thư mục mỗi `JWKS_KEY_DIR_RELOAD_SECONDS`, mặc định
+30s; verifier refresh mỗi `JWKS_REFRESH_SECONDS`, mặc định 60s, cache tối đa
+`JWKS_CACHE_TTL_SECONDS`, mặc định 300s):
+
+```bash
+cd ../../metap && go run ./cmd/dev-tools gen-jwks-key ../waap/data-plane/keys/jwks <kid-mới>   # 1. publish, chưa ký
+# đợi > JWKS_CACHE_TTL_SECONDS để mọi verifier đã thấy key mới
+echo <kid-mới> > ../waap/data-plane/keys/jwks/signing-kid                                 # 2. bắt đầu ký bằng key mới
+# đợi > TTL session dài nhất (auth.sessionTtlSeconds) để token ký bằng key cũ hết hạn
+rm ../waap/data-plane/keys/jwks/<kid-cũ>.key                                               # 3. retire
+```
+
+Chuyển từ cặp RSA dùng chung cũ sang JWKS mà không đăng xuất ai: giữ thêm
+`AUTH_JWT_PUBLIC_KEY_PATH` trên mọi service (và gateway) trong 1 vòng TTL session — token RSA
+cũ (không có `kid`) vẫn verify được — rồi bỏ biến đó đi.
 
 Login portal bằng user tạo ở `provision-tenant`. Tài khoản đó là `admin` của tenant (deny-by-default
 không áp lên admin); user khác trong tenant cần policy trước khi làm được gì.

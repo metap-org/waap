@@ -531,14 +531,23 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   `72-control-edge-planes.md`.
 - Docs are the spec. If an implementation choice isn't settled in `data-plane/docs/`, don't invent
   one silently — it's likely one of the explicitly-flagged open questions above.
-- **Current state (Go, re-checked 2026-11-07): auth is back on the shared static RSA keypair —
-  the JWKS topology described in the rest of this bullet is Rust-era history.** All 3 Go
-  data-plane services (`metap`'s `pkg/app` → `httpserver.AppState`) and `waf-graphql-gateway`
-  read `AUTH_JWT_PRIVATE_KEY_PATH`/`AUTH_JWT_PUBLIC_KEY_PATH`; nothing serves
-  `/.well-known/jwks.json` or reads `JWKS_URL`, because `httpserver.AppState` only supports the
-  static-key path (disclosed in `cmd/zones-service/main.go`'s and the gateway's own header
-  comments). `metap` does have `pkg/jwks`; wiring it into `AppState` is the open follow-up if
-  JWKS rotation is wanted again.
+- **Current state (2026-11-08): single JWKS issuer.** `zones-service` is the only service holding a
+  signing key (`JWKS_KEYS_DIR` → `metap`'s `jwks.LoadKeyDir`: `<kid>.key` files + `signing-kid`);
+  it signs every token (EdDSA, `kid` header) and publishes `/.well-known/jwks.json`.
+  `scanning-service`, `alerting-service` and `waf-graphql-gateway` verify via `JWKS_URL` and hold
+  no private key — their `/auth/login` answers `501 not_token_issuer` (checked before the
+  password), so every login (portal, gateway service accounts, control-plane) goes to `:3000`.
+  The gateway therefore takes `UPSTREAM_N_REST_URL` explicitly (it used to derive each upstream's
+  REST base from its login URL). Cross-service calls forward the caller's own token
+  (`RequestContext.ForwardedBearerToken`, now set by `metap`'s HTTP and gRPC auth) —
+  `GuardedZonesBackend` no longer mints a token, and refuses a zone delete (503) when there is no
+  caller token to forward. Rotation is live, no restart (issuer re-reads the key dir; verifiers
+  refetch on an unknown kid and on a timer) — verified end to end on the compose stack: publish,
+  promote, retire, with an old-key token rejected by all 3 services after retirement. RSA
+  (`AUTH_JWT_PUBLIC_KEY_PATH`) is only a cutover fallback for kid-less tokens; the compose files no
+  longer set it. Keys live in `data-plane/keys/` (gitignored, and excluded from the image build
+  by `data-plane/Dockerfile.dockerignore`) and are mounted at runtime. Recipe and rotation steps:
+  `data-plane/README.md` "Token: một issuer duy nhất".
 - **(History) Auth moved from a shared static RSA keypair to `metap-jwks` (Ed25519, 2026-09-04).** The 3
   `data-plane` services + `graphql-gateway` used to share 1 `dev-jwt-private.pem` file (copied
   into every container) for both mint and verify. They now default to a `metap-jwks` trust root
