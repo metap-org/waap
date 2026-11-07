@@ -1,0 +1,25 @@
+
+```sql postgres://metap:metap@localhost:5433/metap
+
+-- USE waf
+SET search_path TO waf, public; 
+
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'waf'
+ORDER BY table_name;
+
+-- waf_alert_notifications
+-- waf_alert_policies     
+-- waf_ddos_policies      
+-- waf_domains            
+-- waf_firewall_rules     
+-- waf_incidents          
+-- waf_ip_access_lists    
+-- waf_scan_findings      
+-- waf_scan_jobs          
+-- waf_security_events    
+-- waf_zones              
+SELECT * FROM waf.waf_alert_policies LIMIT 20;
+
+```
