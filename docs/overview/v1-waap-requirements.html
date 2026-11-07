@@ -108,6 +108,7 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-03-business-analysis-11-provider-operations">3.11 Vận hành của NCC</a>
 <a class="sub" href="#f-03-business-analysis-12-api-security">3.12 API security</a>
 <a class="sub" href="#f-03-business-analysis-13-configuration-surface">3.13 Bề mặt cấu hình: rule và setting trên portal</a>
+<a class="sub" href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14 Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo</a>
 <a class="top" href="#f-04-product-direction-00-index">4. Định hướng sản phẩm</a>
 <a class="sub" href="#f-04-product-direction-01-modern-waap-fit">4.1 Sản phẩm đang định hướng gì, đã phù hợp WAAP hiện đại chưa</a>
 <a class="sub" href="#f-04-product-direction-02-ai-ml">4.2 AI/ML tích hợp vào đâu</a>
@@ -134,6 +135,7 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-03-business-analysis-11-provider-operations">3.11 Vận hành của NCC</a>
 <a class="sub" href="#f-03-business-analysis-12-api-security">3.12 API security</a>
 <a class="sub" href="#f-03-business-analysis-13-configuration-surface">3.13 Bề mặt cấu hình: rule và setting trên portal</a>
+<a class="sub" href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14 Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo</a>
 <a class="top" href="#f-04-product-direction-00-index">4. Định hướng sản phẩm</a>
 <a class="sub" href="#f-04-product-direction-01-modern-waap-fit">4.1 Sản phẩm đang định hướng gì, đã phù hợp WAAP hiện đại chưa</a>
 <a class="sub" href="#f-04-product-direction-02-ai-ml">4.2 AI/ML tích hợp vào đâu</a>
@@ -1504,6 +1506,48 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td>MR</td>
 <td><strong>GitSource</strong></td>
 </tr>
+<tr>
+<td><strong>F5.7</strong></td>
+<td><strong>Cấu hình nhiều tầng</strong> (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14</a>)</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>F5.7.1</td>
+<td>Tầng system: bộ rule managed mặc định cho mọi website; cập nhật phát toàn fleet theo canary</td>
+<td>C</td>
+<td>MVP</td>
+<td><strong>RulesetRelease</strong></td>
+</tr>
+<tr>
+<td>F5.7.2</td>
+<td>Tầng global: cấu hình chung và tập rule custom của NCC, gán cho domain, cluster hoặc node</td>
+<td>M</td>
+<td>MR</td>
+<td><strong>RuleSet</strong>, <strong>RuleSetAssignment</strong></td>
+</tr>
+<tr>
+<td>F5.7.3</td>
+<td>Tầng website: rule của riêng website, số lượng theo gói</td>
+<td>M</td>
+<td>MVP</td>
+<td>CustomRule, Entitlements</td>
+</tr>
+<tr>
+<td>F5.7.4</td>
+<td>Ưu tiên giữa tầng: tầng trên ghi đè tầng dưới; whitelist ưu tiên theo OQ-163</td>
+<td>C</td>
+<td>MVP</td>
+<td>—</td>
+</tr>
+<tr>
+<td>F5.7.5</td>
+<td>Hiện cho khách rule nào áp lên website của họ và đến từ tầng nào</td>
+<td>M</td>
+<td>MVP</td>
+<td>—</td>
+</tr>
 </tbody>
 </table>
 <h2 id="f-01-functional-decomposition--f6-phân-phối-cấu-hình-và-fleet">F6 Phân phối cấu hình và fleet</h2>
@@ -1835,6 +1879,55 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td>MVP</td>
 <td><strong>ExportDestination</strong></td>
 </tr>
+<tr>
+<td><strong>F7.7</strong></td>
+<td><strong>Lịch sử tấn công</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>F7.7.1</td>
+<td>Gom event thành một bản ghi cho mỗi đợt tấn công, hai loại: DDoS L7 và vuln-scan</td>
+<td>A</td>
+<td>MVP</td>
+<td><strong>AttackEpisode</strong></td>
+</tr>
+<tr>
+<td>F7.7.2</td>
+<td>Xem danh sách, chi tiết đợt tấn công (bắt đầu, đỉnh, nguồn, biện pháp đã áp) theo quyền và gói</td>
+<td>A</td>
+<td>MVP</td>
+<td>AttackEpisode</td>
+</tr>
+<tr>
+<td>F7.7.3</td>
+<td>Giữ lịch sử theo gói; nhân viên NCC có quyền xem, có audit</td>
+<td>A</td>
+<td>MVP</td>
+<td>AttackEpisode</td>
+</tr>
+<tr>
+<td><strong>F7.8</strong></td>
+<td><strong>Event WAF</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>F7.8.1</td>
+<td>Màn riêng: danh sách event, chi tiết, rule vi phạm</td>
+<td>A</td>
+<td>MVP</td>
+<td>SecurityEvent</td>
+</tr>
+<tr>
+<td>F7.8.2</td>
+<td>Tuning chặn nhầm ngay từ event (nối F7.5)</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>FalsePositiveLabel</strong>, <strong>Exception</strong></td>
+</tr>
 </tbody>
 </table>
 <h2 id="f-01-functional-decomposition--f8-phát-hiện-cảnh-báo-sự-cố">F8 Phát hiện, cảnh báo, sự cố</h2>
@@ -1911,6 +2004,27 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td>M</td>
 <td>MVP</td>
 <td>—</td>
+</tr>
+<tr>
+<td>F8.2.5</td>
+<td>Ngưỡng cảnh báo theo từng loại tấn công, ba mức low, medium, high, có mặc định; đặt ở tầng zone</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>AlertThreshold</strong></td>
+</tr>
+<tr>
+<td>F8.2.6</td>
+<td>Template nội dung thông báo: mẫu mặc định, khách tuỳ chỉnh</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>NotificationTemplate</strong></td>
+</tr>
+<tr>
+<td>F8.2.7</td>
+<td>Định tuyến thông báo theo mức và vai trò; leo thang khi mức high không ack</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>AlertPolicy</strong></td>
 </tr>
 <tr>
 <td><strong>F8.3</strong></td>
@@ -3847,6 +3961,27 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>MR</td>
 <td>Override sinh cảnh báo critical tới mọi Owner và Admin của account trong ≤ 1 phút</td>
 </tr>
+<tr>
+<td>FR-5-22</td>
+<td>Cấu hình có ba tầng: system, global, website (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14</a>); tầng trên ghi đè tầng dưới (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-37</a>)</td>
+<td>F5.7.1–F5.7.4</td>
+<td>MVP (system, website); MR (global)</td>
+<td>Khách xem được rule nào áp lên website của mình và từ tầng nào</td>
+</tr>
+<tr>
+<td>FR-5-23</td>
+<td>Số rule và tập rule tầng website bị giới hạn theo gói</td>
+<td>F5.7.3</td>
+<td>MVP</td>
+<td>Vượt trần thì từ chối khi lưu, nêu rõ trần của gói</td>
+</tr>
+<tr>
+<td>FR-5-24</td>
+<td>NCC phải tạo được tập rule custom ở tầng global và gán cho domain, cluster hoặc node; phát qua đường thường có canary</td>
+<td>F5.7.2</td>
+<td>MR</td>
+<td>Tập rule gán cho một domain chỉ ảnh hưởng domain đó</td>
+</tr>
 </tbody>
 </table>
 <h3 id="f-02-requirements--f6-phân-phối-cấu-hình-và-f11-threat-intelligence">F6 Phân phối cấu hình và F11 Threat intelligence</h3>
@@ -4022,6 +4157,27 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>MVP</td>
 <td>Đích lọc &quot;chỉ block, challenge&quot; không nhận bản ghi allow nào</td>
 </tr>
+<tr>
+<td>FR-7-12</td>
+<td>Mỗi đợt tấn công DDoS L7 hoặc vuln-scan phải là <strong>một bản ghi</strong>, mở khi chạm ngưỡng và đóng khi hết (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-38</a>)</td>
+<td>F7.7.1</td>
+<td>MVP</td>
+<td>Một đợt flood 30 phút sinh một bản ghi, không phải hàng nghìn</td>
+</tr>
+<tr>
+<td>FR-7-13</td>
+<td>Lịch sử đợt tấn công và event WAF giữ theo gói; khách xem nếu gói cho phép; nhân viên NCC xem theo quyền được cấp, có audit</td>
+<td>F7.7.2, F7.7.3</td>
+<td>MVP</td>
+<td>Gói không cho xem thì ẩn màn, không trả dữ liệu</td>
+</tr>
+<tr>
+<td>FR-7-14</td>
+<td>Portal phải có màn event WAF riêng: danh sách, chi tiết, rule vi phạm, và tuning chặn nhầm từ event</td>
+<td>F7.8.1, F7.8.2</td>
+<td>MVP</td>
+<td>Từ một event bấm tạo exception nháp điền sẵn rule, đường dẫn</td>
+</tr>
 </tbody>
 </table>
 <h3 id="f-02-requirements--f8-phát-hiện-cảnh-báo-sự-cố">F8 Phát hiện, cảnh báo, sự cố</h3>
@@ -4098,6 +4254,20 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>F8.3.3</td>
 <td>MR</td>
 <td>Mở link bằng trình quét link (không đăng nhập) không thay đổi gì</td>
+</tr>
+<tr>
+<td>FR-8-10</td>
+<td>Mỗi loại tấn công (DDoS L7, vuln-scan và các loại khác) phải có ngưỡng mặc định ở ba mức low, medium, high; khách chỉnh ở tầng zone; chạm ngưỡng mới lên cảnh báo</td>
+<td>F8.2.5</td>
+<td>MVP</td>
+<td>Zone không chỉnh gì vẫn nhận cảnh báo theo mặc định</td>
+</tr>
+<tr>
+<td>FR-8-11</td>
+<td>Nội dung thông báo dùng template có biến, có mẫu mặc định, khách tuỳ chỉnh được</td>
+<td>F8.2.6</td>
+<td>MVP</td>
+<td>Xem trước được trước khi lưu</td>
 </tr>
 </tbody>
 </table>
@@ -4522,6 +4692,16 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>Log-only không bao giờ tự chuyển sang chặn: sau thời gian quan sát (mặc định 7 ngày, BR-24) hệ thống gửi báo cáo số request sẽ bị chặn và rule nghi chặn nhầm; người dùng bấm chuyển, bước chuyển đi qua change request</td>
 <td>F5.1.6</td>
 </tr>
+<tr>
+<td>BR-37</td>
+<td>Giữa các tầng cấu hình: tầng trên ghi đè tầng dưới (system trên global trên website). Whitelist ưu tiên trong các cặp whitelist, blacklist cùng tầng; whitelist của website không thắng tầng trên và không bỏ qua WAF, rate limit, DDoS (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-28</a>); rule khẩn của NCC không bị whitelist nào đè (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-33</a>); whitelist của global thắng blacklist của website và CRS (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-đã-chốt-theo-đề-xuất-của-claude">OQ-163</a>)</td>
+<td>F5.7.4</td>
+</tr>
+<tr>
+<td>BR-38</td>
+<td>Một đợt tấn công là một bản ghi, thuộc đúng một trong hai loại (DDoS L7, vuln-scan); chỉ mở đợt và gửi cảnh báo khi vượt ngưỡng đã cấu hình</td>
+<td>F7.7.1</td>
+</tr>
 </tbody>
 </table>
 <h2 id="f-02-requirements--5-yêu-cầu-dữ-liệu">5. Yêu cầu dữ liệu</h2>
@@ -4615,7 +4795,7 @@ hoặc đọc qua API.</p>
 <tr>
 <td>DT-9</td>
 <td>Vận hành bảo mật của khách</td>
-<td>SavedSearch, AlertPolicy, NotificationChannel, ExportDestination, FalsePositiveLabel, Case, CaseLink, ReportDefinition, ReportRun</td>
+<td>SavedSearch, AlertPolicy, AlertThreshold, NotificationTemplate, NotificationChannel, ExportDestination, FalsePositiveLabel, Case, CaseLink, ReportDefinition, ReportRun</td>
 <td>M</td>
 <td>Nhỏ so với DT-3</td>
 <td>Theo vòng đời; ReportRun 13 tháng</td>
@@ -4633,7 +4813,7 @@ hoặc đọc qua API.</p>
 <tr>
 <td>DT-11</td>
 <td>Phân phối, fleet</td>
-<td>ZoneBundle, Manifest, CompileResult, Rollout, RolloutStatus, Node, NodeCert, NodeDenyList, ZonePlacement, RulesetRelease, EmergencyRule, EmergencyRuleOverride, ReputationFeed, PopState, FleetFreeze</td>
+<td>RuleSet, RuleSetAssignment, ZoneBundle, Manifest, CompileResult, Rollout, RolloutStatus, Node, NodeCert, NodeDenyList, ZonePlacement, RulesetRelease, EmergencyRule, EmergencyRuleOverride, ReputationFeed, PopState, FleetFreeze</td>
 <td>C</td>
 <td>8 GB bundle mỗi PoP, ≈ 700 node</td>
 <td>Bundle: N version gần nhất mỗi zone</td>
@@ -4642,7 +4822,7 @@ hoặc đọc qua API.</p>
 <tr>
 <td>DT-12</td>
 <td>Telemetry</td>
-<td>SecurityEvent, AccessLog, RequestSample, UsageCounter, AlertState, NotificationDelivery, ReplayJob, bảng tổng hợp</td>
+<td>SecurityEvent, AttackEpisode, AccessLog, RequestSample, UsageCounter, AlertState, NotificationDelivery, ReplayJob, bảng tổng hợp</td>
 <td>A</td>
 <td>≈ 1,15 triệu bản ghi/s, 12 TB/ngày</td>
 <td>Theo gói: 24 giờ đến 365 ngày</td>
@@ -4979,8 +5159,8 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 <td>5.5, outbox của Management</td>
 </tr>
 <tr>
-<td>OQ-16…OQ-162</td>
-<td>OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-162 theo từng nghiệp vụ (<a href="#f-03-business-analysis-00-index">§3</a>); OQ-127…OQ-142 về định hướng sản phẩm (<a href="#f-04-product-direction-00-index">§4</a>)</td>
+<td>OQ-16…OQ-165</td>
+<td>OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ (<a href="#f-03-business-analysis-00-index">§3</a>); OQ-127…OQ-142 về định hướng sản phẩm (<a href="#f-04-product-direction-00-index">§4</a>)</td>
 <td>Một số đã quyết hoặc có đề xuất chờ duyệt</td>
 <td>Theo trang</td>
 </tr>
@@ -4989,7 +5169,7 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 </section>
 <section class="doc" id="f-03-business-analysis-00-index"><div class="path">03-business-analysis/00-index.md</div><h1 id="f-03-business-analysis-00-index--3-phân-tích-nghiệp-vụ">3. Phân tích nghiệp vụ</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-07): 13 nghiệp vụ ở bước 1.</strong> Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
+<p><strong>Trạng thái (2026-11-07): 14 nghiệp vụ ở bước 1.</strong> Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
 còn lại của 3.2–3.6 có đề xuất của Claude chờ duyệt. Chưa nghiệp vụ nào có luồng được duyệt.</p>
 </blockquote>
 <p>Bản đồ phân rã nói hệ thống <strong>có</strong> những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
@@ -5099,6 +5279,12 @@ xuất chờ duyệt.</li>
 <td>Bề mặt cấu hình: rule và setting trên portal, cấu hình nâng cao cho admin</td>
 <td>OQ-151…OQ-162</td>
 <td>Đã quyết nhóm tính năng theo plane (trang lỗi, emergency override, Trust/Skip, audit export, rollout, dry-run, failover, tarpit, IP thật sau CDN, xử lý một bấm, live tail, chống bão, lọc export); danh mục và các câu còn lại ở bước 1</td>
+</tr>
+<tr>
+<td><a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14</a></td>
+<td>Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo</td>
+<td>OQ-163…OQ-165</td>
+<td>Đã quyết hướng và chốt OQ-163…165 theo đề xuất của Claude (ba tầng, hai loại đợt tấn công, ngưỡng ba mức); luồng chưa vẽ</td>
 </tr>
 </tbody>
 </table>
@@ -9434,7 +9620,8 @@ dữ liệu. Liên quan: F2.4.3, F1.1.4, F9.3 ở <a href="#f-01-functional-deco
 <section class="doc" id="f-03-business-analysis-08-monitoring-investigation"><div class="path">03-business-analysis/08-monitoring-investigation.md</div><h1 id="f-03-business-analysis-08-monitoring-investigation--38-giám-sát-điều-tra-cảnh-báo-báo-cáo">3.8 Giám sát, điều tra, cảnh báo, báo cáo</h1>
 <blockquote>
 <p><strong>Trạng thái: tạm hoãn theo chủ dự án (2026-11-07), &quot;giám sát thì tính sau&quot;.</strong> Kịch bản và câu hỏi dưới đây giữ
-nguyên để quay lại sau, không phân tích thêm lúc này.</p>
+nguyên để quay lại sau, không phân tích thêm lúc này. <strong>Ngoại lệ:</strong> lịch sử tấn công (hai loại đợt, màn event WAF)
+và ngưỡng cảnh báo đã được mở lại ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds">3.14</a>.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-08-monitoring-investigation--1-phạm-vi">1. Phạm vi</h2>
 <p>Công việc thường ngày sau onboarding: xem tình hình, điều tra một sự việc, nhận cảnh báo, đẩy log sang hệ
@@ -11651,7 +11838,7 @@ khỏi portal của khách; các trục dưới đây là những gì portal và
 <td>OQ-118</td>
 <td>Portal vận hành của NCC: thao tác nào cần hai người duyệt (khoá zone, bật mitigation hàng loạt, đóng băng fleet)?</td>
 <td>KB11-F2, KB11-F5</td>
-<td></td>
+<td><strong>Hoãn</strong> (2026-11-07): thuộc nghiệp vụ phân quyền, làm khi có tính năng phân quyền; không chặn việc khác</td>
 </tr>
 <tr>
 <td>OQ-119</td>
@@ -12604,7 +12791,7 @@ cửa sổ dedup mặc định 30 phút.</p>
 <tbody>
 <tr>
 <td>OQ-151</td>
-<td>Một ngôn ngữ biểu thức chung cho mọi loại rule, hay form riêng cho từng tính năng?</td>
+<td><strong>Đã quyết: một ngôn ngữ chung</strong> (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--24-các-câu-hỏi-cũ-đã-trả-lời">3.14</a>). Một ngôn ngữ biểu thức chung cho mọi loại rule, hay form riêng cho từng tính năng?</td>
 <td>KB13-A1…KB13-A5</td>
 <td>Cloudflare dùng một ngôn ngữ chung, form builder sinh ra biểu thức. Custom rule đã dùng CEL (<a href="v1-waap-architecture.html#f-09-adr-0032-cel-checked-at-control-ir-at-edge" target="_blank" rel="noopener">ADR-0032</a>); câu hỏi là có mở rộng CEL cho mọi loại rule không</td>
 </tr>
@@ -12648,13 +12835,13 @@ cửa sổ dedup mặc định 30 phút.</p>
 <td>OQ-158</td>
 <td>Cảnh báo: ngưỡng riêng từng loại hay chỉ mức nhạy? Có template nội dung không? Có kênh Zalo, Telegram không?</td>
 <td>KB13-G1…KB13-G8</td>
-<td></td>
+<td><strong>Đã quyết một phần</strong> ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--23-cảnh-báo-và-ngưỡng">3.14</a>: có ngưỡng ba mức, có template, ngưỡng ở tầng zone. Còn mở: Zalo, Telegram</td>
 </tr>
 <tr>
 <td>OQ-159</td>
 <td>Cấu hình nâng cao từng lớp: những tham số nào, phạm vi áp ở đâu, chỉ admin NCC hay mở một phần cho Enterprise?</td>
 <td>KB13-H1…KB13-H5</td>
-<td></td>
+<td>Có đề xuất ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--32-tham-số-nâng-cao-theo-lớp-các-sản-phẩm-waap-cho-cấu-hình-gì">3.14 §3.2</a> và ba tầng ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--21-ba-tầng-cấu-hình">§2.1</a>, chờ duyệt</td>
 </tr>
 <tr>
 <td>OQ-160</td>
@@ -12680,6 +12867,374 @@ cửa sổ dedup mặc định 30 phút.</p>
 <p>F3, F5, F8 ở <a href="#f-01-functional-decomposition">§1</a>; <a href="#f-03-business-analysis-02-policy-change">3.2</a>, <a href="#f-03-business-analysis-04-false-positive">3.4</a>,
 <a href="#f-03-business-analysis-09-bot-management">3.9</a>, <a href="#f-03-business-analysis-10-cache-performance">3.10</a>, <a href="#f-03-business-analysis-12-api-security">3.12</a>; pipeline ở
 <a href="v1-waap-architecture.html#f-05-building-blocks-08-components-01-l7" target="_blank" rel="noopener">kiến trúc 5.8.1</a>.</p>
+</section>
+<section class="doc" id="f-03-business-analysis-14-config-tiers-attack-history-thresholds"><div class="path">03-business-analysis/14-config-tiers-attack-history-thresholds.md</div><h1 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--314-cấu-hình-nhiều-tầng-lịch-sử-tấn-công-ngưỡng-cảnh-báo">3.14 Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo</h1>
+<blockquote>
+<p><strong>Trạng thái: chủ dự án đã quyết hướng (2026-11-07); các đề xuất của Claude được chốt làm quyết định làm việc, &quot;có vấn đề gì tính sau&quot; (2026-11-07). Phần chi tiết và luồng chưa viết.</strong> Trang này ghi lại
+các tính năng sẽ có để không bị quên. Theo yêu cầu của chủ dự án, <strong>luồng vẽ và phân tích cụ thể làm sau</strong>
+(<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--5-luồng-cần-vẽ-chưa-viết">§5</a>). Phần &quot;đề xuất của Claude&quot; ở <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--3-đề-xuất-của-claude-đã-chốt-làm-quyết-định-làm-việc-đổi-sau-được">§3</a> chưa phải quyết định.</p>
+</blockquote>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--1-phạm-vi">1. Phạm vi</h2>
+<p>Ba nhóm nghiệp vụ lộ ra khi chủ dự án xem prototype portal Management Plane: cấu hình có nhiều tầng (system,
+global, website), lịch sử tấn công chia theo loại, và cảnh báo có ngưỡng. Liên quan: F5, F7, F8, F11 ở
+<a href="#f-01-functional-decomposition">§1</a>; <a href="#f-03-business-analysis-13-configuration-surface">3.13</a> (bề mặt cấu hình);
+<a href="#f-03-business-analysis-08-monitoring-investigation">3.8</a> (giám sát, được mở lại một phần).</p>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--2-đã-quyết-chủ-dự-án-2026-11-07">2. Đã quyết (chủ dự án, 2026-11-07)</h2>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--21-ba-tầng-cấu-hình">2.1 Ba tầng cấu hình</h3>
+<table>
+<thead>
+<tr>
+<th>Tầng</th>
+<th>Là gì</th>
+<th>Phạm vi áp dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>System</strong></td>
+<td>Bộ rule managed (CRS) mặc định của NCC</td>
+<td>Mặc định cho mọi website. Mỗi lần cập nhật phát ra toàn bộ website, có chiến lược canary (bàn sau)</td>
+</tr>
+<tr>
+<td><strong>Global</strong></td>
+<td>Cấu hình áp cho mọi website, cộng với các <strong>tập rule custom của NCC</strong></td>
+<td>Chọn tập rule để dùng cho từng domain, hoặc cho cluster, node</td>
+</tr>
+<tr>
+<td><strong>Website</strong></td>
+<td>Rule của riêng một website</td>
+<td>Chỉ áp cho website đó; số rule theo gói subscription</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Tầng trên ghi đè tầng dưới.</strong> Global thắng website.</li>
+<li><strong>Whitelist luôn được ưu tiên</strong> trong các cặp whitelist, blacklist. Ranh giới của ưu tiên này: <a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-đã-chốt-theo-đề-xuất-của-claude">OQ-163</a>.</li>
+<li>Tầng nào ai được sửa: chủ dự án giao Claude phân tích (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--31-ai-sửa-tầng-nào">§3.1</a>); đã chốt theo đề xuất.</li>
+</ul>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--22-lịch-sử-tấn-công">2.2 Lịch sử tấn công</h3>
+<ul>
+<li>Có <strong>hai loại đợt tấn công</strong>: <strong>DDoS L7</strong> và <strong>vuln-scan</strong> (rà quét lỗ hổng, về bản chất là WAF chặn rồi gửi event).
+Mỗi cuộc tấn công thuộc một trong hai loại là <strong>một bản ghi</strong> (không phải từng request).</li>
+<li>Cả hai đều có <strong>ngưỡng cấu hình</strong>; chạm ngưỡng mới lên cảnh báo.</li>
+<li>Có <strong>một màn riêng cho event WAF</strong>: xem chi tiết từng event và rule vi phạm; nếu là chặn nhầm thì tuning ngay từ
+event (nối với F7.5).</li>
+<li><strong>Lịch sử giữ theo gói.</strong> Khách xem được nếu gói cho phép. Admin, NOC và người vận hành nào được phân quyền
+cũng xem được. Phần gói cần phân tích thêm (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--34-lịch-sử-theo-gói">§3.4</a>).</li>
+<li>DDoS và WAF được tách (đợt DDoS và đợt vuln-scan là hai loại; event WAF là màn riêng).</li>
+</ul>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--23-cảnh-báo-và-ngưỡng">2.3 Cảnh báo và ngưỡng</h3>
+<ul>
+<li>Mọi loại tấn công có <strong>ngưỡng mặc định</strong>, chia <strong>ba mức: low, medium, high</strong>.</li>
+<li><strong>Template nội dung thông báo</strong> có chắc chắn, khách chỉnh được, có template mẫu mặc định.</li>
+<li><strong>Ngưỡng đặt ở tầng zone.</strong></li>
+<li>Định tuyến thông báo: chủ dự án giao Claude tự quyết (<a href="#f-03-business-analysis-14-config-tiers-attack-history-thresholds--35-định-tuyến-thông-báo-claude-quyết-theo-uỷ-quyền">§3.5</a>).</li>
+</ul>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--24-các-câu-hỏi-cũ-đã-trả-lời">2.4 Các câu hỏi cũ đã trả lời</h3>
+<table>
+<thead>
+<tr>
+<th>Câu</th>
+<th>Kết luận</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OQ-151</td>
+<td><strong>Một ngôn ngữ biểu thức chung</strong> cho mọi loại rule (CEL, <a href="v1-waap-architecture.html#f-09-adr-0032-cel-checked-at-control-ir-at-edge" target="_blank" rel="noopener">ADR-0032</a>)</td>
+</tr>
+<tr>
+<td>OQ-118</td>
+<td>Thao tác nào cần người duyệt thuộc <strong>nghiệp vụ phân quyền</strong>, có tính năng rồi mới tính. Không chặn các việc trên</td>
+</tr>
+<tr>
+<td>OQ-158</td>
+<td>Một phần: ngưỡng riêng từng loại có mặc định (low, medium, high), template có và chỉnh được, ngưỡng ở tầng zone. Còn mở: kênh Zalo, Telegram</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--3-đề-xuất-của-claude-đã-chốt-làm-quyết-định-làm-việc-đổi-sau-được">3. Đề xuất của Claude (đã chốt làm quyết định làm việc, đổi sau được)</h2>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--31-ai-sửa-tầng-nào">3.1 Ai sửa tầng nào</h3>
+<table>
+<thead>
+<tr>
+<th>Tầng</th>
+<th>Ai sửa</th>
+<th>Ai đọc</th>
+<th>Duyệt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>System (CRS, ruleset NCC)</td>
+<td>Threat research của NCC</td>
+<td>NCC; khách chỉ thấy phiên bản đang chạy và ghi chú phát hành</td>
+<td>Rollout theo wave, log-only trước khi chặn (<a href="#f-02-requirements--f6-phân-phối-cấu-hình-và-f11-threat-intelligence">FR-11-01</a>)</td>
+</tr>
+<tr>
+<td>Global (cấu hình chung, tập rule custom của NCC, gán cho domain, cluster, node)</td>
+<td>Admin NCC, SOC của NCC có quyền</td>
+<td>NCC; khách thấy tập rule nào đang áp cho website của mình, không thấy nội dung rule</td>
+<td>Hai người cho thao tác ảnh hưởng nhiều website (chờ phần phân quyền)</td>
+</tr>
+<tr>
+<td>Website</td>
+<td>Khách (theo vai trò); support NCC khi khách cấp quyền</td>
+<td>Khách</td>
+<td>Theo loại tài khoản: self-service tự phát hành, doanh nghiệp cần duyệt (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-26</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>Gợi ý hệ quả: rule khách có thể bị rule global đè nhưng khách phải <strong>nhìn thấy</strong> vì sao (rule nào, tầng nào),
+nếu không sẽ không gỡ lỗi được. Điều này nối với công cụ giải thích của <a href="#f-03-business-analysis-13-configuration-surface--5-câu-hỏi-cần-chủ-dự-án-quyết">OQ-161</a>.</p>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--32-tham-số-nâng-cao-theo-lớp-các-sản-phẩm-waap-cho-cấu-hình-gì">3.2 Tham số nâng cao theo lớp: các sản phẩm WAAP cho cấu hình gì</h3>
+<p>Tổng hợp theo hiểu biết của Claude về tài liệu công khai của Cloudflare, Akamai, AWS WAF, Imperva, F5, Fastly
+(Signal Sciences) và Azure WAF; <strong>chưa tra lại từng nhà</strong>. Cột cuối là đề xuất: <strong>K</strong> = khách chỉnh, <strong>E</strong> =
+Enterprise chỉnh, <strong>A</strong> = chỉ admin NCC.</p>
+<table>
+<thead>
+<tr>
+<th>Lớp</th>
+<th>Tham số hay gặp</th>
+<th>Ai</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kết nối, TLS</td>
+<td>Phiên bản TLS tối thiểu, bộ cipher, HTTP/2, HTTP/3, HSTS, mTLS từ client, timeout bắt tay và giữ kết nối</td>
+<td>K: TLS tối thiểu, HSTS; E: mTLS; A: cipher, timeout</td>
+</tr>
+<tr>
+<td>Giới hạn request</td>
+<td>Kích thước header, URL, body, số tham số, độ sâu JSON, method cho phép, content-type cho phép</td>
+<td>K: trong trần của gói; A: trần</td>
+</tr>
+<tr>
+<td>Chuẩn hoá</td>
+<td>Giải mã URL nhiều lần, chuẩn hoá unicode, xử lý request mơ hồ (smuggling), HTTP version</td>
+<td>A (E đọc)</td>
+</tr>
+<tr>
+<td>DDoS L7</td>
+<td>Độ nhạy, ngưỡng tuyệt đối theo req/s, đo theo IP, ASN, quốc gia, cửa sổ học baseline, thời gian giữ biện pháp, đường dẫn loại trừ</td>
+<td>K: độ nhạy, hành động, loại trừ; E: ngưỡng tuyệt đối; A: baseline</td>
+</tr>
+<tr>
+<td>Rate limit</td>
+<td>Khoá đếm, cửa sổ, ngưỡng, hành động, thời gian phạt, đếm theo mã response</td>
+<td>K</td>
+</tr>
+<tr>
+<td>Bot</td>
+<td>Độ nhạy, danh sách JA4 cho phép, chặn, loại bot đã xác minh, loại challenge, TTL clearance, loại trừ file tĩnh</td>
+<td>K; A: trọng số tín hiệu</td>
+</tr>
+<tr>
+<td>WAF managed</td>
+<td>Chọn ruleset, ghim phiên bản hay tự cập nhật, paranoia level, ngưỡng anomaly vào và ra, đổi hành động theo rule hoặc nhóm, tắt rule, exception theo phạm vi</td>
+<td>K: paranoia, ngưỡng, exception; E: ghim phiên bản; A: phát hành</td>
+</tr>
+<tr>
+<td>Kiểm body</td>
+<td>Giới hạn kích thước kiểm, hành vi khi vượt (kiểm một phần, bỏ qua, chặn), bật tắt parser JSON, XML, multipart, timeout regex</td>
+<td>K: hành vi khi vượt; A: timeout</td>
+</tr>
+<tr>
+<td>API</td>
+<td>Chế độ schema, hành động với endpoint lạ, JWT (issuer, audience, lệch giờ), GraphQL (độ sâu, độ phức tạp, introspection)</td>
+<td>K</td>
+</tr>
+<tr>
+<td>Response</td>
+<td>Trang lỗi, mã trạng thái, header thêm bớt, CORS</td>
+<td>K</td>
+</tr>
+<tr>
+<td>Origin</td>
+<td>Timeout kết nối và đọc, retry, health check (chu kỳ, ngưỡng), xác minh TLS tới origin, SNI, Host header, kích thước pool</td>
+<td>K: phần lớn; A: trần</td>
+</tr>
+<tr>
+<td>Cache</td>
+<td>TTL, bỏ qua, xử lý query string, stale-if-error, tiered cache</td>
+<td>K</td>
+</tr>
+<tr>
+<td>Log</td>
+<td>Lấy mẫu access log, trường được ghi, che dữ liệu cá nhân, retention</td>
+<td>K trong trần gói; A: trần</td>
+</tr>
+</tbody>
+</table>
+<p>Nguyên tắc đề xuất: tham số <strong>làm giảm an toàn</strong> (nới giới hạn, tắt kiểm) chỉ chỉnh được trong trần của gói
+và có audit; tham số <strong>ảnh hưởng nhiều khách</strong> (chuẩn hoá, cipher, timeout engine) chỉ admin NCC.</p>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--33-hành-động-ddos-l7-cho-khách">3.3 Hành động DDoS L7 cho khách</h3>
+<table>
+<thead>
+<tr>
+<th>Hành động</th>
+<th>Khi nào dùng</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chỉ ghi log</td>
+<td>Giai đoạn quan sát, ngưỡng mới</td>
+<td>Không áp dụng ở tuần đầu: <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-24</a> chặn DDoS từ request đầu tiên</td>
+</tr>
+<tr>
+<td>Challenge (managed)</td>
+<td><strong>Mặc định</strong></td>
+<td>Người thật qua được, công cụ flood thì không</td>
+</tr>
+<tr>
+<td>Giới hạn tốc độ nguồn</td>
+<td>Nguồn có tỉ lệ cao nhưng chưa chắc xấu (đối tác, proxy)</td>
+<td>Throttle thay vì chặn</td>
+</tr>
+<tr>
+<td>Chặn có thời hạn</td>
+<td>Nguồn đã rõ ràng</td>
+<td>Thời hạn 10 phút, tăng dần nếu quay lại; tự hết hạn</td>
+</tr>
+<tr>
+<td>Chặn theo ASN, quốc gia tạm thời</td>
+<td>Flood từ một nhà mạng</td>
+<td>Qua kênh khẩn, có hạn (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-27</a>)</td>
+</tr>
+<tr>
+<td>Under Attack mode</td>
+<td>Toàn zone đang bị flood</td>
+<td>Challenge mọi request chưa có clearance; tự bật có hẹn giờ tắt chưa chốt (<a href="v1-waap-architecture.html#f-09-adr-0008-under-attack-mode" target="_blank" rel="noopener">ADR-0008</a>)</td>
+</tr>
+<tr>
+<td>Tarpit</td>
+<td>Nguồn dò đăng nhập</td>
+<td>Có trần theo node (đã quyết)</td>
+</tr>
+<tr>
+<td>Chỉ phục vụ từ cache</td>
+<td>Origin quá tải do flood</td>
+<td>Chỉ khi zone có cache; cảnh báo khách</td>
+</tr>
+</tbody>
+</table>
+<p>Khách chọn: độ nhạy (low, medium, high), hành động chính, thời gian giữ biện pháp, danh sách loại trừ (Trust).
+Ngưỡng tuyệt đối cho Enterprise.</p>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--34-lịch-sử-theo-gói">3.4 Lịch sử theo gói</h3>
+<p>Hai kho có chi phí rất khác nhau, nên giữ khác nhau:</p>
+<table>
+<thead>
+<tr>
+<th>Kho</th>
+<th>Kích thước</th>
+<th>Free</th>
+<th>Pro</th>
+<th>Business</th>
+<th>Enterprise</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Đợt tấn công</strong> (DDoS L7, vuln-scan; một bản ghi mỗi đợt)</td>
+<td>Nhỏ</td>
+<td>30 ngày</td>
+<td>90 ngày</td>
+<td>12 tháng</td>
+<td>24 tháng, tuỳ hợp đồng</td>
+</tr>
+<tr>
+<td><strong>Event WAF</strong> (từng request)</td>
+<td>Lớn</td>
+<td>3 ngày</td>
+<td>14 ngày</td>
+<td>30 ngày</td>
+<td>90 ngày, lâu hơn qua archive</td>
+</tr>
+</tbody>
+</table>
+<p>Các con số là điểm khởi đầu để thảo luận, không dựa trên dữ liệu chi phí thật. Nguyên tắc: bản ghi đợt tấn công
+rẻ, nên giữ lâu hơn nhiều so với event; security event không bao giờ lấy mẫu (<a href="v1-waap-architecture.html#f-08-cross-cutting-18-segments-and-plans" target="_blank" rel="noopener">8.18</a>).
+Quyền xem: khách theo vai trò, nhân viên NCC theo quyền được cấp (NOC, admin, SOC), xem dữ liệu request của
+khách cần lý do và để lại audit (<a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-20</a>).</p>
+<p><strong>Đợt vuln-scan</strong> cần định nghĩa gom event: đề xuất cùng nguồn (IP hoặc ASN) trong cửa sổ 10 phút, vượt
+ngưỡng số event hoặc số rule khác nhau thì mở đợt; im lặng 30 phút thì đóng.</p>
+<h3 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--35-định-tuyến-thông-báo-claude-quyết-theo-uỷ-quyền">3.5 Định tuyến thông báo (Claude quyết theo uỷ quyền)</h3>
+<p>Chủ dự án giao &quot;m tự quyết&quot;, nên ghi như quyết định, đổi lại dễ:</p>
+<table>
+<thead>
+<tr>
+<th>Mức</th>
+<th>Kênh mặc định</th>
+<th>Nhịp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>High</td>
+<td>Chat và email tới Owner, người trực; PagerDuty hoặc SMS nếu khách bật</td>
+<td>Tức thì; không ack trong 15 phút thì leo thang người kế tiếp. Giờ im lặng <strong>không</strong> chặn mức high</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Chat và email tới nhóm bảo mật của zone</td>
+<td>Tức thì, gộp theo <a href="#f-02-requirements--f8-phát-hiện-cảnh-báo-sự-cố">FR-8-08</a></td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Hiện trên portal; email tóm tắt hằng ngày</td>
+<td>Digest</td>
+</tr>
+</tbody>
+</table>
+<p>Người nhận theo vai trò và theo zone (ghi đè được ở cấp zone); mọi kênh của cảnh báo high lỗi thì gửi email tới
+liên hệ bảo mật của account (đã có ở 5.8.11).</p>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--4-đã-chốt-theo-đề-xuất-của-claude">4. Đã chốt theo đề xuất của Claude</h2>
+<p>Chủ dự án: &quot;làm theo đề xuất của bro trước, có vấn đề gì tính sau; phần cần chốt mày cũng đề xuất luôn&quot;. Ba câu dưới đây chốt theo đề xuất, ghi là quyết định làm việc và có thể đảo.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Câu hỏi</th>
+<th>Quyết định làm việc</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OQ-163</td>
+<td>&quot;Whitelist luôn ưu tiên&quot; có thắng cả <strong>rule khẩn của NCC</strong> (chặn 0-day, CVE) không? Và nó chỉ thắng blacklist, hay cũng bỏ qua WAF, rate limit, DDoS?</td>
+<td><strong>Chốt:</strong> whitelist thắng blacklist cùng tầng; whitelist của website <strong>không</strong> thắng tầng trên (global, system) và không bỏ qua WAF, rate limit, DDoS (giữ <a href="#f-02-requirements--4-quy-tắc-nghiệp-vụ">BR-28</a>); <strong>rule khẩn của NCC không bị whitelist nào đè</strong> (whitelist một IP bị chiếm sẽ mở lỗ hổng 0-day), chỉ support đặt log-only có hạn cho một zone (<a href="#f-02-requirements--f12-vận-hành-ncc">FR-12-07</a>); whitelist của <strong>global</strong> thắng blacklist của website và CRS, có audit. Bảng đủ 7 trường hợp có trong prototype portal, màn &quot;Ba tầng cấu hình&quot;</td>
+</tr>
+<tr>
+<td>OQ-164</td>
+<td>Có tầng <strong>account (tổ chức)</strong> cho khách không (một bộ rule dùng cho nhiều website của cùng khách, như agency 50 site)?</td>
+<td>Ba tầng anh nêu đều của NCC hoặc của một website. Tài liệu cũ có kế thừa org → nhóm zone → zone (FR-5-18, Mở rộng). <strong>Chốt:</strong> MVP <strong>không có tầng account</strong>; tầng website chỉ là tập rule của một website. Khách nhiều site dùng <strong>mẫu policy</strong> (PolicyTemplate, sao chép hoặc liên kết vào từng website) ở mức Mở rộng; mẫu không thêm tầng ưu tiên mới, rule trong mẫu vẫn tính vào trần theo gói của từng website</td>
+</tr>
+<tr>
+<td>OQ-165</td>
+<td>Tập rule custom của NCC gán theo <strong>node, cluster</strong> được: khách có thấy và chọn không, hay chỉ NCC gán?</td>
+<td>Gán theo node liên quan hạ tầng (cell, PoP); <strong>Chốt:</strong> chỉ NCC gán; khách chỉ thấy tập nào đang áp cho website của mình, không thấy nội dung rule</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--5-luồng-cần-vẽ-chưa-viết">5. Luồng cần vẽ (chưa viết)</h2>
+<p>Theo yêu cầu của chủ dự án, các luồng sau cần vẽ và phân tích cụ thể, <strong>chưa làm</strong>:</p>
+<ol>
+<li>Hợp nhất ba tầng khi biên dịch: thứ tự, ghi đè, whitelist, xung đột, kết quả cho khách thấy.</li>
+<li>Phát ruleset mới ở tầng system tới toàn bộ website (canary bàn riêng, nối <a href="v1-waap-architecture.html#f-08-cross-cutting-15-config-propagation-and-apply" target="_blank" rel="noopener">8.15</a>).</li>
+<li>Tạo tập rule global và gán cho domain, cluster, node.</li>
+<li>Áp giới hạn số rule theo gói ở tầng website.</li>
+<li>Vòng đời một đợt tấn công: mở, leo thang, giảm thiểu, đóng; cả hai loại.</li>
+<li>Từ ngưỡng đến thông báo: đánh giá, mức low, medium, high, định tuyến, template.</li>
+<li>Từ event WAF đến tuning chặn nhầm.</li>
+</ol>
+<h2 id="f-03-business-analysis-14-config-tiers-attack-history-thresholds--6-phụ-thuộc">6. Phụ thuộc</h2>
+<p>F5, F7, F8, F11 ở <a href="#f-01-functional-decomposition">§1</a>; <a href="#f-03-business-analysis-13-configuration-surface">3.13</a>, <a href="#f-03-business-analysis-09-bot-management">3.9</a>;
+<a href="v1-waap-architecture.html#f-08-cross-cutting-15-config-propagation-and-apply" target="_blank" rel="noopener">kiến trúc 8.15</a> (lớp phát cấu hình),
+<a href="v1-waap-architecture.html#f-05-building-blocks-08-components-09-query-detection-export-replay" target="_blank" rel="noopener">5.8.9</a> (detection),
+<a href="v1-waap-architecture.html#f-05-building-blocks-08-components-10-alerting-rules-and-algorithms" target="_blank" rel="noopener">5.8.10</a> (cảnh báo).</p>
 </section>
 <section class="doc" id="f-04-product-direction-00-index"><div class="path">04-product-direction/00-index.md</div><h1 id="f-04-product-direction-00-index--4-định-hướng-sản-phẩm">4. Định hướng sản phẩm</h1>
 <blockquote>

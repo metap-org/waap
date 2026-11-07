@@ -1,7 +1,8 @@
 # 3.8 Giám sát, điều tra, cảnh báo, báo cáo
 
 > **Trạng thái: tạm hoãn theo chủ dự án (2026-11-07), "giám sát thì tính sau".** Kịch bản và câu hỏi dưới đây giữ
-> nguyên để quay lại sau, không phân tích thêm lúc này.
+> nguyên để quay lại sau, không phân tích thêm lúc này. **Ngoại lệ:** lịch sử tấn công (hai loại đợt, màn event WAF)
+> và ngưỡng cảnh báo đã được mở lại ở [3.14](14-config-tiers-attack-history-thresholds.md).
 
 ## 1. Phạm vi
 

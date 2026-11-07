@@ -375,7 +375,7 @@ Mỗi tiền tố chỉ có một nghĩa trong toàn bộ tài liệu.
 | **F1…F12, Fx.y, Fx.y.z** | Nhóm chức năng, chức năng, chức năng lá | [requirements §1](../../requirements/01-functional-decomposition.md) |
 | **PM1…PM7 / PC1…PC8 / PE1…PE4 / PA1…PA8** | Thành phần chức năng của Management / Control / Edge / Analytics trong phân rã theo plane | [requirements §1](../../requirements/01-functional-decomposition.md#phân-rã-theo-plane) |
 | **LK-1…LK-28** | Liên kết giữa các plane (chức năng phát → chức năng nhận, hợp đồng, kiểu, hành vi khi hỏng) | [requirements §1](../../requirements/01-functional-decomposition.md#liên-kết-giữa-các-plane) |
-| **FR-x-nn / BR-n / DT-n / NFR-n / IR-n / OQ-n** | Yêu cầu chức năng / quy tắc nghiệp vụ / yêu cầu dữ liệu / phi chức năng / giao tiếp ngoài / câu hỏi mở của requirements (OQ-1…OQ-15 ở §2, OQ-16…OQ-20 ở Phụ lục A của §3.1, OQ-21…OQ-126 và OQ-143…OQ-162 ở các trang của §3, OQ-127…OQ-142 ở §4) | [requirements §2](../../requirements/02-requirements.md) |
+| **FR-x-nn / BR-n / DT-n / NFR-n / IR-n / OQ-n** | Yêu cầu chức năng / quy tắc nghiệp vụ / yêu cầu dữ liệu / phi chức năng / giao tiếp ngoài / câu hỏi mở của requirements (OQ-1…OQ-15 ở §2, OQ-16…OQ-20 ở Phụ lục A của §3.1, OQ-21…OQ-126 và OQ-143…OQ-165 ở các trang của §3, OQ-127…OQ-142 ở §4) | [requirements §2](../../requirements/02-requirements.md) |
 | **QS-1…QS-41** | Kịch bản chất lượng đo được | [10.3](../10-quality/00-index.md#103-kịch-bản) |
 | **R1…R29** | Rủi ro | [11.1](../11-risks/00-index.md) |
 | **A1…A17 / B1…B10** | Tình huống vận hành tự xảy ra / thao tác của người vận hành, mỗi cái có runbook | [8.13](../08-cross-cutting/13-operational-behaviors.md) |

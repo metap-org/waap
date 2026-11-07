@@ -182,15 +182,15 @@ cửa sổ dedup mặc định 30 phút.
 
 | ID | Câu hỏi | Kịch bản | Ghi chú ban đầu |
 |---|---|---|---|
-| OQ-151 | Một ngôn ngữ biểu thức chung cho mọi loại rule, hay form riêng cho từng tính năng? | KB13-A1…KB13-A5 | Cloudflare dùng một ngôn ngữ chung, form builder sinh ra biểu thức. Custom rule đã dùng CEL ([ADR-0032](../../architecture/09-adr/0032-cel-checked-at-control-ir-at-edge.md)); câu hỏi là có mở rộng CEL cho mọi loại rule không |
+| OQ-151 | **Đã quyết: một ngôn ngữ chung** ([3.14](14-config-tiers-attack-history-thresholds.md#24-các-câu-hỏi-cũ-đã-trả-lời)). Một ngôn ngữ biểu thức chung cho mọi loại rule, hay form riêng cho từng tính năng? | KB13-A1…KB13-A5 | Cloudflare dùng một ngôn ngữ chung, form builder sinh ra biểu thức. Custom rule đã dùng CEL ([ADR-0032](../../architecture/09-adr/0032-cel-checked-at-control-ir-at-edge.md)); câu hỏi là có mở rộng CEL cho mọi loại rule không |
 | OQ-152 | Biểu thức ở MVP gồm những trường nào (IP, quốc gia, ASN, JA4, User-Agent, URI, header, cookie, body, bot score, kết quả WAF)? | KB13-A4 | |
 | OQ-153 | Có list dùng lại cấp account (IP, ASN, JA4, hostname) không? | KB13-C1, KB13-J3 | |
 | OQ-154 | Rate limit ở MVP có khoá đếm theo biểu thức, đếm theo response và thời gian phạt không? | §2 | |
 | OQ-155 | Khách được chọn những loại challenge nào (cookie, JS, tương tác, managed)? TTL clearance do khách đặt hay cố định? | §2 | Gắn với 3.9 |
 | OQ-156 | Trang chặn: khách sửa HTML tự do, hay chỉ điền template (logo, màu, nội dung, liên hệ)? Gói nào? | KB13-F1…KB13-F6 | **Đã quyết một phần** ở §4: tải HTML, CSS tĩnh, không JavaScript; còn mở gói nào có |
 | OQ-157 | Có nhóm transform rule (header, rewrite, redirect) ở v1 không? | §2 | |
-| OQ-158 | Cảnh báo: ngưỡng riêng từng loại hay chỉ mức nhạy? Có template nội dung không? Có kênh Zalo, Telegram không? | KB13-G1…KB13-G8 | |
-| OQ-159 | Cấu hình nâng cao từng lớp: những tham số nào, phạm vi áp ở đâu, chỉ admin NCC hay mở một phần cho Enterprise? | KB13-H1…KB13-H5 | |
+| OQ-158 | Cảnh báo: ngưỡng riêng từng loại hay chỉ mức nhạy? Có template nội dung không? Có kênh Zalo, Telegram không? | KB13-G1…KB13-G8 | **Đã quyết một phần** ở [3.14](14-config-tiers-attack-history-thresholds.md#23-cảnh-báo-và-ngưỡng): có ngưỡng ba mức, có template, ngưỡng ở tầng zone. Còn mở: Zalo, Telegram |
+| OQ-159 | Cấu hình nâng cao từng lớp: những tham số nào, phạm vi áp ở đâu, chỉ admin NCC hay mở một phần cho Enterprise? | KB13-H1…KB13-H5 | Có đề xuất ở [3.14 §3.2](14-config-tiers-attack-history-thresholds.md#32-tham-số-nâng-cao-theo-lớp-các-sản-phẩm-waap-cho-cấu-hình-gì) và ba tầng ở [§2.1](14-config-tiers-attack-history-thresholds.md#21-ba-tầng-cấu-hình), chờ duyệt |
 | OQ-160 | Setting nào đi qua change request, setting nào áp ngay? | KB13-J1 | |
 | OQ-161 | Có công cụ giải thích "vì sao request này bị chặn" cho khách không? | KB13-B4 | |
 | OQ-162 | Trần số rule và độ phức tạp theo gói? | KB13-D1…KB13-D4 | Gắn với 3.5 |
