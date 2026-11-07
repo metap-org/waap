@@ -152,7 +152,7 @@ khỏi portal của khách; các trục dưới đây là những gì portal và
 | OQ-91 | Mục tiêu thời gian từ CVE tới rule khẩn; có trang công bố theo CVE không? | KB11-A1, KB11-A3 | |
 | OQ-92 | POC cho Enterprise: thời gian, chi phí, ai làm | KB11-D1 | |
 | OQ-93 | On-prem: NCC vận hành hay khách tự vận hành? | KB11-D3 | |
-| OQ-118 | Portal vận hành của NCC: thao tác nào cần hai người duyệt (khoá zone, bật mitigation hàng loạt, đóng băng fleet)? | KB11-F2, KB11-F5 | |
+| OQ-118 | Portal vận hành của NCC: thao tác nào cần hai người duyệt (khoá zone, bật mitigation hàng loạt, đóng băng fleet)? | KB11-F2, KB11-F5 | **Hoãn** (2026-11-07): thuộc nghiệp vụ phân quyền, làm khi có tính năng phân quyền; không chặn việc khác |
 | OQ-119 | Khách không vào được portal (portal sập, mất tài khoản) khi đang bị tấn công: kênh dự phòng là gì? | KB11-B6, KB11-C5 | Gắn với OQ-41 đã quyết |
 | OQ-120 | Lộ trình chứng chỉ của NCC (ISO 27001, SOC 2, PCI DSS)? | KB11-H1 | Ảnh hưởng việc bán cho ngân hàng, thương mại điện tử |
 | OQ-121 | Có chia sẻ chỉ dấu tấn công với CERT, VNCERT không, với dữ liệu nào? | KB11-J1 | |

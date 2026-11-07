@@ -297,6 +297,12 @@ Mọi thay đổi ảnh hưởng tới traffic đi qua nhóm này. Persona chín
 | F5.6.1 | Toàn bộ F5.1–F5.4 qua public API | M | MVP | — |
 | F5.6.2 | Terraform provider | M | MR | — |
 | F5.6.3 | Đồng bộ từ Git (GitOps) | M | MR | **GitSource** |
+| **F5.7** | **Cấu hình nhiều tầng** ([3.14](03-business-analysis/14-config-tiers-attack-history-thresholds.md)) | | | |
+| F5.7.1 | Tầng system: bộ rule managed mặc định cho mọi website; cập nhật phát toàn fleet theo canary | C | MVP | **RulesetRelease** |
+| F5.7.2 | Tầng global: cấu hình chung và tập rule custom của NCC, gán cho domain, cluster hoặc node | M | MR | **RuleSet**, **RuleSetAssignment** |
+| F5.7.3 | Tầng website: rule của riêng website, số lượng theo gói | M | MVP | CustomRule, Entitlements |
+| F5.7.4 | Ưu tiên giữa tầng: tầng trên ghi đè tầng dưới; whitelist ưu tiên (ranh giới chờ OQ-163) | C | MVP | — |
+| F5.7.5 | Hiện cho khách rule nào áp lên website của họ và đến từ tầng nào | M | MVP | — |
 
 ## F6 Phân phối cấu hình và fleet
 
@@ -354,6 +360,13 @@ Persona chính: SOC analyst, quản trị bảo mật; support của NCC với q
 | F7.6.1 | Cấu hình đích export (Splunk, S3, HTTP, Kafka, syslog) | M | MVP | **ExportDestination** |
 | F7.6.2 | Đẩy event liên tục, thử lại, báo đích lỗi | A | MVP | Trạng thái export |
 | F7.6.3 | Bộ lọc export theo hành động, loại event, zone, trường; lấy mẫu log allow | A | MVP | **ExportDestination** |
+| **F7.7** | **Lịch sử tấn công** | | | |
+| F7.7.1 | Gom event thành một bản ghi cho mỗi đợt tấn công, hai loại: DDoS L7 và vuln-scan | A | MVP | **AttackEpisode** |
+| F7.7.2 | Xem danh sách, chi tiết đợt tấn công (bắt đầu, đỉnh, nguồn, biện pháp đã áp) theo quyền và gói | A | MVP | AttackEpisode |
+| F7.7.3 | Giữ lịch sử theo gói; nhân viên NCC có quyền xem, có audit | A | MVP | AttackEpisode |
+| **F7.8** | **Event WAF** | | | |
+| F7.8.1 | Màn riêng: danh sách event, chi tiết, rule vi phạm | A | MVP | SecurityEvent |
+| F7.8.2 | Tuning chặn nhầm ngay từ event (nối F7.5) | M | MVP | **FalsePositiveLabel**, **Exception** |
 
 ## F8 Phát hiện, cảnh báo, sự cố
 
@@ -368,6 +381,9 @@ Persona chính: SOC analyst, quản trị bảo mật; support của NCC với q
 | F8.2.2 | Kênh thông báo: email, webhook, Slack, Teams, PagerDuty, SMS | M | MVP | **NotificationChannel** |
 | F8.2.3 | Giờ im lặng, chu kỳ lặp, gộp cảnh báo | M | MVP | **AlertPolicy** |
 | F8.2.4 | Gửi thử kênh | M | MVP | — |
+| F8.2.5 | Ngưỡng cảnh báo theo từng loại tấn công, ba mức low, medium, high, có mặc định; đặt ở tầng zone | M | MVP | **AlertThreshold** |
+| F8.2.6 | Template nội dung thông báo: mẫu mặc định, khách tuỳ chỉnh | M | MVP | **NotificationTemplate** |
+| F8.2.7 | Định tuyến thông báo theo mức và vai trò; leo thang khi mức high không ack | M | MVP | **AlertPolicy** |
 | **F8.3** | **Gửi thông báo** | | | |
 | F8.3.1 | Gửi theo kênh, thử lại, ghi kết quả | A | MVP | **NotificationDelivery** |
 | F8.3.2 | Chống bão: dedup theo alert, zone, nguồn; gom vào một thread hoặc digest; mức tăng hoặc nguồn mới thì gửi tin mới | A | MVP | **NotificationDelivery** |

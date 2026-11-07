@@ -162,6 +162,9 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-5-19 | Người dùng nên duyệt endpoint API từ discovery và tải OpenAPI làm schema | F5.1.8 | MR | |
 | FR-5-20 | Public API phải có endpoint kiểm tra không lưu (validate, dry-run): chạy cùng checker và `edge-verify` với Control, trả lỗi theo rule, không tạo PolicyVersion hay change request; có quota theo tenant | F5.2.4 | MVP | Gọi validate nhiều lần không sinh dòng nào trong `policy_versions` |
 | FR-5-21 | Account cần duyệt nên có emergency override theo [BR-27](#4-quy-tắc-nghiệp-vụ) | F5.5.3 | MR | Override sinh cảnh báo critical tới mọi Owner và Admin của account trong ≤ 1 phút |
+| FR-5-22 | Cấu hình có ba tầng: system, global, website ([3.14](03-business-analysis/14-config-tiers-attack-history-thresholds.md)); tầng trên ghi đè tầng dưới ([BR-37](#4-quy-tắc-nghiệp-vụ)) | F5.7.1–F5.7.4 | MVP (system, website); MR (global) | Khách xem được rule nào áp lên website của mình và từ tầng nào |
+| FR-5-23 | Số rule và tập rule tầng website bị giới hạn theo gói | F5.7.3 | MVP | Vượt trần thì từ chối khi lưu, nêu rõ trần của gói |
+| FR-5-24 | NCC phải tạo được tập rule custom ở tầng global và gán cho domain, cluster hoặc node; phát qua đường thường có canary | F5.7.2 | MR | Tập rule gán cho một domain chỉ ảnh hưởng domain đó |
 
 ### F6 Phân phối cấu hình và F11 Threat intelligence
 
@@ -193,6 +196,9 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-7-09 | Mọi truy vấn dữ liệu traffic phải đi qua Query API áp quyền theo tenant | F7.3 | MVP | QS-9 |
 | FR-7-10 | Portal phải có live tail lọc theo rule ID, IP, path, hành động, gồm hit log-only; lọc trước khi đẩy về trình duyệt; giới hạn tốc độ và thời lượng phiên; theo quyền xem dữ liệu request | F7.2.3 | MVP | Phiên live tail chỉ nhận event khớp bộ lọc |
 | FR-7-11 | Đích export phải có bộ lọc theo hành động, loại event, zone, trường, và lấy mẫu log allow | F7.6.3 | MVP | Đích lọc "chỉ block, challenge" không nhận bản ghi allow nào |
+| FR-7-12 | Mỗi đợt tấn công DDoS L7 hoặc vuln-scan phải là **một bản ghi**, mở khi chạm ngưỡng và đóng khi hết ([BR-38](#4-quy-tắc-nghiệp-vụ)) | F7.7.1 | MVP | Một đợt flood 30 phút sinh một bản ghi, không phải hàng nghìn |
+| FR-7-13 | Lịch sử đợt tấn công và event WAF giữ theo gói; khách xem nếu gói cho phép; nhân viên NCC xem theo quyền được cấp, có audit | F7.7.2, F7.7.3 | MVP | Gói không cho xem thì ẩn màn, không trả dữ liệu |
+| FR-7-14 | Portal phải có màn event WAF riêng: danh sách, chi tiết, rule vi phạm, và tuning chặn nhầm từ event | F7.8.1, F7.8.2 | MVP | Từ một event bấm tạo exception nháp điền sẵn rule, đường dẫn |
 
 ### F8 Phát hiện, cảnh báo, sự cố
 
@@ -207,6 +213,8 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-8-07 | Chấp nhận đề xuất mitigation từ case phải tạo rule tạm có hạn qua kênh khẩn | F8.1.3, F5.5.2 | MR | |
 | FR-8-08 | Notifier phải dedup theo alert, zone, nguồn: cùng khoá trong cửa sổ gộp (mặc định 30 phút) chỉ gửi tin đầu, các lần sau gom vào thread hoặc digest; mức tăng hoặc nguồn mới phá dedup | F8.3.2 | MVP | Alert W3 bắn 1.000 lần trong 30 phút sinh 1 tin và 1 digest trên Slack |
 | FR-8-09 | Thông báo nên kèm link xử lý một bấm tới mitigation đề xuất theo [BR-30](#4-quy-tắc-nghiệp-vụ) | F8.3.3 | MR | Mở link bằng trình quét link (không đăng nhập) không thay đổi gì |
+| FR-8-10 | Mỗi loại tấn công (DDoS L7, vuln-scan và các loại khác) phải có ngưỡng mặc định ở ba mức low, medium, high; khách chỉnh ở tầng zone; chạm ngưỡng mới lên cảnh báo | F8.2.5 | MVP | Zone không chỉnh gì vẫn nhận cảnh báo theo mặc định |
+| FR-8-11 | Nội dung thông báo dùng template có biến, có mẫu mặc định, khách tuỳ chỉnh được | F8.2.6 | MVP | Xem trước được trước khi lưu |
 
 ### F9 Báo cáo và tuân thủ
 
@@ -290,6 +298,8 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | BR-34 | Hành động mặc định theo bot score (1–99, thấp là bot) và nhóm path: path thường: dưới 10 challenge, 10 đến dưới 50 log, từ 50 allow; path nhạy cảm (login, checkout): dưới 10 block, 10 đến dưới 50 challenge tương tác, từ 50 allow; path API: không challenge, dùng rate limit theo consumer. Mặc định dùng managed challenge (edge tự chọn JS hay tương tác theo điểm). Khách sửa được mọi mốc | F3.6.2 |
 | BR-35 | Endpoint API có schema: kiểm schema chạy trước managed ruleset trong tầng WAF, request sai schema bị loại không quét signature; endpoint đang enforce schema được giảm paranoia CRS để giảm chặn nhầm | F3.7.1 |
 | BR-36 | Log-only không bao giờ tự chuyển sang chặn: sau thời gian quan sát (mặc định 7 ngày, BR-24) hệ thống gửi báo cáo số request sẽ bị chặn và rule nghi chặn nhầm; người dùng bấm chuyển, bước chuyển đi qua change request | F5.1.6 |
+| BR-37 | Giữa các tầng cấu hình: tầng trên ghi đè tầng dưới (system trên global trên website). Whitelist ưu tiên trong các cặp whitelist, blacklist; ranh giới với rule khẩn của NCC và với [BR-28](#4-quy-tắc-nghiệp-vụ), [BR-33](#4-quy-tắc-nghiệp-vụ) chờ chốt ([OQ-163](03-business-analysis/14-config-tiers-attack-history-thresholds.md#4-cần-chủ-dự-án-chốt)) | F5.7.4 |
+| BR-38 | Một đợt tấn công là một bản ghi, thuộc đúng một trong hai loại (DDoS L7, vuln-scan); chỉ mở đợt và gửi cảnh báo khi vượt ngưỡng đã cấu hình | F7.7.1 |
 
 ## 5. Yêu cầu dữ liệu
 
@@ -306,10 +316,10 @@ hoặc đọc qua API.
 | DT-6 | Thay đổi và duyệt | ChangeRequest, Approval, ChangeWindow, TemporaryMitigation, BulkOperation, GitSource | M | ≈ thay đổi cấu hình 1,7/s | 13 tháng truy vấn được | Trung bình |
 | DT-7 | Audit | AuditEntry | M | Lớn nhất của Management, ghi thêm | Không xoá; archive sau 13 tháng | Có dữ liệu cá nhân |
 | DT-8 | Gói, billing | Plan, PlanVersion, Price, AddOn, Subscription, Entitlements, UsageDaily, QuotaNotice, Invoice, InvoiceLine, Payment, PaymentMethod (token), CreditNote | M | 1 triệu subscription, 1 triệu dòng usage mỗi ngày | Hoá đơn, chứng từ ≥ 10 năm (Luật Kế toán) | Tài chính; không lưu số thẻ |
-| DT-9 | Vận hành bảo mật của khách | SavedSearch, AlertPolicy, NotificationChannel, ExportDestination, FalsePositiveLabel, Case, CaseLink, ReportDefinition, ReportRun | M | Nhỏ so với DT-3 | Theo vòng đời; ReportRun 13 tháng | Credential kênh, đích export ở secret store |
+| DT-9 | Vận hành bảo mật của khách | SavedSearch, AlertPolicy, AlertThreshold, NotificationTemplate, NotificationChannel, ExportDestination, FalsePositiveLabel, Case, CaseLink, ReportDefinition, ReportRun | M | Nhỏ so với DT-3 | Theo vòng đời; ReportRun 13 tháng | Credential kênh, đích export ở secret store |
 | DT-10 | Dữ liệu NCC | Partner, Pop, SupportAccessGrant, trạng thái khoá org | M (`PLATFORM_TENANT_ID`) | Nhỏ | Theo vòng đời | Thấp |
-| DT-11 | Phân phối, fleet | ZoneBundle, Manifest, CompileResult, Rollout, RolloutStatus, Node, NodeCert, NodeDenyList, ZonePlacement, RulesetRelease, EmergencyRule, EmergencyRuleOverride, ReputationFeed, PopState, FleetFreeze | C | 8 GB bundle mỗi PoP, ≈ 700 node | Bundle: N version gần nhất mỗi zone | Khoá ký ở KMS |
-| DT-12 | Telemetry | SecurityEvent, AccessLog, RequestSample, UsageCounter, AlertState, NotificationDelivery, ReplayJob, bảng tổng hợp | A | ≈ 1,15 triệu bản ghi/s, 12 TB/ngày | Theo gói: 24 giờ đến 365 ngày | Có IP và header của end-user |
+| DT-11 | Phân phối, fleet | RuleSet, RuleSetAssignment, ZoneBundle, Manifest, CompileResult, Rollout, RolloutStatus, Node, NodeCert, NodeDenyList, ZonePlacement, RulesetRelease, EmergencyRule, EmergencyRuleOverride, ReputationFeed, PopState, FleetFreeze | C | 8 GB bundle mỗi PoP, ≈ 700 node | Bundle: N version gần nhất mỗi zone | Khoá ký ở KMS |
+| DT-12 | Telemetry | SecurityEvent, AttackEpisode, AccessLog, RequestSample, UsageCounter, AlertState, NotificationDelivery, ReplayJob, bảng tổng hợp | A | ≈ 1,15 triệu bản ghi/s, 12 TB/ngày | Theo gói: 24 giờ đến 365 ngày | Có IP và header của end-user |
 
 Yêu cầu chung cho dữ liệu:
 
@@ -384,4 +394,4 @@ Phân rã theo plane, thành phần và các liên kết `LK-…` giữa plane �
 | OQ-13 | Developer có được tạo exception không cần duyệt trong zone được giao không? | Không, luôn qua change request | FR-1-06, F5.1.4 |
 | OQ-14 | Billing theo account hay theo org (một hoá đơn cho cả org)? | Theo account, gộp được ở cấp org | DT-8 |
 | OQ-15 | Chốt các hợp đồng tạm ở [5.5](../architecture/05-building-blocks/05-contracts.md#hợp-đồng-bổ-sung-tạm-2026-11-06) (purge, kết quả biên dịch, rollout, cert, kiểm zone, kiểm origin, `PopState`, `PermissionsChanged`, cấu hình alert/export, nhãn chặn nhầm, replay, xoá dữ liệu, cách ly, reputation) | Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3 | 5.5, outbox của Management |
-| OQ-16…OQ-162 | OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-162 theo từng nghiệp vụ ([§3](03-business-analysis/00-index.md)); OQ-127…OQ-142 về định hướng sản phẩm ([§4](04-product-direction/00-index.md)) | Một số đã quyết hoặc có đề xuất chờ duyệt | Theo trang |
+| OQ-16…OQ-165 | OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ ([§3](03-business-analysis/00-index.md)); OQ-127…OQ-142 về định hướng sản phẩm ([§4](04-product-direction/00-index.md)) | Một số đã quyết hoặc có đề xuất chờ duyệt | Theo trang |

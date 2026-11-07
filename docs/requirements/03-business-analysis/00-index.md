@@ -1,6 +1,6 @@
 # 3. Phân tích nghiệp vụ
 
-> **Trạng thái (2026-11-07): 13 nghiệp vụ ở bước 1.** Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
+> **Trạng thái (2026-11-07): 14 nghiệp vụ ở bước 1.** Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
 > còn lại của 3.2–3.6 có đề xuất của Claude chờ duyệt. Chưa nghiệp vụ nào có luồng được duyệt.
 
 Bản đồ phân rã nói hệ thống **có** những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
@@ -39,6 +39,7 @@ Mỗi nghiệp vụ đi qua hai bước, và **không viết bước 2 khi chủ
 | [3.11](11-provider-operations.md) | Vận hành của NCC | OQ-89…OQ-93, OQ-118…OQ-123 | Bước 1, đã thêm trục F–N |
 | [3.12](12-api-security.md) | API security | OQ-84, OQ-107…OQ-111 | Bước 1, tách từ trang bot cũ |
 | [3.13](13-configuration-surface.md) | Bề mặt cấu hình: rule và setting trên portal, cấu hình nâng cao cho admin | OQ-151…OQ-162 | Đã quyết nhóm tính năng theo plane (trang lỗi, emergency override, Trust/Skip, audit export, rollout, dry-run, failover, tarpit, IP thật sau CDN, xử lý một bấm, live tail, chống bão, lọc export); danh mục và các câu còn lại ở bước 1 |
+| [3.14](14-config-tiers-attack-history-thresholds.md) | Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo | OQ-163…OQ-165 | Đã quyết hướng (ba tầng, hai loại đợt tấn công, ngưỡng ba mức); luồng chưa vẽ |
 
 ## Câu hỏi nối giữa các nghiệp vụ
 
