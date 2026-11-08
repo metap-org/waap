@@ -244,7 +244,7 @@ type CompiledZone struct {
 	SchemaVersion uint32 `json:"schemaVersion"`
 	ZoneID        string `json:"zoneId"`
 	// TenantID is not read by any request-path logic (the edge never scopes anything by tenant —
-	// that's a data-plane concept it deliberately doesn't know) or by cache/refresh logic. Kept
+	// that's a management-plane concept it deliberately doesn't know) or by cache/refresh logic. Kept
 	// for wire-contract fidelity and debug logging.
 	TenantID       string         `json:"tenantId"`
 	Hostname       string         `json:"hostname"`

@@ -7,7 +7,7 @@
 // being protected; there is no origin to re-read it from on the hot path. And the key layout is a
 // PUBLISHED CONTRACT consumed by a process that deliberately does not depend on metap
 // (package ruleset) — it cannot be an internal detail of a metap package. Tenancy is still in the
-// payload, and hostnames are globally unique in data-plane (Zone.hostname is unique), so keying
+// payload, and hostnames are globally unique in management-plane (Zone.hostname is unique), so keying
 // by hostname is safe.
 //
 // Writes are pipelined per zone so a reader never sees the index updated before the rule-set it
@@ -69,7 +69,7 @@ func (d *Distributor) Unpublish(ctx context.Context, hostname string) error {
 }
 
 // PublishedHostnames returns hostnames currently published — what a full resync diffs against
-// to find zones that have disappeared from data-plane without this worker ever seeing the
+// to find zones that have disappeared from management-plane without this worker ever seeing the
 // delete event.
 func (d *Distributor) PublishedHostnames(ctx context.Context) ([]string, error) {
 	members, err := d.client.SMembers(ctx, ruleset.ZoneIndexKey).Result()

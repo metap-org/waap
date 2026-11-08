@@ -5,7 +5,7 @@
 //  1. Request handling never waits on telemetry. Events go onto a bounded channel with a
 //     non-blocking send; if the channel is full they are dropped and counted. An edge that
 //     stalls requests because a reporting endpoint is slow has failed at its only job.
-//  2. The edge posts to control-plane, never to data-plane. N edge nodes writing straight into
+//  2. The edge posts to control-plane, never to management-plane. N edge nodes writing straight into
 //     the portal's database would put real traffic volume onto it. The batching worker on the
 //     other side is what turns this into sane write rates.
 //

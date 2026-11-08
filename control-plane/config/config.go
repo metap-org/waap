@@ -13,13 +13,13 @@ import (
 type Config struct {
 	// ZonesURL is where the wafZones/wafDdosPolicies/wafFirewallRules/wafIpAccessLists GraphQL
 	// fields live — the GATEWAY, not zones-service's own port. Neither zones-service nor
-	// alerting-service mounts /graphql itself — only the gateway aggregates all 3 data-plane
+	// alerting-service mounts /graphql itself — only the gateway aggregates all 3 management-plane
 	// services' entities into one reachable schema.
 	ZonesURL string
-	// AlertingURL is where createWafSecurityEvents lives — telemetry coming up from the edge is
-	// written here. Same gateway URL as ZonesURL in practice, kept as a separate config field in
-	// case a future deployment splits the gateway per upstream.
-	AlertingURL string
+	// AnalyticsURL is the Analytics plane's analytics-api — edge telemetry is written there in
+	// batches. AnalyticsIngestToken is its ingest secret (ANALYTICS_INGEST_TOKEN on both sides).
+	AnalyticsURL         string
+	AnalyticsIngestToken string
 	// LoginURL: a real user this process logs in as, exactly like cron-scheduler does. Not a
 	// hand-minted static JWT: that pattern already caused a live outage in metap when the
 	// token's TTL expired in a running deployment.
@@ -84,7 +84,8 @@ func Load() (Config, error) {
 
 	return Config{
 		ZonesURL:               envOrString("ZONES_URL", "http://localhost:4000"),
-		AlertingURL:            envOrString("ALERTING_URL", "http://localhost:4000"),
+		AnalyticsURL:           envOrString("ANALYTICS_URL", "http://localhost:3030"),
+		AnalyticsIngestToken:   envOrString("ANALYTICS_INGEST_TOKEN", ""),
 		LoginURL:               envOrString("CONTROL_LOGIN_URL", "http://localhost:3000/auth/login"),
 		ServiceEmail:           serviceEmail,
 		ServicePassword:        servicePassword,

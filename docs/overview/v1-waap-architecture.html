@@ -281,7 +281,7 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
     <section class="doc" id="f-index"><div class="path">index.md</div><h1 id="f-index--kiến-trúc-waap-mục-tiêu">Kiến trúc WAAP mục tiêu</h1>
 <p>Tài liệu kiến trúc <strong>đích</strong> cho sản phẩm WAAP (Web Application &amp; API Protection) enterprise, bán
 dạng SaaS trước, giữ đường cho on-prem. Tài liệu dựng từ yêu cầu sản phẩm, <strong>không</strong> mô tả code
-hiện có trong repo này: phần code ở <code>data-plane/</code>, <code>control-plane/</code>, <code>edge-plane/</code> là bản demo,
+hiện có trong repo này: phần code ở <code>management-plane/</code>, <code>control-plane/</code>, <code>edge-plane/</code> là bản demo,
 chênh lệch so với kiến trúc đích được ghi ở <a href="#f-11-risks-00-index">11. Risks and Technical Debt</a>.</p>
 <p>Trạng thái: <strong>bản nháp có quyết định</strong> (2026-11-06). Mục 1–4 và level 1–2 của mục 5 mô tả <em>vai trò</em>,
 không gắn sản phẩm. Lựa chọn công nghệ nằm ở <a href="#f-05-building-blocks-07-technology-map">05 · bản đồ công nghệ</a>
@@ -327,10 +327,11 @@ là mục 5.8.5.</li>
 nghiệp vụ. Tách khỏi kiến trúc: requirements nói hệ thống phải làm gì, thư mục này nói làm bằng gì. Kiến
 trúc trỏ sang requirements khi cần lý do, không chép lại.</li>
 <li><code>docs/overview/</code>: bản HTML để đọc và trình bày (xem <code>README.md</code> trong đó), prefix <code>v1-</code>; bản hiện hành sinh từ thư mục này.</li>
-<li><code>data-plane/docs/</code>: spec nghiệp vụ và màn hình của portal demo. Phần nghiệp vụ (persona, domain,
+<li><code>management-plane/docs/</code>: spec nghiệp vụ và màn hình của portal demo. Phần nghiệp vụ (persona, domain,
 gói cước) vẫn dùng được làm đầu vào; phần ranh giới kiến trúc ở đó được thay bằng tài liệu này.</li>
-<li>Tên gọi: thư mục <code>data-plane/</code> của repo tương ứng <strong>Management plane</strong> ở đây. Theo nghĩa chuẩn
-ngành, <em>data plane</em> là đường đi của traffic, tức <strong>Edge plane</strong>.</li>
+<li>Tên gọi: thư mục <code>management-plane/</code> của repo là <strong>Management plane</strong> ở đây (trước 2026-11-08 thư mục
+này tên là <code>data-plane/</code>, đổi cho khớp <a href="#f-09-adr-0001-four-planes">ADR-0001</a>). Theo nghĩa chuẩn ngành,
+<em>data plane</em> là đường đi của traffic, tức <strong>Edge plane</strong>.</li>
 </ul>
 </section>
 <section class="doc" id="f-01-introduction-00-index"><div class="path">01-introduction/00-index.md</div><h1 id="f-01-introduction-00-index--1-introduction-and-goals">1. Introduction and Goals</h1>
@@ -15768,7 +15769,7 @@ theo chính sách tài liệu (<a href="#f-02-constraints-00-index--24-conventio
 </tr>
 <tr>
 <td><strong>Management plane</strong></td>
-<td>Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Thư mục <code>data-plane/</code> của repo demo</td>
+<td>Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Thư mục <code>management-plane/</code> của repo demo (trước 2026-11-08 tên là <code>data-plane/</code>)</td>
 </tr>
 <tr>
 <td><strong>Control plane</strong></td>
@@ -15784,7 +15785,7 @@ theo chính sách tài liệu (<a href="#f-02-constraints-00-index--24-conventio
 </tr>
 <tr>
 <td><strong>Data plane</strong></td>
-<td>Thuật ngữ ngành cho đường đi của traffic, tức Edge plane ở đây (không phải thư mục <code>data-plane/</code> của repo)</td>
+<td>Thuật ngữ ngành cho đường đi của traffic, tức Edge plane ở đây (không liên quan thư mục <code>data-plane/</code> cũ của repo, nay là <code>management-plane/</code>)</td>
 </tr>
 <tr>
 <td><strong>PoP</strong></td>

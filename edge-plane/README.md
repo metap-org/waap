@@ -8,7 +8,7 @@ This is the part of the product that actually protects a site. Everything else c
 ## Deliberately not built on `metap`
 
 Nothing from `metap`'s platform (metadata, CRUD, permission, DB access) appears anywhere in this
-tree, and that is a design decision rather than an omission (`../data-plane/docs/04-architecture-boundary.md`): a metadata-driven CRUD platform is
+tree, and that is a design decision rather than an omission (`../management-plane/docs/04-architecture-boundary.md`): a metadata-driven CRUD platform is
 the right tool for config that changes shape as the business learns, and the wrong tool for a
 fixed-shape, high-volume, latency-sensitive request path. It also means an edge node has no way to
 reach the portal's database or schema even by accident.
@@ -23,7 +23,7 @@ dependency list.
 ## How it gets its configuration
 
 It reads Redis keys that `../control-plane` writes, and nothing else. It never calls
-`../data-plane`.
+`../management-plane`.
 
 - The snapshot lives in memory; **a request never touches Redis**.
 - A refresh ticker (`REFRESH_INTERVAL_SECONDS`, default 10s — this value *is* the 10-30s
@@ -49,9 +49,9 @@ and the request is passed through. That is what makes monitor mode useful rather
 
 ## Telemetry goes up through `control-plane`
 
-`POST` batches to `control-plane`'s ingest endpoint, never straight into `data-plane`. This
+`POST` batches to `control-plane`'s ingest endpoint, never straight into `management-plane`. This
 resolves the open question in `04-architecture-boundary.md` in favour of its option 2 — the one
-that doc already leaned toward, because it keeps the "the edge never talks to `data-plane`" rule
+that doc already leaned toward, because it keeps the "the edge never talks to `management-plane`" rule
 intact and keeps N edge nodes' worth of small writes off the portal's database.
 
 Events are queued with `try_send` and **dropped when the buffer is full**. Losing some evidence
@@ -71,7 +71,7 @@ Each of these is a real gap, not a rough edge that will quietly work out:
 - **Rate limiting is per-node**, so a fleet of N nodes gives an effective budget of roughly N× the
   configured one. Exactness would cost a Redis round trip per request.
 - **The challenge is demo-grade** — it proves the client runs JS and honours cookies, nothing
-  more. Bot management proper is v2 (`../data-plane/docs/01-product-vision.md`).
+  more. Bot management proper is v2 (`../management-plane/docs/01-product-vision.md`).
 - **`CLIENT_IP_HEADER` is unset by default.** Trusting a client-supplied IP header by default
   would let anyone spoof past every IP rule and rate limit in the product.
 

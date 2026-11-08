@@ -58,11 +58,11 @@ theo chính sách tài liệu ([2.4](../02-constraints/00-index.md#24-convention
 |---|---|
 | **WAAP** | Web Application & API Protection: WAF, DDoS L7, bot, API security gộp thành một sản phẩm |
 | **Plane** | Một phần hệ thống có chu kỳ deploy và yêu cầu riêng; có 4 plane ([ADR-0001](../09-adr/0001-four-planes.md)) |
-| **Management plane** | Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Thư mục `data-plane/` của repo demo |
+| **Management plane** | Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Thư mục `management-plane/` của repo demo (trước 2026-11-08 tên là `data-plane/`) |
 | **Control plane** | Plane biến ý định thành config edge chạy được và phân phối nó |
 | **Edge plane** | Đường đi của traffic thật; theo nghĩa chuẩn ngành là *data plane* |
 | **Analytics plane** | Plane nhận, lưu, truy vấn, phân tích log; detection, cảnh báo, export, metering |
-| **Data plane** | Thuật ngữ ngành cho đường đi của traffic, tức Edge plane ở đây (không phải thư mục `data-plane/` của repo) |
+| **Data plane** | Thuật ngữ ngành cho đường đi của traffic, tức Edge plane ở đây (không liên quan thư mục `data-plane/` cũ của repo, nay là `management-plane/`) |
 | **PoP** | Point of Presence: một điểm đặt edge node |
 | **SaaS / Hybrid / On-prem** | Ba mô hình triển khai: mọi plane ở NCC / Management, Control ở NCC còn edge (và có thể Analytics) ở hạ tầng khách / mọi plane ở hạ tầng khách ([7.1](../07-deployment/00-index.md#71-ba-mô-hình-triển-khai)) |
 | **Core region** | Region đặt Management và Control, active/standby qua hai availability zone |

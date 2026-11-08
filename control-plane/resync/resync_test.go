@@ -10,23 +10,23 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/metap-org/waap/control-plane/dataplane"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/ports/portsmock"
 	"github.com/metap-org/waap/control-plane/ruleset"
 )
 
-func zoneRecord(id, status, hostname string) dataplane.Record {
+func zoneRecord(id, status, hostname string) management.Record {
 	data := map[string]json.RawMessage{}
 	for k, v := range map[string]any{"status": status, "hostname": hostname, "tenantId": "t1", "originAddress": "http://o", "protectionMode": "enforce"} {
 		b, _ := json.Marshal(v)
 		data[k] = b
 	}
-	return dataplane.Record{ID: id, Data: data}
+	return management.Record{ID: id, Data: data}
 }
 
 func TestRunOncePublishesEveryLiveZoneRemovesOrphansAndBumpsTheEpoch(t *testing.T) {
 	src, sink := portsmock.NewConfigSource(t), portsmock.NewRuleSink(t)
-	src.EXPECT().AllZones(mock.Anything).Return([]dataplane.Record{
+	src.EXPECT().AllZones(mock.Anything).Return([]management.Record{
 		zoneRecord("z1", "active", "a.example.com"),
 		zoneRecord("z2", "paused", "b.example.com"),
 		zoneRecord("z3", "pending", "c.example.com"), // not publishable: skipped, and so removed if present
@@ -54,10 +54,10 @@ func TestRunOncePublishesEveryLiveZoneRemovesOrphansAndBumpsTheEpoch(t *testing.
 
 func TestRunOnceStopsBeforeRemovingAnythingWhenTheDataPlaneFails(t *testing.T) {
 	src, sink := portsmock.NewConfigSource(t), portsmock.NewRuleSink(t)
-	boom := errors.New("data-plane down")
+	boom := errors.New("management-plane down")
 	src.EXPECT().AllZones(mock.Anything).Return(nil, boom)
 
-	// The convergence guarantee must never read "data-plane unreachable" as "zero zones" and
+	// The convergence guarantee must never read "management-plane unreachable" as "zero zones" and
 	// wipe the edge: no PublishedHostnames/Unpublish/BumpEpoch expected.
 	require.ErrorIs(t, RunOnce(context.Background(), src, sink), boom)
 }

@@ -44,7 +44,7 @@ func Run(ctx context.Context, amqpURL, queue string, dp ports.ConfigSource, dist
 }
 
 // handle processes one message. It deliberately does not reuse the consumer loop's own ctx for
-// the data-plane/Redis calls below (ctx exists only to let RunResilientConsumer's reconnect loop
+// the management-plane/Redis calls below (ctx exists only to let RunResilientConsumer's reconnect loop
 // stop on shutdown) — cancelling it must stop new reconnect attempts, not abort an in-flight
 // compile that is already running, which is what the Rust original's plain "await a shutdown
 // future" shape (as opposed to a cancellation token threaded into the call itself) achieves.
@@ -78,7 +78,7 @@ func handle(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSi
 	}
 
 	if err := sync.Zone(context.Background(), dp, distributor, zoneID, envelope.TenantID, knownHostname); err != nil {
-		// Requeue: the usual cause is data-plane or Redis being briefly unreachable, which
+		// Requeue: the usual cause is management-plane or Redis being briefly unreachable, which
 		// clears on its own. The periodic resync is the backstop if it doesn't, so this never
 		// needs to be the only thing that can recover.
 		slog.Warn("failed to sync zone, requeueing", "error", err, "zone_id", zoneID)

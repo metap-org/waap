@@ -16,12 +16,12 @@ import (
 type Config struct {
 	ListenAddr string
 	// RedisURL: where compiled rule-sets are read from. The only thing this process reads
-	// config from — never data-plane.
+	// config from — never management-plane.
 	RedisURL string
 	// RefreshInterval: how often the snapshot is refreshed. This value IS the
 	// config-propagation SLA (10-30s in the architecture doc).
 	RefreshInterval time.Duration
-	// IngestURL: control-plane's ingest endpoint. Telemetry goes here, never to data-plane.
+	// IngestURL: control-plane's ingest endpoint. Telemetry goes here, never to management-plane.
 	IngestURL              string
 	IngestToken            *string
 	TelemetryBuffer        int

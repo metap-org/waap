@@ -1,7 +1,7 @@
 // Package ports declares the two seams of the control-plane pipeline, so the compile/sync/resync
-// logic is unit-testable without a live data-plane or Redis:
+// logic is unit-testable without a live management-plane or Redis:
 //
-//	ConfigSource (data-plane GraphQL, dataplane.DataPlane) -> compile -> RuleSink (Redis, distribute.Distributor)
+//	ConfigSource (management-plane GraphQL, management.Client) -> compile -> RuleSink (Redis, distribute.Distributor)
 //
 // Mocks: ports/portsmock (mockery, `go generate ./ports/...`).
 package ports
@@ -11,25 +11,27 @@ package ports
 import (
 	"context"
 
-	"github.com/metap-org/waap/control-plane/dataplane"
+	"github.com/metap-org/waap/control-plane/analytics"
 	"github.com/metap-org/waap/control-plane/distribute"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/ruleset"
 )
 
 // ConfigSource reads the portal's source-of-truth config.
 type ConfigSource interface {
-	Zone(ctx context.Context, zoneID string) (*dataplane.Record, error)
-	AllZones(ctx context.Context) ([]dataplane.Record, error)
-	DdosPoliciesFor(ctx context.Context, zoneID string) ([]dataplane.Record, error)
-	RulesFor(ctx context.Context, zoneID string) ([]dataplane.Record, error)
-	TenantWideRulesFor(ctx context.Context) ([]dataplane.Record, error)
-	IPAccessListsFor(ctx context.Context, zoneID string) ([]dataplane.Record, error)
-	TenantWideIPAccessListsFor(ctx context.Context) ([]dataplane.Record, error)
+	Zone(ctx context.Context, zoneID string) (*management.Record, error)
+	AllZones(ctx context.Context) ([]management.Record, error)
+	DdosPoliciesFor(ctx context.Context, zoneID string) ([]management.Record, error)
+	RulesFor(ctx context.Context, zoneID string) ([]management.Record, error)
+	TenantWideRulesFor(ctx context.Context) ([]management.Record, error)
+	IPAccessListsFor(ctx context.Context, zoneID string) ([]management.Record, error)
+	TenantWideIPAccessListsFor(ctx context.Context) ([]management.Record, error)
 }
 
-// EventSink writes edge telemetry back into the data-plane.
+// EventSink writes edge telemetry into the Analytics plane, one batch per call. It returns how
+// many events the sink rejected as invalid (dropped, not retryable).
 type EventSink interface {
-	CreateSecurityEvent(ctx context.Context, payload any) error
+	WriteSecurityEvents(ctx context.Context, events []map[string]any) (int, error)
 }
 
 // RuleSink is where compiled rule-sets are published for the edge to read.
@@ -42,7 +44,7 @@ type RuleSink interface {
 }
 
 var (
-	_ ConfigSource = (*dataplane.DataPlane)(nil)
-	_ EventSink    = (*dataplane.DataPlane)(nil)
+	_ ConfigSource = (*management.Client)(nil)
+	_ EventSink    = (*analytics.Client)(nil)
 	_ RuleSink     = (*distribute.Distributor)(nil)
 )

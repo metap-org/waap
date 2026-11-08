@@ -1,4 +1,4 @@
-// Package compile translates data-plane records into ruleset.CompiledZone. The "compile" half
+// Package compile translates management-plane records into ruleset.CompiledZone. The "compile" half
 // of this worker's name.
 //
 // Everything decided here is something the edge then never has to decide per request:
@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metap-org/waap/control-plane/dataplane"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/ruleset"
 )
 
@@ -33,7 +33,7 @@ import (
 // product says is not protected. "paused" IS published because pausing means "stop enforcing",
 // not "stop serving": the edge still needs the origin address to pass traffic through, and
 // protectionMode handling is what makes it inert.
-func Publishable(zone dataplane.Record) bool {
+func Publishable(zone management.Record) bool {
 	status, ok := zone.Str("status")
 	if !ok && zone.Status != nil {
 		status = *zone.Status
@@ -274,7 +274,7 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 	}), true
 }
 
-func compileRule(rule dataplane.Record) (ruleset.CompiledRule, bool) {
+func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
 	if enabled, ok := rule.Bool("enabled"); ok && !enabled {
 		return ruleset.CompiledRule{}, false
 	}
@@ -328,7 +328,7 @@ func compileRule(rule dataplane.Record) (ruleset.CompiledRule, bool) {
 // ruleType "ipAccessList" is informational only (telemetry/display) — compileZone below is what
 // actually gives these rows evaluate-before-everything-else priority, by where it places them
 // in the compiled list, not anything the edge's evaluator reads off this field.
-func compileIPAccessList(entry dataplane.Record) (ruleset.CompiledRule, bool) {
+func compileIPAccessList(entry management.Record) (ruleset.CompiledRule, bool) {
 	if enabled, ok := entry.Bool("enabled"); ok && !enabled {
 		return ruleset.CompiledRule{}, false
 	}
@@ -357,7 +357,7 @@ func compileIPAccessList(entry dataplane.Record) (ruleset.CompiledRule, bool) {
 	}, true
 }
 
-func compileDdos(policy dataplane.Record) (ruleset.CompiledDdos, bool) {
+func compileDdos(policy management.Record) (ruleset.CompiledDdos, bool) {
 	if enabled, ok := policy.Bool("enabled"); ok && !enabled {
 		return ruleset.CompiledDdos{}, false
 	}
@@ -400,7 +400,7 @@ func compileDdos(policy dataplane.Record) (ruleset.CompiledDdos, bool) {
 
 // compileDdosPolicies returns every enabled policy, priority-sorted ascending — the edge's
 // evaluator walks this in order, first scope-matching-and-over-budget policy wins.
-func compileDdosPolicies(policies []dataplane.Record) []ruleset.CompiledDdos {
+func compileDdosPolicies(policies []management.Record) []ruleset.CompiledDdos {
 	compiled := make([]ruleset.CompiledDdos, 0, len(policies))
 	for _, p := range policies {
 		if c, ok := compileDdos(p); ok {
@@ -411,7 +411,7 @@ func compileDdosPolicies(policies []dataplane.Record) []ruleset.CompiledDdos {
 	return compiled
 }
 
-func CompileZone(zone dataplane.Record, tenantID string, ddosPolicies, rules, ipAccessLists []dataplane.Record) (ruleset.CompiledZone, bool) {
+func CompileZone(zone management.Record, tenantID string, ddosPolicies, rules, ipAccessLists []management.Record) (ruleset.CompiledZone, bool) {
 	hostname, ok := zone.Str("hostname")
 	if !ok {
 		return ruleset.CompiledZone{}, false

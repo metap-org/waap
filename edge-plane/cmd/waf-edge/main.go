@@ -9,7 +9,7 @@
 //
 // # What it is allowed to know
 //
-// Only what control-plane compiled into Redis (package ruleset). It never reads data-plane's
+// Only what control-plane compiled into Redis (package ruleset). It never reads management-plane's
 // database, never calls its API, and never learns an entity name. Telemetry goes back up through
 // control-plane for the same reason.
 //

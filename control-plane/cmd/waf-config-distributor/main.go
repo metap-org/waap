@@ -2,17 +2,17 @@
 //
 // Three concurrent jobs in one process, all shut down together:
 //
-//  1. subscribe — outbox events from data-plane -> recompile the affected zone (fast path).
+//  1. subscribe — outbox events from management-plane -> recompile the affected zone (fast path).
 //  2. resync — full sweep on a timer -> guarantees convergence when an event is missed.
 //  3. ingest — an HTTP endpoint the edge posts telemetry batches to, plus /health.
 //
-// One process rather than three because they share the same data-plane client (and therefore
+// One process rather than three because they share the same management-plane client (and therefore
 // one service-account session) and the same Redis connection pool; splitting them would triple
 // the login traffic and the connection count to serve the same work. If the ingest path ever
 // needs to scale separately from config distribution, it is the obvious seam to cut.
 //
-// No UI, no CRUD, no database of its own — everything it knows comes from data-plane's API and
-// everything it produces lands in Redis or back in data-plane.
+// No UI, no CRUD, no database of its own — everything it knows comes from management-plane's API and
+// everything it produces lands in Redis or back in management-plane.
 package main
 
 import (
@@ -24,10 +24,11 @@ import (
 	"github.com/metap-org/metap/pkg/infra"
 	"github.com/metap-org/metap/pkg/runtime"
 
+	"github.com/metap-org/waap/control-plane/analytics"
 	"github.com/metap-org/waap/control-plane/config"
-	"github.com/metap-org/waap/control-plane/dataplane"
 	"github.com/metap-org/waap/control-plane/distribute"
 	"github.com/metap-org/waap/control-plane/ingest"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/resync"
 	"github.com/metap-org/waap/control-plane/subscribe"
 )
@@ -40,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// bg is used for all real data-plane/Redis work — never cancelled on shutdown, so an
+	// bg is used for all real management-plane/Redis work — never cancelled on shutdown, so an
 	// in-flight compile or write finishes rather than being cut off (mirroring the Rust
 	// original's plain "await a shutdown future" shape, which never threads a cancellation
 	// token into the work itself). consumerCtx exists only to let the RabbitMQ consumer's own
@@ -51,15 +52,16 @@ func main() {
 
 	httpClient := runtime.DefaultHTTPClient()
 	// Fails boot if it can't log in — unlike cron-scheduler, which degrades because some of its
-	// job types need no credential. Here every single thing this process does needs data-plane,
+	// job types need no credential. Here every single thing this process does needs management-plane,
 	// so starting up without a session would just be a process that logs errors forever.
 	token, err := runtime.StartServiceTokenSource(bg, httpClient, cfg.LoginURL, cfg.ServiceEmail, cfg.ServicePassword)
 	if err != nil {
-		slog.Error("logging into data-plane", "error", err)
+		slog.Error("logging into management-plane", "error", err)
 		os.Exit(1)
 	}
 
-	dp := dataplane.New(httpClient, cfg.ZonesURL, cfg.AlertingURL, token)
+	dp := management.New(httpClient, cfg.ZonesURL, token)
+	events := analytics.New(httpClient, cfg.AnalyticsURL, cfg.AnalyticsIngestToken, token)
 	distributor, err := distribute.Connect(cfg.RedisURL)
 	if err != nil {
 		slog.Error("connecting to redis", "error", err)
@@ -75,7 +77,7 @@ func main() {
 	// means unprotected hostnames.
 	if err := resync.RunOnce(bg, dp, distributor); err != nil {
 		// Not fatal — the timer will retry, and refusing to boot would take the ingest endpoint
-		// down with it for a problem that may well be a slow data-plane still starting up.
+		// down with it for a problem that may well be a slow management-plane still starting up.
 		slog.Error("initial resync failed, continuing", "error", err)
 	}
 
@@ -108,7 +110,7 @@ func main() {
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
-		ingest.RunWriter(bg, dp, queue, cfg.IngestMaxBatch, shutdown)
+		ingest.RunWriter(bg, events, queue, cfg.IngestMaxBatch, shutdown)
 	}()
 
 	slog.Info("waf-config-distributor starting", "addr", cfg.Addr(), "zones_url", cfg.ZonesURL,

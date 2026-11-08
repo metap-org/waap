@@ -7,7 +7,7 @@ package portsmock
 import (
 	"context"
 
-	"github.com/metap-org/waap/control-plane/dataplane"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/ruleset"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -49,23 +49,23 @@ func (_m *ConfigSource) EXPECT() *ConfigSource_Expecter {
 }
 
 // AllZones provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) AllZones(ctx context.Context) ([]dataplane.Record, error) {
+func (_mock *ConfigSource) AllZones(ctx context.Context) ([]management.Record, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AllZones")
 	}
 
-	var r0 []dataplane.Record
+	var r0 []management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]management.Record, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []management.Record); ok {
 		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dataplane.Record)
+			r0 = ret.Get(0).([]management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -100,34 +100,34 @@ func (_c *ConfigSource_AllZones_Call) Run(run func(ctx context.Context)) *Config
 	return _c
 }
 
-func (_c *ConfigSource_AllZones_Call) Return(records []dataplane.Record, err error) *ConfigSource_AllZones_Call {
+func (_c *ConfigSource_AllZones_Call) Return(records []management.Record, err error) *ConfigSource_AllZones_Call {
 	_c.Call.Return(records, err)
 	return _c
 }
 
-func (_c *ConfigSource_AllZones_Call) RunAndReturn(run func(ctx context.Context) ([]dataplane.Record, error)) *ConfigSource_AllZones_Call {
+func (_c *ConfigSource_AllZones_Call) RunAndReturn(run func(ctx context.Context) ([]management.Record, error)) *ConfigSource_AllZones_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DdosPoliciesFor provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) DdosPoliciesFor(ctx context.Context, zoneID string) ([]dataplane.Record, error) {
+func (_mock *ConfigSource) DdosPoliciesFor(ctx context.Context, zoneID string) ([]management.Record, error) {
 	ret := _mock.Called(ctx, zoneID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DdosPoliciesFor")
 	}
 
-	var r0 []dataplane.Record
+	var r0 []management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]management.Record, error)); ok {
 		return returnFunc(ctx, zoneID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []management.Record); ok {
 		r0 = returnFunc(ctx, zoneID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dataplane.Record)
+			r0 = ret.Get(0).([]management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -168,34 +168,34 @@ func (_c *ConfigSource_DdosPoliciesFor_Call) Run(run func(ctx context.Context, z
 	return _c
 }
 
-func (_c *ConfigSource_DdosPoliciesFor_Call) Return(records []dataplane.Record, err error) *ConfigSource_DdosPoliciesFor_Call {
+func (_c *ConfigSource_DdosPoliciesFor_Call) Return(records []management.Record, err error) *ConfigSource_DdosPoliciesFor_Call {
 	_c.Call.Return(records, err)
 	return _c
 }
 
-func (_c *ConfigSource_DdosPoliciesFor_Call) RunAndReturn(run func(ctx context.Context, zoneID string) ([]dataplane.Record, error)) *ConfigSource_DdosPoliciesFor_Call {
+func (_c *ConfigSource_DdosPoliciesFor_Call) RunAndReturn(run func(ctx context.Context, zoneID string) ([]management.Record, error)) *ConfigSource_DdosPoliciesFor_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // IPAccessListsFor provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) IPAccessListsFor(ctx context.Context, zoneID string) ([]dataplane.Record, error) {
+func (_mock *ConfigSource) IPAccessListsFor(ctx context.Context, zoneID string) ([]management.Record, error) {
 	ret := _mock.Called(ctx, zoneID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IPAccessListsFor")
 	}
 
-	var r0 []dataplane.Record
+	var r0 []management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]management.Record, error)); ok {
 		return returnFunc(ctx, zoneID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []management.Record); ok {
 		r0 = returnFunc(ctx, zoneID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dataplane.Record)
+			r0 = ret.Get(0).([]management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -236,34 +236,34 @@ func (_c *ConfigSource_IPAccessListsFor_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *ConfigSource_IPAccessListsFor_Call) Return(records []dataplane.Record, err error) *ConfigSource_IPAccessListsFor_Call {
+func (_c *ConfigSource_IPAccessListsFor_Call) Return(records []management.Record, err error) *ConfigSource_IPAccessListsFor_Call {
 	_c.Call.Return(records, err)
 	return _c
 }
 
-func (_c *ConfigSource_IPAccessListsFor_Call) RunAndReturn(run func(ctx context.Context, zoneID string) ([]dataplane.Record, error)) *ConfigSource_IPAccessListsFor_Call {
+func (_c *ConfigSource_IPAccessListsFor_Call) RunAndReturn(run func(ctx context.Context, zoneID string) ([]management.Record, error)) *ConfigSource_IPAccessListsFor_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RulesFor provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) RulesFor(ctx context.Context, zoneID string) ([]dataplane.Record, error) {
+func (_mock *ConfigSource) RulesFor(ctx context.Context, zoneID string) ([]management.Record, error) {
 	ret := _mock.Called(ctx, zoneID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RulesFor")
 	}
 
-	var r0 []dataplane.Record
+	var r0 []management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]management.Record, error)); ok {
 		return returnFunc(ctx, zoneID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []management.Record); ok {
 		r0 = returnFunc(ctx, zoneID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dataplane.Record)
+			r0 = ret.Get(0).([]management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -304,34 +304,34 @@ func (_c *ConfigSource_RulesFor_Call) Run(run func(ctx context.Context, zoneID s
 	return _c
 }
 
-func (_c *ConfigSource_RulesFor_Call) Return(records []dataplane.Record, err error) *ConfigSource_RulesFor_Call {
+func (_c *ConfigSource_RulesFor_Call) Return(records []management.Record, err error) *ConfigSource_RulesFor_Call {
 	_c.Call.Return(records, err)
 	return _c
 }
 
-func (_c *ConfigSource_RulesFor_Call) RunAndReturn(run func(ctx context.Context, zoneID string) ([]dataplane.Record, error)) *ConfigSource_RulesFor_Call {
+func (_c *ConfigSource_RulesFor_Call) RunAndReturn(run func(ctx context.Context, zoneID string) ([]management.Record, error)) *ConfigSource_RulesFor_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // TenantWideIPAccessListsFor provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) TenantWideIPAccessListsFor(ctx context.Context) ([]dataplane.Record, error) {
+func (_mock *ConfigSource) TenantWideIPAccessListsFor(ctx context.Context) ([]management.Record, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TenantWideIPAccessListsFor")
 	}
 
-	var r0 []dataplane.Record
+	var r0 []management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]management.Record, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []management.Record); ok {
 		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dataplane.Record)
+			r0 = ret.Get(0).([]management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -366,34 +366,34 @@ func (_c *ConfigSource_TenantWideIPAccessListsFor_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *ConfigSource_TenantWideIPAccessListsFor_Call) Return(records []dataplane.Record, err error) *ConfigSource_TenantWideIPAccessListsFor_Call {
+func (_c *ConfigSource_TenantWideIPAccessListsFor_Call) Return(records []management.Record, err error) *ConfigSource_TenantWideIPAccessListsFor_Call {
 	_c.Call.Return(records, err)
 	return _c
 }
 
-func (_c *ConfigSource_TenantWideIPAccessListsFor_Call) RunAndReturn(run func(ctx context.Context) ([]dataplane.Record, error)) *ConfigSource_TenantWideIPAccessListsFor_Call {
+func (_c *ConfigSource_TenantWideIPAccessListsFor_Call) RunAndReturn(run func(ctx context.Context) ([]management.Record, error)) *ConfigSource_TenantWideIPAccessListsFor_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // TenantWideRulesFor provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) TenantWideRulesFor(ctx context.Context) ([]dataplane.Record, error) {
+func (_mock *ConfigSource) TenantWideRulesFor(ctx context.Context) ([]management.Record, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TenantWideRulesFor")
 	}
 
-	var r0 []dataplane.Record
+	var r0 []management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]management.Record, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []management.Record); ok {
 		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]dataplane.Record)
+			r0 = ret.Get(0).([]management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -428,34 +428,34 @@ func (_c *ConfigSource_TenantWideRulesFor_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *ConfigSource_TenantWideRulesFor_Call) Return(records []dataplane.Record, err error) *ConfigSource_TenantWideRulesFor_Call {
+func (_c *ConfigSource_TenantWideRulesFor_Call) Return(records []management.Record, err error) *ConfigSource_TenantWideRulesFor_Call {
 	_c.Call.Return(records, err)
 	return _c
 }
 
-func (_c *ConfigSource_TenantWideRulesFor_Call) RunAndReturn(run func(ctx context.Context) ([]dataplane.Record, error)) *ConfigSource_TenantWideRulesFor_Call {
+func (_c *ConfigSource_TenantWideRulesFor_Call) RunAndReturn(run func(ctx context.Context) ([]management.Record, error)) *ConfigSource_TenantWideRulesFor_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Zone provides a mock function for the type ConfigSource
-func (_mock *ConfigSource) Zone(ctx context.Context, zoneID string) (*dataplane.Record, error) {
+func (_mock *ConfigSource) Zone(ctx context.Context, zoneID string) (*management.Record, error) {
 	ret := _mock.Called(ctx, zoneID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Zone")
 	}
 
-	var r0 *dataplane.Record
+	var r0 *management.Record
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*dataplane.Record, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*management.Record, error)); ok {
 		return returnFunc(ctx, zoneID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *dataplane.Record); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *management.Record); ok {
 		r0 = returnFunc(ctx, zoneID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*dataplane.Record)
+			r0 = ret.Get(0).(*management.Record)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -496,12 +496,12 @@ func (_c *ConfigSource_Zone_Call) Run(run func(ctx context.Context, zoneID strin
 	return _c
 }
 
-func (_c *ConfigSource_Zone_Call) Return(record *dataplane.Record, err error) *ConfigSource_Zone_Call {
+func (_c *ConfigSource_Zone_Call) Return(record *management.Record, err error) *ConfigSource_Zone_Call {
 	_c.Call.Return(record, err)
 	return _c
 }
 
-func (_c *ConfigSource_Zone_Call) RunAndReturn(run func(ctx context.Context, zoneID string) (*dataplane.Record, error)) *ConfigSource_Zone_Call {
+func (_c *ConfigSource_Zone_Call) RunAndReturn(run func(ctx context.Context, zoneID string) (*management.Record, error)) *ConfigSource_Zone_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -542,44 +542,53 @@ func (_m *EventSink) EXPECT() *EventSink_Expecter {
 	return &EventSink_Expecter{mock: &_m.Mock}
 }
 
-// CreateSecurityEvent provides a mock function for the type EventSink
-func (_mock *EventSink) CreateSecurityEvent(ctx context.Context, payload any) error {
-	ret := _mock.Called(ctx, payload)
+// WriteSecurityEvents provides a mock function for the type EventSink
+func (_mock *EventSink) WriteSecurityEvents(ctx context.Context, events []map[string]any) (int, error) {
+	ret := _mock.Called(ctx, events)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateSecurityEvent")
+		panic("no return value specified for WriteSecurityEvents")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, any) error); ok {
-		r0 = returnFunc(ctx, payload)
-	} else {
-		r0 = ret.Error(0)
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []map[string]any) (int, error)); ok {
+		return returnFunc(ctx, events)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []map[string]any) int); ok {
+		r0 = returnFunc(ctx, events)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []map[string]any) error); ok {
+		r1 = returnFunc(ctx, events)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
-// EventSink_CreateSecurityEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSecurityEvent'
-type EventSink_CreateSecurityEvent_Call struct {
+// EventSink_WriteSecurityEvents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WriteSecurityEvents'
+type EventSink_WriteSecurityEvents_Call struct {
 	*mock.Call
 }
 
-// CreateSecurityEvent is a helper method to define mock.On call
+// WriteSecurityEvents is a helper method to define mock.On call
 //   - ctx context.Context
-//   - payload any
-func (_e *EventSink_Expecter) CreateSecurityEvent(ctx any, payload any) *EventSink_CreateSecurityEvent_Call {
-	return &EventSink_CreateSecurityEvent_Call{Call: _e.mock.On("CreateSecurityEvent", ctx, payload)}
+//   - events []map[string]any
+func (_e *EventSink_Expecter) WriteSecurityEvents(ctx any, events any) *EventSink_WriteSecurityEvents_Call {
+	return &EventSink_WriteSecurityEvents_Call{Call: _e.mock.On("WriteSecurityEvents", ctx, events)}
 }
 
-func (_c *EventSink_CreateSecurityEvent_Call) Run(run func(ctx context.Context, payload any)) *EventSink_CreateSecurityEvent_Call {
+func (_c *EventSink_WriteSecurityEvents_Call) Run(run func(ctx context.Context, events []map[string]any)) *EventSink_WriteSecurityEvents_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 any
+		var arg1 []map[string]any
 		if args[1] != nil {
-			arg1 = args[1].(any)
+			arg1 = args[1].([]map[string]any)
 		}
 		run(
 			arg0,
@@ -589,12 +598,12 @@ func (_c *EventSink_CreateSecurityEvent_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *EventSink_CreateSecurityEvent_Call) Return(err error) *EventSink_CreateSecurityEvent_Call {
-	_c.Call.Return(err)
+func (_c *EventSink_WriteSecurityEvents_Call) Return(n int, err error) *EventSink_WriteSecurityEvents_Call {
+	_c.Call.Return(n, err)
 	return _c
 }
 
-func (_c *EventSink_CreateSecurityEvent_Call) RunAndReturn(run func(ctx context.Context, payload any) error) *EventSink_CreateSecurityEvent_Call {
+func (_c *EventSink_WriteSecurityEvents_Call) RunAndReturn(run func(ctx context.Context, events []map[string]any) (int, error)) *EventSink_WriteSecurityEvents_Call {
 	_c.Call.Return(run)
 	return _c
 }

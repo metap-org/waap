@@ -10,21 +10,21 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/metap-org/waap/control-plane/dataplane"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/ports/portsmock"
 	"github.com/metap-org/waap/control-plane/ruleset"
 )
 
-func record(id string, fields map[string]any) dataplane.Record {
+func record(id string, fields map[string]any) management.Record {
 	data := map[string]json.RawMessage{}
 	for k, v := range fields {
 		b, _ := json.Marshal(v)
 		data[k] = b
 	}
-	return dataplane.Record{ID: id, Data: data}
+	return management.Record{ID: id, Data: data}
 }
 
-func zone(status, hostname string) *dataplane.Record {
+func zone(status, hostname string) *management.Record {
 	z := record("z1", map[string]any{
 		"status": status, "hostname": hostname, "originAddress": "http://origin", "protectionMode": "enforce", "configVersion": 3,
 	})
@@ -91,7 +91,7 @@ func TestRenamedZoneUnpublishesTheOldHostnameBeforePublishingTheNewOne(t *testin
 
 func TestADataPlaneErrorAbortsWithoutTouchingTheEdge(t *testing.T) {
 	src, sink := portsmock.NewConfigSource(t), portsmock.NewRuleSink(t)
-	boom := errors.New("data-plane down")
+	boom := errors.New("management-plane down")
 	src.EXPECT().Zone(mock.Anything, "z1").Return(zone("active", "shop.example.com"), nil)
 	src.EXPECT().DdosPoliciesFor(mock.Anything, "z1").Return(nil, boom)
 

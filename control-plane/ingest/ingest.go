@@ -1,20 +1,23 @@
-// Package ingest handles telemetry going UP: edge-plane -> here -> data-plane.
+// Package ingest handles telemetry going UP: edge-plane -> here -> analytics-plane.
+//
+// Since 2026-11-08 events go to the Analytics plane (ADR-0001), in real batches, instead of one
+// createWafSecurityEvents GraphQL mutation per event into Management's Postgres. The edge-facing
+// side (this endpoint, its token, its back-pressure rule) is unchanged.
 //
 // # The architecture decision this implements
 //
 // The design doc left this explicitly unresolved, with two candidates: (1) the edge calls
-// metap-grpc's generic RecordService.Create on data-plane directly, or (2) the edge batches to
+// metap-grpc's generic RecordService.Create on management-plane directly, or (2) the edge batches to
 // control-plane, which writes onward. This implements (2), which is also the option that doc
 // leaned toward, for the reason it gave: option (1) breaks the rule stated everywhere else in
-// the design — edge-plane never talks to data-plane directly — and it would put N edge nodes x
+// the design — edge-plane never talks to management-plane directly — and it would put N edge nodes x
 // real traffic worth of small writes straight onto the portal's database.
 //
 // # What this is not
 //
-// It is not a bypass of CrudService. Every event still goes through data-plane's ordinary
-// createWafSecurityEvents mutation, so validation, permission and the outbox all apply exactly
-// as they do for a portal write. What batching buys is fewer, larger requests — not a shortcut
-// past the platform's rules.
+// It is not a bypass of validation: analytics-api validates every event (enums, IP, timestamp,
+// lengths) and files it under the service account's own tenant; an invalid event is rejected
+// there and counted here, never silently stored.
 //
 // # Known limitation
 //
@@ -95,7 +98,7 @@ func ingestHandler(state *State) http.HandlerFunc {
 		accepted, dropped := 0, 0
 		for _, event := range body.Events {
 			// A non-blocking send, not a blocking one: blocking this request until the writer
-			// drains would turn a slow data-plane into back-pressure on request handling at the
+			// drains would turn a slow management-plane into back-pressure on request handling at the
 			// edge, which is the one place in this system that must never wait on the portal.
 			select {
 			case state.Queue <- event:
@@ -130,12 +133,7 @@ func Router(state *State) http.Handler {
 	return r
 }
 
-// RunWriter drains the buffer into data-plane, one record per event.
-//
-// The batching here is of REQUESTS IN FLIGHT, not of a bulk endpoint: metap's generic CRUD has
-// no batch-create route, and inventing one for this would be a much larger change to core than
-// this feature warrants. So the win is that the edge makes one call per batch instead of one per
-// request, and this worker absorbs the fan-out where a slow write costs nobody latency.
+// RunWriter drains the buffer into the Analytics plane, one ingest request per batch.
 func RunWriter(ctx context.Context, dp ports.EventSink, queue <-chan EdgeEvent, maxBatch int, shutdown <-chan struct{}) {
 	for {
 		var batch []EdgeEvent
@@ -164,22 +162,26 @@ func RunWriter(ctx context.Context, dp ports.EventSink, queue <-chan EdgeEvent, 
 			}
 		}
 
-		written := 0
+		payloads := make([]map[string]any, 0, len(batch))
 		for _, event := range batch {
-			payload := map[string]any{
+			payloads = append(payloads, map[string]any{
 				"zoneId": event.ZoneID, "triggeredBy": event.TriggeredBy, "triggeredById": event.TriggeredByID,
 				"triggeredByName": event.TriggeredByName, "action": event.Action, "sourceIp": event.SourceIP,
 				"requestPath": event.RequestPath, "occurredAt": event.OccurredAt,
-			}
-			if err := dp.CreateSecurityEvent(ctx, payload); err != nil {
-				// Logged and dropped, not retried: a retry loop here would stall the whole
-				// buffer behind one bad event, and this package's own doc comment already owns
-				// the "telemetry is lossy under failure" trade.
-				slog.Warn("failed to write security event", "error", err)
-				continue
-			}
-			written++
+			})
 		}
+		rejected, err := dp.WriteSecurityEvents(ctx, payloads)
+		if err != nil {
+			// Logged and dropped, not retried: a retry loop here would stall the whole buffer
+			// behind one bad batch, and this package's own doc comment already owns the
+			// "telemetry is lossy under failure" trade.
+			slog.Warn("failed to write security events", "error", err, "batch", len(batch))
+			continue
+		}
+		if rejected > 0 {
+			slog.Warn("analytics rejected invalid security events", "rejected", rejected, "batch", len(batch))
+		}
+		written := len(batch) - rejected
 		slog.Debug("ingest batch written", "batch", len(batch), "written", written)
 	}
 }

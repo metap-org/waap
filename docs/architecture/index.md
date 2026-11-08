@@ -2,7 +2,7 @@
 
 Tài liệu kiến trúc **đích** cho sản phẩm WAAP (Web Application & API Protection) enterprise, bán
 dạng SaaS trước, giữ đường cho on-prem. Tài liệu dựng từ yêu cầu sản phẩm, **không** mô tả code
-hiện có trong repo này: phần code ở `data-plane/`, `control-plane/`, `edge-plane/` là bản demo,
+hiện có trong repo này: phần code ở `management-plane/`, `control-plane/`, `edge-plane/` là bản demo,
 chênh lệch so với kiến trúc đích được ghi ở [11. Risks and Technical Debt](11-risks/00-index.md).
 
 Trạng thái: **bản nháp có quyết định** (2026-11-06). Mục 1–4 và level 1–2 của mục 5 mô tả *vai trò*,
@@ -52,7 +52,8 @@ Diagram viết bằng Mermaid để GitHub render trực tiếp và diff đượ
   nghiệp vụ. Tách khỏi kiến trúc: requirements nói hệ thống phải làm gì, thư mục này nói làm bằng gì. Kiến
   trúc trỏ sang requirements khi cần lý do, không chép lại.
 - `docs/overview/`: bản HTML để đọc và trình bày (xem `README.md` trong đó), prefix `v1-`; bản hiện hành sinh từ thư mục này.
-- `data-plane/docs/`: spec nghiệp vụ và màn hình của portal demo. Phần nghiệp vụ (persona, domain,
+- `management-plane/docs/`: spec nghiệp vụ và màn hình của portal demo. Phần nghiệp vụ (persona, domain,
   gói cước) vẫn dùng được làm đầu vào; phần ranh giới kiến trúc ở đó được thay bằng tài liệu này.
-- Tên gọi: thư mục `data-plane/` của repo tương ứng **Management plane** ở đây. Theo nghĩa chuẩn
-  ngành, *data plane* là đường đi của traffic, tức **Edge plane**.
+- Tên gọi: thư mục `management-plane/` của repo là **Management plane** ở đây (trước 2026-11-08 thư mục
+  này tên là `data-plane/`, đổi cho khớp [ADR-0001](09-adr/0001-four-planes.md)). Theo nghĩa chuẩn ngành,
+  *data plane* là đường đi của traffic, tức **Edge plane**.

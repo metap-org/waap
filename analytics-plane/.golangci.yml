@@ -1,0 +1,22 @@
+# Architecture guard only: `golangci-lint run ./...` from analytics-plane.
+version: "2"
+linters:
+  default: none
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # analytics-plane is not built on metap (ADR-0009): from the
+        # metap module it may import only pkg/kit/* — standard-library-only utilities with no
+        # metadata/CRUD/permission/DB knowledge. Anything else from metap means the work
+        # belongs in management-plane instead.
+        metap-kit-only:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: github.com/metap-org/metap
+              desc: "analytics-plane may import only github.com/metap-org/metap/pkg/kit/* from metap"
+          allow:
+            - github.com/metap-org/metap/pkg/kit

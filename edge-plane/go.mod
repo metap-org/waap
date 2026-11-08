@@ -18,5 +18,5 @@ require (
 
 // Only github.com/metap-org/metap/pkg/kit/* may be imported from metap (standard-library-only
 // utilities) — enforced by depguard, see .golangci.yml. Local sibling checkout, same convention
-// as data-plane/go and control-plane/go.
+// as management-plane/go and control-plane/go.
 replace github.com/metap-org/metap => ../../metap

@@ -7,7 +7,7 @@
 // the same bytes, and the cost of a wrong diff is a zone silently serving stale rules.
 //
 // This is also the only thing that removes a zone whose delete event went missing: the index in
-// Redis is compared against the set of hostnames data-plane currently says should be served.
+// Redis is compared against the set of hostnames management-plane currently says should be served.
 package resync
 
 import (
@@ -77,7 +77,7 @@ func RunOnce(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleS
 		expected[hostname] = struct{}{}
 	}
 
-	// Anything published that data-plane no longer considers servable: a deleted zone, one
+	// Anything published that management-plane no longer considers servable: a deleted zone, one
 	// suspended or paused back to pending, or a hostname that was renamed.
 	published, err := distributor.PublishedHostnames(ctx)
 	if err != nil {
@@ -102,7 +102,7 @@ func RunOnce(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleS
 
 // RunLoop runs RunOnce on interval until shutdown is closed.
 //
-// A slow sweep (a large fleet, a sluggish data-plane) never makes this fire repeatedly in a
+// A slow sweep (a large fleet, a sluggish management-plane) never makes this fire repeatedly in a
 // burst to "catch up" — unlike tokio's default MissedTickBehavior::Burst, Go's time.Ticker
 // always drops a missed tick (its channel is buffered to exactly 1), which is already the
 // "Skip" behavior the Rust original had to opt into explicitly.

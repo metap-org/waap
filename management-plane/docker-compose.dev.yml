@@ -1,0 +1,192 @@
+# Dev loop for the WAF Customer Portal: the 3 Go services + graphql-gateway via `go run` from the
+# mounted source, plus the Vite dev server. Same prerequisites as docker-compose.yml (shared
+# Postgres/RabbitMQ from ../../metap, ./keys/jwks, ./.env — see README.md "Chạy local").
+#
+# `go run` builds from the bind-mounted metap-org root, so a code change is picked up by
+# `docker compose -f docker-compose.dev.yml restart <service>` (seconds; the Go build cache lives in
+# the go-cache volume). There is no file-watching auto-reload. Don't run this and
+# docker-compose.yml at the same time — they publish the same host ports.
+name: waap-management-plane-dev
+
+x-go: &go
+  image: golang:1.26
+  working_dir: /workspace/waap/management-plane
+  volumes:
+    - ../../:/workspace
+    - go-cache:/root/.cache/go-build
+    - go-mod:/go/pkg/mod
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+x-service-env: &service-env
+  DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
+  RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
+  CORS_ORIGINS: http://localhost:5173
+  GRPC_ENABLED: "true"
+
+x-health: &health
+  interval: 5s
+  timeout: 3s
+  retries: 60 # the first `go run` compiles everything
+  start_period: 20s
+
+services:
+  zones-service:
+    <<: *go
+    command: go run ./cmd/zones-service
+    ports: ["3000:3000", "3001:3001"]
+    environment:
+      <<: *service-env
+      PORT: "3000"
+      # The token issuer: signs every token and publishes /.well-known/jwks.json.
+      JWKS_KEYS_DIR: /workspace/waap/management-plane/keys/jwks
+      SCANNING_GRPC_ADDR: scanning-service:3011
+      ALERTING_GRPC_ADDR: alerting-service:3021
+      # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
+      # dns.google — set records at http://localhost:8053.
+      DOH_RESOLVER_URL: http://dns-mock:8053/resolve
+    healthcheck:
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3000/health"]
+    depends_on:
+      dns-mock: { condition: service_started }
+
+  # Stand-in for the outside world's DNS (../devtools/dns-mock): real DNS on host :15353 (udp+tcp; container :5353 — host 5353 is usually mDNS; try
+  # `dig @127.0.0.1 -p 15353 ...`), DoH + admin API + UI on :8053. State survives restarts in the
+  # dns-mock volume; seeded with *.edge.waf.local -> 127.0.0.1 on first boot.
+  dns-mock:
+    <<: *go
+    working_dir: /workspace/waap/devtools/dns-mock
+    command: go run .
+    ports: ["${DNS_MOCK_HOST_PORT:-15353}:5353/udp", "${DNS_MOCK_HOST_PORT:-15353}:5353/tcp", "8053:8053"]
+    environment:
+      DNS_MOCK_STATE_FILE: /var/lib/dns-mock/state.json
+      DNS_MOCK_SEED_FILE: /workspace/waap/devtools/dns-mock/seed.dev.json
+    volumes:
+      - ../../:/workspace
+      - go-cache:/root/.cache/go-build
+      - go-mod:/go/pkg/mod
+      - dns-mock:/var/lib/dns-mock
+
+  scanning-service:
+    <<: *go
+    command: go run ./cmd/scanning-service
+    ports: ["3010:3010", "3011:3011"]
+    environment:
+      <<: *service-env
+      PORT: "3010"
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+    healthcheck:
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3010/health"]
+
+  alerting-service:
+    <<: *go
+    command: go run ./cmd/alerting-service
+    ports: ["3020:3020", "3021:3021"]
+    environment:
+      <<: *service-env
+      PORT: "3020"
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      ANALYTICS_URL: http://analytics-api:3030
+    healthcheck:
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3020/health"]
+
+  graphql-gateway:
+    <<: *go
+    command: go run ./cmd/waf-graphql-gateway
+    ports: ["4000:4000"]
+    environment:
+      PORT: "4000"
+      CORS_ORIGINS: http://localhost:5173
+      ANALYTICS_URL: http://analytics-api:3030
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      # Every service account logs in at the issuer; REST_URL says where each upstream really is.
+      UPSTREAM_1_NAME: zones
+      UPSTREAM_1_GRPC_ADDR: zones-service:3001
+      UPSTREAM_1_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_1_REST_URL: http://zones-service:3000
+      UPSTREAM_1_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL:?set WAF_SERVICE_EMAIL in .env}
+      UPSTREAM_1_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD:?set WAF_SERVICE_PASSWORD in .env}
+      UPSTREAM_2_NAME: scanning
+      UPSTREAM_2_GRPC_ADDR: scanning-service:3011
+      UPSTREAM_2_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_2_REST_URL: http://scanning-service:3010
+      UPSTREAM_2_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
+      UPSTREAM_2_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
+      UPSTREAM_3_NAME: alerting
+      UPSTREAM_3_GRPC_ADDR: alerting-service:3021
+      UPSTREAM_3_LOGIN_URL: http://zones-service:3000/auth/login
+      UPSTREAM_3_REST_URL: http://alerting-service:3020
+      UPSTREAM_3_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
+      UPSTREAM_3_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
+    depends_on:
+      zones-service: { condition: service_healthy }
+      scanning-service: { condition: service_healthy }
+      alerting-service: { condition: service_healthy }
+
+  # --- Analytics plane (../../analytics-plane) — a separate plane, run here for the dev loop ---
+  # ClickHouse holds security events (ADR-0020); analytics-api ingests them (from control-plane)
+  # and answers the portal's reads through the gateway. Data survives restarts in the volume.
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    ports: ["8123:8123", "9000:9000"]
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  analytics-api:
+    <<: *go
+    working_dir: /workspace/waap/analytics-plane
+    command: go run ./cmd/analytics-api
+    ports: ["3030:3030"]
+    environment:
+      PORT: "3030"
+      CLICKHOUSE_URL: clickhouse://default:@clickhouse:9000
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      ANALYTICS_INGEST_TOKEN: ${ANALYTICS_INGEST_TOKEN:-}
+    healthcheck:
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3030/health"]
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      zones-service: { condition: service_healthy }
+
+  # Vite dev server (hot reload). design-system is consumed through its built dist/, so it is
+  # built first; platform-ui is consumed from source.
+  web:
+    extends:
+      file: ../../docker-compose.dev.base.yml
+      service: web-dev
+    working_dir: /workspace/waap/management-plane/web
+    environment:
+      ZONES_URL: http://zones-service:3000
+      SCANNING_URL: http://scanning-service:3010
+      ALERTING_URL: http://alerting-service:3020
+      GATEWAY_URL: http://graphql-gateway:4000
+    ports: ["5173:5173"]
+    depends_on:
+      zones-service: { condition: service_healthy }
+      scanning-service: { condition: service_healthy }
+      alerting-service: { condition: service_healthy }
+    command: >
+      sh -c '
+        cd /workspace/design-system && pnpm install --frozen-lockfile && pnpm build &&
+        cd /workspace/platform-ui && pnpm install --frozen-lockfile &&
+        cd /workspace/waap/management-plane/web && pnpm install --frozen-lockfile && pnpm exec vite --host 0.0.0.0
+      '
+
+volumes:
+  go-cache:
+  go-mod:
+  dns-mock:
+  clickhouse:

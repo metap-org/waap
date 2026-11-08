@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -68,4 +69,24 @@ func TestHealthReportsRedisReachability(t *testing.T) {
 			assert.Equal(t, tc.status, rec.Code)
 		})
 	}
+}
+
+func TestRunWriterSendsOneBatchPerDrain(t *testing.T) {
+	sink := portsmock.NewEventSink(t)
+	queue := make(chan EdgeEvent, 10)
+	for i := 0; i < 3; i++ {
+		queue <- EdgeEvent{ZoneID: "z1", Action: "blocked", SourceIP: "203.0.113.7"}
+	}
+	done := make(chan struct{})
+	sink.EXPECT().WriteSecurityEvents(mock.Anything, mock.MatchedBy(func(events []map[string]any) bool {
+		return len(events) == 3 && events[0]["zoneId"] == "z1" && events[0]["sourceIp"] == "203.0.113.7"
+	})).RunAndReturn(func(context.Context, []map[string]any) (int, error) {
+		close(done)
+		return 1, nil
+	}).Once()
+
+	shutdown := make(chan struct{})
+	go RunWriter(context.Background(), sink, queue, 200, shutdown)
+	<-done
+	close(shutdown)
 }

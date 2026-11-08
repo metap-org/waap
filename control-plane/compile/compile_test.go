@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/metap-org/waap/control-plane/dataplane"
+	"github.com/metap-org/waap/control-plane/management"
 	"github.com/metap-org/waap/control-plane/ruleset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,18 +17,18 @@ func rawJSON(t *testing.T, v any) json.RawMessage {
 	return b
 }
 
-func record(id string, status *string, data map[string]any) dataplane.Record {
+func record(id string, status *string, data map[string]any) management.Record {
 	fields := make(map[string]json.RawMessage, len(data))
 	for k, v := range data {
 		b, _ := json.Marshal(v)
 		fields[k] = b
 	}
-	return dataplane.Record{ID: id, Status: status, Data: fields}
+	return management.Record{ID: id, Status: status, Data: fields}
 }
 
 func strPtr(s string) *string { return &s }
 
-func zoneRecord(t *testing.T, status string, extra map[string]any) dataplane.Record {
+func zoneRecord(t *testing.T, status string, extra map[string]any) management.Record {
 	data := map[string]any{
 		"hostname":       "shop.example.com",
 		"originAddress":  "10.0.0.1",
@@ -203,7 +203,7 @@ func TestCompileDdosEnabledCarriesFieldsThrough(t *testing.T) {
 
 func TestCompileZoneSortsRulesByPriorityAndDropsUnrepresentableOnes(t *testing.T) {
 	z := zoneRecord(t, "active", nil)
-	rules := []dataplane.Record{
+	rules := []management.Record{
 		record("r-high-priority-num", nil, map[string]any{"name": "second", "ruleType": "waf", "action": "log", "priority": 200, "enabled": true}),
 		record("r-low-priority-num", nil, map[string]any{"name": "first", "ruleType": "waf", "action": "block", "priority": 10, "enabled": true}),
 		record("r-disabled", nil, map[string]any{"name": "disabled", "ruleType": "waf", "action": "block", "priority": 1, "enabled": false}),
@@ -226,7 +226,7 @@ func TestCompileZoneCarriesDdosOnlyWhenPresentAndEnabled(t *testing.T) {
 	ddos := record("ddos-1", nil, map[string]any{
 		"sensitivity": "medium", "action": "challenge", "requestRateThreshold": 500, "burstWindow": 60, "enabled": true,
 	})
-	compiled, ok := CompileZone(z, "tenant-1", []dataplane.Record{ddos}, nil, nil)
+	compiled, ok := CompileZone(z, "tenant-1", []management.Record{ddos}, nil, nil)
 	require.True(t, ok, "expected 1 ddos policy, got %+v ok=%v", compiled.Ddos, ok)
 	require.Len(t, compiled.Ddos, 1, "expected 1 ddos policy, got %+v ok=%v", compiled.Ddos, ok)
 
@@ -235,7 +235,7 @@ func TestCompileZoneCarriesDdosOnlyWhenPresentAndEnabled(t *testing.T) {
 }
 
 func TestCompileDdosPoliciesSortsByPriorityAndDropsDisabled(t *testing.T) {
-	policies := []dataplane.Record{
+	policies := []management.Record{
 		record("high-priority-num", nil, map[string]any{"sensitivity": "low", "action": "log", "requestRateThreshold": 100, "burstWindow": 60, "priority": 200, "enabled": true}),
 		record("low-priority-num", nil, map[string]any{"sensitivity": "high", "action": "block", "requestRateThreshold": 10, "burstWindow": 60, "priority": 10, "enabled": true}),
 		record("disabled", nil, map[string]any{"sensitivity": "high", "action": "block", "requestRateThreshold": 10, "burstWindow": 60, "priority": 1, "enabled": false}),
@@ -267,7 +267,7 @@ func TestCompileDdosEmptyScopeFieldsMeanUnscoped(t *testing.T) {
 	assert.False(t, compiled.PathPrefix != nil || compiled.HttpMethod != nil, "expected unscoped (nil) pathPrefix/httpMethod, got %+v / %+v", compiled.PathPrefix, compiled.HttpMethod)
 }
 
-func accessListEntry(id, listType, value string, enabled bool) dataplane.Record {
+func accessListEntry(id, listType, value string, enabled bool) management.Record {
 	return record(id, nil, map[string]any{"type": listType, "value": value, "enabled": enabled})
 }
 
@@ -294,10 +294,10 @@ func TestCompileIPAccessListDropsDisabledEntries(t *testing.T) {
 
 func TestCompileZonePlacesIPAccessListsBeforeRegularRulesAllowBeforeBlock(t *testing.T) {
 	z := zoneRecord(t, "active", nil)
-	rules := []dataplane.Record{
+	rules := []management.Record{
 		record("r-1", nil, map[string]any{"name": "regular", "ruleType": "waf", "action": "block", "priority": 1, "enabled": true}),
 	}
-	accessLists := []dataplane.Record{
+	accessLists := []management.Record{
 		accessListEntry("bl-1", "blacklist", "10.0.0.1", true),
 		accessListEntry("wl-1", "whitelist", "10.0.0.2", true),
 	}

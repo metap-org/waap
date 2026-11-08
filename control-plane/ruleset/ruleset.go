@@ -3,7 +3,7 @@
 //
 // Two properties this shape is designed for:
 //
-//  1. edge-plane never learns data-plane's schema. It does not see metap's records table, its
+//  1. edge-plane never learns management-plane's schema. It does not see metap's records table, its
 //     JSONB field bag, entity names, or workflow state names. It sees a flat, already-decided
 //     rule list. That is the whole point of compiling here rather than letting the edge read
 //     config itself.
