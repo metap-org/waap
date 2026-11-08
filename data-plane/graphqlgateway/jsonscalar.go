@@ -12,7 +12,7 @@ import (
 )
 
 var jsonScalar = graphql.NewScalar(graphql.ScalarConfig{
-	Name:        "JSON",
+	Name:        "Json",
 	Description: "An arbitrary JSON value (object, array, string, number, boolean or null).",
 	Serialize: func(value interface{}) interface{} {
 		return value

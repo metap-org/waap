@@ -2,8 +2,9 @@
 //
 // A bespoke, forwarding gateway (confirmed with the project owner, since metap-go never got a
 // GraphQL layer at all — metap-graphql/metap-graphql-http/metap-graphql-gateway were never
-// ported): every entity field is built from a hardcoded list of the 11 entities the 3 WAF
-// services own (graphqlgateway.BuildSchema), forwarding to each upstream's gRPC RecordBackend
+// ported). The schema is generated from the 3 WAF services' own entity definitions (imported
+// below for their init() SubmitEntity side effect) in the Rust metap-graphql wire shape the
+// portal and control-plane expect (graphqlgateway.BuildSchema), forwarding to each upstream's gRPC RecordBackend
 // (grpcapi.GrpcBackend, the same client the 3 Go WAF services already use for their own
 // cross-service calls); the 8 custom business-action mutations forward to each service's REST
 // endpoint instead, since those have no gRPC equivalent.
@@ -28,9 +29,15 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/jwks"
+	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/runtime"
+
+	_ "github.com/metap-org/waap/data-plane/alertingservice/entities"
+	_ "github.com/metap-org/waap/data-plane/scanningservice/entities"
+	_ "github.com/metap-org/waap/data-plane/zonesservice/entities"
 
 	"github.com/metap-org/waap/data-plane/graphqlgateway"
 )
@@ -176,20 +183,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Order is cosmetic (a map in BuildSchema either way) — order is load-bearing nowhere here
-	// since each entity's name is globally unique and the backend map is built from it.
-	entities := []graphqlgateway.EntityBackend{
-		{Name: "waf.domains", Backend: zonesBackend},
-		{Name: "waf.zones", Backend: zonesBackend, HasWorkflow: true},
-		{Name: "waf.ddos_policies", Backend: zonesBackend},
-		{Name: "waf.firewall_rules", Backend: zonesBackend},
-		{Name: "waf.ip_access_lists", Backend: zonesBackend},
-		{Name: "waf.scan_jobs", Backend: scanningBackend, HasWorkflow: true},
-		{Name: "waf.scan_findings", Backend: scanningBackend, HasWorkflow: true},
-		{Name: "waf.alert_policies", Backend: alertingBackend},
-		{Name: "waf.alert_notifications", Backend: alertingBackend},
-		{Name: "waf.security_events", Backend: alertingBackend},
-		{Name: "waf.incidents", Backend: alertingBackend, HasWorkflow: true},
+	// Which upstream owns each entity. The entity shapes themselves come from the metadata
+	// registry, so a field added to an entity shows up here without touching this file.
+	owners := map[string]crud.RecordBackend{
+		"waf.domains":             zonesBackend,
+		"waf.zones":               zonesBackend,
+		"waf.ddos_policies":       zonesBackend,
+		"waf.firewall_rules":      zonesBackend,
+		"waf.ip_access_lists":     zonesBackend,
+		"waf.scan_jobs":           scanningBackend,
+		"waf.scan_findings":       scanningBackend,
+		"waf.alert_policies":      alertingBackend,
+		"waf.alert_notifications": alertingBackend,
+		"waf.security_events":     alertingBackend,
+		"waf.incidents":           alertingBackend,
+	}
+	registry := metadata.NewMetadataRegistry()
+	if err := registry.RegisterAllSubmitted(); err != nil {
+		slog.Error("registering WAF entity metadata", "error", err)
+		os.Exit(1)
 	}
 
 	rest := graphqlgateway.RestURLs{
@@ -198,13 +210,18 @@ func main() {
 		Alerting: byName["alerting"].restURL,
 	}
 
-	schema, err := graphqlgateway.BuildSchema(entities, rest)
+	schema, err := graphqlgateway.BuildSchema(registry, owners, rest)
 	if err != nil {
 		slog.Error("building GraphQL schema", "error", err)
 		os.Exit(1)
 	}
 
-	server := graphqlgateway.NewServer(schema, verifier)
+	defaults := graphqlgateway.DefaultLimits()
+	limits := graphqlgateway.Limits{
+		MaxDepth:      runtime.EnvOr("GRAPHQL_MAX_DEPTH", defaults.MaxDepth),
+		MaxComplexity: runtime.EnvOr("GRAPHQL_MAX_COMPLEXITY", defaults.MaxComplexity),
+	}
+	server := graphqlgateway.NewServer(schema, verifier, limits)
 
 	corsOrigins, _ := runtime.Optional("CORS_ORIGINS")
 	var origins []string
@@ -214,11 +231,11 @@ func main() {
 	handler := runtime.CORS(runtime.CORSOptions{
 		Origins: origins,
 		Methods: []string{"GET", "POST", "OPTIONS"},
-		Headers: []string{"Authorization", "Content-Type"},
+		Headers: []string{"Authorization", "Content-Type", "X-CSRF-Token"},
 	})(server.Router())
 
 	addr := fmt.Sprintf("%s:%d", host, port)
-	slog.Info("waf-graphql-gateway listening", "addr", addr, "entities", len(entities))
+	slog.Info("waf-graphql-gateway listening", "addr", addr, "entities", len(owners))
 	if err := runtime.Serve(addr, handler); err != nil && err != http.ErrServerClosed {
 		slog.Error("waf-graphql-gateway exited with an error", "error", err)
 		os.Exit(1)

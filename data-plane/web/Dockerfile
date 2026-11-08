@@ -49,7 +49,7 @@ WORKDIR /workspace
 # source) is too late and re-triggers [ERR_PNPM_IGNORED_BUILDS] (found live, 2026-09-01).
 COPY design-system/package.json design-system/pnpm-lock.yaml design-system/pnpm-workspace.yaml design-system/
 COPY platform-ui/package.json platform-ui/pnpm-lock.yaml platform-ui/
-COPY waap/data-plane/web/package.json waap/data-plane/web/pnpm-lock.yaml waap/data-plane/web/
+COPY waap/data-plane/web/package.json waap/data-plane/web/pnpm-lock.yaml waap/data-plane/web/pnpm-workspace.yaml waap/data-plane/web/
 
 RUN cd design-system && pnpm install --frozen-lockfile
 RUN cd platform-ui && pnpm install --frozen-lockfile

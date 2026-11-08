@@ -6,13 +6,55 @@ FROM information_schema.tables
 ORDER BY table_schema;
 
 
-SELECT table_catalog, table_schema, table_name, table_type
+SELECT DISTINCT table_name
 FROM information_schema.tables
 WHERE table_schema = 'metadata'
 ORDER BY table_name;
 
 
-SELECT * FROM oauth_authorization_codes;
-SELECT * FROM cron_jobs;
+-- table_name                    
+-- ──────────────────────────────
+-- _sqlx_migrations              
+-- attachments                   
+-- audit_trail_entries_date...
+-- audit_trail_entries_default   
+-- cron_job_runs                 
+-- cron_jobs                     
+-- dashboard_configs             
+-- low_code_entity_drafts        
+-- low_code_entity_versions      
+-- low_code_metadata_audit_events
+-- lowcode_impersonation_sessions
+-- metadata_versions             
+-- oauth_authorization_codes     
+-- oauth_clients                 
+-- oauth_consents                
+-- oauth_pending_authorizations  
+-- oauth_refresh_tokens          
+-- outbox_events                 
+-- platform_configs              
+-- policies                      
+-- reconciler_backfill_progress  
+-- reconciler_entity_deployments 
+-- reconciler_entity_status      
+-- tenant_auth_configs           
+-- tenant_configs                
+-- user_preferences              
+-- user_roles                    
+-- users                         
+-- workflow_events               
+-- workflow_runs                 
+
+SELECT * FROM metadata.oauth_authorization_codes;
+SELECT * FROM metadata.cron_jobs;
+
+SELECT * FROM metadata.users;
+SELECT * FROM metadata.user_roles;
+SELECT * FROM metadata.user_preferences;
+SELECT * FROM metadata.policies;
+
+SELECT * FROM metadata.reconciler_entity_status;
+SELECT * FROM metadata.reconciler_entity_deployments;
+SELECT * FROM metadata.reconciler_backfill_progress;
 
 ```

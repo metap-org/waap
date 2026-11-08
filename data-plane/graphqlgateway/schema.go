@@ -1,16 +1,26 @@
-// Package graphqlgateway is WAF's own GraphQL BFF — a bespoke, forwarding gateway, not a port
-// of metap-graphql's generic dynamic-schema-from-metadata engine (that engine was never ported
-// to metap-go at all; see this repo's own notes on why the port stopped there). Every entity
-// field here is built from a small, hardcoded list of the 11 entities the 3 WAF services own
-// (survivable because that list almost never changes, unlike a true low-code platform's), and
-// every field just forwards to the matching upstream's crud.RecordBackend — in this case a real
-// gRPC call (grpcapi.GrpcBackend), the same client already used by the 3 Go WAF services'
-// cross-service calls.
+// Package graphqlgateway is WAF's own GraphQL BFF — a forwarding gateway in front of the 3 WAF
+// services' gRPC RecordBackends. metap's Go port has no generic GraphQL engine (no Go
+// metap-graphql), so this package builds the schema itself — but the schema it builds is
+// wire-compatible with the Rust metap-graphql one, because both of its real clients were written
+// against that: @metap/platform-ui's graphqlRecords.ts (the Customer Portal) and
+// control-plane/dataplane (the config distributor). Concretely, per entity in the metadata
+// registry (crates/metap-graphql/src/schema.rs, recovered from git history, is the reference):
 //
-// Naming convention (matches the Rust gateway's metap-graphql::naming so a frontend query
-// string is portable either way): "waf.ddos_policies" -> get field "wafDdosPolicies", list
-// field "wafDdosPoliciesList", mutations "createWafDdosPolicies"/"updateWafDdosPolicies"/
-// "deleteWafDdosPolicies", plus "transitionWafDdosPolicies" only for an entity with a workflow.
+//   - an object type named after the entity ("waf.ddos_policies" -> WafDdosPolicies) with the
+//     record envelope (id, entity, code, status, version, createdAt, updatedAt, capabilities)
+//     plus every declared field flattened to the top level, typed by kind. A reference field is
+//     a plain ID ("zoneId"), the same value create/update take; its target record is a separate
+//     relation field ("zone { hostname }", RelationFieldName), resolved through the target
+//     entity's own backend. (Deliberate departure from the Rust schema, which made the reference
+//     field itself the object: reads now match writes, and a bare "zoneId" selection — what
+//     control-plane and RelatedRecordsPanel send — is valid.)
+//   - a Connection type ({ records, nextCursor, hasMore });
+//   - query fields wafDdosPolicies(id) / wafDdosPoliciesList(filter, sort, cursor, limit,
+//     listView, jql), plus one shared aggregate(entity, spec): Json!;
+//   - mutations create/update/delete (+ transition for an entity with a workflow), taking
+//     expectedVersion and an optional reason.
+//
+// The scalar is named "Json", matching the Rust schema — clients declare `$data: Json!`.
 package graphqlgateway
 
 import (
@@ -18,28 +28,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/graphql-go/graphql"
 
 	"github.com/metap-org/metap/pkg/crud"
+	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 )
 
-// EntityBackend is one entity this gateway serves, plus which upstream backend answers for it.
-type EntityBackend struct {
-	Name        string // "waf.zones"
-	Backend     crud.RecordBackend
-	HasWorkflow bool
-}
-
 type contextKey int
 
-const requestContextKey contextKey = 0
+const (
+	requestContextKey contextKey = iota
+	recordCacheKey
+)
 
 func withRequestContext(ctx context.Context, rc *permission.RequestContext) context.Context {
-	return context.WithValue(ctx, requestContextKey, rc)
+	ctx = context.WithValue(ctx, requestContextKey, rc)
+	return context.WithValue(ctx, recordCacheKey, &recordCache{entries: map[string]*recordHandle{}})
 }
 
 func requestContextFrom(ctx context.Context) *permission.RequestContext {
@@ -52,26 +61,82 @@ func requestContextFrom(ctx context.Context) *permission.RequestContext {
 	return rc
 }
 
-var recordType = graphql.NewObject(graphql.ObjectConfig{
-	Name: "Record",
-	Fields: graphql.Fields{
-		"id":        &graphql.Field{Type: graphql.NewNonNull(graphql.ID)},
-		"entity":    &graphql.Field{Type: graphql.NewNonNull(graphql.String)},
-		"status":    &graphql.Field{Type: graphql.String},
-		"data":      &graphql.Field{Type: jsonScalar},
-		"version":   &graphql.Field{Type: graphql.NewNonNull(graphql.Int)},
-		"createdAt": &graphql.Field{Type: graphql.NewNonNull(graphql.String)},
-		"updatedAt": &graphql.Field{Type: graphql.NewNonNull(graphql.String)},
-	},
-})
+// recordCache memoizes reference lookups for one request, so a list of 50 rules all pointing at
+// the same zone costs one upstream Get, not 50 (the Rust schema used a DataLoader for this).
+type recordCache struct {
+	mu      sync.Mutex
+	entries map[string]*recordHandle // nil value = looked up, not found/denied
+}
 
-var recordListType = graphql.NewObject(graphql.ObjectConfig{
-	Name: "RecordList",
-	Fields: graphql.Fields{
-		"records":    &graphql.Field{Type: graphql.NewList(recordType)},
-		"nextCursor": &graphql.Field{Type: graphql.String},
-	},
-})
+// recordHandle is the source value of every entity object: the envelope plus the decoded data
+// bag that the flattened field resolvers read from.
+type recordHandle struct {
+	dto          crud.RecordDto
+	data         map[string]interface{}
+	capabilities *crud.RecordCapabilities
+}
+
+func newRecordHandle(dto crud.RecordDto, capabilities *crud.RecordCapabilities) (*recordHandle, error) {
+	data, err := jsonObjectToMap(dto.Data)
+	if err != nil {
+		return nil, err
+	}
+	return &recordHandle{dto: dto, data: data, capabilities: capabilities}, nil
+}
+
+func (h *recordHandle) envelope(key string) interface{} {
+	switch key {
+	case "id":
+		return h.dto.ID.String()
+	case "entity":
+		return h.dto.Entity
+	case "code":
+		if h.dto.Code == nil {
+			return nil
+		}
+		return *h.dto.Code
+	case "status":
+		if h.dto.Status == nil {
+			return nil
+		}
+		return *h.dto.Status
+	case "version":
+		return h.dto.Version
+	case "createdAt":
+		return h.dto.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00")
+	case "updatedAt":
+		return h.dto.UpdatedAt.Format("2006-01-02T15:04:05.000Z07:00")
+	case "capabilities":
+		if h.capabilities == nil {
+			return nil
+		}
+		return capabilitiesToMap(*h.capabilities)
+	}
+	return nil
+}
+
+func capabilitiesToMap(c crud.RecordCapabilities) interface{} {
+	raw, err := json.Marshal(c)
+	if err != nil {
+		return nil
+	}
+	var out interface{} // nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+type connectionHandle struct {
+	records    []*recordHandle
+	nextCursor interface{}
+	hasMore    bool
+}
+
+var envelopeFieldNames = map[string]bool{
+	"id": true, "entity": true, "code": true, "status": true,
+	"version": true, "createdAt": true, "updatedAt": true, "capabilities": true,
+}
 
 func capitalize(s string) string {
 	if s == "" {
@@ -80,40 +145,32 @@ func capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// fieldBase turns "waf.ddos_policies" into "wafDdosPolicies".
-func fieldBase(entityName string) string {
-	prefix, local, found := strings.Cut(entityName, ".")
-	if !found {
-		local = prefix
-		prefix = ""
+// typeName: "waf.ddos_policies" -> "WafDdosPolicies" (metap-graphql naming::type_name).
+func typeName(entityName string) string {
+	parts := strings.FieldsFunc(entityName, func(r rune) bool { return r == '.' || r == '_' || r == '-' })
+	for i, p := range parts {
+		parts[i] = capitalize(p)
 	}
-	segments := strings.Split(local, "_")
-	for i, s := range segments {
-		segments[i] = capitalize(s)
-	}
-	return prefix + strings.Join(segments, "")
+	return strings.Join(parts, "")
 }
 
-func recordToMap(dto crud.RecordDto) map[string]interface{} {
-	data, _ := jsonObjectToMap(dto.Data)
-	return map[string]interface{}{
-		"id": dto.ID.String(), "entity": dto.Entity, "status": dto.Status,
-		"data": data, "version": dto.Version,
-		"createdAt": dto.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
-		"updatedAt": dto.UpdatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
+// fieldBase: "waf.ddos_policies" -> "wafDdosPolicies" (metap-graphql naming::get_field_name).
+func fieldBase(entityName string) string {
+	t := typeName(entityName)
+	if t == "" {
+		return t
 	}
+	return strings.ToLower(t[:1]) + t[1:]
 }
 
 func jsonObjectToMap(obj crud.JsonObject) (map[string]interface{}, error) {
 	out := make(map[string]interface{}, len(obj))
 	for k, raw := range obj {
 		// False positive below: jsonObjectToMap converts a crud.JsonObject (map[string]json.RawMessage)
-		// into the untyped map[string]interface{} shape this bespoke, no-codegen GraphQL gateway's
-		// resolvers need for all 11 entities across 3 upstream services — the field set is
-		// metadata-driven at runtime, never known at compile time, so there is no single concrete
-		// struct to deserialize into here either (same reasoning as custom.go's forwardCustomMutation).
-		// The rule's match spans from this declaration through the Unmarshal call below, and
-		// Semgrep anchors a multi-line match's suppression to its FIRST line, not the call site.
+		// into the untyped map[string]interface{} shape this no-codegen GraphQL gateway's resolvers
+		// need — the field set is metadata-driven at runtime, never known at compile time, so there
+		// is no single concrete struct to deserialize into (same reasoning as custom.go's
+		// forwardCustomMutation). Semgrep anchors a multi-line match's suppression to its first line.
 		var v interface{} // nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
 		if err := json.Unmarshal(raw, &v); err != nil {
 			return nil, err
@@ -159,11 +216,218 @@ func int32Arg(args map[string]interface{}, name string) int32 {
 	}
 }
 
+func stringArg(args map[string]interface{}, name string) *string {
+	if s, ok := args[name].(string); ok {
+		return &s
+	}
+	return nil
+}
+
+func objectArg(args map[string]interface{}, name string) (crud.JsonObject, bool, error) {
+	m, ok := args[name].(map[string]interface{})
+	if !ok {
+		return nil, false, nil
+	}
+	obj, err := mapToJsonObject(m)
+	return obj, true, err
+}
+
 func resultError(status uint16, code string, message *string, fieldErrors map[string][]string) error {
 	return newServiceError(status, code, message, fieldErrors)
 }
 
-func getField(eb EntityBackend) *graphql.Field {
+// schemaBuilder holds what every resolver needs: which backend owns each entity, and the object
+// type built for each entity (a reference field's type is the target entity's object, so types
+// are created first and their fields filled lazily via FieldsThunk).
+type schemaBuilder struct {
+	registry *metadata.MetadataRegistry
+	backends map[string]crud.RecordBackend
+	types    map[string]*graphql.Object
+}
+
+func (b *schemaBuilder) backendFor(entity string) (crud.RecordBackend, error) {
+	backend, ok := b.backends[entity]
+	if !ok {
+		return nil, fmt.Errorf("unknown entity %q", entity)
+	}
+	return backend, nil
+}
+
+// loadReference resolves one reference field's target record, memoized per request. A denied or
+// missing target resolves to null rather than failing the whole parent record, same as the Rust
+// RecordLoader (a GetMany that simply omits ids it can't return).
+func (b *schemaBuilder) loadReference(ctx context.Context, entity string, id uuid.UUID) (*recordHandle, error) {
+	cache, _ := ctx.Value(recordCacheKey).(*recordCache)
+	key := entity + "/" + id.String()
+	if cache != nil {
+		cache.mu.Lock()
+		h, hit := cache.entries[key]
+		cache.mu.Unlock()
+		if hit {
+			return h, nil
+		}
+	}
+	backend, err := b.backendFor(entity)
+	if err != nil {
+		return nil, err
+	}
+	result, err := backend.Get(ctx, entity, id, requestContextFrom(ctx))
+	if err != nil {
+		return nil, err
+	}
+	var h *recordHandle
+	if result.IsOk {
+		capabilities := result.Data.Capabilities
+		h, err = newRecordHandle(result.Data.Record, &capabilities)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if cache != nil {
+		cache.mu.Lock()
+		cache.entries[key] = h
+		cache.mu.Unlock()
+	}
+	return h, nil
+}
+
+func envelopeResolver(key string) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		h, ok := p.Source.(*recordHandle)
+		if !ok {
+			return nil, nil
+		}
+		return h.envelope(key), nil
+	}
+}
+
+func dataResolver(fieldName string) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		h, ok := p.Source.(*recordHandle)
+		if !ok {
+			return nil, nil
+		}
+		return h.data[fieldName], nil
+	}
+}
+
+// RelationFieldName names the relation field that carries a reference field's target record:
+// strip a trailing "Id" ("zoneId" -> "zone", "domainId" -> "domain"); when there is no such
+// suffix, or the stripped name is already taken by an envelope or declared field, append "Ref"
+// instead ("owner" -> "ownerRef"). @metap/platform-ui's graphqlNaming.ts relationFieldName
+// implements the same rule — keep the two in step.
+func RelationFieldName(fieldName string, taken map[string]bool) string {
+	if len(fieldName) > 2 && strings.HasSuffix(fieldName, "Id") {
+		if base := fieldName[:len(fieldName)-2]; !taken[base] {
+			return base
+		}
+	}
+	return fieldName + "Ref"
+}
+
+func scalarFor(kind metadata.FieldKind) graphql.Output {
+	switch kind {
+	case metadata.KindID:
+		return graphql.ID
+	case metadata.KindNumber, metadata.KindMoney:
+		return graphql.Float
+	case metadata.KindBoolean:
+		return graphql.Boolean
+	case metadata.KindJSON:
+		return jsonScalar
+	default: // string, enum, date, datetime
+		return graphql.String
+	}
+}
+
+func (b *schemaBuilder) entityFields(summary metadata.EntitySummary) graphql.Fields {
+	fields := graphql.Fields{}
+	for _, key := range []string{"id", "entity", "code", "status", "createdAt", "updatedAt"} {
+		fields[key] = &graphql.Field{Type: graphql.String, Resolve: envelopeResolver(key)}
+	}
+	fields["version"] = &graphql.Field{Type: graphql.Int, Resolve: envelopeResolver("version")}
+	fields["capabilities"] = &graphql.Field{Type: jsonScalar, Resolve: envelopeResolver("capabilities")}
+
+	taken := map[string]bool{}
+	for k := range envelopeFieldNames {
+		taken[k] = true
+	}
+	for _, f := range summary.Fields {
+		taken[f.Name] = true
+	}
+
+	for _, f := range summary.Fields {
+		if envelopeFieldNames[f.Name] {
+			continue
+		}
+		name := f.Name
+		if f.Kind == metadata.KindReference {
+			// Flat: the reference field itself is the plain id — the same value create/update
+			// take in `data`, so a record reads back exactly as it is written.
+			fields[name] = &graphql.Field{Type: graphql.ID, Resolve: dataResolver(name)}
+			if f.RefEntity == nil {
+				continue
+			}
+			// The referenced record, when a caller wants more than its id, is a separate
+			// relation field: "zoneId" -> "zone" (see RelationFieldName).
+			if target, ok := b.types[*f.RefEntity]; ok {
+				refEntity := *f.RefEntity
+				fields[RelationFieldName(name, taken)] = &graphql.Field{
+					Type: target,
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						h, ok := p.Source.(*recordHandle)
+						if !ok {
+							return nil, nil
+						}
+						idStr, _ := h.data[name].(string)
+						id, err := uuid.Parse(idStr)
+						if err != nil {
+							return nil, nil
+						}
+						ref, err := b.loadReference(p.Context, refEntity, id)
+						if err != nil || ref == nil {
+							return nil, err
+						}
+						return ref, nil
+					},
+				}
+			}
+			// A target entity this gateway doesn't serve gets no relation field — just the id.
+			continue
+		}
+		fields[name] = &graphql.Field{Type: scalarFor(f.Kind), Resolve: dataResolver(name)}
+	}
+	return fields
+}
+
+func connectionType(entityName string, recordType *graphql.Object) *graphql.Object {
+	return graphql.NewObject(graphql.ObjectConfig{
+		Name: typeName(entityName) + "Connection",
+		Fields: graphql.Fields{
+			"records": &graphql.Field{
+				Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(recordType))),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return p.Source.(*connectionHandle).records, nil
+				},
+			},
+			"nextCursor": &graphql.Field{
+				Type: graphql.String,
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return p.Source.(*connectionHandle).nextCursor, nil
+				},
+			},
+			"hasMore": &graphql.Field{
+				Type: graphql.NewNonNull(graphql.Boolean),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return p.Source.(*connectionHandle).hasMore, nil
+				},
+			},
+		},
+	})
+}
+
+func (b *schemaBuilder) getField(entity string, recordType *graphql.Object) *graphql.Field {
+	backend := b.backends[entity]
 	return &graphql.Field{
 		Type: recordType,
 		Args: graphql.FieldConfigArgument{
@@ -174,154 +438,218 @@ func getField(eb EntityBackend) *graphql.Field {
 			if err != nil {
 				return nil, err
 			}
-			rc := requestContextFrom(p.Context)
-			result, err := eb.Backend.Get(p.Context, eb.Name, id, rc)
+			result, err := backend.Get(p.Context, entity, id, requestContextFrom(p.Context))
 			if err != nil {
 				return nil, err
 			}
 			if !result.IsOk {
 				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
 			}
-			return recordToMap(result.Data.Record), nil
+			capabilities := result.Data.Capabilities
+			return newRecordHandle(result.Data.Record, &capabilities)
 		},
 	}
 }
 
-func listField(eb EntityBackend) *graphql.Field {
+// listInputFromArgs mirrors metap-graphql's list_input_from_args: limit defaults to 30 and must
+// be in 1..=200; filter is a flat object whose values are stringified.
+func listInputFromArgs(args map[string]interface{}) (query.ListInput, error) {
+	input := query.ListInput{Limit: 30}
+	if _, ok := args["limit"]; ok {
+		n := int64(int32Arg(args, "limit"))
+		if n <= 0 || n > 200 {
+			return input, fmt.Errorf("`limit` must be a positive integer no greater than 200")
+		}
+		input.Limit = n
+	}
+	input.Sort = stringArg(args, "sort")
+	input.Cursor = stringArg(args, "cursor")
+	input.ListView = stringArg(args, "listView")
+	input.JQL = stringArg(args, "jql")
+	if filter, ok := args["filter"].(map[string]interface{}); ok {
+		for k, v := range filter {
+			var s string
+			switch tv := v.(type) {
+			case string:
+				s = tv
+			case nil:
+				continue
+			default:
+				raw, _ := json.Marshal(tv)
+				s = string(raw)
+			}
+			input.Filters = append(input.Filters, [2]string{k, s})
+		}
+	}
+	return input, nil
+}
+
+func (b *schemaBuilder) listField(entity string, connection *graphql.Object) *graphql.Field {
+	backend := b.backends[entity]
 	return &graphql.Field{
-		Type: recordListType,
+		Type: graphql.NewNonNull(connection),
 		Args: graphql.FieldConfigArgument{
-			"filter": &graphql.ArgumentConfig{Type: jsonScalar},
-			"limit":  &graphql.ArgumentConfig{Type: graphql.Int},
-			"sort":   &graphql.ArgumentConfig{Type: graphql.String},
-			"cursor": &graphql.ArgumentConfig{Type: graphql.String},
+			"filter":   &graphql.ArgumentConfig{Type: jsonScalar},
+			"sort":     &graphql.ArgumentConfig{Type: graphql.String},
+			"cursor":   &graphql.ArgumentConfig{Type: graphql.String},
+			"limit":    &graphql.ArgumentConfig{Type: graphql.Int},
+			"listView": &graphql.ArgumentConfig{Type: graphql.String},
+			"jql":      &graphql.ArgumentConfig{Type: graphql.String},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			input := query.ListInput{Limit: 50}
-			if _, ok := p.Args["limit"]; ok {
-				input.Limit = int64(int32Arg(p.Args, "limit"))
+			input, err := listInputFromArgs(p.Args)
+			if err != nil {
+				return nil, err
 			}
-			if sortVal, ok := p.Args["sort"].(string); ok {
-				input.Sort = &sortVal
+			result, err := backend.List(p.Context, entity, input, requestContextFrom(p.Context))
+			if err != nil {
+				return nil, err
 			}
-			if cursorVal, ok := p.Args["cursor"].(string); ok {
-				input.Cursor = &cursorVal
+			if !result.IsOk {
+				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
 			}
-			if filter, ok := p.Args["filter"].(map[string]interface{}); ok {
-				for k, v := range filter {
-					input.Filters = append(input.Filters, [2]string{k, fmt.Sprintf("%v", v)})
+			conn := &connectionHandle{records: make([]*recordHandle, 0, len(result.Data))}
+			for _, dto := range result.Data {
+				h, err := newRecordHandle(dto, nil)
+				if err != nil {
+					return nil, err
 				}
+				conn.records = append(conn.records, h)
 			}
-			rc := requestContextFrom(p.Context)
-			result, err := eb.Backend.List(p.Context, eb.Name, input, rc)
-			if err != nil {
-				return nil, err
-			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			}
-			records := make([]map[string]interface{}, 0, len(result.Data))
-			for _, r := range result.Data {
-				records = append(records, recordToMap(r))
-			}
-			var nextCursor interface{}
 			if result.Page != nil && result.Page.NextCursor != nil {
-				nextCursor = *result.Page.NextCursor
+				conn.nextCursor = *result.Page.NextCursor
+				conn.hasMore = true
 			}
-			return map[string]interface{}{"records": records, "nextCursor": nextCursor}, nil
+			return conn, nil
 		},
 	}
 }
 
-func createField(eb EntityBackend) *graphql.Field {
+func (b *schemaBuilder) aggregateField() *graphql.Field {
 	return &graphql.Field{
-		Type: graphql.NewNonNull(recordType),
+		Type: graphql.NewNonNull(jsonScalar),
 		Args: graphql.FieldConfigArgument{
-			"data": &graphql.ArgumentConfig{Type: graphql.NewNonNull(jsonScalar)},
+			"entity": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+			"spec":   &graphql.ArgumentConfig{Type: graphql.NewNonNull(jsonScalar)},
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			dataMap, _ := p.Args["data"].(map[string]interface{})
-			data, err := mapToJsonObject(dataMap)
+			entity, _ := p.Args["entity"].(string)
+			backend, err := b.backendFor(entity)
 			if err != nil {
 				return nil, err
 			}
-			rc := requestContextFrom(p.Context)
-			result, err := eb.Backend.Create(p.Context, eb.Name, data, rc, nil)
+			raw, err := json.Marshal(p.Args["spec"])
+			if err != nil {
+				return nil, err
+			}
+			var spec query.AggregateSpec
+			if err := json.Unmarshal(raw, &spec); err != nil {
+				return nil, fmt.Errorf("invalid aggregate spec: %w", err)
+			}
+			result, err := backend.Aggregate(p.Context, entity, spec, requestContextFrom(p.Context))
 			if err != nil {
 				return nil, err
 			}
 			if !result.IsOk {
 				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
 			}
-			return recordToMap(result.Data), nil
+			rows := make([]interface{}, 0, len(result.Data))
+			for _, r := range result.Data {
+				var row interface{} // nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+				if err := json.Unmarshal(r, &row); err != nil {
+					return nil, err
+				}
+				rows = append(rows, row)
+			}
+			return map[string]interface{}{"data": rows}, nil
 		},
 	}
 }
 
-func updateField(eb EntityBackend) *graphql.Field {
-	return &graphql.Field{
-		Type: graphql.NewNonNull(recordType),
+func recordResult(result crud.ServiceResult[crud.RecordDto], err error) (interface{}, error) {
+	if err != nil {
+		return nil, err
+	}
+	if !result.IsOk {
+		return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
+	}
+	return newRecordHandle(result.Data, nil)
+}
+
+func (b *schemaBuilder) addMutations(fields graphql.Fields, entity string, recordType *graphql.Object, hasWorkflow bool) {
+	backend := b.backends[entity]
+	pascal := typeName(entity)
+	reasonArg := &graphql.ArgumentConfig{Type: graphql.String}
+
+	fields["create"+pascal] = &graphql.Field{
+		Type: recordType,
 		Args: graphql.FieldConfigArgument{
-			"id":      &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
-			"version": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
-			"data":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(jsonScalar)},
+			"data":   &graphql.ArgumentConfig{Type: graphql.NewNonNull(jsonScalar)},
+			"reason": reasonArg,
+		},
+		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			data, ok, err := objectArg(p.Args, "data")
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				return nil, fmt.Errorf("`data` must be an object")
+			}
+			return recordResult(backend.Create(p.Context, entity, data, requestContextFrom(p.Context), stringArg(p.Args, "reason")))
+		},
+	}
+
+	fields["update"+pascal] = &graphql.Field{
+		Type: recordType,
+		Args: graphql.FieldConfigArgument{
+			"id":              &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
+			"expectedVersion": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"data":            &graphql.ArgumentConfig{Type: graphql.NewNonNull(jsonScalar)},
+			"reason":          reasonArg,
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			id, err := parseID(p.Args, "id")
 			if err != nil {
 				return nil, err
 			}
-			dataMap, _ := p.Args["data"].(map[string]interface{})
-			data, err := mapToJsonObject(dataMap)
+			data, ok, err := objectArg(p.Args, "data")
 			if err != nil {
 				return nil, err
 			}
-			rc := requestContextFrom(p.Context)
-			result, err := eb.Backend.Update(p.Context, eb.Name, id, int32Arg(p.Args, "version"), data, rc, nil)
-			if err != nil {
-				return nil, err
+			if !ok {
+				return nil, fmt.Errorf("`data` must be an object")
 			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			}
-			return recordToMap(result.Data), nil
+			return recordResult(backend.Update(p.Context, entity, id, int32Arg(p.Args, "expectedVersion"), data, requestContextFrom(p.Context), stringArg(p.Args, "reason")))
 		},
 	}
-}
 
-func deleteField(eb EntityBackend) *graphql.Field {
-	return &graphql.Field{
-		Type: graphql.NewNonNull(recordType),
+	fields["delete"+pascal] = &graphql.Field{
+		Type: recordType,
 		Args: graphql.FieldConfigArgument{
-			"id":      &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
-			"version": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"id":              &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
+			"expectedVersion": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"reason":          reasonArg,
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			id, err := parseID(p.Args, "id")
 			if err != nil {
 				return nil, err
 			}
-			rc := requestContextFrom(p.Context)
-			result, err := eb.Backend.Delete(p.Context, eb.Name, id, int32Arg(p.Args, "version"), rc, nil)
-			if err != nil {
-				return nil, err
-			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			}
-			return recordToMap(result.Data), nil
+			return recordResult(backend.Delete(p.Context, entity, id, int32Arg(p.Args, "expectedVersion"), requestContextFrom(p.Context), stringArg(p.Args, "reason")))
 		},
 	}
-}
 
-func transitionField(eb EntityBackend) *graphql.Field {
-	return &graphql.Field{
-		Type: graphql.NewNonNull(recordType),
+	if !hasWorkflow {
+		return
+	}
+	fields["transition"+pascal] = &graphql.Field{
+		Type: recordType,
 		Args: graphql.FieldConfigArgument{
-			"id":      &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
-			"action":  &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
-			"version": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
-			"data":    &graphql.ArgumentConfig{Type: jsonScalar},
+			"id":              &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
+			"action":          &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+			"expectedVersion": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"data":            &graphql.ArgumentConfig{Type: jsonScalar},
+			"reason":          reasonArg,
 		},
 		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 			id, err := parseID(p.Args, "id")
@@ -329,46 +657,54 @@ func transitionField(eb EntityBackend) *graphql.Field {
 				return nil, err
 			}
 			action, _ := p.Args["action"].(string)
-			var data crud.JsonObject
-			if dataMap, ok := p.Args["data"].(map[string]interface{}); ok {
-				data, err = mapToJsonObject(dataMap)
-				if err != nil {
-					return nil, err
-				}
-			}
-			rc := requestContextFrom(p.Context)
-			result, err := eb.Backend.Transition(p.Context, eb.Name, id, action, int32Arg(p.Args, "version"), data, rc, nil)
+			data, _, err := objectArg(p.Args, "data")
 			if err != nil {
 				return nil, err
 			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			}
-			return recordToMap(result.Data), nil
+			return recordResult(backend.Transition(p.Context, entity, id, action, int32Arg(p.Args, "expectedVersion"), data, requestContextFrom(p.Context), stringArg(p.Args, "reason")))
 		},
 	}
 }
 
-// BuildSchema assembles the full schema: generic CRUD fields for every entity in entities, plus
-// the 8 hand-written custom business-action mutations (addCustomFields).
-func BuildSchema(entities []EntityBackend, rest RestURLs) (graphql.Schema, error) {
-	queryFields := graphql.Fields{}
-	mutationFields := graphql.Fields{}
+// BuildSchema assembles the full schema from registry: typed CRUD fields for every entity that
+// has a backend in backends (keyed by entity name), the shared aggregate query, plus the
+// hand-written custom business-action mutations (addCustomFields) and the platform admin/settings
+// fields (addPlatformFields, forwarded to zones-service's REST routes).
+func BuildSchema(registry *metadata.MetadataRegistry, backends map[string]crud.RecordBackend, rest RestURLs) (graphql.Schema, error) {
+	b := &schemaBuilder{registry: registry, backends: backends, types: map[string]*graphql.Object{}}
 
-	for _, eb := range entities {
-		base := fieldBase(eb.Name)
-		pascal := capitalize(base)
-		queryFields[base] = getField(eb)
-		queryFields[base+"List"] = listField(eb)
-		mutationFields["create"+pascal] = createField(eb)
-		mutationFields["update"+pascal] = updateField(eb)
-		mutationFields["delete"+pascal] = deleteField(eb)
-		if eb.HasWorkflow {
-			mutationFields["transition"+pascal] = transitionField(eb)
+	var summaries []metadata.EntitySummary
+	for name := range backends {
+		summary, ok := registry.GetEntityMetadata(name)
+		if !ok {
+			return graphql.Schema{}, fmt.Errorf("entity %q has a backend but no metadata", name)
 		}
+		summaries = append(summaries, summary)
 	}
 
+	// Create every object first so reference fields can point at any entity's type, then fill
+	// fields lazily (FieldsThunk runs after all types exist).
+	for _, summary := range summaries {
+		summary := summary
+		b.types[summary.Name] = graphql.NewObject(graphql.ObjectConfig{
+			Name:   typeName(summary.Name),
+			Fields: graphql.FieldsThunk(func() graphql.Fields { return b.entityFields(summary) }),
+		})
+	}
+
+	queryFields := graphql.Fields{}
+	mutationFields := graphql.Fields{}
+	for _, summary := range summaries {
+		recordType := b.types[summary.Name]
+		base := fieldBase(summary.Name)
+		queryFields[base] = b.getField(summary.Name, recordType)
+		queryFields[base+"List"] = b.listField(summary.Name, connectionType(summary.Name, recordType))
+		b.addMutations(mutationFields, summary.Name, recordType, summary.Workflow != nil)
+	}
+	queryFields["aggregate"] = b.aggregateField()
+
 	addCustomFields(mutationFields, rest)
+	addPlatformFields(queryFields, mutationFields, rest.Zones)
 
 	queryType := graphql.NewObject(graphql.ObjectConfig{Name: "Query", Fields: queryFields})
 	mutationType := graphql.NewObject(graphql.ObjectConfig{Name: "Mutation", Fields: mutationFields})

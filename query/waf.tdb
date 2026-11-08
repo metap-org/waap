@@ -21,5 +21,6 @@ ORDER BY table_name;
 -- waf_security_events    
 -- waf_zones              
 SELECT * FROM waf.waf_alert_policies LIMIT 20;
+SELECT * FROM waf.waf_zones LIMIT 20;
 
 ```
