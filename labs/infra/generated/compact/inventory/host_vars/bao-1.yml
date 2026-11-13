@@ -1,0 +1,4 @@
+lab_disks:
+- name: audit
+  size: 2GiB
+  mount: /var/log/openbao-audit

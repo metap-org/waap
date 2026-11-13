@@ -1,0 +1,43 @@
+---
+- name: Gói công cụ đĩa
+  ansible.builtin.apt:
+    name: "{{ ['xfsprogs'] + (['cryptsetup'] if luks_enabled | bool else []) }}"
+    state: present
+  when: lab_disks | length > 0
+
+- name: Tìm thiết bị của từng đĩa phụ (Incus đặt serial incus_<tên>)
+  ansible.builtin.shell: "set -o pipefail; ls /dev/disk/by-id/*incus_{{ item.name }} | head -1"
+  args:
+    executable: /bin/bash
+  loop: "{{ lab_disks }}"
+  register: disk_dev
+  changed_when: false
+  failed_when: disk_dev.stdout | length == 0
+
+- name: Tạo hệ tệp
+  community.general.filesystem:
+    fstype: "{{ disk_fstype }}"
+    dev: "{{ item.stdout }}"
+  loop: "{{ disk_dev.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not (luks_enabled | bool)
+
+- name: Gắn đĩa
+  ansible.posix.mount:
+    path: "{{ item.item.mount }}"
+    src: "{{ item.stdout }}"
+    fstype: "{{ disk_fstype }}"
+    opts: "{{ disk_mount_opts }}{{ ',noexec' if item.item.name in ['data', 'wal', 'audit'] else '' }}"
+    state: mounted
+  loop: "{{ disk_dev.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not (luks_enabled | bool)
+
+- name: Bộ lập lịch I/O none cho đĩa ảo
+  ansible.builtin.copy:
+    content: 'ACTION=="add|change", KERNEL=="sd[a-z]|vd[a-z]|nvme[0-9]n[0-9]", ATTR{queue/scheduler}="none"'
+    dest: /etc/udev/rules.d/60-waap-io-scheduler.rules
+    mode: "0644"
+  when: lab_disks | length > 0

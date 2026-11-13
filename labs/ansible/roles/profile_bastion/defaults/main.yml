@@ -1,0 +1,5 @@
+---
+bastion_mfa: false          # true khi đã cấp TOTP cho từng người; bật sớm có thể tự khoá mình ra
+wg_listen_port: 51820
+wg_address: 10.10.99.1/24
+wg_peers: []                # [{name, public_key, allowed_ip}]

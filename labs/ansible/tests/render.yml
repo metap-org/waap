@@ -1,0 +1,24 @@
+---
+# Kiểm bản dựng mẫu của các template mà không cần máy thật:
+#   ansible-playbook -c local -i localhost, -e @tests/vars.yml tests/render.yml
+- hosts: localhost
+  gather_facts: false
+  become: false
+  vars_files: [vars.yml]
+  tasks:
+    - name: Thư mục đầu ra
+      ansible.builtin.file: { path: /tmp/render-test, state: directory, mode: "0755" }
+    - name: Dựng template
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "/tmp/render-test/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: ../roles/baseline/templates/sshd-hardening.conf.j2, dest: sshd.conf }
+        - { src: ../roles/baseline/templates/sysctl-hardening.conf.j2, dest: sysctl.conf }
+        - { src: ../roles/baseline/templates/audit.rules.j2, dest: audit.rules }
+        - { src: ../roles/baseline/templates/chrony.conf.j2, dest: chrony.conf }
+        - { src: ../roles/baseline/templates/sudoers-ops.j2, dest: sudoers }
+        - { src: ../roles/profile_k8s_node/templates/config.yaml.j2, dest: k3s-server.yaml }
+        - { src: ../roles/profile_bastion/templates/wg0.conf.j2, dest: wg0.conf }
+        - { src: ../roles/hardened_unit/templates/hardening.conf.j2, dest: unit.conf }

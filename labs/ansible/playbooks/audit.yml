@@ -1,0 +1,58 @@
+---
+# Quét hardening, không đổi cấu hình. Cổng của P4 (ADR-0048): kết quả CIS đạt ngưỡng L5 (chưa chốt) và không trôi.
+#   ansible-playbook playbooks/audit.yml                 # Lynis trên mọi node, in chỉ số hardening
+#   ansible-playbook site.yml --check --diff             # kiểm trôi cấu hình
+- name: Quét Lynis
+  hosts: all
+  vars:
+    lynis_min_index: 0     # ngưỡng chỉ số; L5 chưa chốt nên chưa chặn, chỉ báo cáo
+  tasks:
+    - name: Cài lynis
+      ansible.builtin.apt:
+        name: lynis
+        state: present
+
+    - name: Chạy audit
+      ansible.builtin.command: lynis audit system --quick --no-colors --quiet --report-file /var/log/lynis-report.dat
+      register: lynis_run
+      changed_when: false
+      failed_when: lynis_run.rc not in [0, 1, 2]
+
+    - name: Đọc chỉ số hardening
+      ansible.builtin.shell: set -o pipefail; grep '^hardening_index=' /var/log/lynis-report.dat | cut -d= -f2
+      args:
+        executable: /bin/bash
+      register: lynis_index
+      changed_when: false
+
+    - name: Báo cáo
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: hardening_index={{ lynis_index.stdout }}"
+
+    - name: Chặn nếu dưới ngưỡng
+      ansible.builtin.assert:
+        that: lynis_index.stdout | int >= lynis_min_index
+        quiet: true
+
+    - name: AppArmor không có profile ở chế độ complain
+      ansible.builtin.command: aa-status --complaining
+      register: aa_complain
+      changed_when: false
+      failed_when: aa_complain.stdout | trim | int > 0
+
+- name: Kiểm nội dung CIS bằng OpenSCAP (nếu có datastream)
+  hosts: all
+  vars:
+    # Nội dung CIS cho Ubuntu 24.04 đến từ Ubuntu Security Guide (cần Ubuntu Pro) hoặc ssg-base nếu có bản noble.
+    # Chưa xác minh gói nào khả dụng; đặt đường dẫn khi đã có.
+    scap_datastream: ""
+    scap_profile: "xccdf_org.ssgproject.content_profile_cis_level1_server"
+  tasks:
+    - name: Chạy oscap
+      ansible.builtin.shell: >
+        oscap xccdf eval --profile {{ scap_profile }} --results /var/log/oscap-results.xml
+        --report /var/log/oscap-report.html {{ scap_datastream }}
+      register: oscap_run
+      changed_when: false
+      failed_when: oscap_run.rc not in [0, 2]
+      when: scap_datastream | length > 0

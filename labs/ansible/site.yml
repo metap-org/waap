@@ -1,0 +1,40 @@
+---
+# Cài và hardening theo ADR-0048: chuẩn nền cho mọi node, rồi hồ sơ theo vai trò.
+# Chạy:  ansible-playbook site.yml [--limit <vm>] [--tags access,kernel] [--check --diff]
+- name: Chuẩn nền (mọi node)
+  hosts: all
+  roles:
+    - baseline
+    - hostfw
+
+- name: Hồ sơ k8s-node
+  hosts: role_k8s_cp:role_k8s_app
+  roles: [profile_k8s_node]
+
+- name: Hồ sơ edge-l7
+  hosts: role_edge_l7
+  roles: [profile_edge_l7]
+
+- name: Hồ sơ edge-waf
+  hosts: role_edge_waf
+  roles: [profile_edge_waf]
+
+- name: Hồ sơ data
+  hosts: role_postgres:role_clickhouse:role_kafka:role_rabbitmq
+  roles: [profile_data]
+
+- name: Hồ sơ secret
+  hosts: role_openbao
+  roles: [profile_secret]
+
+- name: Hồ sơ bastion
+  hosts: role_bastion
+  roles: [profile_bastion]
+
+- name: Hồ sơ ops
+  hosts: role_ci_runner
+  roles: [profile_ops]
+
+- name: Cập nhật AIDE sau thay đổi hợp lệ
+  hosts: all:!role_firewall
+  roles: [aide_refresh]

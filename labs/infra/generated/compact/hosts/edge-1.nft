@@ -1,0 +1,20 @@
+#!/usr/sbin/nft -f
+# Sinh tự động từ flows.yaml cho edge-1 (profile compact). KHÔNG sửa tay.
+flush ruleset
+table inet host {
+  chain input {
+    type filter hook input priority 0; policy drop;
+    ct state established,related accept comment "stateful"
+    ct state invalid drop
+    iifname "lo" accept
+    icmp type echo-request limit rate 5/second accept comment "ping"
+    ip saddr { 10.10.0.11, 10.10.0.12, 10.10.0.13 } tcp dport { 80, 443 } accept comment "N02"
+    ip saddr { 10.10.0.11, 10.10.0.12, 10.10.0.13 } udp dport { 443 } accept comment "N02q"
+    ip saddr { 10.10.60.11 } tcp dport { 22 } accept comment "N25"
+    ip saddr { 10.10.60.12 } tcp dport { 9100, 9090 } accept comment "N26"
+    counter drop comment "default-deny"
+  }
+  chain output {
+    type filter hook output priority 0; policy accept;
+  }
+}

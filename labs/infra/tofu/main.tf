@@ -19,6 +19,9 @@ locals {
 
   fw      = local.vms["fw-1"]
   others  = { for k, v in local.vms : k => v if k != "fw-1" }
+
+  # Đĩa phụ theo profile (host_vars của Ansible cũng sinh từ cùng khai báo này).
+  extra_disks = merge([for k, v in local.others : { for d in try(v.disks, []) : "${k}-${d.name}" => merge(d, { vm = k }) }]...)
   up_cidr = local.zones.uplink.cidr
 }
 
@@ -63,7 +66,7 @@ resource "incus_instance" "fw" {
       up_ip     = cidrhost(local.up_cidr, local.zones.uplink.fw_host)
       up_gw     = cidrhost(local.up_cidr, 1)
     })
-    "security.secureboot" = "true"
+    "security.secureboot" = "false" # ảnh images:* không ký cho Secure Boot; ghi là rủi ro theo ADR-0045/0048
   }
 
   device {
@@ -100,6 +103,14 @@ resource "incus_instance" "fw" {
   }
 }
 
+resource "incus_storage_volume" "extra" {
+  for_each     = local.extra_disks
+  name         = each.key
+  pool         = var.storage_pool
+  content_type = "block"
+  config       = { size = each.value.size }
+}
+
 resource "incus_instance" "vm" {
   for_each = local.others
   name     = each.key
@@ -121,7 +132,7 @@ resource "incus_instance" "vm" {
       nic = each.value.nics[0]
       dns = cidrhost(local.up_cidr, 1)
     })
-    "security.secureboot" = "true"
+    "security.secureboot" = "false" # ảnh images:* không ký cho Secure Boot; ghi là rủi ro theo ADR-0045/0048
   }
 
   device {
@@ -131,6 +142,19 @@ resource "incus_instance" "vm" {
       path = "/"
       pool = var.storage_pool
       size = each.value.disk
+    }
+  }
+
+  # Tên thiết bị trùng tên đĩa: Incus đặt serial incus_<tên>, Ansible tìm đĩa theo serial đó.
+  dynamic "device" {
+    for_each = { for k, d in local.extra_disks : d.name => d if d.vm == each.key }
+    content {
+      name = device.key
+      type = "disk"
+      properties = {
+        pool   = var.storage_pool
+        source = incus_storage_volume.extra["${each.key}-${device.key}"].name
+      }
     }
   }
 

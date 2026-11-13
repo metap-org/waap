@@ -1,0 +1,2 @@
+---
+ssh_allow_tcp_forwarding: true   # ProxyJump qua bastion cần chuyển tiếp TCP

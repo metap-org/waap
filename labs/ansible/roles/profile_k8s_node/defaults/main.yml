@@ -1,0 +1,8 @@
+---
+k8s_distro: k3s
+# Không tải nhị phân khi chưa ghim phiên bản và checksum (lấy từ trang phát hành, tự kiểm).
+k3s_version: ""
+k3s_sha256: ""
+k3s_token: ""            # lab: sinh bằng `lab k3s-token`; P5: lấy từ OpenBao
+k3s_api_endpoint: "https://{{ hostvars[groups['role_k8s_cp'][0]].lab_ip }}:6443"
+k3s_role: "{{ 'server' if inventory_hostname in groups['role_k8s_cp'] else 'agent' }}"

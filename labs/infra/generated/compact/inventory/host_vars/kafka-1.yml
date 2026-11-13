@@ -1,0 +1,4 @@
+lab_disks:
+- name: data
+  size: 30GiB
+  mount: /var/lib/waap/data

@@ -1,0 +1,63 @@
+---
+- name: sysctl mạng cho edge
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/97-waap-edge.conf
+    mode: "0644"
+    content: |
+      net.core.somaxconn = 65535
+      net.core.netdev_max_backlog = 16384
+      net.ipv4.tcp_max_syn_backlog = 16384
+      net.ipv4.ip_local_port_range = 10240 65535
+      net.ipv4.tcp_tw_reuse = 1
+      net.ipv4.tcp_fin_timeout = 15
+      net.core.rmem_max = 16777216
+      net.core.wmem_max = 16777216
+      fs.file-max = 2097152
+  notify: reload sysctl
+
+- name: Người dùng dịch vụ edge
+  ansible.builtin.user:
+    name: "{{ edge_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Thư mục cache (đĩa phụ nếu có)
+  ansible.builtin.include_role:
+    name: disks
+
+- name: Thư mục cache thuộc dịch vụ
+  ansible.builtin.file:
+    path: /var/cache/waap-edge
+    state: directory
+    owner: "{{ edge_user }}"
+    group: "{{ edge_user }}"
+    mode: "0750"
+
+- name: Unit waap-edge, chưa bật vì binary đến từ pipeline
+  ansible.builtin.template:
+    src: waap-edge.service.j2
+    dest: /etc/systemd/system/waap-edge.service
+    mode: "0644"
+    owner: root
+    group: root
+  notify: daemon reload
+
+- name: Hardening unit, chỉ NET_BIND_SERVICE
+  ansible.builtin.include_role:
+    name: hardened_unit
+  vars:
+    hu_unit: waap-edge
+    hu_capabilities: [CAP_NET_BIND_SERVICE]
+    hu_memory_max: "{{ edge_memory_max }}"
+    hu_read_write_paths: [/var/cache/waap-edge]
+    hu_extra: "LimitNOFILE=1048576\nMemoryDenyWriteExecute=false"
+
+- name: Tinh chỉnh NIC (RSS, IRQ affinity), chỉ bare metal
+  ansible.builtin.template:
+    src: waap-nic-tune.sh.j2
+    dest: /usr/local/sbin/waap-nic-tune
+    mode: "0750"
+    owner: root
+    group: root
+  when: edge_tune_nic | bool

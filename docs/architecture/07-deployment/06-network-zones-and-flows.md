@@ -188,6 +188,69 @@ Hai cấu hình, cùng một thiết kế mạng. Cấu hình **thu gọn** gộ
 
 Đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15.
 
+### 5.1 Lab 64 GB (profile `compact`)
+
+Sinh tự động từ `labs/infra/profiles/compact.yaml` bằng `python3 labs/infra/tools/gen_lab.py diagram compact --inject <tệp này>`; không sửa tay giữa hai marker.
+
+<!-- lab-diagram:start -->
+```mermaid
+flowchart TB
+  subgraph Z0["Z0 Internet giả lập"]
+    origin["origin<br/>0.11 · 512MiB"]
+    loadgen["loadgen<br/>0.12 · 1GiB"]
+    dns_mock["dns-mock<br/>0.13 · 512MiB"]
+  end
+  subgraph Z1["Z1 Edge DMZ · 10.10.10.0/24"]
+    edge_1["edge-1<br/>10.11 · 3GiB"]
+    dns_1["dns-1<br/>10.12 · 512MiB"]
+  end
+  subgraph Z2["Z2 Biên · 10.10.20.0/24"]
+    perimeter_1["perimeter-1<br/>20.11 · 2GiB"]
+  end
+  subgraph Z3["Z3 Ứng dụng · 10.10.30.0/24"]
+    k8s_cp_1["k8s-cp-1<br/>30.11 · 3GiB"]
+    k8s_wk_1["k8s-wk-1<br/>30.21 · 6GiB"]
+    k8s_wk_2["k8s-wk-2<br/>30.22 · 6GiB"]
+  end
+  subgraph Z4["Z4 Dữ liệu · 10.10.40.0/24"]
+    data_1["data-1<br/>40.11 · 5GiB"]
+    ch_1["ch-1<br/>40.12 · 4GiB"]
+    kafka_1["kafka-1<br/>40.13 · 3GiB"]
+  end
+  subgraph Z5["Z5 Secret · 10.10.50.0/24"]
+    bao_1["bao-1<br/>50.11 · 1GiB"]
+  end
+  subgraph Z6["Z6 Vận hành · 10.10.60.0/24"]
+    bastion["bastion<br/>60.11 · 512MiB"]
+    ops_1["ops-1<br/>60.12 · 4GiB"]
+  end
+  FW{{"fw-1<br/>nftables, router L3 duy nhất"}}
+  Z0 --- FW
+  Z1 --- FW
+  Z2 --- FW
+  Z3 --- FW
+  Z4 --- FW
+  Z5 --- FW
+  Z6 --- FW
+```
+
+| Vùng | Máy | RAM (GB) |
+|---|---|---|
+| Z0 | origin, loadgen, dns-mock | 2.0 |
+| Z1 | edge-1, dns-1 | 3.5 |
+| Z2 | perimeter-1 | 2.0 |
+| Z3 | k8s-cp-1, k8s-wk-1, k8s-wk-2 | 15.0 |
+| Z4 | data-1, ch-1, kafka-1 | 12.0 |
+| Z5 | bao-1 | 1.0 |
+| Z6 | bastion, ops-1 | 4.5 |
+| (router) | fw-1 | 1.0 |
+| **Tổng VM** | 16 máy | **41.0** |
+| Dự trữ máy chủ | hệ điều hành, Incus, đệm đĩa | 8 (ước lượng) |
+| **Cần** | | **49.0** |
+
+Đĩa cấp phát tối đa khoảng 398 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
+<!-- lab-diagram:end -->
+
 **Chọn theo RAM của máy chủ lab** (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến `profile`, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:
 
 | RAM máy chủ | Profile | Máy | RAM lab cần (ước lượng) |

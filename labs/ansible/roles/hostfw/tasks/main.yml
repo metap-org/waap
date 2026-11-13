@@ -1,0 +1,21 @@
+---
+# Firewall máy chủ: input default-deny theo ma trận 7.6 (kể cả luồng cùng vùng mà fw-1 không thấy).
+- name: Luật nftables của máy này
+  ansible.builtin.copy:
+    src: "{{ lab_generated_dir }}/{{ lab_profile }}/hosts/{{ inventory_hostname }}.nft"
+    dest: /etc/nftables.conf
+    mode: "0644"
+    owner: root
+    group: root
+    validate: /usr/sbin/nft -c -f %s
+  when: hostfw_enabled | bool
+  notify: reload nftables
+  tags: [hostfw]
+
+- name: nftables bật cùng máy
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: started
+  when: hostfw_enabled | bool
+  tags: [hostfw]

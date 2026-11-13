@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+node-ip: {{ lab_ip }}
+token-file: /etc/rancher/k3s/token
+kubelet-arg:
+  - protect-kernel-defaults=true
+  - read-only-port=0
+  - anonymous-auth=false
+  - authorization-mode=Webhook
+  - streaming-connection-idle-timeout=5m
+  - make-iptables-util-chains=true
+{% if k3s_role == 'server' %}
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+disable:
+  - traefik
+  - servicelb
+tls-san:
+  - {{ lab_ip }}
+kube-apiserver-arg:
+  - anonymous-auth=false
+  - audit-log-path=/var/log/k3s-audit.log
+  - audit-log-maxage=30
+  - audit-log-maxbackup=10
+  - audit-log-maxsize=100
+  - profiling=false
+kube-controller-manager-arg:
+  - profiling=false
+kube-scheduler-arg:
+  - profiling=false
+{% else %}
+server: {{ k3s_api_endpoint }}
+{% endif %}

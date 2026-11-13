@@ -3,16 +3,21 @@
 profile: compact
 vms:
   - { name: fw-1,        zones: [Z0, Z1, Z2, Z3, Z4, Z5, Z6], host: 1, cpu: 2, mem: 1GiB,  disk: 8GiB,  roles: [firewall] }
-  - { name: edge-1,      zones: [Z1], host: 11, cpu: 2, mem: 3GiB,  disk: 20GiB, roles: [edge-l7, edge-waf, valkey-edge] }
+  - { name: edge-1,      zones: [Z1], host: 11, cpu: 2, mem: 3GiB,  disk: 20GiB, roles: [edge-l7, edge-waf, valkey-edge],
+    disks: [{ name: cache, size: 10GiB, mount: /var/cache/waap-edge }] }
   - { name: dns-1,       zones: [Z1], host: 12, cpu: 1, mem: 512MiB, disk: 8GiB,  roles: [dns] }
   - { name: perimeter-1, zones: [Z2], host: 11, cpu: 2, mem: 2GiB,  disk: 12GiB, roles: [ingress-1, egw-1, egress-1] }
   - { name: k8s-cp-1,    zones: [Z3], host: 11, cpu: 2, mem: 3GiB,  disk: 30GiB, roles: [k8s-cp] }
   - { name: k8s-wk-1,    zones: [Z3], host: 21, cpu: 3, mem: 6GiB,  disk: 40GiB, roles: [k8s-app] }
   - { name: k8s-wk-2,    zones: [Z3], host: 22, cpu: 3, mem: 6GiB,  disk: 40GiB, roles: [k8s-app] }
-  - { name: data-1,      zones: [Z4], host: 11, cpu: 2, mem: 5GiB,  disk: 60GiB, roles: [postgres, rabbitmq, valkey-central, object-storage] }
-  - { name: ch-1,        zones: [Z4], host: 12, cpu: 2, mem: 4GiB,  disk: 60GiB, roles: [clickhouse] }
-  - { name: kafka-1,     zones: [Z4], host: 13, cpu: 2, mem: 3GiB,  disk: 40GiB, roles: [kafka] }
-  - { name: bao-1,       zones: [Z5], host: 11, cpu: 1, mem: 1GiB,  disk: 8GiB,  roles: [openbao] }
+  - { name: data-1,      zones: [Z4], host: 11, cpu: 2, mem: 5GiB,  disk: 60GiB, roles: [postgres, rabbitmq, valkey-central, object-storage],
+    disks: [{ name: data, size: 50GiB, mount: /var/lib/waap/data }, { name: wal, size: 10GiB, mount: /var/lib/waap/wal }] }
+  - { name: ch-1,        zones: [Z4], host: 12, cpu: 2, mem: 4GiB,  disk: 60GiB, roles: [clickhouse],
+    disks: [{ name: data, size: 50GiB, mount: /var/lib/waap/data }] }
+  - { name: kafka-1,     zones: [Z4], host: 13, cpu: 2, mem: 3GiB,  disk: 40GiB, roles: [kafka],
+    disks: [{ name: data, size: 30GiB, mount: /var/lib/waap/data }] }
+  - { name: bao-1,       zones: [Z5], host: 11, cpu: 1, mem: 1GiB,  disk: 8GiB,  roles: [openbao],
+    disks: [{ name: audit, size: 2GiB, mount: /var/log/openbao-audit }] }
   - { name: bastion,     zones: [Z6], host: 11, cpu: 1, mem: 512MiB, disk: 8GiB,  roles: [bastion] }
   - { name: ops-1,       zones: [Z6], host: 12, cpu: 2, mem: 4GiB,  disk: 40GiB, roles: [ci-runner, registry, infra, obs] }
   - { name: origin,      zones: [Z0], host: 11, cpu: 1, mem: 512MiB, disk: 8GiB,  roles: [origin] }

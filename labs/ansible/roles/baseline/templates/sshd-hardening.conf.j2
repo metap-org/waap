@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication {{ 'yes' if (bastion_mfa | default(false)) else 'no' }}
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+AllowGroups {{ ssh_login_group }}
+TrustedUserCAKeys /etc/ssh/trusted_user_ca.pub
+{% if ssh_allow_static_keys | bool %}
+AuthorizedKeysFile .ssh/authorized_keys
+{% else %}
+AuthorizedKeysFile none
+{% endif %}
+{% if bastion_mfa | default(false) %}
+AuthenticationMethods publickey,keyboard-interactive
+{% endif %}
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding {{ 'yes' if ssh_allow_tcp_forwarding | bool else 'no' }}
+MaxAuthTries 3
+MaxSessions 4
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+LogLevel VERBOSE
+Banner /etc/issue.net
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+KexAlgorithms sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com

@@ -1,0 +1,4 @@
+---
+secret_service_user: openbao
+secret_unit: openbao
+secret_audit_dir: /var/log/openbao-audit

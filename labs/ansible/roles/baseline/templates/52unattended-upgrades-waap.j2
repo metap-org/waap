@@ -1,0 +1,11 @@
+// {{ ansible_managed }}
+// Chỉ vá bảo mật. Khởi động lại trong khung giờ; node trung tâm đặt reboot_time lệch nhau để không mất đồng thời.
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}-security";
+    "${distro_id}ESMApps:${distro_codename}-apps-security";
+    "${distro_id}ESM:${distro_codename}-infra-security";
+};
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+Unattended-Upgrade::Automatic-Reboot-Time "{{ reboot_time }}";

@@ -37,6 +37,10 @@ flows:
   # Chỉ có trong lab: Z0 là "Internet giả" nên cần đường ra Internet thật (NAT qua uplink) cho loadgen, dns-mock.
   - { id: L01, src: "zone:Z0", dst: "uplink", proto: tcp, ports: [80, 443], covers: [], lab_only: true }
 
+# Luật cục bộ ngoài ma trận 7.6: các node K8s nói chuyện với nhau (kubelet, etcd, CNI, DNS cụm). Ma trận chỉ nói về liên vùng.
+local:
+  - { id: L02, hosts: "zone:Z3", note: "K8s nội vùng" }
+
 # Cấm tuyệt đối 7.6 §4.7. Sinh luật không được tạo ra bất kỳ luồng nào trùng (cặp máy nguồn, máy đích).
 # X07 (bastion không phải đường đọc dữ liệu khách) là ngữ nghĩa ứng dụng, kiểm ở P2 bằng test, không phải luật mạng.
 forbidden:

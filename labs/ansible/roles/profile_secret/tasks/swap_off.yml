@@ -1,0 +1,11 @@
+---
+- name: Tắt swap đang chạy
+  ansible.builtin.command: swapoff -a
+  when: ansible_facts.swaptotal_mb | default(0) | int > 0
+  changed_when: true
+
+- name: Bỏ swap khỏi fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#\n].*\sswap\s.*)$'
+    replace: '# \1'

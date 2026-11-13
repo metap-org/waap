@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Điều khiển lab. Chạy trên máy có Incus và OpenTofu (máy ảo Ubuntu trên Hyper-V hoặc Linux native).
-# Dùng: lab {check|gen|up|seal|down|destroy|status}   Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY
+# Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
+# Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_K3S_VERSION, LAB_K3S_SHA256 (ghim k3s, tự lấy từ trang phát hành)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INFRA="$ROOT/infra"
@@ -18,8 +19,28 @@ cmd_check() { python3 "$INFRA/tools/test_gen_nft.py" && python3 "$INFRA/tools/ge
 
 cmd_gen() { # gen [--bootstrap]
   python3 "$INFRA/tools/gen_nft.py" gen "$PROFILE" "$@" -o "$GEN/$PROFILE"
+  python3 "$INFRA/tools/gen_lab.py" inventory "$PROFILE" -o "$GEN/$PROFILE/inventory"
   nft -c -f "$GEN/$PROFILE/ruleset.nft" 2>/dev/null || echo "(bỏ qua nft -c: không chạy được ở đây)"
 }
+
+cmd_ssh_ca() { # CA SSH của lab (P5 chuyển sang OpenBao ký)
+  need ssh-keygen; mkdir -p "$GEN"
+  [ -f "$GEN/ssh_user_ca" ] || ssh-keygen -q -t ed25519 -N "" -f "$GEN/ssh_user_ca" -C "lab-user-ca"
+  chmod 600 "$GEN/ssh_user_ca"; echo "CA công khai: $GEN/ssh_user_ca.pub"
+}
+
+cmd_token() { [ -f "$GEN/k3s-token" ] || { umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$GEN/k3s-token"; }; }
+
+ansible_run() { # ansible_run <playbook> [tham số]
+  need ansible-playbook; cmd_ssh_ca; cmd_token
+  ( cd "$ROOT/ansible" && ansible-galaxy collection install -r requirements.yml >/dev/null &&
+    ansible-playbook -i "$GEN/$PROFILE/inventory" "$@" \
+      -e "lab_generated_dir=$GEN" -e "k3s_version=${LAB_K3S_VERSION:-}" -e "k3s_sha256=${LAB_K3S_SHA256:-}" \
+      -e "k3s_token=$(cat "$GEN/k3s-token")" )
+}
+
+cmd_provision() { ansible_run site.yml "$@"; }
+cmd_audit() { ansible_run playbooks/audit.yml "$@"; }
 
 cmd_up() {
   need tofu; need incus; [ -n "$SSH_KEY" ] || { echo "đặt LAB_SSH_KEY (khoá công khai)"; exit 1; }
@@ -34,13 +55,14 @@ cmd_up() {
   tf apply -input=false -auto-approve -target=incus_instance.fw   # fw-1 lên trước
   echo "chờ cloud-init của fw-1..."; incus exec fw-1 -- cloud-init status --wait
   tf apply -input=false -auto-approve
-  echo "Lab đã dựng ở chế độ BOOTSTRAP (mọi vùng ra Internet để cài gói). Chạy 'lab seal' khi xong."
+  echo "Lab đã dựng ở chế độ BOOTSTRAP (mọi vùng ra Internet để cài gói). Chạy 'lab provision' rồi 'lab seal'."
 }
 
 cmd_seal() { # gỡ đường ra Internet tạm, về đúng ma trận
   cmd_gen
   incus file push "$GEN/$PROFILE/ruleset.nft" fw-1/etc/nftables.conf
   incus exec fw-1 -- nft -f /etc/nftables.conf
+  cmd_provision -e lab_bootstrap=false --tags packages,access,updates,kernel,hostfw   # khoá SSH tĩnh, apt qua egress, firewall máy chủ không còn bootstrap
   echo "đã seal: fw-1 chỉ còn luật trong ma trận"
 }
 
@@ -59,7 +81,8 @@ cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
 cmd_status() { incus list -c ns4t -f compact; }
 
 case "${1:-}" in
-  check) cmd_check ;; gen) shift; cmd_gen "$@" ;; up) cmd_up ;; seal) cmd_seal ;;
+  check) cmd_check ;; gen) shift; cmd_gen "$@" ;; ssh-ca) cmd_ssh_ca ;; up) cmd_up ;;
+  provision) shift; cmd_provision "$@" ;; audit) shift; cmd_audit "$@" ;; seal) cmd_seal ;;
   down) cmd_down ;; destroy) cmd_destroy ;; status) cmd_status ;;
   *) sed -n '2,4p' "$0"; exit 2 ;;
 esac

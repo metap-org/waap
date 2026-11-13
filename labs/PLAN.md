@@ -95,6 +95,8 @@ Phụ thuộc: P1 (có thể song song với P2).
 
 ### P4. Chuẩn cài đặt node và hardening (bước 4) · M
 
+**Tiến độ (2026-11-13): lát 1 đã viết, chưa chạy trên máy thật.** Bộ Ansible `baseline` và 7 hồ sơ, firewall máy chủ sinh từ ma trận, lint và render đã kiểm: xem [ansible/README.md](ansible/README.md). Chưa có: RKE2, Vector, phân vùng `/var` riêng, SSH cert từ OpenBao, quét CIS đầy đủ.
+
 Phụ thuộc: P1; chuẩn do P0 duyệt.
 
 Một **chuẩn chung** (một tài liệu, một tập vai trò Ansible) và các hồ sơ node theo vai trò:

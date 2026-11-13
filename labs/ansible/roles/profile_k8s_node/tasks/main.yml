@@ -1,0 +1,94 @@
+---
+- name: Chỉ hỗ trợ k3s (RKE2 chưa viết)
+  ansible.builtin.assert:
+    that:
+      - k8s_distro == 'k3s'
+      - k3s_version | length > 0
+      - k3s_sha256 | length == 64
+      - k3s_token | length >= 32
+    fail_msg: "Ghim k3s_version, k3s_sha256 (từ trang phát hành) và k3s_token (>=32 ký tự) trước khi cài. Không tải nhị phân chưa kiểm."
+    quiet: true
+
+- name: Module kernel cho container
+  ansible.builtin.copy:
+    content: "overlay\nbr_netfilter\n"
+    dest: /etc/modules-load.d/k8s.conf
+    mode: "0644"
+
+- name: Nạp module ngay
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: [overlay, br_netfilter]
+
+- name: sysctl cho node container (protect-kernel-defaults cần đúng các giá trị này)
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/98-k8s.conf
+    mode: "0644"
+    content: |
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      vm.panic_on_oom = 0
+      vm.overcommit_memory = 1
+      kernel.panic = 10
+      kernel.panic_on_oops = 1
+      kernel.keys.root_maxbytes = 25000000
+  notify: reload sysctl
+
+- name: Tắt swap
+  ansible.builtin.import_role:
+    name: profile_secret
+    tasks_from: swap_off.yml
+
+- name: Thư mục cấu hình k3s
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+
+- name: Token cụm
+  ansible.builtin.copy:
+    content: "{{ k3s_token }}"
+    dest: /etc/rancher/k3s/token
+    mode: "0600"
+    owner: root
+    group: root
+  no_log: true
+
+- name: Cấu hình k3s (kubelet đã khoá, mã hoá secret, tắt traefik và servicelb)
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0600"
+    owner: root
+    group: root
+  notify: restart k3s
+
+- name: Tải k3s đã ghim và kiểm checksum
+  ansible.builtin.get_url:
+    url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s"
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ k3s_sha256 }}"
+    mode: "0755"
+    owner: root
+    group: root
+  notify: restart k3s
+
+- name: Unit systemd
+  ansible.builtin.template:
+    src: "k3s-{{ k3s_role }}.service.j2"
+    dest: "/etc/systemd/system/{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}.service"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: [daemon reload, restart k3s]
+
+- name: Dịch vụ k3s bật
+  ansible.builtin.systemd:
+    name: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"
+    enabled: true
+    state: started
+    daemon_reload: true

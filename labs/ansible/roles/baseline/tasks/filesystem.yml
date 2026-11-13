@@ -1,0 +1,26 @@
+---
+# ADR-0048 yêu cầu phân vùng riêng; image cloud chỉ có một phân vùng gốc nên lab chỉ làm được /tmp và /dev/shm.
+# /var, /var/log, /var/log/audit tách riêng là việc của máy thật hoặc đĩa phụ (xem labs/infra/README.md).
+- name: /tmp là tmpfs nodev,nosuid,noexec
+  ansible.posix.mount:
+    path: /tmp
+    src: tmpfs
+    fstype: tmpfs
+    opts: "defaults,rw,nosuid,nodev,noexec,relatime,size={{ tmp_size }},mode=1777"
+    state: mounted
+
+- name: /dev/shm nodev,nosuid,noexec
+  ansible.posix.mount:
+    path: /dev/shm
+    src: tmpfs
+    fstype: tmpfs
+    opts: "defaults,nodev,nosuid,noexec"
+    state: mounted
+
+- name: Chặn module kernel không dùng
+  ansible.builtin.template:
+    src: modprobe-blacklist.conf.j2
+    dest: /etc/modprobe.d/90-waap-blacklist.conf
+    mode: "0644"
+    owner: root
+    group: root

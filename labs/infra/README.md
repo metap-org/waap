@@ -10,7 +10,8 @@
 | `flows.yaml` | Ma trận luồng N01 đến N29 và cấm tuyệt đối X01 đến X06 dưới dạng dữ liệu |
 | `tools/gen_nft.py` | Sinh luật nftables của `fw-1` từ ma trận. Lệnh `check` là T07 hai chiều: mọi dòng 7.6 có luật, mọi luật có dòng 7.6, và không luồng nào vi phạm cấm tuyệt đối |
 | `tofu/`, `cloud-init/` | OpenTofu (provider `lxc/incus`): một cầu ảo mỗi vùng (máy chủ không có IP trên cầu), `fw-1` nhiều card mạng, mỗi VM khác một card, IP tĩnh qua cloud-init |
-| `../bin/lab` | `check`, `gen`, `up`, `seal`, `down`, `destroy`, `status` |
+| `../bin/lab` | `check`, `gen`, `ssh-ca`, `up`, `provision`, `seal`, `audit`, `down`, `destroy`, `status` |
+| `../ansible/` | Bộ cài và hardening, xem [README](../ansible/README.md) |
 
 ## Đã kiểm chứng và chưa
 
@@ -36,3 +37,4 @@ labs/bin/lab down    # snapshot và tắt theo thứ tự ngược
 
 1. **N27 ("mọi VM" dùng NTP/DNS ở `infra` Z6) đụng X01, X05, X02.** Edge (Z1) không được tới Z6, OpenBao (Z5) không được khởi tạo kết nối ra, Z0 không được tới Z6. Tạm loại Z0, Z1, Z5 khỏi N27. Hai hướng: (a) đặt một nguồn NTP/DNS riêng ở Z1 (`dns-1` kiêm chrony) và ở Z5 cho phép riêng một ngoại lệ tới `infra`; (b) sửa X01/X05 thành "trừ NTP/DNS tới `infra`". Edge cần giờ chuẩn vì cert node sống 24 giờ, nên không thể bỏ.
 2. **N24 (WireGuard từ Z0 vào `bastion` Z6) đụng X02 ("Z0 không tới Z6").** Tạm coi N24 là ngoại lệ duy nhất (`except: [N24]` trong `flows.yaml`); 7.6 nên ghi rõ.
+3. **Vùng không có đường ra không vá được (phát hiện khi viết bộ cài).** Theo ma trận chỉ Z3 (N21) và `ci-runner` (N29) tới được `egress-1`; Z1, Z2, Z4, Z5 thì không, nên `unattended-upgrades` ở đó không lấy được bản vá sau khi gỡ bootstrap. Hướng đề xuất: bản sao apt nội bộ ở `registry` (Z6) cộng luồng mới "Z1, Z2, Z4, Z5 tới `registry` 443/TCP" (X01 cấm Z1 tới Z6, nên Z1 cần ngoại lệ hoặc nguồn khác, cùng loại vấn đề với N27). Chưa thêm vào ma trận vì cần chủ dự án chọn.

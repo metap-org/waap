@@ -1,0 +1,19 @@
+---
+ssh_login_group: ops
+ssh_allow_static_keys: false
+ssh_allow_tcp_forwarding: false
+bastion_mfa: true
+sysctl_ip_forward: 0
+audit_immutable: true
+ntp_servers: [10.10.60.12]
+k3s_role: server
+lab_ip: 10.10.30.11
+k3s_api_endpoint: https://10.10.30.11:6443
+ansible_managed: "Quản lý bởi Ansible"
+wg_address: 10.10.99.1/24
+wg_listen_port: 51820
+wg_peers: [{ name: admin, public_key: AAAA, allowed_ip: 10.10.99.2/32 }]
+hu_capabilities: [CAP_NET_BIND_SERVICE]
+hu_memory_max: 2G
+hu_read_write_paths: [/var/cache/waap-edge]
+hu_extra: "LimitNOFILE=1048576"

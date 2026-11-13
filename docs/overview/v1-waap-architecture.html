@@ -8700,6 +8700,116 @@ Cổng là mặc định, có thể đổi.</p>
 </tbody>
 </table>
 <p>Đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15.</p>
+<h3 id="f-07-deployment-06-network-zones-and-flows--51-lab-64-gb-profile-compact">5.1 Lab 64 GB (profile <code>compact</code>)</h3>
+<p>Sinh tự động từ <code>labs/infra/profiles/compact.yaml</code> bằng <code>python3 labs/infra/tools/gen_lab.py diagram compact --inject &lt;tệp này&gt;</code>; không sửa tay giữa hai marker.</p>
+<p>&lt;!-- lab-diagram:start --&gt;</p>
+<div class="diagram"><pre class="mermaid">flowchart TB
+  subgraph Z0[&quot;Z0 Internet giả lập&quot;]
+    origin[&quot;origin&lt;br/&gt;0.11 · 512MiB&quot;]
+    loadgen[&quot;loadgen&lt;br/&gt;0.12 · 1GiB&quot;]
+    dns_mock[&quot;dns-mock&lt;br/&gt;0.13 · 512MiB&quot;]
+  end
+  subgraph Z1[&quot;Z1 Edge DMZ · 10.10.10.0/24&quot;]
+    edge_1[&quot;edge-1&lt;br/&gt;10.11 · 3GiB&quot;]
+    dns_1[&quot;dns-1&lt;br/&gt;10.12 · 512MiB&quot;]
+  end
+  subgraph Z2[&quot;Z2 Biên · 10.10.20.0/24&quot;]
+    perimeter_1[&quot;perimeter-1&lt;br/&gt;20.11 · 2GiB&quot;]
+  end
+  subgraph Z3[&quot;Z3 Ứng dụng · 10.10.30.0/24&quot;]
+    k8s_cp_1[&quot;k8s-cp-1&lt;br/&gt;30.11 · 3GiB&quot;]
+    k8s_wk_1[&quot;k8s-wk-1&lt;br/&gt;30.21 · 6GiB&quot;]
+    k8s_wk_2[&quot;k8s-wk-2&lt;br/&gt;30.22 · 6GiB&quot;]
+  end
+  subgraph Z4[&quot;Z4 Dữ liệu · 10.10.40.0/24&quot;]
+    data_1[&quot;data-1&lt;br/&gt;40.11 · 5GiB&quot;]
+    ch_1[&quot;ch-1&lt;br/&gt;40.12 · 4GiB&quot;]
+    kafka_1[&quot;kafka-1&lt;br/&gt;40.13 · 3GiB&quot;]
+  end
+  subgraph Z5[&quot;Z5 Secret · 10.10.50.0/24&quot;]
+    bao_1[&quot;bao-1&lt;br/&gt;50.11 · 1GiB&quot;]
+  end
+  subgraph Z6[&quot;Z6 Vận hành · 10.10.60.0/24&quot;]
+    bastion[&quot;bastion&lt;br/&gt;60.11 · 512MiB&quot;]
+    ops_1[&quot;ops-1&lt;br/&gt;60.12 · 4GiB&quot;]
+  end
+  FW{{&quot;fw-1&lt;br/&gt;nftables, router L3 duy nhất&quot;}}
+  Z0 --- FW
+  Z1 --- FW
+  Z2 --- FW
+  Z3 --- FW
+  Z4 --- FW
+  Z5 --- FW
+  Z6 --- FW
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>Máy</th>
+<th>RAM (GB)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Z0</td>
+<td>origin, loadgen, dns-mock</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>Z1</td>
+<td>edge-1, dns-1</td>
+<td>3.5</td>
+</tr>
+<tr>
+<td>Z2</td>
+<td>perimeter-1</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>Z3</td>
+<td>k8s-cp-1, k8s-wk-1, k8s-wk-2</td>
+<td>15.0</td>
+</tr>
+<tr>
+<td>Z4</td>
+<td>data-1, ch-1, kafka-1</td>
+<td>12.0</td>
+</tr>
+<tr>
+<td>Z5</td>
+<td>bao-1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>Z6</td>
+<td>bastion, ops-1</td>
+<td>4.5</td>
+</tr>
+<tr>
+<td>(router)</td>
+<td>fw-1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td><strong>Tổng VM</strong></td>
+<td>16 máy</td>
+<td><strong>41.0</strong></td>
+</tr>
+<tr>
+<td>Dự trữ máy chủ</td>
+<td>hệ điều hành, Incus, đệm đĩa</td>
+<td>8 (ước lượng)</td>
+</tr>
+<tr>
+<td><strong>Cần</strong></td>
+<td></td>
+<td><strong>49.0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Đĩa cấp phát tối đa khoảng 398 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
+&lt;!-- lab-diagram:end --&gt;</p>
 <p><strong>Chọn theo RAM của máy chủ lab</strong> (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến <code>profile</code>, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:</p>
 <table>
 <thead>

@@ -1,0 +1,15 @@
+---
+- name: Bộ sysctl chuẩn
+  ansible.builtin.template:
+    src: sysctl-hardening.conf.j2
+    dest: /etc/sysctl.d/99-waap-hardening.conf
+    mode: "0644"
+    owner: root
+    group: root
+  notify: reload sysctl
+
+- name: Tắt core dump cho mọi người dùng
+  ansible.builtin.copy:
+    content: "* hard core 0\n"
+    dest: /etc/security/limits.d/10-no-core.conf
+    mode: "0644"

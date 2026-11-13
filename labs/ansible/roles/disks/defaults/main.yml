@@ -1,0 +1,7 @@
+---
+lab_disks: []
+disk_fstype: xfs
+disk_mount_opts: "noatime,nodev,nosuid"
+# LUKS (ADR-0048 hồ sơ data, secret). Lab mặc định tắt: khoá để cùng đĩa với dữ liệu thì không có tác dụng bảo vệ.
+# Production lấy khoá từ OpenBao hoặc TPM; bật ở lab chỉ để thử đường cài đặt.
+luks_enabled: false

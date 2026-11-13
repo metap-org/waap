@@ -132,6 +132,70 @@ def render(zones, prof, flows, bootstrap):
     return "\n".join(L) + "\n", ips
 
 
+# Vai trò bị khoá đường ra ở firewall máy chủ (7.6 X04, X05; ADR-0048 hồ sơ edge-waf, secret, data).
+EGRESS_LOCKED = {"edge-waf", "openbao", "postgres", "clickhouse", "kafka", "rabbitmq", "object-storage", "valkey-central"}
+
+
+def render_host(zones, prof, flows, vm_name, bootstrap=False):
+    """Firewall máy chủ cho một VM: input default-deny theo ma trận (cả luồng cùng vùng), output chỉ khoá với vai trò nhạy cảm."""
+    ips = vm_ips(zones, prof)
+    vm = next(v for v in prof["vms"] if v["name"] == vm_name)
+    mine = {ips[vm_name][z] for z in vm["zones"]}
+    L = [f"#!/usr/sbin/nft -f", f"# Sinh tự động từ flows.yaml cho {vm_name} (profile {prof['profile']}). KHÔNG sửa tay.",
+         "flush ruleset", "table inet host {", "  chain input {",
+         "    type filter hook input priority 0; policy drop;",
+         '    ct state established,related accept comment "stateful"',
+         '    ct state invalid drop',
+         '    iifname "lo" accept',
+         '    icmp type echo-request limit rate 5/second accept comment "ping"']
+    for f in flows["flows"]:
+        if f.get("lab_only") and f["dst"] == UPLINK:
+            continue
+        dst = resolve(f["dst"], zones, prof, ips) if f["dst"] != UPLINK else set()
+        if not any(d[0] == vm_name for d in dst):
+            continue
+        src = resolve(f["src"], zones, prof, ips)
+        s_ips = sorted({x[2] for x in src if x[0] != vm_name or f["src"] == f["dst"]})
+        if not s_ips:
+            continue
+        ports = ", ".join(str(p) for p in f["ports"])
+        L.append(f'    ip saddr {{ {", ".join(s_ips)} }} {f["proto"]} dport {{ {ports} }} accept comment "{f["id"]}"')
+    for loc in flows.get("local", []):
+        members = resolve(loc["hosts"], zones, prof, ips)
+        if any(m[0] == vm_name for m in members):
+            L.append(f'    ip saddr {{ {", ".join(sorted({m[2] for m in members}))} }} accept comment "{loc["id"]} {loc["note"]}"')
+    L.append('    counter drop comment "default-deny"')
+    L.append("  }")
+    roles = set(vm["roles"])
+    locked = bool(roles & EGRESS_LOCKED) and "edge-l7" not in roles and not bootstrap
+    L.append("  chain output {")
+    if locked:
+        L.append("    type filter hook output priority 0; policy drop;")
+        L.append('    ct state established,related accept comment "stateful"')
+        L.append('    oifname "lo" accept')
+        for f in flows["flows"]:
+            if f["dst"] == UPLINK:
+                continue
+            src = resolve(f["src"], zones, prof, ips)
+            if not any(x[0] == vm_name for x in src):
+                continue
+            dst = resolve(f["dst"], zones, prof, ips)
+            d_ips = sorted({d[2] for d in dst if d[0] != vm_name or f["src"] == f["dst"]})
+            if d_ips:
+                ports = ", ".join(str(p) for p in f["ports"])
+                L.append(f'    ip daddr {{ {", ".join(d_ips)} }} {f["proto"]} dport {{ {ports} }} accept comment "{f["id"]}"')
+        for loc in flows.get("local", []):
+            members = resolve(loc["hosts"], zones, prof, ips)
+            if any(m[0] == vm_name for m in members):
+                L.append(f'    ip daddr {{ {", ".join(sorted({m[2] for m in members}))} }} accept comment "{loc["id"]}"')
+        L.append('    counter drop comment "egress-locked"')
+    else:
+        L.append("    type filter hook output priority 0; policy accept;")
+    L.append("  }")
+    L.append("}")
+    return "\n".join(L) + "\n"
+
+
 def check(profile):
     zones, prof, flows = load(profile)
     ips = vm_ips(zones, prof)
@@ -177,6 +241,10 @@ def main():
     text, ips = render(zones, prof, flows, a.bootstrap)
     out = Path(a.o); out.mkdir(parents=True, exist_ok=True)
     (out / "ruleset.nft").write_text(text)
+    hd = out / "hosts"; hd.mkdir(exist_ok=True)
+    for v in prof["vms"]:
+        if "firewall" not in v["roles"]:
+            (hd / f"{v['name']}.nft").write_text(render_host(zones, prof, flows, v["name"], a.bootstrap))
     (out / "inventory.json").write_text(json.dumps({"profile": prof["profile"], "ips": ips}, indent=2))
     print(f"ghi {out}/ruleset.nft ({len(text.splitlines())} dòng)")
 

@@ -1,0 +1,5 @@
+---
+waf_user: waap-waf
+waf_cpus: "2-3"          # AllowedCPUs của slice riêng; lab VM nhỏ đặt lại theo số vCPU
+waf_memory_max: 2G
+waf_cpu_quota: "200%"

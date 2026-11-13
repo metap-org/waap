@@ -352,3 +352,31 @@ jobs:
       - uses: actions/checkout@v4
       - run: pip install semgrep
       - run: semgrep scan --config p/golang --config p/secrets --config .semgrep.yml --error
+
+  labs-infra:
+    name: labs — luật firewall từ ma trận, Ansible lint, render template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cài công cụ
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q nftables
+          python3 -m pip install -q pyyaml ansible ansible-lint
+      - name: Sinh luật và kiểm T07 hai chiều (7.6 <-> luật, cấm tuyệt đối)
+        run: |
+          python3 labs/infra/tools/test_gen_nft.py
+          python3 labs/infra/tools/gen_nft.py check compact
+          python3 labs/infra/tools/gen_nft.py gen compact --bootstrap -o labs/infra/generated/compact
+          python3 labs/infra/tools/gen_nft.py gen compact -o labs/infra/generated/compact
+          for f in labs/infra/generated/compact/ruleset.nft labs/infra/generated/compact/hosts/*.nft; do sudo nft -c -f "$f"; done
+      - name: Ansible lint, syntax và render template
+        working-directory: labs/ansible
+        run: |
+          python3 ../infra/tools/gen_lab.py inventory compact -o ../infra/generated/compact/inventory
+          echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPLACEHOLDERFORSYNTAXCHECKONLY000000000 ci" > ../infra/generated/ssh_user_ca.pub
+          ansible-lint
+          ansible-playbook site.yml --syntax-check
+          ANSIBLE_ROLES_PATH=roles ansible-playbook -c local -i localhost, -e @tests/vars.yml tests/render.yml
