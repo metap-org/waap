@@ -23,7 +23,7 @@ ngoài; mỗi plane một chu kỳ triển khai riêng ([ADR-0001](../docs/archi
 | # | Câu hỏi | Mặc định đề xuất |
 |---|---|---|
 | L1 | Lab chạy trên nền nào? | **Đã chốt (chủ dự án, 2026-11-13): máy ảo.** Còn mở: hypervisor cụ thể (Proxmox, KVM) và `fw-1` dùng nftables hay VyOS |
-| L2 | Tài nguyên tối đa: số máy, CPU, RAM, disk? | Hai cấu hình ở [7.6 §5](../docs/architecture/07-deployment/06-network-zones-and-flows.md#5-bố-cục-máy-ảo-theo-vùng): đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15; chọn theo tài nguyên có |
+| L2 | Tài nguyên tối đa: số máy, CPU, RAM, disk? | Bốn profile theo RAM (`core`, `min`, `compact`, `full`) ở [7.6 §5](../docs/architecture/07-deployment/06-network-zones-and-flows.md#5-bố-cục-máy-ảo-theo-vùng). Chủ dự án dự kiến máy 64 đến 128 GB RAM trong tương lai; lab viết theo biến `profile` để nâng lên không phải viết lại. Máy hiện tại: chờ anh cho biết cấu hình |
 | L3 | Hệ điều hành cho node: một họ hay nhiều? | Ubuntu 24.04 LTS cho mọi node ở lab, một chuẩn hardening duy nhất ([ADR-0048](../docs/architecture/09-adr/0048-node-baseline-and-hardening-profiles.md)) |
 | L4 | Công cụ GitOps và IaC? | Argo CD cho K8s; **OpenTofu** cho hạ tầng (Terraform và Packer là BSL, trái tinh thần ADR-0024); Ansible cho cấu hình node; image cloud gốc cộng cloud-init, chưa dùng golden image ([ADR-0049](../docs/architecture/09-adr/0049-gitops-and-devsecops-per-plane.md)) |
 | L5 | Chuẩn hardening: CIS benchmark mức nào? | CIS Level 1 bắt buộc cho mọi node; Level 2 cho edge và bastion |

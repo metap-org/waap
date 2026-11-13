@@ -188,6 +188,17 @@ Hai cấu hình, cùng một thiết kế mạng. Cấu hình **thu gọn** gộ
 
 Đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15.
 
+**Chọn theo RAM của máy chủ lab** (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến `profile`, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:
+
+| RAM máy chủ | Profile | Máy | RAM lab cần (ước lượng) |
+|---|---|---|---|
+| 16 GB | `core` | khoảng 8 | khoảng 10 GB; bỏ Kafka và ClickHouse thật |
+| 32 GB | `min` | khoảng 10 | khoảng 24 GB; bốn plane thu nhỏ, đủ các vùng mạng |
+| **64 GB** | `compact` | khoảng 15 | khoảng 48 GB; HA nhẹ (K8s ba node) |
+| **128 GB** | `full` | khoảng 30 | khoảng 90 GB; hai PoP giả, K8s và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật |
+
+Chủ dự án dự kiến nâng máy lên 64 đến 128 GB RAM: bắt đầu bằng profile nhỏ, chuyển lên `compact` rồi `full` khi có máy. Với máy 64 đến 128 GB nên dùng **một máy Linux riêng** làm máy chủ lab (Incus chạy trực tiếp, không lồng trong máy ảo khác): lab chạy nhanh hơn, và có card mạng thật để thử tinh chỉnh edge (RSS, IRQ affinity) mà máy ảo lồng không thử được. CPU từ 16 nhân, NVMe từ 1 TB.
+
 ## 6. Kiểm thử mạng
 
 Mỗi dòng ở §4.7 thành một test tự động chạy trong CI của lab (cả hai chiều: bị chặn ở firewall vùng **và** ở firewall máy chủ):

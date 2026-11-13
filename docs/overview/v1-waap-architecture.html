@@ -8700,6 +8700,44 @@ Cổng là mặc định, có thể đổi.</p>
 </tbody>
 </table>
 <p>Đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15.</p>
+<p><strong>Chọn theo RAM của máy chủ lab</strong> (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến <code>profile</code>, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:</p>
+<table>
+<thead>
+<tr>
+<th>RAM máy chủ</th>
+<th>Profile</th>
+<th>Máy</th>
+<th>RAM lab cần (ước lượng)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>16 GB</td>
+<td><code>core</code></td>
+<td>khoảng 8</td>
+<td>khoảng 10 GB; bỏ Kafka và ClickHouse thật</td>
+</tr>
+<tr>
+<td>32 GB</td>
+<td><code>min</code></td>
+<td>khoảng 10</td>
+<td>khoảng 24 GB; bốn plane thu nhỏ, đủ các vùng mạng</td>
+</tr>
+<tr>
+<td><strong>64 GB</strong></td>
+<td><code>compact</code></td>
+<td>khoảng 15</td>
+<td>khoảng 48 GB; HA nhẹ (K8s ba node)</td>
+</tr>
+<tr>
+<td><strong>128 GB</strong></td>
+<td><code>full</code></td>
+<td>khoảng 30</td>
+<td>khoảng 90 GB; hai PoP giả, K8s và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật</td>
+</tr>
+</tbody>
+</table>
+<p>Chủ dự án dự kiến nâng máy lên 64 đến 128 GB RAM: bắt đầu bằng profile nhỏ, chuyển lên <code>compact</code> rồi <code>full</code> khi có máy. Với máy 64 đến 128 GB nên dùng <strong>một máy Linux riêng</strong> làm máy chủ lab (Incus chạy trực tiếp, không lồng trong máy ảo khác): lab chạy nhanh hơn, và có card mạng thật để thử tinh chỉnh edge (RSS, IRQ affinity) mà máy ảo lồng không thử được. CPU từ 16 nhân, NVMe từ 1 TB.</p>
 <h2 id="f-07-deployment-06-network-zones-and-flows--6-kiểm-thử-mạng">6. Kiểm thử mạng</h2>
 <p>Mỗi dòng ở §4.7 thành một test tự động chạy trong CI của lab (cả hai chiều: bị chặn ở firewall vùng <strong>và</strong> ở firewall máy chủ):</p>
 <table>
