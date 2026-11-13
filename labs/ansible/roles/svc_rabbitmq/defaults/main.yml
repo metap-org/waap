@@ -1,4 +1,4 @@
 ---
 rabbit_user: metap
-rabbit_password: "{{ lab_secrets.rabbitmq_password }}"
+rabbit_password: "{{ lab_secrets.rabbitmq_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/rabbitmq_password length=24 chars=ascii_letters,digits') }}"
 rabbit_vhost: /

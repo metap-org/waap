@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[Unit]
+Description={{ app_name }}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ app_user }}
+Group={{ app_user }}
+EnvironmentFile=/etc/waap/{{ app_name }}.env
+ExecStart=/usr/local/bin/{{ app_name }} {{ app_exec_args }}
+Restart=on-failure
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target

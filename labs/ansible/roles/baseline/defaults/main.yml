@@ -1,2 +1,18 @@
 ---
 baseline_aide_enabled: true
+
+# Mặc định để role dùng được ngoài lab (waap-install --harden). Lab ghi đè ở group_vars/all.yml.
+ssh_user_ca_pub_file: ""        # rỗng: không cài CA, nên cũng không tắt khoá SSH tĩnh
+ssh_allow_static_keys: true
+ntp_servers: [ntp.ubuntu.com]
+ssh_allow_tcp_forwarding: false
+ssh_login_group: ops
+sysctl_ip_forward: 0
+audit_immutable: false        # true khoá luật audit tới lần khởi động lại (CIS); lab để false
+tmp_size: 2G
+reboot_time: "03:30"
+apt_proxy: ""
+baseline_packages: [auditd, audispd-plugins, aide, aide-common, apparmor, apparmor-utils, chrony, unattended-upgrades, nftables, acl, ethtool, qemu-guest-agent]
+baseline_removed_packages: [gcc, g++, make, telnet, rsh-client, talk, nis, tftp]
+disabled_services: [avahi-daemon, cups, rpcbind, bluetooth, ModemManager, apport]
+blacklisted_modules: [cramfs, freevxfs, hfs, hfsplus, jffs2, udf, usb-storage, firewire-core, firewire-ohci, dccp, sctp, rds, tipc]

@@ -1,0 +1,20 @@
+---
+# ClickHouse. Cần ghim clickhouse_debs (url, sha256).
+# Chạy: labs/bin/waap-install clickhouse --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài clickhouse
+  hosts: all
+  become: true
+  vars:
+    clickhouse_allowed_cidrs: "{{ app_allow_from }}"
+    app_fw_ports: [{"proto": "tcp", "ports": [9000]}]
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+  roles:
+    - svc_clickhouse
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

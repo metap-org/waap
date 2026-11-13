@@ -1,0 +1,22 @@
+---
+# nginx cổng vào portal. Cần perimeter_backend_nodes.
+# Chạy: labs/bin/waap-install ingress --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài ingress
+  hosts: all
+  become: true
+  vars:
+    perimeter_ingress: true
+    perimeter_egw: false
+    perimeter_egress: false
+    app_fw_ports: [{"proto": "tcp", "ports": [443]}]
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+  roles:
+    - svc_perimeter
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

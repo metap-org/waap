@@ -1,0 +1,11 @@
+---
+# Ví dụ cho waap-install config-distributor: -e @apps/examples/config-distributor.yml (thay các dấu ...)
+app_env:
+  CONTROL_SERVICE_EMAIL: "..."
+app_env_secret:
+  ZONES_URL: "..."
+  CONTROL_LOGIN_URL: "..."
+  CONTROL_SERVICE_PASSWORD: "..."
+  REDIS_URL: "..."
+  AMQP_URL: "..."
+  ANALYTICS_URL: "..."

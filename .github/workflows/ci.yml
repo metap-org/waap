@@ -386,7 +386,9 @@ jobs:
         run: |
           python3 ../infra/tools/gen_lab.py inventory compact -o ../infra/generated/compact/inventory
           echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPLACEHOLDERFORSYNTAXCHECKONLY000000000 ci" > ../infra/generated/ssh_user_ca.pub
+          python3 ../infra/tools/gen_apps.py && git diff --exit-code -- apps || { echo "apps/*.yml lệch gen_apps.py, chạy lại rồi commit"; exit 1; }
           ansible-lint
+          for f in apps/*.yml; do ansible-playbook "$f" --syntax-check -i localhost,; done
           ansible-playbook site.yml --syntax-check
           ansible-playbook services.yml --syntax-check -e "{lab_secrets: {}}"
           ANSIBLE_ROLES_PATH=roles ansible-playbook -c local -i localhost, -e @tests/vars.yml tests/render.yml

@@ -1,7 +1,12 @@
 ---
+# Vai trò nào chạy trên máy này. Lab tính từ nhóm inventory; cài độc lập thì chọn bằng cờ.
+perimeter_ingress: "{{ inventory_hostname in (groups['role_ingress_1'] | default([])) }}"
+perimeter_egw: "{{ inventory_hostname in (groups['role_egw_1'] | default([])) }}"
+perimeter_egress: "{{ inventory_hostname in (groups['role_egress_1'] | default([])) }}"
 perimeter_ingress_port: 443
 perimeter_egw_port: 8443
-perimeter_backend_nodes: "{{ groups['role_k8s_app'] | map('extract', hostvars, 'lab_ip') | list }}"
+# Địa chỉ các node chạy ứng dụng; lab lấy từ inventory, cài độc lập thì truyền vào.
+perimeter_backend_nodes: "{{ (groups['role_k8s_app'] | default([])) | map('extract', hostvars, 'lab_ip') | list }}"
 perimeter_portal_nodeport: 30080
 perimeter_ingest_nodeport: 30410
 egress_allowed_domains: [github.com, ghcr.io, registry.k8s.io, acme-v02.api.letsencrypt.org]

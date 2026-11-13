@@ -1,0 +1,17 @@
+#!/usr/sbin/nft -f
+# {{ ansible_managed }}
+flush ruleset
+table inet app {
+  chain input {
+    type filter hook input priority 0; policy drop;
+    ct state established,related accept
+    ct state invalid drop
+    iifname "lo" accept
+    icmp type echo-request limit rate 5/second accept
+    ip saddr { {{ app_ssh_from | join(', ') }} } tcp dport 22 accept comment "ssh"
+{% for r in app_fw_ports %}
+    ip saddr { {{ app_allow_from | join(', ') }} } {{ r.proto | default('tcp') }} dport { {{ r.ports | join(', ') }} } accept comment "app"
+{% endfor %}
+    counter drop comment "default-deny"
+  }
+}

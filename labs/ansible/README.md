@@ -19,6 +19,35 @@
 | `profile_ops` | Runner không giữ secret, đường ra qua `egress-1` |
 | `aide_refresh` | Chạy cuối: thay đổi do Ansible là hợp lệ, thay đổi ngoài Ansible bị AIDE báo |
 
+## Cài từng ứng dụng đứng riêng (`waap-install`)
+
+Mỗi ứng dụng cài được **độc lập trên một máy bất kỳ**, bất kể vùng mạng, không cần lab, inventory hay ma trận luồng. Lab chỉ là một nơi gọi cùng các role này.
+
+```
+labs/bin/waap-install list                                   # 18 ứng dụng
+labs/bin/waap-install redis --host local                     # cài lên chính máy này
+labs/bin/waap-install postgres --host 10.0.1.5 --harden \
+    -e 'app_allow_from=["10.0.2.0/24"]' -e 'app_ssh_from=["10.0.9.5/32"]'
+labs/bin/waap-install zones-service --host 10.0.3.7 -e @labs/ansible/apps/examples/zones-service.yml
+```
+
+| Nhóm | Ứng dụng |
+|---|---|
+| Kho dữ liệu | `postgres`, `rabbitmq`, `redis`, `clickhouse` |
+| Biên | `ingress`, `egw`, `egress` |
+| Edge | `edge` (cần `redis` cùng máy hoặc `edge_redis_url`) |
+| K8s | `k3s-node` (server hoặc agent) |
+| Dịch vụ Go (systemd, không cần K8s) | `zones-service`, `scanning-service`, `alerting-service`, `graphql-gateway`, `analytics-api`, `config-distributor` |
+| Hỗ trợ lab | `origin`, `loadgen`, `dns-mock` |
+
+- **Tham số rõ ràng, không ngầm theo vùng:** IP nghe mặc định là IP của máy; `app_allow_from` là danh sách CIDR được tới ứng dụng (cũng là danh sách PostgreSQL, ClickHouse, squid chấp nhận); thiếu địa chỉ bắt buộc thì báo lỗi ngay.
+- **Mật khẩu tự sinh** lần đầu, lưu ở `~/.waap-install/secrets/<host>/` trên máy chạy lệnh, dùng lại các lần sau (idempotent). Ghi đè bằng `-e`.
+- **`--harden`** áp thêm chuẩn nền (`baseline`) trước khi cài. Khi chưa có CA SSH thì giữ khoá SSH tĩnh, **không tự khoá bạn**.
+- **Firewall riêng:** chỉ bật khi có `app_allow_from`, bắt buộc kèm `app_ssh_from` (nếu không, từ chối chạy). Luật input default-deny, chỉ mở cổng của ứng dụng.
+- **Dịch vụ Go** chạy bằng systemd với drop-in hardening chuẩn (`NoNewPrivileges`, `ProtectSystem=strict`, bỏ hết capability, `MemoryMax`), biến môi trường ở `/etc/waap/<app>.env` (0640 root:nhóm dịch vụ). Cần nhị phân từ `labs/bin/lab build` (hoặc `-e app_bin_dir=...`). `apps/examples/` có danh sách khoá bắt buộc; thiếu khoá thì dừng sớm.
+- Danh sách ứng dụng sinh từ `labs/infra/tools/gen_apps.py`; sửa ở đó rồi chạy lại, CI kiểm không lệch.
+- **Đã chạy thật** (trong sandbox không có systemd): `zones-service` chạy tới bước nạp systemd, tạo đúng người dùng, tệp env 0640, unit và drop-in (đọc lại được); `systemd-analyze verify` không báo lỗi. Thiếu khoá bắt buộc thì dừng với thông báo rõ. **Chưa chạy được:** cài gói apt (sandbox thiếu `python3-apt`) và bật dịch vụ systemd, nên `postgres`, `redis`... mới qua kiểm cú pháp, lint và chế độ `--check`.
+
 ## Dịch vụ (P1 lát 2, `services.yml`)
 
 | Role | Nội dung |

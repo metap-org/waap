@@ -1,4 +1,5 @@
 ---
 dns_mock_binary_src: "{{ lab_generated_dir }}/bin/dns-mock"
 dns_mock_user: dnsmock
+dns_mock_admin_token: "{{ lab_secrets.dns_mock_admin_token if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/dns_mock_admin_token length=24 chars=ascii_letters,digits') }}"
 dns_mock_state: /var/lib/dns-mock

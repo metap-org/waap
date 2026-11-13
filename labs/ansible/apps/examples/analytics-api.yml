@@ -1,0 +1,7 @@
+---
+# Ví dụ cho waap-install analytics-api: -e @apps/examples/analytics-api.yml (thay các dấu ...)
+app_env:
+  {}
+app_env_secret:
+  CLICKHOUSE_URL: "..."
+  JWKS_URL: "..."

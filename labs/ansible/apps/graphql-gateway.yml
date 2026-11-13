@@ -1,0 +1,31 @@
+---
+# Cổng GraphQL gom ba dịch vụ. Khai UPSTREAM_n_* như management-plane/docker-compose.yml.
+# Chạy: labs/bin/waap-install graphql-gateway --host <ip|local> -e @vars.yml [--harden]
+# Cấu hình qua app_env (không bí mật) và app_env_secret (bí mật); xem apps/examples/graphql-gateway.yml.
+# Bắt buộc có các khoá: JWKS_URL, ANALYTICS_URL, UPSTREAM_1_NAME.
+- name: Cài graphql-gateway
+  hosts: all
+  become: true
+  vars:
+    app_name: waf-graphql-gateway
+    app_binary_src: "{{ app_bin_dir }}/waf-graphql-gateway"
+    app_env_defaults: {"PORT": "4000"}
+    app_health_url: ""
+    app_fw_ports: [{"proto": "tcp", "ports": [4000]}]
+    required_keys: ["JWKS_URL", "ANALYTICS_URL", "UPSTREAM_1_NAME"]
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+    - name: Đủ cấu hình bắt buộc
+      ansible.builtin.assert:
+        that: (required_keys | difference((app_env | default({})).keys() | list + (app_env_secret | default({})).keys() | list)) | length == 0
+        fail_msg: "Thiếu khoá cấu hình, xem apps/examples/graphql-gateway.yml"
+        quiet: true
+  roles:
+    - app_service
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

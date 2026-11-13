@@ -5,7 +5,7 @@ upstream portal {
 {% endfor %}
 }
 server {
-  listen {{ lab_ip }}:{{ perimeter_ingress_port }} ssl;
+  listen {{ app_listen_ip }}:{{ perimeter_ingress_port }} ssl;
   ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
   ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
   ssl_protocols TLSv1.2 TLSv1.3;

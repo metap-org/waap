@@ -1,0 +1,110 @@
+---
+- name: Kiểm tham số
+  ansible.builtin.assert:
+    that:
+      - app_name is defined
+      - app_binary_src is defined
+    quiet: true
+
+- name: Nhị phân có sẵn ở máy điều khiển
+  ansible.builtin.stat:
+    path: "{{ app_binary_src }}"
+  delegate_to: localhost
+  become: false
+  register: bin_stat
+
+- name: Cần nhị phân đã dựng (lab build hoặc go build)
+  ansible.builtin.assert:
+    that: bin_stat.stat.exists
+    fail_msg: "Không thấy {{ app_binary_src }}. Dựng trước (labs/bin/lab build) hoặc truyền -e app_binary_src=<đường dẫn>."
+    quiet: true
+
+- name: Người dùng dịch vụ không đăng nhập được
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Thư mục cấu hình
+  ansible.builtin.file:
+    path: /etc/waap
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Nhị phân
+  ansible.builtin.copy:
+    src: "{{ app_binary_src }}"
+    dest: "/usr/local/bin/{{ app_name }}"
+    mode: "0755"
+    owner: root
+    group: root
+  notify: restart app
+
+- name: Thư mục dữ liệu
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode | default('0750') }}"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+  loop: "{{ app_extra_dirs }}"
+
+- name: Tệp đi kèm (khoá, cấu hình)
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode | default('0640') }}"
+    owner: root
+    group: "{{ app_user }}"
+  loop: "{{ app_files }}"
+  no_log: true
+  notify: restart app
+
+- name: Biến môi trường (bí mật nên chỉ root và nhóm dịch vụ đọc được)
+  ansible.builtin.template:
+    src: app.env.j2
+    dest: "/etc/waap/{{ app_name }}.env"
+    mode: "0640"
+    owner: root
+    group: "{{ app_user }}"
+  no_log: true
+  notify: restart app
+
+- name: Unit systemd
+  ansible.builtin.template:
+    src: app.service.j2
+    dest: "/etc/systemd/system/{{ app_name }}.service"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: [daemon reload, restart app]
+
+- name: Hardening unit
+  ansible.builtin.include_role:
+    name: hardened_unit
+  vars:
+    hu_unit: "{{ app_name }}"
+    hu_capabilities: "{{ app_capabilities }}"
+    hu_memory_max: "{{ app_memory_max }}"
+    hu_read_write_paths: "{{ app_extra_dirs | map(attribute='path') | list }}"
+    hu_extra: "MemoryDenyWriteExecute=false"
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: "{{ app_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Đợi dịch vụ sẵn sàng
+  ansible.builtin.uri:
+    url: "{{ app_health_url }}"
+    status_code: 200
+  register: health
+  until: health.status == 200
+  retries: "{{ app_health_retries }}"
+  delay: 3
+  when: app_health_url | length > 0 and not ansible_check_mode

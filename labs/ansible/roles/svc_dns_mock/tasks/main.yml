@@ -33,7 +33,7 @@
       [Service]
       User={{ dns_mock_user }}
       Environment=DNS_MOCK_STATE_FILE={{ dns_mock_state }}/state.json
-      Environment=DNS_MOCK_ADMIN_TOKEN={{ lab_secrets.dns_mock_admin_token }}
+      Environment=DNS_MOCK_ADMIN_TOKEN={{ dns_mock_admin_token }}
       AmbientCapabilities=CAP_NET_BIND_SERVICE
       ExecStart=/usr/local/bin/dns-mock
       Restart=on-failure

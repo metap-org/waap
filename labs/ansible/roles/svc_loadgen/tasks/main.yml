@@ -1,4 +1,10 @@
 ---
+- name: Cần địa chỉ edge
+  ansible.builtin.assert:
+    that: loadgen_edge_ip | length > 0
+    fail_msg: "Truyền loadgen_edge_ip."
+    quiet: true
+
 - name: Công cụ tải
   ansible.builtin.apt:
     name: [curl, apache2-utils]

@@ -1,0 +1,31 @@
+---
+- name: Cần CIDR SSH để không tự khoá
+  ansible.builtin.assert:
+    that: app_ssh_from | length > 0
+    fail_msg: "Bật firewall (app_allow_from) thì phải khai app_ssh_from, nếu không bạn sẽ mất kết nối."
+    quiet: true
+  when: app_allow_from | length > 0
+
+- name: nftables
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+  when: app_allow_from | length > 0
+
+- name: Luật input default-deny chỉ cho cổng của ứng dụng
+  ansible.builtin.template:
+    src: app.nft.j2
+    dest: /etc/nftables.conf
+    mode: "0644"
+    owner: root
+    group: root
+    validate: /usr/sbin/nft -c -f %s
+  when: app_allow_from | length > 0
+  notify: reload nftables
+
+- name: nftables bật cùng máy
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: started
+  when: app_allow_from | length > 0

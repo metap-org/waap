@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
-bind 127.0.0.1 {{ lab_ip }}
+bind 127.0.0.1 {{ app_listen_ip }}
 protected-mode yes
 port 6379
 dir {{ redis_dir }}

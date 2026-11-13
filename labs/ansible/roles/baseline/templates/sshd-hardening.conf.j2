@@ -5,7 +5,9 @@ KbdInteractiveAuthentication {{ 'yes' if (bastion_mfa | default(false)) else 'no
 PubkeyAuthentication yes
 PermitEmptyPasswords no
 AllowGroups {{ ssh_login_group }}
+{% if ssh_user_ca_pub_file | length > 0 %}
 TrustedUserCAKeys /etc/ssh/trusted_user_ca.pub
+{% endif %}
 {% if ssh_allow_static_keys | bool %}
 AuthorizedKeysFile .ssh/authorized_keys
 {% else %}

@@ -6,7 +6,7 @@ upstream control_ingest {
 {% endfor %}
 }
 server {
-  listen {{ lab_ip }}:{{ perimeter_egw_port }};
+  listen {{ app_listen_ip }}:{{ perimeter_egw_port }};
   server_tokens off;
   client_max_body_size 2m;
   location = /ingest/events {

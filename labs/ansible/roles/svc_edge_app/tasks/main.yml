@@ -1,4 +1,10 @@
 ---
+- name: Cần URL nhận telemetry
+  ansible.builtin.assert:
+    that: edge_ingest_url | length > 0
+    fail_msg: "Truyền edge_ingest_url."
+    quiet: true
+
 - name: Thư mục binary
   ansible.builtin.file:
     path: /opt/waap/bin

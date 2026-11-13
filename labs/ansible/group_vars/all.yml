@@ -4,27 +4,12 @@
 ansible_connection: community.general.incus
 ansible_incus_remote: local
 ansible_incus_host: "{{ inventory_hostname }}"
-
+app_listen_ip: "{{ lab_ip }}"     # lab: IP trong vùng; cài độc lập (apps/) lấy IP mặc định của máy
 lab_bootstrap: true           # true: còn khoá SSH tĩnh, apt ra Internet trực tiếp. `lab seal` đặt false.
 lab_generated_dir: "{{ playbook_dir }}/../infra/generated"
-
 # --- truy cập ---
 ssh_user_ca_pub_file: "{{ lab_generated_dir }}/ssh_user_ca.pub"   # `lab ssh-ca` sinh; P5 chuyển sang OpenBao ký
 ssh_allow_static_keys: "{{ lab_bootstrap }}"
-ssh_allow_tcp_forwarding: false
-ssh_login_group: ops
-
-# --- hệ thống ---
-sysctl_ip_forward: 0
+# --- hệ thống (mặc định chuẩn nằm ở roles/baseline/defaults) ---
 hostfw_enabled: true
-audit_immutable: false        # true khoá luật audit tới lần khởi động lại (CIS); lab để false
-tmp_size: 2G
-reboot_time: "03:30"
-apt_proxy: ""
 ntp_servers: "{{ ['ntp.ubuntu.com'] if (lab_bootstrap or not lab_infra_ip) else [lab_infra_ip] }}"
-
-# --- gói ---
-baseline_packages: [auditd, audispd-plugins, aide, aide-common, apparmor, apparmor-utils, chrony, unattended-upgrades, nftables, acl, ethtool, qemu-guest-agent]
-baseline_removed_packages: [gcc, g++, make, telnet, rsh-client, talk, nis, tftp]
-disabled_services: [avahi-daemon, cups, rpcbind, bluetooth, ModemManager, apport]
-blacklisted_modules: [cramfs, freevxfs, hfs, hfsplus, jffs2, udf, usb-storage, firewire-core, firewire-ohci, dccp, sctp, rds, tipc]

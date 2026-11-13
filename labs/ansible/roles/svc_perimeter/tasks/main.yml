@@ -1,4 +1,10 @@
 ---
+- name: Cần địa chỉ backend khi dựng ingress hoặc egw
+  ansible.builtin.assert:
+    that: perimeter_backend_nodes | length > 0 or not (perimeter_ingress | bool or perimeter_egw | bool)
+    fail_msg: "Truyền perimeter_backend_nodes (danh sách IP node ứng dụng)."
+    quiet: true
+
 - name: Gói (nginx cho ingress và egw, squid cho egress)
   ansible.builtin.apt:
     name: [nginx, squid, ssl-cert]
@@ -15,7 +21,7 @@
     src: ingress.conf.j2
     dest: /etc/nginx/conf.d/10-ingress.conf
     mode: "0644"
-  when: inventory_hostname in groups['role_ingress_1']
+  when: perimeter_ingress | bool
   notify: restart nginx
 
 - name: egw-1, relay telemetry của edge tới control-plane (chỉ chuyển tiếp, không giữ dữ liệu)
@@ -23,7 +29,7 @@
     src: egw.conf.j2
     dest: /etc/nginx/conf.d/20-egw.conf
     mode: "0644"
-  when: inventory_hostname in groups['role_egw_1']
+  when: perimeter_egw | bool
   notify: restart nginx
 
 - name: egress-1, proxy ra Internet có allowlist
@@ -31,7 +37,7 @@
     src: squid.conf.j2
     dest: /etc/squid/squid.conf
     mode: "0644"
-  when: inventory_hostname in groups['role_egress_1']
+  when: perimeter_egress | bool
   notify: restart squid
 
 - name: Chạy

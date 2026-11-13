@@ -1,0 +1,20 @@
+---
+# waap-edge ngoài K8s. Cần edge_ingest_url; chạy cùng apps/redis hoặc trỏ edge_redis_url.
+# Chạy: labs/bin/waap-install edge --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài edge
+  hosts: all
+  become: true
+  vars:
+    edge_binary_src: "{{ app_bin_dir }}/waap-edge"
+    app_fw_ports: [{"proto": "tcp", "ports": [8080]}]
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+  roles:
+    - svc_edge_app
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

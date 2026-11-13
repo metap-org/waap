@@ -1,2 +1,2 @@
 ---
-loadgen_edge_ip: "{{ hostvars[groups['role_edge_l7'][0]].lab_ip }}"
+loadgen_edge_ip: "{{ hostvars[groups['role_edge_l7'][0]].lab_ip if groups['role_edge_l7'] is defined else '' }}"

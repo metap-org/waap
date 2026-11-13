@@ -4,7 +4,7 @@
     name: ["postgresql-{{ pg_version }}", python3-psycopg2, ssl-cert]
     state: present
 
-- name: Cụm mới trên đĩa dữ liệu và đĩa WAL riêng (thay cụm mặc định)
+- name: Cụm mới trên đĩa dữ liệu và đĩa WAL riêng (chỉ khi đặt pg_wal; mặc định dùng cụm của gói)
   ansible.builtin.shell: |
     set -e
     pg_dropcluster --stop {{ pg_version }} main || true
@@ -13,6 +13,7 @@
   args:
     creates: "{{ pg_data }}/PG_VERSION"
     executable: /bin/bash
+  when: pg_wal | length > 0
 
 - name: Cấu hình (nghe trên IP lab, TLS, scram, ghi log kết nối)
   ansible.builtin.template:

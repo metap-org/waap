@@ -17,13 +17,14 @@
     name: root
     password_lock: true
 
-- name: CA công khai của SSH cert ngắn hạn
+- name: CA công khai của SSH cert ngắn hạn (bỏ qua nếu chưa có CA)
   ansible.builtin.copy:
     src: "{{ ssh_user_ca_pub_file }}"
     dest: /etc/ssh/trusted_user_ca.pub
     mode: "0644"
     owner: root
     group: root
+  when: ssh_user_ca_pub_file | length > 0
   notify: restart ssh
 
 - name: Cấu hình sshd (drop-in)

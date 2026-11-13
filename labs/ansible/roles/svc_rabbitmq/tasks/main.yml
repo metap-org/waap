@@ -9,7 +9,7 @@
     dest: /etc/rabbitmq/rabbitmq.conf
     mode: "0644"
     content: |
-      listeners.tcp.1 = {{ lab_ip }}:5672
+      listeners.tcp.1 = {{ app_listen_ip }}:5672
       loopback_users = none
       default_user_tags.administrator = false
   notify: restart rabbitmq

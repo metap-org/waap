@@ -1,9 +1,10 @@
 ---
 pg_version: 16
-pg_data: /var/lib/waap/data/pg
-pg_wal: /var/lib/waap/wal/pg
+# Mặc định theo gói Debian; lab đặt đĩa dữ liệu và WAL riêng bằng cách ghi đè hai biến này.
+pg_data: "/var/lib/postgresql/{{ pg_version }}/main"
+pg_wal: ""
 pg_db: metap
 pg_user: metap
 # Mật khẩu lấy từ lab_secrets (lab chỉ; P5 chuyển sang OpenBao dynamic secret).
-pg_password: "{{ lab_secrets.postgres_password }}"
+pg_password: "{{ lab_secrets.postgres_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/postgres_password length=24 chars=ascii_letters,digits') }}"
 pg_allowed_cidrs: ["10.10.30.0/24"]   # Z3 (N14)

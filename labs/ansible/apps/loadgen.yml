@@ -1,0 +1,19 @@
+---
+# Máy tải. Cần loadgen_edge_ip.
+# Chạy: labs/bin/waap-install loadgen --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài loadgen
+  hosts: all
+  become: true
+  vars:
+    app_fw_ports: []
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+  roles:
+    - svc_loadgen
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

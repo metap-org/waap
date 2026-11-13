@@ -1,0 +1,7 @@
+---
+# Ví dụ cho waap-install graphql-gateway: -e @apps/examples/graphql-gateway.yml (thay các dấu ...)
+app_env:
+  UPSTREAM_1_NAME: "..."
+app_env_secret:
+  JWKS_URL: "..."
+  ANALYTICS_URL: "..."

@@ -10,7 +10,7 @@
     mode: "0644"
     content: |
       server {
-        listen {{ lab_ip }}:80 default_server;
+        listen {{ app_listen_ip }}:80 default_server;
         server_tokens off;
         location = /echo { default_type text/plain; return 200 "origin ok\nhost=$host\nxff=$http_x_forwarded_for\nua=$http_user_agent\n"; }
         location / { default_type text/plain; return 200 "origin\n"; }

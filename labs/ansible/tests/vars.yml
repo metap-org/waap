@@ -17,3 +17,4 @@ hu_capabilities: [CAP_NET_BIND_SERVICE]
 hu_memory_max: 2G
 hu_read_write_paths: [/var/cache/waap-edge]
 hu_extra: "LimitNOFILE=1048576"
+ssh_user_ca_pub_file: "/tmp/ca.pub"

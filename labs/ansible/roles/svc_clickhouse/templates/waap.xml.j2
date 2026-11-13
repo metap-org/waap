@@ -6,7 +6,7 @@
   <user_files_path>{{ clickhouse_data }}/user_files/</user_files_path>
   <users>
     <default>
-      <networks replace="replace"><ip>10.10.30.0/24</ip><ip>127.0.0.1</ip></networks>
+      <networks replace="replace">{% for c in clickhouse_allowed_cidrs %}<ip>{{ c }}</ip>{% endfor %}<ip>127.0.0.1</ip></networks>
     </default>
   </users>
 </clickhouse>

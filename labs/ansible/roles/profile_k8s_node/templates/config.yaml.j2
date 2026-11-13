@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
-node-ip: {{ lab_ip }}
+node-ip: {{ app_listen_ip }}
 token-file: /etc/rancher/k3s/token
 kubelet-arg:
   - protect-kernel-defaults=true
@@ -15,7 +15,7 @@ disable:
   - traefik
   - servicelb
 tls-san:
-  - {{ lab_ip }}
+  - {{ app_listen_ip }}
 kube-apiserver-arg:
   - anonymous-auth=false
   - audit-log-path=/var/log/k3s-audit.log

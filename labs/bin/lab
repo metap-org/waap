@@ -107,6 +107,13 @@ cmd_build() { # dựng nhị phân ngoài K8s và ảnh container cho ứng dụ
   export CGO_ENABLED=0
   ( cd "$REPO/edge-plane" && go build -trimpath -o "$GEN/bin/waap-edge" ./cmd/waf-edge )
   ( cd "$REPO/devtools/dns-mock" && go build -trimpath -o "$GEN/bin/dns-mock" . )
+  # Ứng dụng đứng riêng (waap-install <app>): nhị phân cho từng dịch vụ Go, cùng tên với apps/*.yml mong đợi.
+  local m
+  for m in zones-service scanning-service alerting-service waf-graphql-gateway; do
+    ( cd "$REPO/management-plane" && go build -trimpath -o "$GEN/bin/$m" "./cmd/$m" )
+  done
+  ( cd "$REPO/analytics-plane" && go build -trimpath -o "$GEN/bin/analytics-api" ./cmd/analytics-api )
+  ( cd "$REPO/control-plane" && go build -trimpath -o "$GEN/bin/waf-config-distributor" ./cmd/waf-config-distributor )
   ( cd "$ctx/metap" && go build -trimpath -o "$GEN/bin/db-migrate" ./cmd/db-migrate && go build -trimpath -o "$GEN/bin/dev-tools" ./cmd/dev-tools )
   local svc
   for svc in zones-service scanning-service alerting-service waf-graphql-gateway; do

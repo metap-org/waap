@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
-http_port {{ lab_ip }}:3128
+http_port {{ app_listen_ip }}:3128
 acl allowed_src src {{ egress_allowed_src | join(' ') }}
 acl allowed_dst dstdomain {% for d in egress_allowed_domains %}{{ d }} {% endfor %}
 
