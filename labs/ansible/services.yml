@@ -1,0 +1,41 @@
+---
+# Hạ tầng dữ liệu và biên (P1 lát 2). Dừng ở mức database và proxy ra; KHÔNG triển khai dịch vụ ứng dụng.
+# Chạy sau site.yml:  ansible-playbook services.yml -e @../infra/generated/secrets.yml
+# Profile full có hai máy postgres nhưng cấu hình sao chép (replication) CHƯA viết, nên chỉ cài node đầu; node thứ hai
+# được hardening và có đĩa nhưng chưa có PostgreSQL. Cài nó thành bản độc lập sẽ gây hiểu nhầm là đã có replica.
+- name: egress-1 (proxy ra có allowlist)
+  hosts: role_egress_1
+  roles:
+    - role: svc_perimeter
+      tags: [egress]
+
+# Mirror nội bộ: chạy sau egress-1 (cần đường ra có allowlist để kéo từ vendor) và TRƯỚC khi nâng version database.
+- name: Mirror nội bộ ở registry (aptly, kho artifact, apt-cacher-ng)
+  hosts: role_registry
+  roles:
+    - role: svc_registry
+      tags: [registry]
+
+- name: PostgreSQL (node đầu)
+  hosts: role_postgres[0]
+  roles:
+    - role: svc_postgres
+      tags: [postgres]
+
+- name: RabbitMQ
+  hosts: role_rabbitmq
+  roles:
+    - role: svc_rabbitmq
+      tags: [rabbitmq]
+
+- name: Valkey (valkey-central và valkey-edge)
+  hosts: role_valkey_central:role_valkey_edge
+  roles:
+    - role: svc_valkey
+      tags: [valkey]
+
+- name: ClickHouse
+  hosts: role_clickhouse
+  roles:
+    - role: svc_clickhouse
+      tags: [clickhouse]

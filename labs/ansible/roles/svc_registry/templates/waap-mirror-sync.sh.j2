@@ -1,0 +1,18 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Cập nhật mirror từ vendor và tạo SNAPSHOT mới. KHÔNG publish: client chỉ thấy bản mới khi chạy waap-mirror-promote.
+# Dùng: waap-mirror-sync [<repo>|all]
+set -euo pipefail
+export GNUPGHOME="{{ mirror_data }}/.gnupg"
+{% if mirror_egress_proxy | length > 0 %}
+export http_proxy="{{ mirror_egress_proxy }}" https_proxy="{{ mirror_egress_proxy }}"
+{% endif %}
+A="aptly -config=/etc/aptly.conf"
+want="${1:-all}"
+for r in {{ mirror_repos | map(attribute='name') | join(' ') }}; do
+  [ "$want" = all ] || [ "$want" = "$r" ] || continue
+  $A mirror update -keyring="{{ mirror_data }}/vendor-keys/$r.gpg" "$r"
+  snap="$r-$(date -u +%Y%m%d-%H%M%S)"
+  $A snapshot create "$snap" from mirror "$r"
+  echo "snapshot mới: $snap"
+done

@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+[Service]
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+UMask=0077
+CapabilityBoundingSet={{ hu_capabilities | join(' ') }}
+AmbientCapabilities={{ hu_capabilities | join(' ') }}
+{% if hu_memory_max %}
+MemoryMax={{ hu_memory_max }}
+{% endif %}
+{% if hu_read_write_paths %}
+ReadWritePaths={{ hu_read_write_paths | join(' ') }}
+{% endif %}
+{{ hu_extra }}

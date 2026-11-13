@@ -1,0 +1,12 @@
+# Vùng tin cậy theo 7.6 §2. Dùng chung cho mọi profile: đổi profile không đổi mạng.
+# Z7 (hypervisor) là mạng out-of-band, không tạo ở đây.
+zones:
+  Z0: { cidr: 10.10.0.0/24,  name: internet,  note: "Internet giả lập: loadgen, origin, dns-mock" }
+  Z1: { cidr: 10.10.10.0/24, name: edge-dmz }
+  Z2: { cidr: 10.10.20.0/24, name: perimeter }
+  Z3: { cidr: 10.10.30.0/24, name: app }
+  Z4: { cidr: 10.10.40.0/24, name: data }
+  Z5: { cidr: 10.10.50.0/24, name: secret }
+  Z6: { cidr: 10.10.60.0/24, name: ops }
+# Mạng NAT của Incus cho fw-1 ra Internet thật. Chỉ fw-1 có card mạng ở đây.
+uplink: { cidr: 10.10.254.0/24, fw_host: 2 }

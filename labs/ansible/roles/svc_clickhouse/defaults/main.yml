@@ -1,0 +1,15 @@
+---
+# Cài từ repo apt chính thức của ClickHouse (packages.clickhouse.com), không dùng gói của Ubuntu (không có).
+# Kênh: stable hoặc lts. Nâng version: đặt clickhouse_pkg_version cho CẢ BA gói cùng một version rồi chạy lại.
+clickhouse_channel: lts
+clickhouse_pkg_version: ""
+clickhouse_repo_key_url: https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key
+# Fingerprint đầy đủ của khoá repo; ID dài 8919F6BD2B48D754 khớp tài liệu ClickHouse, phần còn lại cần người duyệt đối chiếu.
+clickhouse_repo_key_fingerprint: 3A9EA1193A97B548BE1457D48919F6BD2B48D754
+clickhouse_packages: [clickhouse-common-static, clickhouse-server, clickhouse-client]
+clickhouse_data: /var/lib/clickhouse
+clickhouse_listen: "{{ app_listen_ip }}"
+clickhouse_ttl_days: 30
+clickhouse_app_user: analytics
+clickhouse_app_password: "{{ lab_secrets.clickhouse_analytics_password if (lab_secrets is defined and 'clickhouse_analytics_password' in lab_secrets) else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/clickhouse_analytics_password length=24 chars=ascii_letters,digits') }}"
+clickhouse_allowed_cidrs: ["10.10.30.0/24"]   # nguồn được dùng tài khoản default; đặt theo nơi cài

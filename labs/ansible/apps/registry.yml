@@ -1,0 +1,19 @@
+---
+# Mirror nội bộ: aptly (snapshot, ký lại), kho artifact, apt-cacher-ng cho Ubuntu.
+# Chạy: labs/bin/waap-install registry --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài registry
+  hosts: all
+  become: true
+  vars:
+    app_fw_ports: [{"proto": "tcp", "ports": [80, 3142]}]
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+  roles:
+    - svc_registry
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Cài MỘT ứng dụng lên MỘT máy bất kỳ, không cần lab, inventory hay vùng mạng.
+#   waap-install list
+#   waap-install <app> --host <ip|local> [--user U] [--key ~/.ssh/id] [--harden] [--check] [-e k=v | -e @tệp.yml]...
+# Ví dụ:
+#   waap-install postgres --host 10.0.1.5 --harden -e 'app_allow_from=["10.0.2.0/24"]' -e 'app_ssh_from=["10.0.9.5/32"]'
+#   waap-install redis --host local
+# Mật khẩu tự sinh lần đầu, lưu ở ~/.waap-install/secrets/<host>/ (máy chạy lệnh này) và dùng lại các lần sau.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ANS="$ROOT/ansible"
+
+usage() { sed -n '2,10p' "$0"; exit 2; }
+[ $# -ge 1 ] || usage
+if [ "$1" = list ]; then
+  for f in "$ANS"/apps/*.yml; do printf '%-20s %s\n' "$(basename "$f" .yml)" "$(sed -n '2p' "$f" | sed 's/^# //')"; done
+  exit 0
+fi
+
+app="$1"; shift
+[ -f "$ANS/apps/$app.yml" ] || { echo "không có ứng dụng '$app' (waap-install list)"; exit 1; }
+host=""; user=""; key=""; extra=(); harden=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) host="$2"; shift 2 ;;
+    --user) user="$2"; shift 2 ;;
+    --key) key="$2"; shift 2 ;;
+    --harden) harden=true; shift ;;
+    --check) extra+=(--check --diff); shift ;;
+    -e) extra+=(-e "$2"); shift 2 ;;
+    *) echo "tham số lạ: $1"; usage ;;
+  esac
+done
+[ -n "$host" ] || { echo "thiếu --host (địa chỉ, hoặc 'local' để cài lên chính máy này)"; exit 1; }
+command -v ansible-playbook >/dev/null || { echo "cần ansible-core (pip install ansible-core)"; exit 1; }
+
+conn=(-c ssh)
+inv="$host,"
+if [ "$host" = local ]; then conn=(-c local); inv="localhost,"; fi
+[ -z "$user" ] || extra+=(-u "$user")
+[ -z "$key" ] || extra+=(--private-key "$key")
+$harden && extra+=(-e app_harden=true)
+
+( cd "$ANS" && ansible-galaxy collection install -r requirements.yml >/dev/null &&
+  ansible-playbook -i "$inv" "${conn[@]}" "apps/$app.yml" "${extra[@]}" )

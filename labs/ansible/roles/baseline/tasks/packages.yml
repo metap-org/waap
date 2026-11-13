@@ -1,0 +1,28 @@
+---
+- name: Apt proxy (chỉ khi node có đường ra qua egress-1)
+  ansible.builtin.template:
+    src: apt-proxy.conf.j2
+    dest: /etc/apt/apt.conf.d/90waap-proxy
+    mode: "0644"
+    owner: root
+    group: root
+  when: apt_proxy | length > 0
+
+- name: Gỡ apt proxy khi không còn dùng
+  ansible.builtin.file:
+    path: /etc/apt/apt.conf.d/90waap-proxy
+    state: absent
+  when: apt_proxy | length == 0
+
+- name: Gói bắt buộc
+  ansible.builtin.apt:
+    name: "{{ baseline_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Gỡ gói không cần (trình biên dịch, công cụ mạng cũ)
+  ansible.builtin.apt:
+    name: "{{ baseline_removed_packages }}"
+    state: absent
+    autoremove: true

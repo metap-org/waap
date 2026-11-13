@@ -1,0 +1,76 @@
+---
+- name: Gộp giá trị tuning theo các vai trò của máy này
+  ansible.builtin.import_tasks: merge.yml
+
+- name: sysctl theo dịch vụ (nạp sau 99-waap-hardening nên giá trị theo dịch vụ thắng khi trùng khoá)
+  ansible.builtin.template:
+    src: sysctl-tuning.conf.j2
+    dest: /etc/sysctl.d/99-zz-waap-tuning.conf
+    mode: "0644"
+    owner: root
+    group: root
+  when: tuning_sysctl | default({}) | length > 0
+  notify: reload sysctl
+  tags: [sysctl]
+
+- name: Module kernel cần cho các khoá sysctl (nạp lại sau khởi động)
+  ansible.builtin.copy:
+    content: "{{ tuning_modules | default([]) | join('\n') }}\n"
+    dest: /etc/modules-load.d/waap-tuning.conf
+    mode: "0644"
+  when: tuning_modules | default([]) | length > 0
+
+- name: Nạp module ngay (trước khi áp sysctl)
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ tuning_modules | default([]) }}"
+
+- name: Áp sysctl ngay
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+  when: tuning_sysctl | default({}) | length > 0
+  tags: [sysctl]
+
+- name: Tắt transparent hugepage
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/waap-thp-off.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Disable transparent hugepage
+      After=sysinit.target local-fs.target
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled; echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+      [Install]
+      WantedBy=multi-user.target
+  when: tuning_thp | default('') == 'never'
+  notify: reload systemd
+  tags: [thp]
+
+- name: Bật waap-thp-off
+  ansible.builtin.systemd:
+    name: waap-thp-off
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: tuning_thp | default('') == 'never'
+  tags: [thp]
+
+- name: Thư mục drop-in giới hạn tài nguyên của dịch vụ
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item.key }}.service.d"
+    state: directory
+    mode: "0755"
+  loop: "{{ tuning_limits | default({}) | dict2items }}"
+  tags: [limits]
+
+- name: Drop-in giới hạn (LimitNOFILE, ...)
+  ansible.builtin.template:
+    src: limits.conf.j2
+    dest: "/etc/systemd/system/{{ item.key }}.service.d/20-waap-limits.conf"
+    mode: "0644"
+  loop: "{{ tuning_limits | default({}) | dict2items }}"
+  notify: reload systemd
+  tags: [limits]

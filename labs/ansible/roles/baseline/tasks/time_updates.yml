@@ -1,0 +1,20 @@
+---
+- name: chrony
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    mode: "0644"
+    owner: root
+    group: root
+  notify: restart chrony
+
+- name: Vá bảo mật tự động
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/apt/apt.conf.d/{{ item.dest }}"
+    mode: "0644"
+    owner: root
+    group: root
+  loop:
+    - { src: 20auto-upgrades.j2, dest: 20auto-upgrades }
+    - { src: 52unattended-upgrades-waap.j2, dest: 52unattended-upgrades-waap }

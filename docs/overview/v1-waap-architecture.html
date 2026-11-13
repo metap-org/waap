@@ -123,6 +123,7 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-06-runtime-10-analytics-flows">6.10 Luồng Analytics</a>
 <a class="top" href="#f-07-deployment-00-index">7. Deployment View</a>
 <a class="sub" href="#f-07-deployment-05-capacity-and-sharding">7.5 Ước lượng tải và sharding ở quy mô 1 triệu website</a>
+<a class="sub" href="#f-07-deployment-06-network-zones-and-flows">7.6 Mạng, vùng tin cậy và ma trận luồng</a>
 <a class="top" href="#f-08-cross-cutting-00-index">8. Cross-cutting Concepts</a>
 <a class="sub" href="#f-08-cross-cutting-12-platform-monitoring">8.12 Giám sát nền tảng</a>
 <a class="sub" href="#f-08-cross-cutting-13-operational-behaviors">8.13 Hành vi vận hành</a>
@@ -179,6 +180,10 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-09-adr-0044-realtime-gateway-and-notifier-runtime">ADR-0044: Realtime gateway cho portal và runtime của notifier</a>
 <a class="sub" href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045: Cert node ngắn hạn tự gia hạn, re-enroll credential, thu hồi không dùng CRL</a>
 <a class="sub" href="#f-09-adr-0046-management-database-tenancy-and-storage">ADR-0046: Database của Management: tenant là org, bảng chung, PolicyVersion là tài liệu bất biến</a>
+<a class="sub" href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047: Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet</a>
+<a class="sub" href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048: Chuẩn node chung, hồ sơ theo vai trò, hardening kiểm được</a>
+<a class="sub" href="#f-09-adr-0049-gitops-and-devsecops-per-plane">ADR-0049: GitOps và DevSecOps cho từng plane, chuỗi cung ứng có ký và kiểm chính sách</a>
+<a class="sub" href="#f-09-adr-0050-secret-management-and-rotation">ADR-0050: Secret manager duy nhất, cấp secret ngắn hạn, xoay tự động theo loại</a>
 <a class="top" href="#f-10-quality-00-index">10. Quality Requirements</a>
 <a class="top" href="#f-11-risks-00-index">11. Risks and Technical Debt</a>
 <a class="top" href="#f-12-glossary-00-index">12. Glossary</a>
@@ -218,6 +223,7 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-06-runtime-10-analytics-flows">6.10 Luồng Analytics</a>
 <a class="top" href="#f-07-deployment-00-index">7. Deployment View</a>
 <a class="sub" href="#f-07-deployment-05-capacity-and-sharding">7.5 Ước lượng tải và sharding ở quy mô 1 triệu website</a>
+<a class="sub" href="#f-07-deployment-06-network-zones-and-flows">7.6 Mạng, vùng tin cậy và ma trận luồng</a>
 <a class="top" href="#f-08-cross-cutting-00-index">8. Cross-cutting Concepts</a>
 <a class="sub" href="#f-08-cross-cutting-12-platform-monitoring">8.12 Giám sát nền tảng</a>
 <a class="sub" href="#f-08-cross-cutting-13-operational-behaviors">8.13 Hành vi vận hành</a>
@@ -274,6 +280,10 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-09-adr-0044-realtime-gateway-and-notifier-runtime">ADR-0044: Realtime gateway cho portal và runtime của notifier</a>
 <a class="sub" href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045: Cert node ngắn hạn tự gia hạn, re-enroll credential, thu hồi không dùng CRL</a>
 <a class="sub" href="#f-09-adr-0046-management-database-tenancy-and-storage">ADR-0046: Database của Management: tenant là org, bảng chung, PolicyVersion là tài liệu bất biến</a>
+<a class="sub" href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047: Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet</a>
+<a class="sub" href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048: Chuẩn node chung, hồ sơ theo vai trò, hardening kiểm được</a>
+<a class="sub" href="#f-09-adr-0049-gitops-and-devsecops-per-plane">ADR-0049: GitOps và DevSecOps cho từng plane, chuỗi cung ứng có ký và kiểm chính sách</a>
+<a class="sub" href="#f-09-adr-0050-secret-management-and-rotation">ADR-0050: Secret manager duy nhất, cấp secret ngắn hạn, xoay tự động theo loại</a>
 <a class="top" href="#f-10-quality-00-index">10. Quality Requirements</a>
 <a class="top" href="#f-11-risks-00-index">11. Risks and Technical Debt</a>
 <a class="top" href="#f-12-glossary-00-index">12. Glossary</a>
@@ -7406,7 +7416,7 @@ prefix trong object storage, xoá đích export; ghi biên bản xoá vào audit
 </table>
 </section>
 <section class="doc" id="f-07-deployment-00-index"><div class="path">07-deployment/00-index.md</div><h1 id="f-07-deployment-00-index--7-deployment-view">7. Deployment View</h1>
-<p>Ước lượng tải, số node và sharding ở quy mô 1 triệu zone: <a href="#f-07-deployment-05-capacity-and-sharding">7.5</a>.</p>
+<p>Ước lượng tải, số node và sharding ở quy mô 1 triệu zone: <a href="#f-07-deployment-05-capacity-and-sharding">7.5</a>. Mạng, vùng tin cậy và ma trận luồng (đề xuất): <a href="#f-07-deployment-06-network-zones-and-flows">7.6</a>.</p>
 <h2 id="f-07-deployment-00-index--71-ba-mô-hình-triển-khai">7.1 Ba mô hình triển khai</h2>
 <p>Cùng các plane, khác chỗ đặt (<a href="#f-09-adr-0006-saas-first-on-prem-capable">ADR-0006</a>).</p>
 <table>
@@ -8123,6 +8133,920 @@ profile chuẩn cùng danh sách rule tắt, gắn cờ <code>waf_profile_fallba
 <tr>
 <td>Cổng tuỳ ý, giao thức không phải HTTP</td>
 <td>Sản phẩm proxy L4 riêng (Mở rộng) với VIP riêng cho zone; không đi qua pipeline WAF</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="doc" id="f-07-deployment-06-network-zones-and-flows"><div class="path">07-deployment/06-network-zones-and-flows.md</div><h1 id="f-07-deployment-06-network-zones-and-flows--76-mạng-vùng-tin-cậy-và-ma-trận-luồng">7.6 Mạng, vùng tin cậy và ma trận luồng</h1>
+<blockquote>
+<p><strong>Trạng thái: đề xuất của Claude, chờ chủ dự án duyệt (2026-11-13).</strong> Chủ dự án đã chốt lab chạy trên <strong>máy ảo</strong>
+và yêu cầu <strong>chia vùng mạng hợp lý</strong>; thiết kế dưới đây là câu trả lời cho yêu cầu đó, nằm trong bước 0 của
+<a href="../../../labs/PLAN.md" target="_blank" rel="noopener">kế hoạch lab</a>. Quyết định kèm theo: <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>; chuẩn node <a href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048</a>, GitOps <a href="#f-09-adr-0049-gitops-and-devsecops-per-plane">ADR-0049</a>, secret <a href="#f-09-adr-0050-secret-management-and-rotation">ADR-0050</a>.
+Các số (dải IP, số máy) là mặc định để dựng lab, đổi được. Các luồng giữa plane lấy từ
+<a href="#f-05-building-blocks-05-contracts">5.5</a>, <a href="#f-05-building-blocks-08-components-06-rollout-distribution-fleet">5.8.6</a>,
+<a href="#f-08-cross-cutting-19-node-identity-and-mtls">8.19</a>, không bịa thêm luồng nào.</p>
+</blockquote>
+<h2 id="f-07-deployment-06-network-zones-and-flows--1-nguyên-tắc">1. Nguyên tắc</h2>
+<ol>
+<li><strong>Mặc định chặn tất cả.</strong> Mỗi luồng được phép là một dòng trong <a href="#f-07-deployment-06-network-zones-and-flows--4-ma-trận-luồng">ma trận ở §4</a>. Không có dòng thì không có đường.</li>
+<li><strong>Edge không với tới thứ gì ngoài cổng của nó.</strong> Edge chỉ đi <strong>ra</strong> cổng edge ở vùng biên (Control, ingest). Không có đường từ edge tới
+Management, dữ liệu, secret hay vận hành (<a href="#f-09-adr-0001-four-planes">ADR-0001</a>; quy tắc &quot;edge không nói chuyện trực tiếp với Management&quot;).</li>
+<li><strong>OpenBao không lộ ra mạng edge.</strong> Node xin cert qua node identity service ở Control, dịch vụ này mới nhờ OpenBao ký
+(<a href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045</a>).</li>
+<li><strong>Không có đường ra Internet trực tiếp</strong> từ vùng ứng dụng, dữ liệu, secret. Mọi egress đi qua một máy egress có allowlist (cũng là nơi áp
+SSRF guard cho webhook của khách). Ngoại lệ duy nhất: <code>edge-l7</code> đi tới origin của khách.</li>
+<li><strong>Ba lớp chặn chồng nhau:</strong> firewall giữa các vùng, firewall trên từng máy, NetworkPolicy trong K8s. Một lớp sai không đủ để mở đường.</li>
+<li><strong>mTLS cho mọi liên kết nội bộ</strong> (cert ngắn hạn, 8.19); không tin địa chỉ IP làm danh tính.</li>
+<li><strong>Quản trị chỉ qua bastion</strong> (WireGuard cộng MFA), có ghi phiên. Không SSH trực tiếp từ ngoài.</li>
+</ol>
+<h2 id="f-07-deployment-06-network-zones-and-flows--2-vùng-tin-cậy">2. Vùng tin cậy</h2>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>VLAN, dải IP đề xuất</th>
+<th>Chứa</th>
+<th>Mức tin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Z0 Internet (giả lập)</strong></td>
+<td><code>10.10.0.0/24</code></td>
+<td><code>loadgen</code>, <code>origin</code> giả, người dùng cuối, DNS bên ngoài (<code>dns-mock</code>)</td>
+<td>Không tin</td>
+</tr>
+<tr>
+<td><strong>Z1 Edge DMZ</strong></td>
+<td><code>10.10.10.0/24</code></td>
+<td><code>edge-l7</code>, <code>edge-waf</code>, <code>dns-1</code>, <code>valkey-edge</code></td>
+<td>Thấp: nhận traffic công khai, coi như có thể bị chiếm</td>
+</tr>
+<tr>
+<td><strong>Z2 Biên (perimeter)</strong></td>
+<td><code>10.10.20.0/24</code></td>
+<td><code>ingress-1</code> (portal, API), <code>egw-1</code> (cổng edge: relay, đầu mTLS), <code>egress-1</code> (đường ra có allowlist)</td>
+<td>Trung bình: chỉ chuyển tiếp, không chứa dữ liệu</td>
+</tr>
+<tr>
+<td><strong>Z3 Ứng dụng nội bộ</strong></td>
+<td><code>10.10.30.0/24</code></td>
+<td>K8s control-plane và worker (Management, Control, Analytics)</td>
+<td>Cao</td>
+</tr>
+<tr>
+<td><strong>Z4 Dữ liệu</strong></td>
+<td><code>10.10.40.0/24</code></td>
+<td>Postgres, ClickHouse, Kafka, RabbitMQ, Valkey (trung tâm), object storage</td>
+<td>Rất cao</td>
+</tr>
+<tr>
+<td><strong>Z5 Secret</strong></td>
+<td><code>10.10.50.0/24</code></td>
+<td>OpenBao (3 node Raft)</td>
+<td>Cao nhất</td>
+</tr>
+<tr>
+<td><strong>Z6 Vận hành</strong></td>
+<td><code>10.10.60.0/24</code></td>
+<td><code>bastion</code>, <code>ci-runner</code>, <code>registry</code>, <code>infra</code> (NTP, DNS nội bộ), <code>obs</code> (giám sát)</td>
+<td>Cao</td>
+</tr>
+<tr>
+<td><strong>Z7 Hypervisor</strong></td>
+<td>mạng out-of-band riêng</td>
+<td>Giao diện quản lý hypervisor, firewall</td>
+<td>Không gắn vào VM nào khác</td>
+</tr>
+</tbody>
+</table>
+<p>Một máy ảo <code>fw-1</code> (nftables hoặc VyOS) là <strong>bộ định tuyến L3 duy nhất</strong> giữa các vùng; mỗi vùng là một VLAN riêng, không có card mạng thứ hai trên VM
+nào để lách qua.</p>
+<h2 id="f-07-deployment-06-network-zones-and-flows--3-sơ-đồ">3. Sơ đồ</h2>
+<div class="diagram"><pre class="mermaid">flowchart TB
+    subgraph z0[&quot;Z0 Internet (giả lập)&quot;]
+        user[&quot;Người dùng cuối, loadgen&quot;]
+        org[&quot;Origin của khách&quot;]
+        admin[&quot;Quản trị viên&quot;]
+    end
+    subgraph z1[&quot;Z1 Edge DMZ&quot;]
+        l7[&quot;edge-l7&quot;]
+        waf[&quot;edge-waf&quot;]
+        vk[&quot;valkey-edge&quot;]
+    end
+    subgraph z2[&quot;Z2 Biên&quot;]
+        ing[&quot;ingress-1&quot;]
+        egw[&quot;egw-1&quot;]
+        egr[&quot;egress-1&quot;]
+    end
+    subgraph z3[&quot;Z3 Ứng dụng nội bộ (K8s)&quot;]
+        mg[&quot;Management&quot;]
+        ct[&quot;Control&quot;]
+        an[&quot;Analytics&quot;]
+    end
+    subgraph z4[&quot;Z4 Dữ liệu&quot;]
+        db[(&quot;Postgres, ClickHouse, Kafka, MQ&quot;)]
+    end
+    subgraph z5[&quot;Z5 Secret&quot;]
+        bao[&quot;OpenBao&quot;]
+    end
+    subgraph z6[&quot;Z6 Vận hành&quot;]
+        bas[&quot;bastion&quot;]
+        ci[&quot;ci-runner, registry, obs, infra&quot;]
+    end
+    user --&gt;|80/443| l7
+    user --&gt;|443| ing
+    l7 --&gt;|gRPC| waf
+    l7 --&gt; vk
+    l7 --&gt;|đến origin| org
+    l7 --&gt;|&quot;mTLS 443: snapshot, node ID, log&quot;| egw
+    ing --&gt; mg
+    egw --&gt; ct
+    egw --&gt; an
+    mg --&gt; db
+    ct --&gt; db
+    an --&gt; db
+    mg --&gt;|8200| bao
+    ct --&gt;|8200| bao
+    mg &amp; ct &amp; an --&gt;|egress allowlist| egr
+    admin --&gt;|WireGuard| bas
+    bas --&gt;|SSH| z1
+    bas --&gt;|SSH| z3
+    bas --&gt;|SSH| z4
+    bas --&gt;|SSH| z5
+</pre></div>
+<p>Hướng mũi tên là hướng khởi tạo kết nối. Mọi mũi tên nối edge đều đi <strong>từ</strong> edge ra; chiều ngược lại không có.</p>
+<h2 id="f-07-deployment-06-network-zones-and-flows--4-ma-trận-luồng">4. Ma trận luồng</h2>
+<p>Mỗi dòng là một luồng được phép. Cột <strong>Khởi tạo</strong> cho biết bên nào mở kết nối; chiều trả lời của cùng kết nối tự động được phép (stateful), không thêm dòng.
+Cổng là mặc định, có thể đổi.</p>
+<h3 id="f-07-deployment-06-network-zones-and-flows--41-từ-internet">4.1 Từ Internet</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Cổng, giao thức</th>
+<th>Xác thực</th>
+<th>Mục đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N01</td>
+<td>Z0</td>
+<td><code>ingress-1</code> (Z2)</td>
+<td>443/TCP</td>
+<td>TLS; người dùng xác thực ở ứng dụng</td>
+<td>Portal, public API, GraphQL</td>
+</tr>
+<tr>
+<td>N02</td>
+<td>Z0</td>
+<td><code>edge-l7</code> (Z1)</td>
+<td>80, 443/TCP; 443/UDP (QUIC)</td>
+<td>TLS theo SNI</td>
+<td>Traffic của khách (đường được bảo vệ)</td>
+</tr>
+<tr>
+<td>N03</td>
+<td>Z0</td>
+<td><code>dns-1</code> (Z1)</td>
+<td>53/UDP, 53/TCP</td>
+<td>—</td>
+<td>DNS điều hướng (<a href="#f-05-building-blocks-08-components-03-dns-and-traffic-steering">5.8.3</a>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-07-deployment-06-network-zones-and-flows--42-edge-đi-ra">4.2 Edge đi ra</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Cổng, giao thức</th>
+<th>Xác thực</th>
+<th>Mục đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N10</td>
+<td><code>edge-l7</code></td>
+<td><code>edge-waf</code> (Z1)</td>
+<td>9443/TCP gRPC</td>
+<td>mTLS</td>
+<td>Inspection API (<a href="#f-05-building-blocks-05-contracts">5.5</a>)</td>
+</tr>
+<tr>
+<td>N11</td>
+<td><code>edge-l7</code></td>
+<td><code>valkey-edge</code> (Z1)</td>
+<td>6379/TCP TLS</td>
+<td>mTLS</td>
+<td>Đồng bộ rate limit (<a href="#f-09-adr-0021-valkey-for-hot-key-rate-limit-sync">ADR-0021</a>)</td>
+</tr>
+<tr>
+<td>N12</td>
+<td><code>edge-l7</code></td>
+<td>Origin của khách (Z0)</td>
+<td>80, 443 và cổng khách khai</td>
+<td>TLS + cert client của Origin CA</td>
+<td>Proxy tới origin. <strong>Chỉ <code>edge-l7</code> có đường ra Internet</strong></td>
+</tr>
+<tr>
+<td>N05</td>
+<td>edge-*</td>
+<td><code>egw-1</code> (Z2)</td>
+<td>443/TCP</td>
+<td>mTLS cert node</td>
+<td>Stream Distribution (<code>DesiredState</code>, <code>Ack</code>, <code>NodeStatus</code>)</td>
+</tr>
+<tr>
+<td>N06</td>
+<td>edge-*</td>
+<td><code>egw-1</code></td>
+<td>443/TCP</td>
+<td>mTLS cert node</td>
+<td>Kéo snapshot, bundle, cert từ relay</td>
+</tr>
+<tr>
+<td>N07</td>
+<td>edge-*</td>
+<td><code>egw-1</code></td>
+<td>443/TCP</td>
+<td>Bootstrap token (lần đầu) rồi mTLS</td>
+<td>Node identity: xin và gia hạn cert 24 h</td>
+</tr>
+<tr>
+<td>N08</td>
+<td>edge-*</td>
+<td><code>egw-1</code></td>
+<td>443/TCP</td>
+<td>mTLS cert node</td>
+<td>Telemetry: Vector gửi security event, access log, usage</td>
+</tr>
+</tbody>
+</table>
+<p>Cả bốn luồng N05 đến N08 dùng chung cổng 443 và tách theo SNI hoặc đường dẫn ở <code>egw-1</code>; <code>egw-1</code> chỉ chuyển tiếp, không giữ dữ liệu.</p>
+<h3 id="f-07-deployment-06-network-zones-and-flows--43-biên-tới-trong">4.3 Biên tới trong</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Cổng, giao thức</th>
+<th>Xác thực</th>
+<th>Mục đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N04</td>
+<td><code>ingress-1</code></td>
+<td>Management (Z3)</td>
+<td>443/TCP</td>
+<td>mTLS</td>
+<td>Chuyển tiếp portal, API</td>
+</tr>
+<tr>
+<td>N09</td>
+<td><code>egw-1</code></td>
+<td>Control: distribution, node identity (Z3); Analytics: ingest gateway (Z3)</td>
+<td>443/TCP</td>
+<td>mTLS</td>
+<td>Chuyển luồng N05 đến N08 vào đúng dịch vụ</td>
+</tr>
+<tr>
+<td>N21</td>
+<td>Z3</td>
+<td><code>egress-1</code> (Z2)</td>
+<td>3128/TCP</td>
+<td>mTLS</td>
+<td>Mọi egress của ứng dụng: webhook của khách, SMTP, ACME, DoH, Git, registry công khai</td>
+</tr>
+<tr>
+<td>N22</td>
+<td><code>egress-1</code></td>
+<td>Internet (Z0)</td>
+<td>80, 443, 587</td>
+<td>Allowlist theo đích</td>
+<td>Cho phép đích đã khai; chặn dải nội bộ và metadata cloud</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-07-deployment-06-network-zones-and-flows--44-ứng-dụng-tới-dữ-liệu-và-secret">4.4 Ứng dụng tới dữ liệu và secret</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Cổng, giao thức</th>
+<th>Xác thực</th>
+<th>Mục đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N14</td>
+<td>Z3</td>
+<td>Postgres (Z4)</td>
+<td>5432/TCP</td>
+<td>mTLS cộng tài khoản theo dịch vụ</td>
+<td>Management, Control lưu trạng thái</td>
+</tr>
+<tr>
+<td>N15</td>
+<td>Z3</td>
+<td>RabbitMQ (Z4)</td>
+<td>5671/TCP</td>
+<td>mTLS</td>
+<td>Sự kiện điều khiển (<a href="#f-09-adr-0022-rabbitmq-for-control-events-kafka-for-telemetry">ADR-0022</a>)</td>
+</tr>
+<tr>
+<td>N16</td>
+<td>Z3</td>
+<td>Kafka (Z4)</td>
+<td>9093/TCP</td>
+<td>mTLS</td>
+<td>Telemetry (<a href="#f-09-adr-0018-kafka-as-telemetry-bus">ADR-0018</a>)</td>
+</tr>
+<tr>
+<td>N17</td>
+<td>Z3</td>
+<td>ClickHouse (Z4)</td>
+<td>8443, 9440/TCP</td>
+<td>mTLS</td>
+<td>Analytics (<a href="#f-09-adr-0020-clickhouse-and-parquet-for-analytics">ADR-0020</a>)</td>
+</tr>
+<tr>
+<td>N18</td>
+<td>Z3</td>
+<td>Valkey trung tâm, object storage (Z4)</td>
+<td>6379, 443/TCP</td>
+<td>mTLS</td>
+<td>Cache, hot key, artifact, báo cáo</td>
+</tr>
+<tr>
+<td>N19</td>
+<td>Z3</td>
+<td>OpenBao (Z5)</td>
+<td>8200/TCP</td>
+<td>mTLS cộng xác thực K8s</td>
+<td>Ký cert dịch vụ, khoá ký manifest, secret ứng dụng (<a href="#f-09-adr-0017-openbao-for-signing-keys-and-node-pki">ADR-0017</a>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-07-deployment-06-network-zones-and-flows--45-trong-cùng-vùng">4.5 Trong cùng vùng</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Cổng</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N20</td>
+<td>OpenBao ↔ OpenBao</td>
+<td>8200, 8201/TCP</td>
+<td>Raft, mTLS</td>
+<td></td>
+</tr>
+<tr>
+<td>N23</td>
+<td>Postgres chính → dự phòng</td>
+<td>5432/TCP</td>
+<td>Sao chép; Kafka, ClickHouse tương tự</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-07-deployment-06-network-zones-and-flows--46-vận-hành">4.6 Vận hành</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Cổng, giao thức</th>
+<th>Xác thực</th>
+<th>Mục đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N24</td>
+<td>Quản trị viên (Z0)</td>
+<td><code>bastion</code> (Z6)</td>
+<td>51820/UDP WireGuard</td>
+<td>Khoá WireGuard cộng MFA</td>
+<td>Cửa vào quản trị duy nhất</td>
+</tr>
+<tr>
+<td>N25</td>
+<td><code>bastion</code></td>
+<td>Mọi VM (Z1 đến Z6)</td>
+<td>22/TCP</td>
+<td>Cert SSH ngắn hạn do OpenBao ký, ghi phiên</td>
+<td>Quản trị, Ansible</td>
+</tr>
+<tr>
+<td>N26</td>
+<td><code>obs</code></td>
+<td>Mọi VM, K8s</td>
+<td>9100, 9090 và cổng metric</td>
+<td>mTLS</td>
+<td>Giám sát độc lập (<a href="#f-09-adr-0029-independent-platform-observability">ADR-0029</a>); <code>obs</code> kéo, không ai đẩy vào</td>
+</tr>
+<tr>
+<td>N27</td>
+<td>Mọi VM</td>
+<td><code>infra</code> (Z6)</td>
+<td>123/UDP, 53/UDP</td>
+<td>—</td>
+<td>Đồng bộ giờ, DNS nội bộ</td>
+</tr>
+<tr>
+<td>N28</td>
+<td>Z3, <code>ci-runner</code></td>
+<td><code>registry</code> (Z6)</td>
+<td>443/TCP</td>
+<td>mTLS</td>
+<td>Kéo và đẩy image</td>
+</tr>
+<tr>
+<td>N29</td>
+<td><code>ci-runner</code>, GitOps controller</td>
+<td><code>egress-1</code> (Z2)</td>
+<td>3128/TCP</td>
+<td>mTLS</td>
+<td>Kéo mã từ Git, đẩy artifact ra ngoài khi cần</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-07-deployment-06-network-zones-and-flows--47-cấm-tuyệt-đối-kiểm-bằng-test">4.7 Cấm tuyệt đối (kiểm bằng test)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Từ</th>
+<th>Tới</th>
+<th>Lý do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>X01</td>
+<td>Z1 (mọi edge)</td>
+<td>Z3, Z4, Z5, Z6, Postgres, OpenBao, Management</td>
+<td>Edge chỉ đi ra cổng <code>egw-1</code></td>
+</tr>
+<tr>
+<td>X02</td>
+<td>Z0</td>
+<td>Z3, Z4, Z5, Z6</td>
+<td>Internet chỉ chạm Z1 và <code>ingress-1</code></td>
+</tr>
+<tr>
+<td>X03</td>
+<td>Z2 <code>ingress-1</code></td>
+<td>Z4, Z5</td>
+<td>Ingress chỉ nói với Management</td>
+</tr>
+<tr>
+<td>X04</td>
+<td>Z4, Z5</td>
+<td>Internet, và Z1</td>
+<td>Dữ liệu và secret không có đường ra</td>
+</tr>
+<tr>
+<td>X05</td>
+<td>Z5 OpenBao</td>
+<td>Mọi nơi (không khởi tạo kết nối ra)</td>
+<td>OpenBao chỉ nhận, không gọi</td>
+</tr>
+<tr>
+<td>X06</td>
+<td>Z3, Z4, Z5</td>
+<td>Internet trực tiếp</td>
+<td>Egress duy nhất là <code>egress-1</code></td>
+</tr>
+<tr>
+<td>X07</td>
+<td>Z6 <code>bastion</code></td>
+<td>Truy cập thẳng vào dữ liệu khách</td>
+<td>Bastion chỉ để quản trị hạ tầng, không phải đường đọc dữ liệu</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-07-deployment-06-network-zones-and-flows--5-bố-cục-máy-ảo-theo-vùng">5. Bố cục máy ảo theo vùng</h2>
+<p>Hai cấu hình, cùng một thiết kế mạng. Cấu hình <strong>thu gọn</strong> gộp vai trò để vừa tài nguyên, không đổi quy tắc luồng (vẫn phân biệt theo vùng và cổng).</p>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>Đầy đủ</th>
+<th>Thu gọn</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Z1</td>
+<td><code>edge-l7-1..2</code>, <code>edge-waf-1</code>, <code>dns-1</code>, <code>valkey-edge</code></td>
+<td><code>edge-1</code> (L7 + WAF, cgroup riêng), <code>dns-1</code>, <code>valkey-edge</code> gộp vào <code>edge-1</code></td>
+</tr>
+<tr>
+<td>Z2</td>
+<td><code>ingress-1</code>, <code>egw-1</code>, <code>egress-1</code></td>
+<td>Một máy <code>perimeter-1</code> chạy ba vai trò, firewall máy chủ tách theo cổng</td>
+</tr>
+<tr>
+<td>Z3</td>
+<td><code>k8s-cp-1..3</code>, <code>k8s-wk-1..3</code></td>
+<td>1 control-plane, 2 worker</td>
+</tr>
+<tr>
+<td>Z4</td>
+<td><code>pg-1..2</code>, <code>ch-1</code>, <code>kafka-1</code>, <code>mq-1</code>, <code>s3-1</code></td>
+<td><code>data-1</code> (Postgres, RabbitMQ, Valkey, SeaweedFS), <code>ch-1</code>, <code>kafka-1</code></td>
+</tr>
+<tr>
+<td>Z5</td>
+<td><code>bao-1..3</code></td>
+<td><code>bao-1</code> (một node, không HA)</td>
+</tr>
+<tr>
+<td>Z6</td>
+<td><code>bastion</code>, <code>ci-runner</code>, <code>registry</code>, <code>infra</code>, <code>obs</code></td>
+<td><code>bastion</code>, <code>ops-1</code> (CI, registry, infra, obs)</td>
+</tr>
+<tr>
+<td>Z0</td>
+<td><code>origin</code>, <code>loadgen</code>, <code>dns-mock</code></td>
+<td>Như đầy đủ</td>
+</tr>
+<tr>
+<td>Khác</td>
+<td><code>fw-1</code></td>
+<td><code>fw-1</code></td>
+</tr>
+</tbody>
+</table>
+<p>Đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15.</p>
+<h3 id="f-07-deployment-06-network-zones-and-flows--51-lab-64-gb-profile-compact">5.1 Lab 64 GB (profile <code>compact</code>)</h3>
+<p>Sinh tự động từ <code>labs/infra/profiles/compact.yaml</code> bằng <code>python3 labs/infra/tools/gen_lab.py diagram compact --inject &lt;tệp này&gt;</code>; không sửa tay giữa hai marker.</p>
+<p>&lt;!-- lab-diagram:start --&gt;</p>
+<div class="diagram"><pre class="mermaid">flowchart TB
+  subgraph Z0[&quot;Z0 Internet giả lập&quot;]
+    origin[&quot;origin&lt;br/&gt;0.11 · 512MiB&quot;]
+    loadgen[&quot;loadgen&lt;br/&gt;0.12 · 1GiB&quot;]
+    dns_mock[&quot;dns-mock&lt;br/&gt;0.13 · 512MiB&quot;]
+  end
+  subgraph Z1[&quot;Z1 Edge DMZ · 10.10.10.0/24&quot;]
+    edge_1[&quot;edge-1&lt;br/&gt;10.11 · 3GiB&quot;]
+    dns_1[&quot;dns-1&lt;br/&gt;10.12 · 512MiB&quot;]
+  end
+  subgraph Z2[&quot;Z2 Biên · 10.10.20.0/24&quot;]
+    perimeter_1[&quot;perimeter-1&lt;br/&gt;20.11 · 2GiB&quot;]
+  end
+  subgraph Z3[&quot;Z3 Ứng dụng · 10.10.30.0/24&quot;]
+    k8s_cp_1[&quot;k8s-cp-1&lt;br/&gt;30.11 · 3GiB&quot;]
+    k8s_wk_1[&quot;k8s-wk-1&lt;br/&gt;30.21 · 6GiB&quot;]
+    k8s_wk_2[&quot;k8s-wk-2&lt;br/&gt;30.22 · 6GiB&quot;]
+  end
+  subgraph Z4[&quot;Z4 Dữ liệu · 10.10.40.0/24&quot;]
+    data_1[&quot;data-1&lt;br/&gt;40.11 · 5GiB&quot;]
+    ch_1[&quot;ch-1&lt;br/&gt;40.12 · 4GiB&quot;]
+    kafka_1[&quot;kafka-1&lt;br/&gt;40.13 · 3GiB&quot;]
+  end
+  subgraph Z5[&quot;Z5 Secret · 10.10.50.0/24&quot;]
+    bao_1[&quot;bao-1&lt;br/&gt;50.11 · 1GiB&quot;]
+  end
+  subgraph Z6[&quot;Z6 Vận hành · 10.10.60.0/24&quot;]
+    bastion[&quot;bastion&lt;br/&gt;60.11 · 512MiB&quot;]
+    ops_1[&quot;ops-1&lt;br/&gt;60.12 · 4GiB&quot;]
+  end
+  FW{{&quot;fw-1&lt;br/&gt;nftables, router L3 duy nhất&quot;}}
+  Z0 --- FW
+  Z1 --- FW
+  Z2 --- FW
+  Z3 --- FW
+  Z4 --- FW
+  Z5 --- FW
+  Z6 --- FW
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>Máy</th>
+<th>RAM (GB)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Z0</td>
+<td>origin, loadgen, dns-mock</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>Z1</td>
+<td>edge-1, dns-1</td>
+<td>3.5</td>
+</tr>
+<tr>
+<td>Z2</td>
+<td>perimeter-1</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>Z3</td>
+<td>k8s-cp-1, k8s-wk-1, k8s-wk-2</td>
+<td>15.0</td>
+</tr>
+<tr>
+<td>Z4</td>
+<td>data-1, ch-1, kafka-1</td>
+<td>12.0</td>
+</tr>
+<tr>
+<td>Z5</td>
+<td>bao-1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>Z6</td>
+<td>bastion, ops-1</td>
+<td>4.5</td>
+</tr>
+<tr>
+<td>(router)</td>
+<td>fw-1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td><strong>Tổng VM</strong></td>
+<td>16 máy</td>
+<td><strong>41.0</strong></td>
+</tr>
+<tr>
+<td>Dự trữ máy chủ</td>
+<td>hệ điều hành, Incus, đệm đĩa</td>
+<td>8 (ước lượng)</td>
+</tr>
+<tr>
+<td><strong>Cần</strong></td>
+<td></td>
+<td><strong>49.0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Đĩa cấp phát tối đa khoảng 398 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
+&lt;!-- lab-diagram:end --&gt;</p>
+<h3 id="f-07-deployment-06-network-zones-and-flows--52-lab-128-gb-profile-full-bản-nháp-chờ-review">5.2 Lab 128 GB (profile <code>full</code>, bản nháp chờ review)</h3>
+<p>Sinh tự động từ <code>labs/infra/profiles/full.yaml</code> bằng <code>python3 labs/infra/tools/gen_lab.py diagram full --inject &lt;tệp này&gt; --marker lab-diagram-full</code>; không sửa tay giữa hai marker. Khác <code>compact</code>: hai PoP edge, K8s 3 server (etcd HA) và 3 worker, mã hoá lưu lượng pod bằng WireGuard, OpenBao 3 node, PostgreSQL có node thứ hai, mỗi kho dữ liệu một máy riêng, vùng biên và vùng vận hành tách vai trò. Danh sách thành phần theo máy: <a href="../../../labs/PLACEMENT.full.md" target="_blank" rel="noopener"><code>labs/PLACEMENT.full.md</code></a>.</p>
+<p>&lt;!-- lab-diagram-full:start --&gt;</p>
+<div class="diagram"><pre class="mermaid">flowchart TB
+  subgraph Z0[&quot;Z0 Internet giả lập&quot;]
+    origin[&quot;origin&lt;br/&gt;0.11 · 512MiB&quot;]
+    loadgen[&quot;loadgen&lt;br/&gt;0.12 · 2GiB&quot;]
+    dns_mock[&quot;dns-mock&lt;br/&gt;0.13 · 512MiB&quot;]
+  end
+  subgraph Z1[&quot;Z1 Edge DMZ · 10.10.10.0/24&quot;]
+    edge_l7_1[&quot;edge-l7-1&lt;br/&gt;10.11 · 2GiB&quot;]
+    edge_l7_2[&quot;edge-l7-2&lt;br/&gt;10.12 · 2GiB&quot;]
+    edge_waf_1[&quot;edge-waf-1&lt;br/&gt;10.13 · 2GiB&quot;]
+    dns_1[&quot;dns-1&lt;br/&gt;10.14 · 512MiB&quot;]
+    valkey_edge[&quot;valkey-edge&lt;br/&gt;10.15 · 1GiB&quot;]
+  end
+  subgraph Z2[&quot;Z2 Biên · 10.10.20.0/24&quot;]
+    ingress_1[&quot;ingress-1&lt;br/&gt;20.11 · 1GiB&quot;]
+    egw_1[&quot;egw-1&lt;br/&gt;20.12 · 1GiB&quot;]
+    egress_1[&quot;egress-1&lt;br/&gt;20.13 · 1GiB&quot;]
+  end
+  subgraph Z3[&quot;Z3 Ứng dụng · 10.10.30.0/24&quot;]
+    k8s_cp_1[&quot;k8s-cp-1&lt;br/&gt;30.11 · 4GiB&quot;]
+    k8s_cp_2[&quot;k8s-cp-2&lt;br/&gt;30.12 · 4GiB&quot;]
+    k8s_cp_3[&quot;k8s-cp-3&lt;br/&gt;30.13 · 4GiB&quot;]
+    k8s_wk_1[&quot;k8s-wk-1&lt;br/&gt;30.21 · 8GiB&quot;]
+    k8s_wk_2[&quot;k8s-wk-2&lt;br/&gt;30.22 · 8GiB&quot;]
+    k8s_wk_3[&quot;k8s-wk-3&lt;br/&gt;30.23 · 8GiB&quot;]
+  end
+  subgraph Z4[&quot;Z4 Dữ liệu · 10.10.40.0/24&quot;]
+    pg_1[&quot;pg-1&lt;br/&gt;40.11 · 6GiB&quot;]
+    pg_2[&quot;pg-2&lt;br/&gt;40.12 · 6GiB&quot;]
+    ch_1[&quot;ch-1&lt;br/&gt;40.13 · 8GiB&quot;]
+    kafka_1[&quot;kafka-1&lt;br/&gt;40.14 · 4GiB&quot;]
+    mq_1[&quot;mq-1&lt;br/&gt;40.15 · 3GiB&quot;]
+    cache_1[&quot;cache-1&lt;br/&gt;40.16 · 1GiB&quot;]
+    s3_1[&quot;s3-1&lt;br/&gt;40.17 · 2GiB&quot;]
+  end
+  subgraph Z5[&quot;Z5 Secret · 10.10.50.0/24&quot;]
+    bao_1[&quot;bao-1&lt;br/&gt;50.11 · 1GiB&quot;]
+    bao_2[&quot;bao-2&lt;br/&gt;50.12 · 1GiB&quot;]
+    bao_3[&quot;bao-3&lt;br/&gt;50.13 · 1GiB&quot;]
+  end
+  subgraph Z6[&quot;Z6 Vận hành · 10.10.60.0/24&quot;]
+    bastion[&quot;bastion&lt;br/&gt;60.11 · 512MiB&quot;]
+    ci_runner[&quot;ci-runner&lt;br/&gt;60.12 · 4GiB&quot;]
+    registry[&quot;registry&lt;br/&gt;60.13 · 2GiB&quot;]
+    infra[&quot;infra&lt;br/&gt;60.14 · 1GiB&quot;]
+    obs[&quot;obs&lt;br/&gt;60.15 · 4GiB&quot;]
+  end
+  FW{{&quot;fw-1&lt;br/&gt;nftables, router L3 duy nhất&quot;}}
+  Z0 --- FW
+  Z1 --- FW
+  Z2 --- FW
+  Z3 --- FW
+  Z4 --- FW
+  Z5 --- FW
+  Z6 --- FW
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>Máy</th>
+<th>RAM (GB)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Z0</td>
+<td>origin, loadgen, dns-mock</td>
+<td>3.0</td>
+</tr>
+<tr>
+<td>Z1</td>
+<td>edge-l7-1, edge-l7-2, edge-waf-1, dns-1, valkey-edge</td>
+<td>7.5</td>
+</tr>
+<tr>
+<td>Z2</td>
+<td>ingress-1, egw-1, egress-1</td>
+<td>3.0</td>
+</tr>
+<tr>
+<td>Z3</td>
+<td>k8s-cp-1, k8s-cp-2, k8s-cp-3, k8s-wk-1, k8s-wk-2, k8s-wk-3</td>
+<td>36.0</td>
+</tr>
+<tr>
+<td>Z4</td>
+<td>pg-1, pg-2, ch-1, kafka-1, mq-1, cache-1, s3-1</td>
+<td>30.0</td>
+</tr>
+<tr>
+<td>Z5</td>
+<td>bao-1, bao-2, bao-3</td>
+<td>3.0</td>
+</tr>
+<tr>
+<td>Z6</td>
+<td>bastion, ci-runner, registry, infra, obs</td>
+<td>11.5</td>
+</tr>
+<tr>
+<td>(router)</td>
+<td>fw-1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td><strong>Tổng VM</strong></td>
+<td>33 máy</td>
+<td><strong>95.0</strong></td>
+</tr>
+<tr>
+<td>Dự trữ máy chủ</td>
+<td>hệ điều hành, Incus, đệm đĩa</td>
+<td>8 (ước lượng)</td>
+</tr>
+<tr>
+<td><strong>Cần</strong></td>
+<td></td>
+<td><strong>103.0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Đĩa cấp phát tối đa khoảng 768 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
+&lt;!-- lab-diagram-full:end --&gt;</p>
+<p><strong>Chọn theo RAM của máy chủ lab</strong> (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến <code>profile</code>, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:</p>
+<table>
+<thead>
+<tr>
+<th>RAM máy chủ</th>
+<th>Profile</th>
+<th>Máy</th>
+<th>RAM lab cần (ước lượng)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>16 GB</td>
+<td><code>core</code></td>
+<td>khoảng 8</td>
+<td>khoảng 10 GB; bỏ Kafka và ClickHouse thật</td>
+</tr>
+<tr>
+<td>32 GB</td>
+<td><code>min</code></td>
+<td>khoảng 10</td>
+<td>khoảng 24 GB; bốn plane thu nhỏ, đủ các vùng mạng</td>
+</tr>
+<tr>
+<td><strong>64 GB</strong></td>
+<td><code>compact</code></td>
+<td>khoảng 15</td>
+<td>khoảng 48 GB; HA nhẹ (K8s ba node)</td>
+</tr>
+<tr>
+<td><strong>128 GB</strong></td>
+<td><code>full</code></td>
+<td>33</td>
+<td>khoảng 95 GB cho VM (cần khoảng 103 GB tính cả máy chủ); hai PoP giả, K8s (3 server, etcd HA, mã hoá lưu lượng pod) và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật</td>
+</tr>
+</tbody>
+</table>
+<p>Chủ dự án dự kiến nâng máy lên 64 đến 128 GB RAM: bắt đầu bằng profile nhỏ, chuyển lên <code>compact</code> rồi <code>full</code> khi có máy. Với máy 64 đến 128 GB nên dùng <strong>một máy Linux riêng</strong> làm máy chủ lab (Incus chạy trực tiếp, không lồng trong máy ảo khác): lab chạy nhanh hơn, và có card mạng thật để thử tinh chỉnh edge (RSS, IRQ affinity) mà máy ảo lồng không thử được. CPU từ 16 nhân, NVMe từ 1 TB.</p>
+<p>Máy dự tính hiện nay là Windows 64 GB, SSD 4 TB, lab bật mới chạy: dùng profile <code>compact</code>. Đề xuất bắt đầu bằng một máy ảo Ubuntu 24.04 trên Hyper-V (bật nested virtualization) chạy Incus; nếu sau này thử edge cần card mạng thật thì chuyển sang Linux native, mã lab không đổi. Vì lab không chạy liên tục nên cần lệnh bật và tắt theo thứ tự (Secret, Data, Internal, Perimeter, Edge), snapshot trước khi tắt, và OpenBao tự unseal sau khi bật (chỉ trong lab, khóa unseal để trong tệp của lab; production giữ Shamir 5/3 theo ADR-0050). Đề xuất của Claude, chờ duyệt.</p>
+<h2 id="f-07-deployment-06-network-zones-and-flows--6-kiểm-thử-mạng">6. Kiểm thử mạng</h2>
+<p>Mỗi dòng ở §4.7 thành một test tự động chạy trong CI của lab (cả hai chiều: bị chặn ở firewall vùng <strong>và</strong> ở firewall máy chủ):</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Cách kiểm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T01</td>
+<td>Từ <code>edge-l7</code>, thử kết nối Postgres, OpenBao, <code>k8s-wk</code>, <code>bastion</code>: phải bị từ chối hoặc hết thời gian</td>
+</tr>
+<tr>
+<td>T02</td>
+<td>Từ <code>loadgen</code>, quét cổng toàn dải Z3 đến Z6: không cổng nào mở</td>
+</tr>
+<tr>
+<td>T03</td>
+<td>Từ <code>ingress-1</code>, thử tới Z4 và Z5: bị chặn</td>
+</tr>
+<tr>
+<td>T04</td>
+<td>Từ OpenBao, thử mở kết nối ra: bị chặn</td>
+</tr>
+<tr>
+<td>T05</td>
+<td>Từ pod ứng dụng, thử <code>curl</code> thẳng Internet và địa chỉ metadata: bị chặn; qua <code>egress-1</code> tới đích đã khai thì thông, tới đích chưa khai thì bị chặn</td>
+</tr>
+<tr>
+<td>T06</td>
+<td>Một cert node đã hết hạn hoặc bị thu hồi không dựng được kết nối ở <code>egw-1</code></td>
+</tr>
+<tr>
+<td>T07</td>
+<td>Ma trận §4 so với luật firewall thật: mọi luật có dòng ma trận, mọi dòng ma trận có luật (kiểm hai chiều bằng script, không so bằng mắt)</td>
+</tr>
+<tr>
+<td>T08</td>
+<td>NetworkPolicy: pod Management không nói được với pod Analytics ngoài đường đã khai</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-07-deployment-06-network-zones-and-flows--7-điểm-còn-mở">7. Điểm còn mở</h2>
+<ul>
+<li><strong>Mâu thuẫn nội bộ bộ sinh luật tìm ra (2026-11-13), chờ chủ dự án chọn:</strong> N27 (mọi VM dùng NTP, DNS ở <code>infra</code>) đụng X01, X05, X02; N24 (WireGuard Z0 vào <code>bastion</code>) đụng X02. Chi tiết và hai hướng giải ở <a href="../../../labs/infra/README.md" target="_blank" rel="noopener">labs/infra/README.md</a>.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Câu</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nền ảo hoá và firewall</td>
+<td>Chủ dự án chốt &quot;máy ảo&quot;; chưa chốt hypervisor (Proxmox, KVM trần, VMware) hay <code>fw-1</code> dùng nftables hay VyOS. Đề xuất: KVM/Proxmox và nftables cho dễ đưa vào mã</td>
+</tr>
+<tr>
+<td>Mesh dịch vụ hay mTLS trực tiếp</td>
+<td>Đề xuất mTLS trực tiếp bằng cert-manager (đã định ở 8.19), chưa thêm mesh</td>
+</tr>
+<tr>
+<td>IPv6</td>
+<td>Đề xuất bỏ qua ở lab, thêm sau khi có yêu cầu</td>
+</tr>
+<tr>
+<td>Mạng edge thật</td>
+<td>PoP thật có thể ở hạ tầng đối tác: vùng Z1 thay bằng đường mTLS ra <code>egw-1</code> qua Internet; lab mô phỏng bằng VLAN</td>
 </tr>
 </tbody>
 </table>
@@ -12481,6 +13405,26 @@ cân nhắc. Quyết định bị thay thế giữ lại với trạng thái &qu
 <td>Database Management: tenant = org, bảng chung + database riêng cho Enterprise, PolicyVersion là tài liệu bất biến, registry toàn cục, bảng partition</td>
 <td>Chấp nhận</td>
 </tr>
+<tr>
+<td><a href="#f-09-adr-0047-network-zones-and-default-deny">0047</a></td>
+<td>Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet; lab trên máy ảo</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
+<tr>
+<td><a href="#f-09-adr-0048-node-baseline-and-hardening-profiles">0048</a></td>
+<td>Chuẩn node chung: Ubuntu 24.04 LTS, role Ansible <code>baseline</code> cộng 7 hồ sơ theo vai trò, hardening CIS kiểm được</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
+<tr>
+<td><a href="#f-09-adr-0049-gitops-and-devsecops-per-plane">0049</a></td>
+<td>GitOps (Argo CD, repo triển khai riêng) và DevSecOps từng plane: quét secret, license, SBOM, quét và ký image, kiểm chính sách; OpenTofu thay Terraform</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
+<tr>
+<td><a href="#f-09-adr-0050-secret-management-and-rotation">0050</a></td>
+<td>OpenBao là secret manager duy nhất, secret động ngắn hạn, bảng xoay theo 12 loại, unseal Shamir ở lab</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
 </tbody>
 </table>
 <p>Quyết định đang chờ: xem <a href="#f-11-risks-00-index--113-quyết-định-còn-mở">11. Risks and Technical Debt</a>.</p>
@@ -14775,6 +15719,539 @@ catalog, autovacuum và migration không chịu nổi.</li>
 hàng chục lần số dòng và compiler phải ghép lại thành tài liệu.</li>
 <li><strong>Shard PostgreSQL (Citus) theo tenant:</strong> chưa cần ở 200–400 GB dữ liệu nóng và vài trăm ghi mỗi giây;
 giữ làm hướng khi số liệu thật vượt.</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0047-network-zones-and-default-deny"><div class="path">09-adr/0047-network-zones-and-default-deny.md</div><h1 id="f-09-adr-0047-network-zones-and-default-deny--adr-0047-phân-vùng-mạng-theo-mức-tin-mặc-định-chặn-một-cổng-cho-edge-một-đường-ra-internet">ADR-0047: Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0001-four-planes">ADR-0001</a>, <a href="#f-09-adr-0006-saas-first-on-prem-capable">ADR-0006</a>, <a href="#f-09-adr-0017-openbao-for-signing-keys-and-node-pki">ADR-0017</a>, <a href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045</a>, <a href="#f-07-deployment-06-network-zones-and-flows">7.6</a></li>
+</ul>
+<h2 id="f-09-adr-0047-network-zones-and-default-deny--bối-cảnh">Bối cảnh</h2>
+<p>Lab bốn plane chạy trên máy ảo và cần một thiết kế mạng cô lập, an toàn, dùng được cho production sau này. Ràng buộc đã có:</p>
+<ul>
+<li>edge không nói chuyện trực tiếp với Management; kết nối đi từ edge ra (ADR-0001, ADR-0006);</li>
+<li>OpenBao không lộ ra mạng edge; node xin cert qua node identity service (ADR-0045);</li>
+<li>edge nhận traffic công khai, phải coi như có thể bị chiếm;</li>
+<li>webhook do khách khai là một đường SSRF nếu ứng dụng ra Internet tự do.</li>
+</ul>
+<h2 id="f-09-adr-0047-network-zones-and-default-deny--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>Tám vùng</strong> theo mức tin: Internet, Edge DMZ, Biên, Ứng dụng nội bộ, Dữ liệu, Secret, Vận hành, hypervisor (<a href="#f-07-deployment-06-network-zones-and-flows--2-vùng-tin-cậy">7.6 §2</a>).</li>
+<li><strong>Mặc định chặn tất cả</strong>; mỗi luồng là một dòng trong ma trận luồng; ma trận và luật firewall được kiểm khớp nhau bằng script.</li>
+<li><strong>Một bộ định tuyến L3 duy nhất</strong> giữa các vùng; mỗi VM chỉ có một card mạng.</li>
+<li><strong>Edge chỉ đi ra một cổng:</strong> <code>egw-1</code> ở vùng Biên, chuyển tiếp mTLS vào Control và ingest; không có đường từ edge tới dữ liệu, secret, vận hành hay Management.</li>
+<li><strong>Một đường ra Internet cho ứng dụng:</strong> máy <code>egress-1</code> có allowlist, cũng là nơi áp SSRF guard; ngoại lệ duy nhất là <code>edge-l7</code> tới origin của khách.</li>
+<li><strong>Quản trị chỉ qua bastion</strong> (WireGuard, MFA, cert SSH ngắn hạn của OpenBao, ghi phiên).</li>
+<li><strong>Ba lớp chặn</strong> chồng nhau: firewall vùng, firewall máy chủ, NetworkPolicy. mTLS cho mọi liên kết nội bộ.</li>
+</ol>
+<h2 id="f-09-adr-0047-network-zones-and-default-deny--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Ưu</th>
+<th>Nhược</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Vùng theo mức tin (đề xuất)</strong></td>
+<td>Edge bị chiếm không với tới dữ liệu; ma trận kiểm được; ánh xạ thẳng sang production</td>
+<td>Nhiều VLAN và luật; cần bộ định tuyến riêng</td>
+</tr>
+<tr>
+<td>Mạng phẳng, chỉ firewall máy chủ</td>
+<td>Đơn giản nhất</td>
+<td>Một máy bị chiếm thấy cả mạng; luật nằm rải rác, khó kiểm</td>
+</tr>
+<tr>
+<td>Một VLAN cho mỗi plane</td>
+<td>Khớp tên bốn plane</td>
+<td>Plane không cùng mức tin (Control vừa nhận edge vừa nối dữ liệu); không tách được cổng edge khỏi nội bộ</td>
+</tr>
+<tr>
+<td>Service mesh mọi nơi</td>
+<td>Danh tính theo dịch vụ, chính sách theo workload</td>
+<td>Thêm một lớp vận hành; không giải quyết cô lập mức mạng cho node ngoài K8s</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0047-network-zones-and-default-deny--hệ-quả">Hệ quả</h2>
+<ul>
+<li>Lab dựng được bố cục mạng giống production và thử được các tình huống tấn công nội bộ (edge bị chiếm).</li>
+<li>Cần thêm các máy phụ: <code>fw-1</code>, <code>ingress-1</code>, <code>egw-1</code>, <code>egress-1</code>; đã tính trong <a href="#f-07-deployment-06-network-zones-and-flows--5-bố-cục-máy-ảo-theo-vùng">7.6 §5</a>.</li>
+<li><code>egw-1</code> thành điểm nghẽn và điểm lỗi của mọi edge: cần HA ở production; lab có bản thu gọn một máy.</li>
+<li>Đổi số cổng hay thêm luồng thì sửa ma trận trước, rồi luật; không sửa luật trước.</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0048-node-baseline-and-hardening-profiles"><div class="path">09-adr/0048-node-baseline-and-hardening-profiles.md</div><h1 id="f-09-adr-0048-node-baseline-and-hardening-profiles--adr-0048-chuẩn-node-chung-hồ-sơ-theo-vai-trò-hardening-kiểm-được">ADR-0048: Chuẩn node chung, hồ sơ theo vai trò, hardening kiểm được</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0023-kubernetes-for-central-planes-edge-outside">ADR-0023</a>, <a href="#f-09-adr-0024-licensing-policy-for-shipped-components">ADR-0024</a>, <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>, <a href="#f-07-deployment-06-network-zones-and-flows">7.6</a></li>
+</ul>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--bối-cảnh">Bối cảnh</h2>
+<p>Lab và production có nhiều loại máy: node K8s, edge (bare metal hoặc VM), kho dữ liệu, OpenBao, bastion. Chủ dự án yêu cầu các service chạy bare metal hay không đều cần
+bộ cài riêng và chuẩn chung: mạng, hệ điều hành, phần mềm, phân quyền, chia đĩa, hardening đầy đủ. Edge là một binary cộng Vector chạy bằng systemd, nên không phụ thuộc hệ điều hành
+cụ thể (ADR-0023).</p>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>Một hệ điều hành cho mọi node ở lab:</strong> Ubuntu 24.04 LTS. Lý do: có benchmark CIS và nội dung OpenSCAP sẵn, vá bảo mật dài hạn. Artifact edge là binary tĩnh nên không buộc khách dùng cùng bản.</li>
+<li><strong>Một chuẩn nền (<code>baseline</code>) áp cho mọi node</strong>, cộng một <strong>hồ sơ</strong> theo vai trò. Chuẩn nền là một role Ansible duy nhất; hồ sơ là role chồng lên.</li>
+<li><strong>Cấp phát:</strong> image cloud gốc cộng cloud-init (tên máy, CA của SSH, khoá bootstrap) cộng Ansible chạy từ Git. Chưa dùng golden image ở MVP (Packer là BSL, xem ADR-0049).</li>
+<li><strong>Không cấu hình tay trên máy.</strong> Máy lệch chuẩn thì dựng lại, không vá.</li>
+<li><strong>Kiểm được:</strong> mỗi hồ sơ có quét CIS (OpenSCAP) và kiểm trôi (Ansible check mode) chạy định kỳ; kết quả là cổng của giai đoạn P4 (<a href="../../../labs/PLAN.md" target="_blank" rel="noopener">kế hoạch lab</a>).</li>
+</ol>
+<h3 id="f-09-adr-0048-node-baseline-and-hardening-profiles--chuẩn-nền-mọi-node">Chuẩn nền (mọi node)</h3>
+<table>
+<thead>
+<tr>
+<th>Hạng mục</th>
+<th>Quy định</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Truy cập</td>
+<td>SSH chỉ bằng cert ngắn hạn do OpenBao ký, không mật khẩu, không đăng nhập root, chỉ từ <code>bastion</code></td>
+</tr>
+<tr>
+<td>Phân quyền</td>
+<td>Mỗi dịch vụ một user hệ thống không đăng nhập được; <code>sudo</code> chỉ cho nhóm vận hành, có ghi lại; không tài khoản dùng chung</td>
+</tr>
+<tr>
+<td>Phân vùng đĩa</td>
+<td><code>/boot</code>, <code>/</code>, <code>/var</code>, <code>/var/log</code>, <code>/var/log/audit</code>, <code>/tmp</code> (<code>nodev,nosuid,noexec</code>), <code>/home</code> (<code>nodev,nosuid</code>); đĩa dữ liệu riêng theo hồ sơ</td>
+</tr>
+<tr>
+<td>Dịch vụ</td>
+<td>Chỉ gói cần thiết; không trình biên dịch, không công cụ mạng thừa; dịch vụ không dùng bị tắt</td>
+</tr>
+<tr>
+<td>Kernel và mạng</td>
+<td>Bộ <code>sysctl</code> chuẩn (chống giả mạo, chặn chuyển tiếp IP trừ router), tắt IPv6 ở lab, tắt module không dùng, tắt USB và FireWire</td>
+</tr>
+<tr>
+<td>Kiểm soát truy cập bắt buộc</td>
+<td>AppArmor ở chế độ enforce</td>
+</tr>
+<tr>
+<td>Nhật ký và kiểm toán</td>
+<td><code>auditd</code> với bộ luật chuẩn; log hệ điều hành gửi về <code>obs</code> qua Vector; giờ đồng bộ bằng <code>chrony</code> tới <code>infra</code></td>
+</tr>
+<tr>
+<td>Toàn vẹn</td>
+<td>AIDE cho thư mục hệ thống; cảnh báo khi đổi ngoài Ansible</td>
+</tr>
+<tr>
+<td>Cập nhật</td>
+<td>Vá bảo mật tự động, khởi động lại trong khung giờ; node trung tâm vá theo đợt để không mất đồng thời</td>
+</tr>
+<tr>
+<td>Dịch vụ của chúng ta</td>
+<td>Unit systemd: <code>NoNewPrivileges</code>, <code>ProtectSystem=strict</code>, <code>ProtectHome</code>, <code>PrivateTmp</code>, tập capability tối thiểu, <code>MemoryMax</code></td>
+</tr>
+<tr>
+<td>Tường lửa</td>
+<td>nftables mặc định chặn, chỉ mở theo ma trận <a href="#f-07-deployment-06-network-zones-and-flows--4-ma-trận-luồng">7.6 §4</a></td>
+</tr>
+<tr>
+<td>Khởi động</td>
+<td>Secure Boot và TPM khi hạ tầng có; không có thì ghi lại là rủi ro (ADR-0045)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-09-adr-0048-node-baseline-and-hardening-profiles--hồ-sơ-theo-vai-trò">Hồ sơ theo vai trò</h3>
+<table>
+<thead>
+<tr>
+<th>Hồ sơ</th>
+<th>Dùng cho</th>
+<th>Khác biệt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>k8s-node</code></td>
+<td>Control-plane, worker K8s</td>
+<td>Kubelet đã khoá, đọc-only trên port kubelet, tắt anonymous auth; cấu hình kernel cho container</td>
+</tr>
+<tr>
+<td><code>edge-l7</code></td>
+<td>Pool L7 (bare metal hoặc VM)</td>
+<td>Chỉ capability <code>NET_BIND_SERVICE</code>; tinh chỉnh mạng (RSS, IRQ affinity, <code>somaxconn</code>); đĩa NVMe cache gắn <code>noatime</code>; có đường ra tới origin của khách (ngoại lệ duy nhất, ADR-0047)</td>
+</tr>
+<tr>
+<td><code>edge-waf</code></td>
+<td>Pool WAF</td>
+<td>CPU và cgroup riêng; <strong>không có đường ra Internet</strong>; không nhận kết nối từ ngoài vùng</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>Postgres, ClickHouse, Kafka, RabbitMQ</td>
+<td>Đĩa riêng cho dữ liệu, WAL, log; bộ lập lịch I/O phù hợp; mã hoá đĩa (LUKS); tài khoản backup riêng</td>
+</tr>
+<tr>
+<td><code>secret</code></td>
+<td>OpenBao</td>
+<td>Không swap; mã hoá đĩa; tắt core dump; khoá bộ nhớ; đĩa audit riêng; không có đường ra</td>
+</tr>
+<tr>
+<td><code>bastion</code></td>
+<td>Cửa quản trị</td>
+<td>Ghi phiên (session recording); MFA; không lưu khoá riêng của ai; không có quyền đọc dữ liệu khách</td>
+</tr>
+<tr>
+<td><code>ops</code></td>
+<td>CI, registry, giám sát, infra</td>
+<td>Runner CI không giữ secret dài hạn; đường ra qua <code>egress-1</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Nhận xét</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Image gốc cộng Ansible (đề xuất)</strong></td>
+<td>Đơn giản, đủ cho lab, kiểm trôi được; chưa có image dựng sẵn</td>
+</tr>
+<tr>
+<td>Golden image bằng Packer</td>
+<td>Dựng nhanh hơn, nhưng Packer chuyển sang BSL; có thể dùng sau cho nội bộ</td>
+</tr>
+<tr>
+<td>OS bất biến cho node K8s (Talos, Flatcar)</td>
+<td>Hardening mạnh và rẻ; đổi cách vận hành và không dùng cho edge; xem xét lại khi chạy production</td>
+</tr>
+<tr>
+<td>Mỗi vai trò một OS, một chuẩn riêng</td>
+<td>Chi phí duy trì nhân lên; không có chuẩn chung như chủ dự án yêu cầu</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--hệ-quả">Hệ quả</h2>
+<ul>
+<li>Một nơi (role <code>baseline</code>) quyết định chuẩn cho mọi node; sửa ở đó là sửa cho cả fleet, qua pull request.</li>
+<li>Ngưỡng điểm CIS còn mở (L5 trong kế hoạch lab); chưa có số liệu để chọn con số.</li>
+<li>Hardening có thể ảnh hưởng hiệu năng edge; áp từng hạng mục và đo trước sau, không áp đồng loạt.</li>
+<li>Công cụ GPL (Ansible, Lynis) chỉ dùng nội bộ NCC, không phát hành tới khách (ADR-0024).</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0049-gitops-and-devsecops-per-plane"><div class="path">09-adr/0049-gitops-and-devsecops-per-plane.md</div><h1 id="f-09-adr-0049-gitops-and-devsecops-per-plane--adr-0049-gitops-và-devsecops-cho-từng-plane-chuỗi-cung-ứng-có-ký-và-kiểm-chính-sách">ADR-0049: GitOps và DevSecOps cho từng plane, chuỗi cung ứng có ký và kiểm chính sách</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0001-four-planes">ADR-0001</a>, <a href="#f-09-adr-0023-kubernetes-for-central-planes-edge-outside">ADR-0023</a>, <a href="#f-09-adr-0024-licensing-policy-for-shipped-components">ADR-0024</a>, <a href="#f-09-adr-0037-config-apply-classes">ADR-0037</a>, <a href="#f-07-deployment-00-index--74-môi-trường">7.4</a>, <a href="#f-08-cross-cutting-15-config-propagation-and-apply">8.15</a></li>
+</ul>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--bối-cảnh">Bối cảnh</h2>
+<p>Bốn plane có bốn chu kỳ triển khai riêng; một thay đổi ở portal không được làm edge deploy lại. Chủ dự án yêu cầu GitOps và DevSecOps trong từng plane. Hiện tại CI mới
+có build, vet, test, fmt, <code>govulncheck</code>, CodeQL, Semgrep và hai guard <code>depguard</code> (edge và analytics chỉ import <code>metap/pkg/kit/*</code>). Chưa có quét secret, SBOM, quét và ký image,
+kiểm chính sách, hay đường triển khai.</p>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>Git là nguồn sự thật.</strong> Mã nằm ở repo của từng plane; <strong>cấu hình triển khai tách ra một repo riêng</strong> (<code>waap-deploy</code>) với Helm và Kustomize, một thư mục cho mỗi
+môi trường (<code>dev</code>, <code>staging</code>, <code>canary</code>, <code>prod</code>). Thay đổi môi trường là sửa file trong repo này, không phải nhánh riêng cho từng môi trường.</li>
+<li><strong>Argo CD kéo</strong> (Apache-2.0), mẫu app-of-apps, mỗi plane một ứng dụng; tự hoàn lại khi cụm lệch Git (<code>selfHeal</code>) và cảnh báo.</li>
+<li><strong>Thăng cấp bằng pull request</strong> đổi digest image trong thư mục môi trường: staging tự động sau khi pipeline qua; canary và prod cần người duyệt (cùng nguyên tắc 4-eyes của BR-26).</li>
+<li><strong>Edge (ngoài K8s) không đi qua Argo:</strong> pipeline phát hành artifact có ký (binary, Vector) tới registry và relay; việc rollout lên node theo cơ chế canary PoP và gate của chính nền tảng
+(7.4, 8.15 lớp D). Git chỉ ghi <em>phiên bản mong muốn</em> của edge; một job đăng ký phiên bản đó vào fleet registry.</li>
+<li><strong>Mỗi plane một pipeline.</strong> Chặng bắt buộc theo bảng dưới. Không có đường tắt triển khai không qua pipeline.</li>
+<li><strong>Chuỗi cung ứng:</strong> image tham chiếu theo digest; base image tối giản, chạy không root; SBOM cho mọi image; ký bằng cosign với khoá ký nằm trong OpenBao transit (ADR-0050); cụm chỉ nhận image đã ký
+(Kyverno <code>verifyImages</code>).</li>
+<li><strong>Không có secret trong Git.</strong> Quét bằng gitleaks ở CI và pre-commit; bootstrap duy nhất (khoá unseal) giữ ngoại tuyến.</li>
+<li><strong>Công cụ chọn theo license</strong> (ADR-0024): OpenTofu (MPL-2.0) thay Terraform (BSL); Argo CD, Kyverno, cosign, Syft, Trivy (Apache-2.0); gitleaks (MIT).</li>
+</ol>
+<h3 id="f-09-adr-0049-gitops-and-devsecops-per-plane--chặng-pipeline">Chặng pipeline</h3>
+<table>
+<thead>
+<tr>
+<th>Chặng</th>
+<th>Công cụ</th>
+<th>Hiện có</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lint, kiểu, fmt</td>
+<td><code>golangci-lint</code>, <code>gofmt</code></td>
+<td>Một phần</td>
+<td>Thêm lint cho IaC (<code>tflint</code>) và manifest</td>
+</tr>
+<tr>
+<td>Unit test</td>
+<td><code>go test</code></td>
+<td>Có</td>
+<td></td>
+</tr>
+<tr>
+<td>Test tích hợp</td>
+<td><code>go test -tags integration</code> (testkit)</td>
+<td>Một phần</td>
+<td>Chạy trong job riêng có Postgres</td>
+</tr>
+<tr>
+<td>SAST</td>
+<td>Semgrep, CodeQL</td>
+<td>Có</td>
+<td></td>
+</tr>
+<tr>
+<td>SCA</td>
+<td><code>govulncheck</code></td>
+<td>Có</td>
+<td>Chặn lỗ hổng mức cao</td>
+</tr>
+<tr>
+<td>Quét secret</td>
+<td>gitleaks</td>
+<td>Chưa</td>
+<td>Chặn merge</td>
+</tr>
+<tr>
+<td>Kiểm license</td>
+<td><code>go-licenses</code></td>
+<td>Chưa</td>
+<td>Theo ADR-0024; chặn BSL, SSPL, AGPL</td>
+</tr>
+<tr>
+<td>Ranh giới plane</td>
+<td><code>depguard</code></td>
+<td>Có (edge, analytics)</td>
+<td>Giữ nguyên</td>
+</tr>
+<tr>
+<td>Build container</td>
+<td>Dockerfile nhiều tầng, distroless</td>
+<td>Có Dockerfile</td>
+<td>Không root, chỉ đọc hệ thống tệp</td>
+</tr>
+<tr>
+<td>SBOM</td>
+<td>Syft</td>
+<td>Chưa</td>
+<td>Đính kèm image</td>
+</tr>
+<tr>
+<td>Quét image</td>
+<td>Trivy</td>
+<td>Chưa</td>
+<td>Chặn lỗ hổng mức cao</td>
+</tr>
+<tr>
+<td>Ký</td>
+<td>cosign, khoá trong OpenBao</td>
+<td>Chưa</td>
+<td></td>
+</tr>
+<tr>
+<td>Kiểm chính sách</td>
+<td>Kyverno (admission), <code>conftest</code> (trước merge)</td>
+<td>Chưa</td>
+<td>Ví dụ: không chạy root, có giới hạn tài nguyên, NetworkPolicy bắt buộc</td>
+</tr>
+<tr>
+<td>Triển khai</td>
+<td>Argo CD</td>
+<td>Chưa</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Nhận xét</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Argo CD, repo triển khai riêng (đề xuất)</strong></td>
+<td>Một nguồn sự thật cho cụm, tách chu kỳ bốn plane; có giao diện xem trôi</td>
+</tr>
+<tr>
+<td>Flux</td>
+<td>Nhẹ và gần K8s hơn, không có giao diện; chọn lại được, hai công cụ tương đương cho nhu cầu này</td>
+</tr>
+<tr>
+<td>Đẩy từ CI vào cụm</td>
+<td>Đơn giản nhưng CI giữ quyền vào cụm, không tự hoàn lại khi bị sửa tay</td>
+</tr>
+<tr>
+<td>Nhánh riêng cho từng môi trường</td>
+<td>Dễ lệch và khó so sánh; thư mục theo môi trường gọn hơn</td>
+</tr>
+<tr>
+<td>Terraform, Packer</td>
+<td>Bị loại: BSL (ADR-0024 áp cho thành phần phát hành; chọn bản tuân thủ cho đồng nhất)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--hệ-quả">Hệ quả</h2>
+<ul>
+<li>Runner CI ở vùng Vận hành, ra Internet qua <code>egress-1</code> (luồng N29, <a href="#f-07-deployment-06-network-zones-and-flows">7.6</a>); không có đường nào từ Internet vào runner.</li>
+<li>Có hai loại &quot;triển khai&quot;: K8s qua Argo, edge qua fleet registry. Hai đường phải cho ra cùng bản ghi &quot;phiên bản nào đang chạy ở đâu&quot;, nếu không audit sẽ thiếu.</li>
+<li>Repo triển khai riêng thêm một nơi để duy trì, đổi lại bốn plane không kéo nhau.</li>
+<li>Quét và ký làm pipeline dài hơn; chặng nặng (quét image, SBOM) chỉ chạy khi image đổi.</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0050-secret-management-and-rotation"><div class="path">09-adr/0050-secret-management-and-rotation.md</div><h1 id="f-09-adr-0050-secret-management-and-rotation--adr-0050-secret-manager-duy-nhất-cấp-secret-ngắn-hạn-xoay-tự-động-theo-loại">ADR-0050: Secret manager duy nhất, cấp secret ngắn hạn, xoay tự động theo loại</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0017-openbao-for-signing-keys-and-node-pki">ADR-0017</a>, <a href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045</a>, <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>, <a href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048</a>, <a href="#f-08-cross-cutting-19-node-identity-and-mtls">8.19</a></li>
+</ul>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--bối-cảnh">Bối cảnh</h2>
+<p>Chủ dự án yêu cầu có secret manager và tự động xoay secret theo nghiệp vụ và hạ tầng. OpenBao đã được chọn cho khoá ký và PKI (ADR-0017). Hiện còn nhiều secret nằm ngoài nó:
+khoá ký JWKS đặt trong thư mục khoá gắn vào container, secret ingest giữa control-plane và analytics-plane, mật khẩu cơ sở dữ liệu tĩnh trong cấu hình compose. Xoay JWKS đã làm được không cần restart,
+nhưng bằng tay.</p>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>OpenBao là secret manager duy nhất</strong> cho cả bốn plane và hạ tầng. Chạy ở vùng Secret ngoài K8s, ba node Raft, không có đường ra (<a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>).</li>
+<li><strong>Ưu tiên secret động, ngắn hạn</strong> hơn secret tĩnh: mật khẩu cơ sở dữ liệu cấp theo yêu cầu với TTL, thu hồi khi hết hạn; cert 24 giờ cho node, 7 ngày cho dịch vụ (ADR-0045).</li>
+<li><strong>Xác thực vào OpenBao theo loại chủ thể:</strong> pod bằng K8s auth; VM bằng cert (TLS auth); CI bằng AppRole với TTL ngắn và secret ID bọc (response wrapping); người bằng OIDC cộng MFA, chỉ cho quản trị.
+<strong>Edge không nói chuyện với OpenBao</strong> (ADR-0045).</li>
+<li><strong>Giao secret không qua biến môi trường dài hạn và không qua Git:</strong> pod nhận qua Secrets Store CSI hoặc agent sidecar của OpenBao ghi vào bộ nhớ (tmpfs), không tạo K8s Secret để khỏi lưu trong etcd; VM dùng OpenBao Agent chạy như dịch vụ.</li>
+<li><strong>Mọi secret có chủ, chu kỳ và cách nạp lại</strong> trong bảng xoay dưới; dịch vụ phải nạp lại không cần khởi động lại.</li>
+<li><strong>Mở khoá (unseal):</strong> lab dùng Shamir 5 phần, cần 3, giữ riêng ngoại tuyến bởi các người khác nhau; root token thu hồi sau bootstrap. Production tự mở khoá bằng transit của một OpenBao thứ hai hoặc KMS.</li>
+<li><strong>Audit bật từ đầu</strong>, gửi về <code>obs</code>; sao lưu snapshot Raft mã hoá lên object storage theo lịch.</li>
+</ol>
+<h3 id="f-09-adr-0050-secret-management-and-rotation--bảng-xoay-theo-loại">Bảng xoay theo loại</h3>
+<table>
+<thead>
+<tr>
+<th>Loại</th>
+<th>Nơi giữ</th>
+<th>Chu kỳ đề xuất</th>
+<th>Cách xoay</th>
+<th>Cách nạp lại</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Khoá ký JWKS</td>
+<td>OpenBao KV; agent ghi thư mục khoá của issuer</td>
+<td>Theo lịch (ví dụ quý) và khi lộ</td>
+<td>Quy trình 3 bước thành job tự động: thêm khoá, đợi mọi verifier làm mới, chuyển <code>signing-kid</code>, đợi token cũ hết hạn, gỡ khoá cũ</td>
+<td>Issuer đọc lại thư mục khoá; verifier lấy lại khi gặp <code>kid</code> lạ (đã có)</td>
+</tr>
+<tr>
+<td>Cert node (edge)</td>
+<td>OpenBao PKI qua node identity service</td>
+<td>24 giờ</td>
+<td>Tự gia hạn ở 2/3 thời hạn</td>
+<td>Agent trên node tải lại (ADR-0045)</td>
+</tr>
+<tr>
+<td>Cert dịch vụ</td>
+<td>OpenBao PKI qua cert-manager</td>
+<td>7 ngày</td>
+<td>Tự gia hạn</td>
+<td>Dịch vụ tải lại cert khi đổi file</td>
+</tr>
+<tr>
+<td>Mật khẩu Postgres</td>
+<td>OpenBao database engine</td>
+<td>Cấp theo yêu cầu, TTL một giờ, tối đa 24 giờ</td>
+<td>Cấp tài khoản tạm, thu hồi khi hết hạn</td>
+<td>Connection pool mở kết nối mới bằng tài khoản mới</td>
+</tr>
+<tr>
+<td>Tài khoản RabbitMQ, Kafka, ClickHouse</td>
+<td>OpenBao (động nếu engine hỗ trợ, nếu không thì tĩnh có xoay)</td>
+<td>Một đến ba mươi ngày</td>
+<td>Xoay theo lịch</td>
+<td>Client đọc lại trước khi hết hạn</td>
+</tr>
+<tr>
+<td>Secret ingest control-plane tới analytics-plane</td>
+<td>OpenBao KV</td>
+<td>Ba mươi ngày</td>
+<td>Hai giá trị song song trong thời gian chuyển</td>
+<td>Hai phía đọc lại</td>
+</tr>
+<tr>
+<td>Khoá ký manifest snapshot</td>
+<td>OpenBao transit</td>
+<td>Theo lịch, phiên bản khoá</td>
+<td>Thêm phiên bản khoá; edge tin nhiều khoá song song</td>
+<td>Edge cập nhật danh sách tin cậy qua bundle</td>
+</tr>
+<tr>
+<td>Cert Origin CA theo zone</td>
+<td>OpenBao PKI</td>
+<td>90 ngày</td>
+<td>Tự gia hạn (ADR-0045)</td>
+<td>Edge nhận qua bundle</td>
+</tr>
+<tr>
+<td>Secret của khách (webhook, kênh thông báo)</td>
+<td><code>SecretStore</code> theo tenant, backend OpenBao</td>
+<td>Do khách chọn</td>
+<td>Qua API, ghi audit</td>
+<td>Đọc lại mỗi lần gửi</td>
+</tr>
+<tr>
+<td>SSH</td>
+<td>OpenBao SSH CA</td>
+<td>Cert vài giờ</td>
+<td>Không có khoá dài hạn</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Secret CI (AppRole)</td>
+<td>OpenBao</td>
+<td>Mỗi lần chạy</td>
+<td>Secret ID dùng một lần</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Khoá unseal, root token</td>
+<td>Ngoại tuyến</td>
+<td>Khi có thay đổi người giữ</td>
+<td>Rekey theo quy trình</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Nhận xét</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OpenBao cho mọi thứ, secret động (đề xuất)</strong></td>
+<td>Một nơi quản lý và audit; secret ngắn hạn giảm thiệt hại khi lộ; cần OpenBao luôn sẵn sàng</td>
+</tr>
+<tr>
+<td>External Secrets tạo K8s Secret</td>
+<td>Dễ dùng nhưng secret nằm trong etcd; cần mã hoá etcd và kiểm soát RBAC chặt</td>
+</tr>
+<tr>
+<td>SOPS trong Git</td>
+<td>Không cần dịch vụ, nhưng không xoay động, khoá giải mã thành điểm yếu</td>
+</tr>
+<tr>
+<td>KMS của cloud</td>
+<td>Không dùng được on-prem; ADR-0006 yêu cầu plane không phụ thuộc một cloud</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--hệ-quả">Hệ quả</h2>
+<ul>
+<li>OpenBao ngoài K8s nên cụm có thể khởi động mà không cần OpenBao, nhưng dịch vụ cần secret thì chờ; thứ tự khởi động phải ghi trong runbook: OpenBao, rồi dữ liệu, rồi ứng dụng.</li>
+<li>Vài dịch vụ phải đổi để nạp lại secret động mà không khởi động lại; hiện chưa dịch vụ nào của management-plane làm vậy cho mật khẩu cơ sở dữ liệu. Đây là công việc code, ngoài phạm vi tài liệu.</li>
+<li>Khoá JWKS hiện là tệp khoá thô nên không đi qua transit được; ký trực tiếp bằng transit là hướng sau, đổi mã của issuer.</li>
+<li>Cần diễn tập: lộ khoá thì thu hồi và xoay trong một thao tác; mất đa số người giữ khoá unseal thì khôi phục thế nào.</li>
 </ul>
 </section>
 <section class="doc" id="f-10-quality-00-index"><div class="path">10-quality/00-index.md</div><h1 id="f-10-quality-00-index--10-quality-requirements">10. Quality Requirements</h1>

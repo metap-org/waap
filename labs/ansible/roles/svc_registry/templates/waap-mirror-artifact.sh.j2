@@ -1,0 +1,15 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Nhận một artifact (tarball) vào kho tĩnh sau khi kiểm sha256 đã ghim. Dùng: waap-mirror-artifact <thư-mục> <tên-tệp> <url> <sha256>
+set -euo pipefail
+dir="${1:?thư mục}"; file="${2:?tên tệp}"; url="${3:?url}"; sha="${4:?sha256}"
+[ "$(printf %s "$sha" | wc -c)" -eq 64 ] || { echo "sha256 phải dài 64 ký tự" >&2; exit 2; }
+{% if mirror_egress_proxy | length > 0 %}
+export http_proxy="{{ mirror_egress_proxy }}" https_proxy="{{ mirror_egress_proxy }}"
+{% endif %}
+dest="{{ mirror_artifacts_dir }}/$dir"; mkdir -p "$dest"
+tmp="$(mktemp -p "$dest" .dl.XXXXXX)"; trap 'rm -f "$tmp"' EXIT
+curl -fsSL --max-time 600 -o "$tmp" "$url"
+echo "$sha  $tmp" | sha256sum -c - >/dev/null || { echo "sha256 không khớp, từ chối nhận $file" >&2; exit 1; }
+chmod 0644 "$tmp"; mv -f "$tmp" "$dest/$file"; trap - EXIT
+echo "đã nhận $dir/$file"

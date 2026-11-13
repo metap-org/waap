@@ -1,0 +1,48 @@
+---
+- name: Gói WireGuard và TOTP
+  ansible.builtin.apt:
+    name: "{{ ['wireguard'] + (['libpam-google-authenticator'] if bastion_mfa | bool else []) }}"
+    state: present
+
+- name: Khoá riêng WireGuard sinh tại chỗ, không rời máy
+  ansible.builtin.shell: umask 077 && wg genkey > /etc/wireguard/private.key
+  args:
+    creates: /etc/wireguard/private.key
+  changed_when: true
+
+- name: Cấu hình wg0
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+    owner: root
+    group: root
+  when: wg_peers | length > 0
+  notify: restart wg
+
+- name: Bật wg0
+  ansible.builtin.systemd:
+    name: wg-quick@wg0
+    enabled: true
+    state: started
+  when: wg_peers | length > 0
+
+- name: Ghi phiên (pam_tty_audit gửi phím gõ vào auditd)
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/sshd
+    line: "session required pam_tty_audit.so enable=* log_passwd"
+    insertafter: EOF
+
+- name: Bastion không giữ khoá riêng của ai
+  ansible.builtin.find:
+    paths: /home
+    patterns: ["id_rsa", "id_ed25519", "id_ecdsa", "*.pem"]
+    recurse: true
+    hidden: true
+  register: stray_keys
+
+- name: Không có khoá riêng
+  ansible.builtin.assert:
+    that: stray_keys.matched == 0
+    fail_msg: "Tìm thấy khoá riêng trên bastion: {{ stray_keys.files | map(attribute='path') | list }}"
+    quiet: true

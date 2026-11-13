@@ -1,0 +1,5 @@
+---
+# Firewall máy chủ cho một ứng dụng đứng riêng: chỉ mở cổng của ứng dụng cho các CIDR khai báo. Mặc định tắt.
+app_allow_from: []     # CIDR được tới ứng dụng; rỗng nghĩa là không đụng firewall
+app_ssh_from: []       # CIDR được SSH; bắt buộc khi bật, để không tự khoá
+app_fw_ports: []       # do playbook của từng ứng dụng đặt: [{proto: tcp, ports: [5432]}]

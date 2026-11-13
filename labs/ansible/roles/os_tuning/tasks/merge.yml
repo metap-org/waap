@@ -1,0 +1,10 @@
+---
+- name: Gộp giá trị tuning theo các vai trò của máy này
+  ansible.builtin.set_fact:
+    tuning_sysctl: >-
+      {{ tuning_sysctl | default({}) | combine((tuning_by_role[item].sysctl | default({}))) }}
+    tuning_thp: "{{ 'never' if (tuning_by_role[item].thp | default('') == 'never' or (tuning_thp | default('') == 'never')) else '' }}"
+    tuning_modules: "{{ (tuning_modules | default([])) + (tuning_by_role[item].modules | default([])) | unique }}"
+    tuning_limits: >-
+      {{ tuning_limits | default({}) | combine((tuning_by_role[item].limits | default({})), recursive=true) }}
+  loop: "{{ tuning_precedence | select('in', tuning_groups) | list }}"

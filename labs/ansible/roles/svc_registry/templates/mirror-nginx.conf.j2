@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+server {
+  listen {{ mirror_listen }}:80 default_server;
+  server_tokens off;
+  # Metadata apt đã được ký bằng khoá của mirror; tarball kiểm sha256 phía client. TLS làm ở P2/P5.
+  location /apt/ {
+    alias {{ mirror_data }}/public/;
+    autoindex off;
+  }
+  location /artifacts/ {
+    alias {{ mirror_artifacts_dir }}/;
+    autoindex off;
+  }
+  location = /healthz { return 200 "ok\n"; }
+  location / { return 404; }
+}

@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# Theo CIS Hardening Guide của RKE2 (docs.rke2.io/security/hardening_guide): profile CIS bật protect-kernel-defaults,
+# tạo audit policy mặc định và cấu hình Pod Security theo profile.
+node-ip: {{ app_listen_ip }}
+token-file: /etc/rancher/rke2/token
+profile: {{ rke2_profile }}
+kubelet-arg:
+  - streaming-connection-idle-timeout=5m
+{% if rke2_role == 'server' %}
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+cni: {{ rke2_cni }}
+disable:
+{% for d in rke2_disable %}
+  - {{ d }}
+{% endfor %}
+tls-san:
+{% for ip in rke2_server_ips %}
+  - {{ ip }}
+{% endfor %}
+kube-controller-manager-arg:
+  - terminated-pod-gc-threshold=10
+{% if inventory_hostname != rke2_first_server %}
+# Server thứ hai trở đi gia nhập cụm do server đầu khởi tạo (etcd HA)
+server: {{ rke2_api_endpoint }}
+{% endif %}
+{% else %}
+server: {{ rke2_api_endpoint }}
+{% endif %}

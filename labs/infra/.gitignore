@@ -1,0 +1,5 @@
+/generated/
+.terraform/
+*.tfstate*
+__pycache__/
+*.pyc

@@ -1,0 +1,47 @@
+---
+- name: Luật auditd
+  ansible.builtin.template:
+    src: audit.rules.j2
+    dest: /etc/audit/rules.d/90-waap.rules
+    mode: "0640"
+    owner: root
+    group: root
+  notify: load audit rules
+
+- name: Cấu hình auditd (xoay vòng, hành vi khi đầy đĩa)
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^\s*{{ item.key }}\s*='
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: max_log_file, value: 50 }
+    - { key: num_logs, value: 10 }
+    - { key: max_log_file_action, value: rotate }
+    - { key: space_left_action, value: syslog }
+    - { key: admin_space_left_action, value: suspend }
+    - { key: disk_full_action, value: suspend }
+    - { key: disk_error_action, value: syslog }
+  notify: reload auditd
+
+- name: auditd chạy
+  ansible.builtin.systemd:
+    name: auditd
+    enabled: true
+    state: started
+
+- name: Khởi tạo cơ sở dữ liệu AIDE (lần đầu, mất vài phút)
+  ansible.builtin.shell: aideinit -y -f && cp -f /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+  args:
+    creates: /var/lib/aide/aide.db
+  when: baseline_aide_enabled | bool
+  changed_when: true
+  tags: [aide]
+
+- name: Kiểm AIDE hằng ngày (cảnh báo khi đổi ngoài Ansible)
+  ansible.builtin.systemd:
+    name: dailyaidecheck.timer
+    enabled: true
+    state: started
+  when: baseline_aide_enabled | bool
+  failed_when: false
+  tags: [aide]

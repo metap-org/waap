@@ -1,0 +1,7 @@
+---
+# Mặc định khi cài một ứng dụng đứng riêng (waap-install). Không cần inventory hay vùng mạng.
+app_listen_ip: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+app_secret_dir: "{{ lookup('env', 'HOME') }}/.waap-install/secrets"   # mật khẩu tự sinh, lưu ở máy điều khiển, dùng lại các lần sau
+app_harden: false        # true: áp thêm chuẩn nền hardening (roles/baseline) trước khi cài
+app_allow_from: []       # CIDR được tới ứng dụng; có giá trị thì bật firewall máy chủ (cần thêm app_ssh_from)
+app_ssh_from: []

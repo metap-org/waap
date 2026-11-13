@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# Bộ nhớ đệm cho kho Ubuntu (vá bảo mật cho các vùng không có đường ra). Chỉ nghe IP lab.
+BindAddress: {{ mirror_listen }}
+Port: {{ mirror_apt_proxy_port }}
+{% if mirror_egress_proxy | length > 0 %}
+Proxy: {{ mirror_egress_proxy }}
+{% endif %}

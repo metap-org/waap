@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Đồng bộ mirror vendor và tạo snapshot (không publish)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User={{ mirror_user }}
+ExecStart=/usr/local/sbin/waap-mirror-sync all

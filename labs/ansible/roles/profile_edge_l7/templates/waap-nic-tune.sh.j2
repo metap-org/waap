@@ -1,0 +1,8 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# RSS: trải hàng đợi nhận theo số nhân; IRQ affinity do irqbalance quyết định (chỉ trên bare metal).
+set -eu
+nic="{{ edge_nic }}"
+cpus="$(nproc)"
+ethtool -L "$nic" combined "$cpus" 2>/dev/null || true
+ethtool -K "$nic" gro on lro off 2>/dev/null || true

@@ -1,0 +1,18 @@
+---
+- name: Gói squid
+  ansible.builtin.apt:
+    name: squid
+    state: present
+
+- name: egress-1, proxy ra Internet có allowlist
+  ansible.builtin.template:
+    src: squid.conf.j2
+    dest: /etc/squid/squid.conf
+    mode: "0644"
+  notify: restart squid
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: squid
+    enabled: true
+    state: started

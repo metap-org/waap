@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Interface]
+Address = {{ wg_address }}
+ListenPort = {{ wg_listen_port }}
+PostUp = umask 077; wg set %i private-key /etc/wireguard/private.key
+{% for p in wg_peers %}
+
+[Peer]
+# {{ p.name }}
+PublicKey = {{ p.public_key }}
+AllowedIPs = {{ p.allowed_ip }}
+{% endfor %}

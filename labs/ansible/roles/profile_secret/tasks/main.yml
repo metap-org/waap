@@ -1,0 +1,40 @@
+---
+# ADR-0048 hồ sơ secret: không swap, không core dump, khoá bộ nhớ, đĩa audit riêng, không đường ra (hostfw).
+- name: Không swap
+  ansible.builtin.import_tasks: swap_off.yml
+
+- name: Thư mục coredump.conf.d
+  ansible.builtin.file:
+    path: /etc/systemd/coredump.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Core dump tắt
+  ansible.builtin.copy:
+    dest: /etc/systemd/coredump.conf.d/10-disable.conf
+    mode: "0644"
+    content: "[Coredump]\nStorage=none\nProcessSizeMax=0\n"
+
+- name: Người dùng dịch vụ không đăng nhập được
+  ansible.builtin.user:
+    name: "{{ secret_service_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Quyền thư mục audit
+  ansible.builtin.file:
+    path: "{{ secret_audit_dir }}"
+    state: directory
+    owner: "{{ secret_service_user }}"
+    group: "{{ secret_service_user }}"
+    mode: "0750"
+
+- name: Drop-in hardening cho OpenBao (khoá bộ nhớ cần CAP_IPC_LOCK)
+  ansible.builtin.include_role:
+    name: hardened_unit
+  vars:
+    hu_unit: "{{ secret_unit }}"
+    hu_capabilities: [CAP_IPC_LOCK]
+    hu_read_write_paths: ["{{ secret_audit_dir }}", /var/lib/openbao]
+    hu_extra: "LimitMEMLOCK=infinity\nLimitCORE=0\nMemoryDenyWriteExecute=false"

@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+{% for m in blacklisted_modules %}
+install {{ m }} /bin/false
+blacklist {{ m }}
+{% endfor %}

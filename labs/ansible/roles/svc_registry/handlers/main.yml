@@ -1,0 +1,17 @@
+---
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  listen: restart nginx
+
+- name: Restart apt-cacher-ng
+  ansible.builtin.systemd:
+    name: apt-cacher-ng
+    state: restarted
+  listen: restart acng
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: reload systemd

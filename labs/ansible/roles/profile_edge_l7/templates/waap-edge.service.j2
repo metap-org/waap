@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+[Unit]
+Description=WAAP edge L7
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ edge_user }}
+Group={{ edge_user }}
+ExecStart={{ edge_binary }}
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

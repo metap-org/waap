@@ -1,0 +1,27 @@
+---
+# Runner CI không giữ secret dài hạn: không có thư mục secret, token lấy ngắn hạn từ OpenBao khi chạy job (P5).
+- name: Người dùng runner không đăng nhập được
+  ansible.builtin.user:
+    name: "{{ ops_runner_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: true
+    home: /var/lib/ci-runner
+
+- name: Home runner chỉ chủ sở hữu
+  ansible.builtin.file:
+    path: /var/lib/ci-runner
+    state: directory
+    owner: "{{ ops_runner_user }}"
+    group: "{{ ops_runner_user }}"
+    mode: "0700"
+
+- name: Đường ra qua egress-1 (N29)
+  ansible.builtin.copy:
+    dest: /etc/profile.d/waap-proxy.sh
+    mode: "0644"
+    content: |
+      export http_proxy="{{ apt_proxy }}"
+      export https_proxy="{{ apt_proxy }}"
+      export no_proxy="localhost,127.0.0.1,10.10.0.0/16"
+  when: apt_proxy | length > 0

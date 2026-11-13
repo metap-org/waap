@@ -1,0 +1,6 @@
+---
+# Bắt buộc: hu_unit (tên unit không có .service). Tuỳ chọn bên dưới.
+hu_capabilities: []          # ví dụ [CAP_NET_BIND_SERVICE]; rỗng nghĩa là bỏ hết
+hu_memory_max: ""            # ví dụ 2G
+hu_read_write_paths: []
+hu_extra: ""

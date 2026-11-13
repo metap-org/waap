@@ -1,0 +1,22 @@
+---
+- name: Kiểm tham số
+  ansible.builtin.assert:
+    that: hu_unit is defined and hu_unit | length > 0
+    quiet: true
+
+- name: Thư mục drop-in
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ hu_unit }}.service.d"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Drop-in hardening
+  ansible.builtin.template:
+    src: hardening.conf.j2
+    dest: "/etc/systemd/system/{{ hu_unit }}.service.d/10-waap-hardening.conf"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: daemon reload

@@ -1,0 +1,53 @@
+---
+- name: Nhóm vận hành
+  ansible.builtin.group:
+    name: "{{ ssh_login_group }}"
+    state: present
+
+- name: Tài khoản ops thuộc nhóm vận hành
+  ansible.builtin.user:
+    name: ops
+    groups: "{{ ssh_login_group }}"
+    append: true
+    shell: /bin/bash
+    password_lock: true
+
+- name: Khoá mật khẩu root
+  ansible.builtin.user:
+    name: root
+    password_lock: true
+
+- name: CA công khai của SSH cert ngắn hạn (bỏ qua nếu chưa có CA)
+  ansible.builtin.copy:
+    src: "{{ ssh_user_ca_pub_file }}"
+    dest: /etc/ssh/trusted_user_ca.pub
+    mode: "0644"
+    owner: root
+    group: root
+  when: ssh_user_ca_pub_file | length > 0
+  notify: restart ssh
+
+- name: Cấu hình sshd (drop-in)
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-waap-hardening.conf
+    mode: "0644"
+    owner: root
+    group: root
+    validate: /usr/sbin/sshd -t -f %s
+  notify: restart ssh
+
+- name: Banner
+  ansible.builtin.copy:
+    content: "Truy cap duoc ghi lai. Chi nguoi duoc uy quyen.\n"
+    dest: /etc/issue.net
+    mode: "0644"
+
+- name: sudo của nhóm vận hành, có ghi log
+  ansible.builtin.template:
+    src: sudoers-ops.j2
+    dest: /etc/sudoers.d/90-waap-ops
+    mode: "0440"
+    owner: root
+    group: root
+    validate: /usr/sbin/visudo -cf %s

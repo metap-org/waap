@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+[Unit]
+Description=WAAP WAF inspection
+After=network-online.target
+
+[Service]
+Slice=waap-waf.slice
+User={{ waf_user }}
+Group={{ waf_user }}
+ExecStart=/opt/waap/bin/waap-waf
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

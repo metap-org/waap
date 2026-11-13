@@ -1,0 +1,23 @@
+---
+- name: Tắt dịch vụ không dùng
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop: "{{ disabled_services }}"
+  register: svc_off
+  failed_when: svc_off.failed and ('Could not find' not in (svc_off.msg | default('')) and 'not found' not in (svc_off.msg | default('')))
+
+- name: AppArmor chạy
+  ansible.builtin.systemd:
+    name: apparmor
+    enabled: true
+    state: started
+
+- name: qemu-guest-agent
+  ansible.builtin.systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+  failed_when: false

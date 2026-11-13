@@ -1,0 +1,94 @@
+---
+- name: Cần phiên bản, sha256 và token đã ghim
+  ansible.builtin.assert:
+    that:
+      - rke2_version | length > 0
+      - rke2_sha256 | length == 64
+      - rke2_token | length >= 32
+      - rke2_role in ['server', 'agent']
+      - rke2_role == 'server' or rke2_api_endpoint | length > 0
+    fail_msg: "Ghim rke2_version, rke2_sha256 (từ trang phát hành) và rke2_token (>=32 ký tự); agent cần rke2_api_endpoint. Không tải nhị phân chưa kiểm."
+    quiet: true
+
+- name: Không swap
+  ansible.builtin.import_role:
+    name: profile_secret
+    tasks_from: swap_off.yml
+
+# Module kernel và sysctl cho kubelet do role os_tuning (nhóm role_k8s_*) áp trước bước này.
+- name: Người dùng etcd (profile CIS bắt buộc; thiếu thì RKE2 từ chối chạy)
+  ansible.builtin.user:
+    name: etcd
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    comment: etcd user
+  when: rke2_role == 'server'
+
+- name: Thư mục cấu hình RKE2
+  ansible.builtin.file:
+    path: /etc/rancher/rke2
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+
+- name: Token cụm
+  ansible.builtin.copy:
+    content: "{{ rke2_token }}"
+    dest: /etc/rancher/rke2/token
+    mode: "0600"
+    owner: root
+    group: root
+  no_log: true
+
+- name: Cấu hình RKE2 (profile CIS, mã hoá secret, tắt ingress mặc định)
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/rke2/config.yaml
+    mode: "0600"
+    owner: root
+    group: root
+  notify: restart rke2
+
+- name: Thư mục manifest tự triển khai của RKE2 (chỉ server)
+  ansible.builtin.file:
+    path: /var/lib/rancher/rke2/server/manifests
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  when: rke2_role == 'server' and rke2_pod_encryption | bool
+
+- name: Mã hoá lưu lượng pod bằng WireGuard (Canal)
+  ansible.builtin.template:
+    src: canal-wireguard.yaml.j2
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-canal-config.yaml
+    mode: "0600"
+    owner: root
+    group: root
+  when: rke2_role == 'server' and rke2_pod_encryption | bool
+
+- name: Tải tarball đã ghim và kiểm checksum
+  ansible.builtin.get_url:
+    url: "{{ rke2_tarball_url }}"
+    dest: "/var/cache/rke2-{{ rke2_version }}.tar.gz"
+    checksum: "sha256:{{ rke2_sha256 }}"
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Giải nén vào /usr/local (nhị phân và unit systemd)
+  ansible.builtin.unarchive:
+    src: "/var/cache/rke2-{{ rke2_version }}.tar.gz"
+    dest: /usr/local
+    remote_src: true
+    creates: "/usr/local/bin/rke2"
+  notify: [daemon reload, restart rke2]
+
+- name: Dịch vụ RKE2 bật
+  ansible.builtin.systemd:
+    name: "rke2-{{ rke2_role }}"
+    enabled: true
+    state: started
+    daemon_reload: true

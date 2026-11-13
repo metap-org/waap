@@ -1,0 +1,7 @@
+---
+# Chạy cuối mỗi lượt: thay đổi do Ansible là hợp lệ, nên cập nhật cơ sở dữ liệu AIDE.
+# Thay đổi ngoài Ansible sẽ bị dailyaidecheck báo vì cơ sở dữ liệu không được cập nhật theo.
+- name: Cập nhật cơ sở dữ liệu AIDE sau thay đổi của Ansible
+  ansible.builtin.shell: aide --update; rc=$?; [ $rc -lt 8 ] && cp -f /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+  when: not ansible_check_mode
+  changed_when: false

@@ -1,0 +1,91 @@
+---
+- name: Repo Erlang của Team RabbitMQ (khoá ký ghim fingerprint)
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: rabbitmq-erlang
+    vendor_repo_key_url: "{{ rabbitmq_repo_key_url }}"
+    vendor_repo_key_fingerprint: "{{ rabbitmq_repo_key_fingerprint }}"
+    vendor_repo_uris: "{{ rabbitmq_repo_hosts | map('regex_replace', '^(.*)$', 'https://\\1/rabbitmq-erlang/ubuntu/' ~ ansible_facts['distribution_release']) | list }}"
+    vendor_repo_suites: ["{{ ansible_facts['distribution_release'] }}"]
+
+- name: Repo RabbitMQ server
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: rabbitmq-server
+    vendor_repo_key_url: "{{ rabbitmq_repo_key_url }}"
+    vendor_repo_key_fingerprint: "{{ rabbitmq_repo_key_fingerprint }}"
+    vendor_repo_uris: "{{ rabbitmq_repo_hosts | map('regex_replace', '^(.*)$', 'https://\\1/rabbitmq-server/ubuntu/' ~ ansible_facts['distribution_release']) | list }}"
+    vendor_repo_suites: ["{{ ansible_facts['distribution_release'] }}"]
+
+- name: Ưu tiên gói của Team RabbitMQ hơn gói cùng tên của Ubuntu
+  ansible.builtin.template:
+    src: apt-pin.j2
+    dest: /etc/apt/preferences.d/rabbitmq
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Bỏ hold để cài hoặc nâng
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: "{{ erlang_packages + ['rabbitmq-server'] }}"
+  failed_when: false
+
+- name: Gói Erlang và RabbitMQ
+  ansible.builtin.apt:
+    name: "{{ rabbit_install_packages }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+
+- name: Giữ gói (Erlang và RabbitMQ chỉ đổi khi đổi biến)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ erlang_packages + ['rabbitmq-server'] }}"
+
+- name: Nghe trên IP lab, không guest
+  ansible.builtin.copy:
+    dest: /etc/rabbitmq/rabbitmq.conf
+    mode: "0644"
+    content: |
+      listeners.tcp.1 = {{ app_listen_ip }}:5672
+      # Ngưỡng bộ nhớ và đĩa tường minh; disk_free_limit >= ngưỡng bộ nhớ (khuyến nghị production checklist của RabbitMQ).
+      vm_memory_high_watermark.relative = 0.4
+      disk_free_limit.absolute = {{ rabbit_disk_free_limit }}
+      log.file.level = info
+  notify: restart rabbitmq
+
+- name: epmd và cổng phân tán chỉ nghe loopback (một node, không cần cụm)
+  ansible.builtin.copy:
+    dest: /etc/rabbitmq/rabbitmq-env.conf
+    mode: "0644"
+    content: |
+      ERL_EPMD_ADDRESS=127.0.0.1
+      SERVER_ADDITIONAL_ERL_ARGS="-kernel inet_dist_use_interface {127,0,0,1}"
+  notify: restart rabbitmq
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: rabbitmq-server
+    enabled: true
+    state: started
+
+- name: Tài khoản ứng dụng
+  community.rabbitmq.rabbitmq_user:
+    user: "{{ rabbit_user }}"
+    password: "{{ rabbit_password }}"
+    vhost: "{{ rabbit_vhost }}"
+    configure_priv: ".*"
+    read_priv: ".*"
+    write_priv: ".*"
+    state: present
+  no_log: true
+
+- name: Xoá tài khoản guest
+  community.rabbitmq.rabbitmq_user:
+    user: guest
+    state: absent

@@ -1,0 +1,16 @@
+---
+# Valkey (thay Redis; Redis 7.4 trở lên đổi giấy phép nên ADR-0024 loại). Cài từ binary chính thức của Valkey cho Ubuntu noble
+# (valkey.io/download, mỗi release có tarball và sha256), vào /opt/valkey/<version> với symlink `current`.
+# Nâng version: đặt valkey_version và valkey_sha256 mới rồi chạy lại. Hoàn tác: trỏ lại symlink `current` về thư mục cũ rồi restart.
+valkey_version: ""        # ví dụ 9.0.7 (lấy ở valkey.io/download)
+valkey_sha256: ""         # sha256 của tarball noble x86_64 trên trang release, tự kiểm
+# URL mặc định theo mẫu của valkey.io; cần người duyệt đối chiếu với trang release của bản ghim.
+mirror_base: ""
+valkey_filename: "valkey-{{ valkey_version }}-noble-x86_64.tar.gz"
+valkey_tarball_url: "{{ (mirror_base ~ '/artifacts/valkey/' ~ valkey_filename) if mirror_base | length > 0 else ('https://download.valkey.io/releases/' ~ valkey_filename) }}"
+valkey_home: /opt/valkey
+valkey_user: valkey
+valkey_dir: /var/lib/valkey
+valkey_control_password: "{{ lab_secrets.redis_control_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/redis_control_password length=24 chars=ascii_letters,digits') }}"
+valkey_edge_password: "{{ lab_secrets.redis_edge_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/redis_edge_password length=24 chars=ascii_letters,digits') }}"
+valkey_maxmemory: 256mb

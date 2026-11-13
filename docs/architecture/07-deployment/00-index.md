@@ -1,6 +1,6 @@
 # 7. Deployment View
 
-Ước lượng tải, số node và sharding ở quy mô 1 triệu zone: [7.5](05-capacity-and-sharding.md).
+Ước lượng tải, số node và sharding ở quy mô 1 triệu zone: [7.5](05-capacity-and-sharding.md). Mạng, vùng tin cậy và ma trận luồng (đề xuất): [7.6](06-network-zones-and-flows.md).
 
 ## 7.1 Ba mô hình triển khai
 

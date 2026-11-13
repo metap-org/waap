@@ -1,0 +1,6 @@
+---
+- name: Restart postgres
+  ansible.builtin.systemd:
+    name: "postgresql@{{ pg_version }}-main"
+    state: restarted
+  listen: restart postgres

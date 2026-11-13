@@ -1,0 +1,19 @@
+---
+# Valkey (binary chính thức, ghim sha256) có ACL: user control ghi, user edge chỉ đọc waf:*. Cần valkey_version, valkey_sha256.
+# Chạy: labs/bin/waap-install valkey --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài valkey
+  hosts: all
+  become: true
+  vars:
+    app_fw_ports: [{"proto": "tcp", "ports": [6379]}]
+  pre_tasks:
+    - name: Chuẩn nền hardening (khi --harden)
+      ansible.builtin.import_role:
+        name: baseline
+      when: app_harden | bool
+  roles:
+    - svc_valkey
+  post_tasks:
+    - name: Firewall riêng của ứng dụng (khi có app_allow_from)
+      ansible.builtin.include_role:
+        name: app_firewall

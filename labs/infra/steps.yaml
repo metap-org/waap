@@ -1,0 +1,744 @@
+# Các bước chạy lab, nhỏ và kiểm được. Mỗi bước: lệnh (run), vì sao (why), bảng "phải là bao nhiêu" (checks), cách hoàn tác.
+# Selector "at" (nơi chạy kiểm): host (máy chủ lab) | tên VM | all | all-except:<vm|vai trò>,... | role:<vai trò>
+# Kiểm sinh tự động: {use: vm_boot|tuning|limits|disks, vms: [...]}. {ip:<vm>} và {fw_rules} được điền khi sinh tài liệu.
+# {secret:<khoá>} chỉ được điền lúc chạy, không vào tài liệu.
+phases:
+  P0: Máy chủ lab sẵn sàng
+  P1: Mạng ảo và fw-1
+  P2: Boot VM theo từng vùng
+  P3: Hardening hệ điều hành từng lớp
+  P4: Firewall máy chủ
+  P5: Tối ưu hệ điều hành theo dịch vụ
+  P6: Đĩa
+  P7: Hồ sơ hệ điều hành theo vai trò
+  P8: Platform và database
+  P9: Khoá (seal)
+
+steps:
+  # ------------------------------------------------------------------ P0
+  - id: P0.1
+    title: Máy chủ lab đủ điều kiện
+    why: Phát hiện sớm thiếu RAM, đĩa, ảo hoá lồng hay công cụ, trước khi dựng bất cứ thứ gì.
+    time: 1 phút
+    run: ["labs/bin/lab check"]
+    checks:
+      - {at: host, what: Incus đã cài, cmd: "incus --version", op: rc0}
+      - {at: host, what: KVM có (ảo hoá lồng bật), cmd: "test -e /dev/kvm", op: rc0}
+      - {at: host, what: RAM máy chủ (GB), cmd: "free -g | awk '/Mem:/{print $2}'", op: ge, value: 50}
+      - {at: host, what: CPU luồng, cmd: nproc, op: ge, value: 8}
+      - {at: host, what: Đĩa trống cho Incus (GB), cmd: "df --output=avail -BG /var/lib/incus 2>/dev/null | tail -1 | tr -dc 0-9", op: ge, value: 200}
+      - {at: host, what: OpenTofu, cmd: "tofu --version", op: rc0}
+      - {at: host, what: Ansible, cmd: "ansible-playbook --version", op: rc0}
+      - {at: host, what: Ma trận luồng và luật sinh ra khớp (T07), cmd: "python3 labs/infra/tools/gen_nft.py check compact", op: rc0}
+    rollback: Không có gì để hoàn tác.
+
+  - id: P0.2
+    title: Khoá và bí mật của lab
+    why: SSH CA, mật khẩu ngẫu nhiên cho database. Nằm ngoài Git (generated/), quyền 0600.
+    depends: [P0.1]
+    time: 1 phút
+    run: ["labs/bin/lab ssh-ca", "labs/bin/lab secrets"]
+    checks:
+      - {at: host, what: Khoá riêng CA SSH quyền 600, cmd: "stat -c %a labs/infra/generated/ssh_user_ca", op: eq, value: "600"}
+      - {at: host, what: secrets.yml quyền 600, cmd: "stat -c %a labs/infra/generated/secrets.yml", op: eq, value: "600"}
+      - {at: host, what: secrets.yml không nằm trong Git, cmd: "git check-ignore -q labs/infra/generated/secrets.yml", op: rc0}
+    rollback: Xoá labs/infra/generated/ (sinh lại được).
+
+  # ------------------------------------------------------------------ P1
+  - id: P1.1
+    title: Dựng 8 cầu ảo (7 vùng và uplink)
+    why: Mỗi vùng một cầu riêng, máy chủ không có IP trên cầu, nên không có đường định tuyến giữa các vùng ngoài fw-1.
+    depends: [P0.2]
+    time: 1 phút
+    run: ["labs/bin/lab tf net"]
+    checks:
+      - {at: host, what: Đủ 8 cầu lab-*, cmd: "incus network list -f csv | grep -c '^lab-'", op: eq, value: "8"}
+      - {at: host, what: Z0 không IP trên máy chủ, cmd: "incus network get lab-z0 ipv4.address", op: eq, value: none}
+      - {at: host, what: Z1 không IP trên máy chủ, cmd: "incus network get lab-z1 ipv4.address", op: eq, value: none}
+      - {at: host, what: Z2 không IP trên máy chủ, cmd: "incus network get lab-z2 ipv4.address", op: eq, value: none}
+      - {at: host, what: Z3 không IP trên máy chủ, cmd: "incus network get lab-z3 ipv4.address", op: eq, value: none}
+      - {at: host, what: Z4 không IP trên máy chủ, cmd: "incus network get lab-z4 ipv4.address", op: eq, value: none}
+      - {at: host, what: Z5 không IP trên máy chủ, cmd: "incus network get lab-z5 ipv4.address", op: eq, value: none}
+      - {at: host, what: Z6 không IP trên máy chủ, cmd: "incus network get lab-z6 ipv4.address", op: eq, value: none}
+      - {at: host, what: Uplink có NAT, cmd: "incus network get lab-up ipv4.nat", op: eq, value: "true"}
+      - {at: host, what: Uplink dải riêng, cmd: "incus network get lab-up ipv4.address", op: eq, value: "10.10.254.1/24"}
+    rollback: "labs/bin/lab destroy (xoá cả lab) hoặc tofu destroy -target=incus_network.zone"
+
+  - id: P1.2
+    title: Boot fw-1 (router duy nhất giữa các vùng)
+    why: fw-1 có một card mạng ở mỗi vùng cộng uplink. Nó là router L3 duy nhất; không VM nào khác có hai card.
+    depends: [P1.1]
+    time: 3 phút
+    run: ["labs/bin/lab tf fw", "incus exec fw-1 -- cloud-init status --wait"]
+    checks:
+      - {at: host, what: fw-1 đang chạy, cmd: "incus list fw-1 -c s -f csv", op: eq, value: RUNNING}
+      - {at: host, what: Secure Boot tắt (ảnh images:* không ký; ghi là rủi ro ADR-0045), cmd: "incus config get fw-1 security.secureboot", op: eq, value: "false"}
+      - {at: host, what: RAM của fw-1, cmd: "incus config get fw-1 limits.memory", op: eq, value: 1GiB}
+      - {at: host, what: vCPU của fw-1, cmd: "incus config get fw-1 limits.cpu", op: eq, value: "2"}
+      - {at: fw-1, what: cloud-init xong, cmd: "cloud-init status | awk '{print $2}'", op: eq, value: done}
+      - {at: fw-1, what: Đủ 8 card mạng (z0 đến z6 và uplink), cmd: "ls /sys/class/net | grep -cE '^(z[0-6]|uplink)$'", op: eq, value: "8"}
+      - {at: fw-1, what: IP z0, cmd: "ip -4 -o addr show z0 | awk '{print $4}'", op: eq, value: 10.10.0.1/24}
+      - {at: fw-1, what: IP z1, cmd: "ip -4 -o addr show z1 | awk '{print $4}'", op: eq, value: 10.10.10.1/24}
+      - {at: fw-1, what: IP z2, cmd: "ip -4 -o addr show z2 | awk '{print $4}'", op: eq, value: 10.10.20.1/24}
+      - {at: fw-1, what: IP z3, cmd: "ip -4 -o addr show z3 | awk '{print $4}'", op: eq, value: 10.10.30.1/24}
+      - {at: fw-1, what: IP z4, cmd: "ip -4 -o addr show z4 | awk '{print $4}'", op: eq, value: 10.10.40.1/24}
+      - {at: fw-1, what: IP z5, cmd: "ip -4 -o addr show z5 | awk '{print $4}'", op: eq, value: 10.10.50.1/24}
+      - {at: fw-1, what: IP z6, cmd: "ip -4 -o addr show z6 | awk '{print $4}'", op: eq, value: 10.10.60.1/24}
+      - {at: fw-1, what: Định tuyến IP bật, cmd: "sysctl -n net.ipv4.ip_forward", op: eq, value: "1"}
+      - {at: fw-1, what: Ra Internet qua uplink, cmd: "ping -c1 -W3 1.1.1.1 >/dev/null", op: rc0}
+    rollback: "incus delete -f fw-1 (tofu dựng lại được)"
+
+  - id: P1.3
+    title: Luật nftables của fw-1 (chế độ bootstrap)
+    why: Default-deny, chỉ các luồng trong ma trận 7.6 được chuyển tiếp; bootstrap tạm cho các vùng ra Internet để cài gói (gỡ ở P9.1).
+    depends: [P1.2]
+    time: 1 phút
+    run: ["labs/bin/lab fw bootstrap"]
+    checks:
+      - {at: fw-1, what: forward policy drop, cmd: "nft list chain inet lab forward | grep -c 'policy drop'", op: eq, value: "1"}
+      - {at: fw-1, what: input policy drop, cmd: "nft list chain inet lab input | grep -c 'policy drop'", op: eq, value: "1"}
+      - {at: fw-1, what: "Số luật chuyển tiếp khớp ma trận ({fw_rules} luật)", cmd: "nft list chain inet lab forward | grep -c ' accept comment '", op: ge, value: "{fw_rules}"}
+      - {at: fw-1, what: Có luật bootstrap (tạm), cmd: "nft list chain inet lab forward | grep -c BOOTSTRAP", op: ge, value: 2}
+      - {at: fw-1, what: NAT ra uplink, cmd: "nft list table ip labnat | grep -c masquerade", op: eq, value: "1"}
+      - {at: fw-1, what: SSH vào fw-1 chỉ từ bastion (10.10.60.11), cmd: "nft list chain inet lab input | grep -c '10.10.60.11'", op: eq, value: "1"}
+    rollback: "labs/bin/lab fw bootstrap để nạp lại; xem luật bằng `incus exec fw-1 -- nft list ruleset`"
+
+  # ------------------------------------------------------------------ P2
+  - id: P2.1
+    title: Boot Z6 Vận hành (bastion, ops-1)
+    why: Boot một vùng một lần, kiểm trước khi sang vùng sau. Vận hành đứng đầu vì bastion là cửa quản trị.
+    depends: [P1.3]
+    time: 3 phút
+    run: ["labs/bin/lab tf vm bastion ops-1"]
+    checks:
+      - {use: vm_boot, vms: [bastion, ops-1]}
+    rollback: "incus delete -f <vm>"
+
+  - id: P2.2
+    title: Boot Z5 Secret (bao-1)
+    why: Vùng nhạy cảm nhất; chỉ một VM.
+    depends: [P2.1]
+    time: 2 phút
+    run: ["labs/bin/lab tf vm bao-1"]
+    checks:
+      - {use: vm_boot, vms: [bao-1]}
+    rollback: "incus delete -f bao-1"
+
+  - id: P2.3
+    title: Boot Z4 Dữ liệu (data-1, ch-1, kafka-1)
+    why: Đĩa phụ được tạo cùng VM (xem P6 để gắn).
+    depends: [P2.2]
+    time: 4 phút
+    run: ["labs/bin/lab tf vm data-1 ch-1 kafka-1"]
+    checks:
+      - {use: vm_boot, vms: [data-1, ch-1, kafka-1]}
+      - {at: data-1, what: Thấy đĩa phụ data và wal, cmd: "ls /dev/disk/by-id | grep -cE 'incus_(data|wal)'", op: ge, value: 2}
+      - {at: ch-1, what: Thấy đĩa phụ data, cmd: "ls /dev/disk/by-id | grep -c 'incus_data'", op: ge, value: 1}
+      - {at: kafka-1, what: Thấy đĩa phụ data, cmd: "ls /dev/disk/by-id | grep -c 'incus_data'", op: ge, value: 1}
+    rollback: "incus delete -f <vm>; incus storage volume delete default <vm>-<đĩa>"
+
+  - id: P2.4
+    title: Boot Z3 Ứng dụng (k8s-cp-1, k8s-wk-1, k8s-wk-2)
+    why: Ba node cho K8s; chỉ boot, chưa cài K8s.
+    depends: [P2.3]
+    time: 5 phút
+    run: ["labs/bin/lab tf vm k8s-cp-1 k8s-wk-1 k8s-wk-2"]
+    checks:
+      - {use: vm_boot, vms: [k8s-cp-1, k8s-wk-1, k8s-wk-2]}
+    rollback: "incus delete -f <vm>"
+
+  - id: P2.5
+    title: Boot Z2 Biên (perimeter-1)
+    why: Một VM gộp ingress-1, egw-1 và egress-1.
+    depends: [P2.4]
+    time: 2 phút
+    run: ["labs/bin/lab tf vm perimeter-1"]
+    checks:
+      - {use: vm_boot, vms: [perimeter-1]}
+    rollback: "incus delete -f perimeter-1"
+
+  - id: P2.6
+    title: Boot Z1 Edge DMZ (edge-1, dns-1)
+    why: Vùng tin thấp nhất trong số các vùng nội bộ.
+    depends: [P2.5]
+    time: 3 phút
+    run: ["labs/bin/lab tf vm edge-1 dns-1"]
+    checks:
+      - {use: vm_boot, vms: [edge-1, dns-1]}
+      - {at: edge-1, what: Thấy đĩa cache, cmd: "ls /dev/disk/by-id | grep -c 'incus_cache'", op: ge, value: 1}
+    rollback: "incus delete -f <vm>"
+
+  - id: P2.7
+    title: Boot Z0 Internet giả (origin, loadgen, dns-mock)
+    why: Các VM đóng vai bên ngoài; chưa cài gì lên chúng.
+    depends: [P2.6]
+    time: 3 phút
+    run: ["labs/bin/lab tf vm origin loadgen dns-mock"]
+    checks:
+      - {use: vm_boot, vms: [origin, loadgen, dns-mock]}
+    rollback: "incus delete -f <vm>"
+
+  # ------------------------------------------------------------------ P3
+  - id: P3.1
+    title: Gói bắt buộc và gỡ trình biên dịch
+    why: "ADR-0048, \"Dịch vụ\": chỉ gói cần thiết, không trình biên dịch, không công cụ mạng cũ."
+    depends: [P2.7]
+    time: 6 phút (16 máy cài song song theo ansible forks)
+    run: ["labs/bin/lab provision --tags packages"]
+    checks:
+      - {at: all, what: auditd đã cài, cmd: "dpkg -s auditd | grep -c 'Status: install ok installed'", op: eq, value: "1"}
+      - {at: all, what: aide đã cài, cmd: "dpkg -s aide | grep -c 'Status: install ok installed'", op: eq, value: "1"}
+      - {at: all, what: chrony đã cài, cmd: "dpkg -s chrony | grep -c 'Status: install ok installed'", op: eq, value: "1"}
+      - {at: all, what: nftables đã cài, cmd: "dpkg -s nftables | grep -c 'Status: install ok installed'", op: eq, value: "1"}
+      - {at: all, what: Không có gcc, cmd: "command -v gcc >/dev/null 2>&1; echo $?", op: eq, value: "1"}
+      - {at: all, what: Không có make, cmd: "command -v make >/dev/null 2>&1; echo $?", op: eq, value: "1"}
+      - {at: all, what: Không có telnet, cmd: "command -v telnet >/dev/null 2>&1; echo $?", op: eq, value: "1"}
+    rollback: Cài lại gói bằng apt nếu cần; bước idempotent.
+
+  - id: P3.2
+    title: Truy cập (SSH, người dùng, sudo)
+    why: Chỉ SSH cert, không mật khẩu, không root, nhóm ops, sudo có ghi log. Lab vẫn vào bằng incus exec nên không tự khoá.
+    depends: [P3.1]
+    time: 2 phút
+    run: ["labs/bin/lab provision --tags access"]
+    checks:
+      - {at: all, what: Cấm đăng nhập root, cmd: "sshd -T | awk '/^permitrootlogin/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Cấm mật khẩu, cmd: "sshd -T | awk '/^passwordauthentication/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Chỉ nhóm ops được SSH, cmd: "sshd -T | awk '/^allowgroups/{print $2}'", op: eq, value: ops}
+      - {at: all, what: Tối đa 3 lần thử, cmd: "sshd -T | awk '/^maxauthtries/{print $2}'", op: eq, value: "3"}
+      - {at: all, what: Hết hạn đăng nhập 30 giây, cmd: "sshd -T | awk '/^logingracetime/{print $2}'", op: eq, value: "30"}
+      - {at: all, what: Ngắt phiên rảnh 300 giây, cmd: "sshd -T | awk '/^clientaliveinterval/{print $2}'", op: eq, value: "300"}
+      - {at: all, what: Không X11, cmd: "sshd -T | awk '/^x11forwarding/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Cấm xác thực theo máy (hostbased), cmd: "sshd -T | awk '/^hostbasedauthentication/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Bỏ qua rhosts, cmd: "sshd -T | awk '/^ignorerhosts/{print $2}'", op: eq, value: "yes"}
+      - {at: all, what: Cấm biến môi trường do người dùng đặt, cmd: "sshd -T | awk '/^permituserenvironment/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Cấm tunnel, cmd: "sshd -T | awk '/^permittunnel/{print $2}'", op: eq, value: "false"}
+      - {at: all, what: Không GSSAPI, cmd: "sshd -T | awk '/^gssapiauthentication/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Giới hạn kết nối chưa xác thực, cmd: "sshd -T | awk '/^maxstartups/{print $2}'", op: eq, value: "10:30:60"}
+      - {at: all, what: Chỉ mã hoá hiện đại (không có cbc), cmd: "sshd -T | awk '/^ciphers/{print $2}' | grep -c cbc", op: eq, value: "0"}
+      - {at: all-except:bastion, what: Không chuyển tiếp TCP, cmd: "sshd -T | awk '/^allowtcpforwarding/{print $2}'", op: eq, value: "no"}
+      - {at: bastion, what: Bastion cho chuyển tiếp TCP (ProxyJump), cmd: "sshd -T | awk '/^allowtcpforwarding/{print $2}'", op: eq, value: "yes"}
+      - {at: all, what: Có CA SSH tin cậy, cmd: "sshd -T | grep -c '^trustedusercakeys'", op: eq, value: "1"}
+      - {at: all, what: Mật khẩu root bị khoá, cmd: "passwd -S root | awk '{print $2}'", op: eq, value: L}
+      - {at: all, what: sudoers của ops quyền 440, cmd: "stat -c %a /etc/sudoers.d/90-waap-ops", op: eq, value: "440"}
+      - {at: all, what: sudo ghi log, cmd: "grep -c 'logfile=\"/var/log/sudo.log\"' /etc/sudoers.d/90-waap-ops", op: eq, value: "1"}
+    rollback: "Xoá /etc/ssh/sshd_config.d/10-waap-hardening.conf rồi systemctl restart ssh (qua incus exec)."
+
+  - id: P3.3
+    title: Hệ tệp và module kernel
+    why: /tmp và /dev/shm không thực thi được; chặn module không dùng (USB, FireWire, hệ tệp lạ, giao thức hiếm).
+    depends: [P3.2]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags filesystem"]
+    checks:
+      - {at: all, what: "/tmp noexec,nosuid,nodev", cmd: "findmnt -no OPTIONS /tmp", op: contains_all, value: [noexec, nosuid, nodev]}
+      - {at: all, what: "/tmp là tmpfs", cmd: "findmnt -no FSTYPE /tmp", op: eq, value: tmpfs}
+      - {at: all, what: "/dev/shm noexec,nosuid,nodev", cmd: "findmnt -no OPTIONS /dev/shm", op: contains_all, value: [noexec, nosuid, nodev]}
+      - {at: all, what: Chặn usb-storage, cmd: "modprobe -n -v usb-storage", op: contains, value: /bin/false}
+      - {at: all, what: Chặn firewire-core, cmd: "modprobe -n -v firewire-core", op: contains, value: /bin/false}
+      - {at: all, what: Chặn cramfs, cmd: "modprobe -n -v cramfs", op: contains, value: /bin/false}
+      - {at: all, what: Chặn sctp, cmd: "modprobe -n -v sctp", op: contains, value: /bin/false}
+    rollback: "Sửa /etc/fstab và /etc/modprobe.d/90-waap-blacklist.conf."
+
+  - id: P3.4
+    title: Dịch vụ hệ thống
+    why: Tắt dịch vụ không dùng; bật AppArmor, auditd.
+    depends: [P3.3]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags services"]
+    checks:
+      - {at: all, what: AppArmor chạy, cmd: "systemctl is-active apparmor", op: eq, value: active}
+      - {at: all, what: avahi không chạy, cmd: "systemctl is-active avahi-daemon; true", op: re, value: "^(inactive|unknown|failed)"}
+      - {at: all, what: cups không chạy, cmd: "systemctl is-active cups; true", op: re, value: "^(inactive|unknown|failed)"}
+      - {at: all, what: rpcbind không chạy, cmd: "systemctl is-active rpcbind; true", op: re, value: "^(inactive|unknown|failed)"}
+      - {at: all, what: Không có profile AppArmor ở chế độ complain, cmd: "aa-status --complaining", op: eq, value: "0"}
+    rollback: Bật lại bằng systemctl unmask.
+
+  - id: P3.5
+    title: Sysctl chuẩn (mạng và kernel)
+    why: Chống giả mạo IP, tắt redirect, ASLR, che con trỏ kernel; tắt IPv6 ở lab. Chuyển tiếp IP chỉ bật ở fw-1 và node K8s.
+    depends: [P3.4]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags kernel"]
+    checks:
+      - {at: all, what: rp_filter, cmd: "sysctl -n net.ipv4.conf.all.rp_filter", op: eq, value: "1"}
+      - {at: all, what: Không nhận source route, cmd: "sysctl -n net.ipv4.conf.all.accept_source_route", op: eq, value: "0"}
+      - {at: all, what: Không nhận redirect, cmd: "sysctl -n net.ipv4.conf.all.accept_redirects", op: eq, value: "0"}
+      - {at: all, what: Không gửi redirect, cmd: "sysctl -n net.ipv4.conf.all.send_redirects", op: eq, value: "0"}
+      - {at: all, what: Ghi log gói lạ, cmd: "sysctl -n net.ipv4.conf.all.log_martians", op: eq, value: "1"}
+      - {at: all, what: SYN cookies, cmd: "sysctl -n net.ipv4.tcp_syncookies", op: eq, value: "1"}
+      - {at: all, what: Tắt IPv6, cmd: "sysctl -n net.ipv6.conf.all.disable_ipv6", op: eq, value: "1"}
+      - {at: all, what: ASLR đầy đủ, cmd: "sysctl -n kernel.randomize_va_space", op: eq, value: "2"}
+      - {at: all, what: Che con trỏ kernel, cmd: "sysctl -n kernel.kptr_restrict", op: eq, value: "2"}
+      - {at: all, what: Không nhận redirect an toàn (default), cmd: "sysctl -n net.ipv4.conf.default.secure_redirects", op: eq, value: "0"}
+      - {at: all, what: Ghi log gói lạ (default), cmd: "sysctl -n net.ipv4.conf.default.log_martians", op: eq, value: "1"}
+      - {at: all, what: Chống TIME-WAIT assassination (RFC 1337), cmd: "sysctl -n net.ipv4.tcp_rfc1337", op: eq, value: "1"}
+      - {at: all, what: Tắt SysRq, cmd: "sysctl -n kernel.sysrq", op: eq, value: "0"}
+      - {at: all, what: perf_event chỉ root, cmd: "sysctl -n kernel.perf_event_paranoid", op: eq, value: "3"}
+      - {at: all, what: Cấm nạp kernel mới bằng kexec, cmd: "sysctl -n kernel.kexec_load_disabled", op: eq, value: "1"}
+      - {at: all, what: Hạn chế dmesg, cmd: "sysctl -n kernel.dmesg_restrict", op: eq, value: "1"}
+      - {at: all, what: ptrace chỉ cha con, cmd: "sysctl -n kernel.yama.ptrace_scope", op: eq, value: "1"}
+      - {at: all, what: bpf không đặc quyền tắt (Ubuntu mặc định 2, không hạ được), cmd: "sysctl -n kernel.unprivileged_bpf_disabled", op: eq, value: "2"}
+      - {at: all, what: Không core dump suid, cmd: "sysctl -n fs.suid_dumpable", op: eq, value: "0"}
+      - {at: "all-except:firewall,k8s-cp,k8s-app", what: Không định tuyến IP, cmd: "sysctl -n net.ipv4.ip_forward", op: eq, value: "0"}
+      - {at: fw-1, what: fw-1 định tuyến IP, cmd: "sysctl -n net.ipv4.ip_forward", op: eq, value: "1"}
+      - {at: role:k8s-cp, what: Node K8s định tuyến IP, cmd: "sysctl -n net.ipv4.ip_forward", op: eq, value: "1"}
+      - {at: role:k8s-app, what: Node K8s định tuyến IP, cmd: "sysctl -n net.ipv4.ip_forward", op: eq, value: "1"}
+    rollback: "Xoá /etc/sysctl.d/99-waap-hardening.conf rồi sysctl --system."
+
+  - id: P3.6
+    title: auditd
+    why: Ghi nhận thay đổi danh tính, sudo, SSH, giờ hệ thống, module kernel, mount, xoá tệp.
+    depends: [P3.5]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags audit"]
+    checks:
+      - {at: all, what: auditd chạy, cmd: "systemctl is-active auditd", op: eq, value: active}
+      - {at: all, what: Audit bật, cmd: "auditctl -s | awk '/^enabled/{print $2}'", op: eq, value: "1"}
+      - {at: all, what: "Số luật đã nạp", cmd: "auditctl -l | wc -l", op: ge, value: 20}
+      - {at: all, what: Có luật identity (passwd, group, shadow, gshadow), cmd: "auditctl -l | grep -c 'k identity'", op: ge, value: 4}
+      - {at: all, what: Có luật sudoers, cmd: "auditctl -l | grep -c 'k sudoers'", op: ge, value: 2}
+      - {at: all, what: Có luật sshd, cmd: "auditctl -l | grep -c 'k sshd'", op: ge, value: 3}
+      - {at: all, what: Có luật đổi giờ, cmd: "auditctl -l | grep -c 'k time-change'", op: ge, value: 1}
+      - {at: all, what: Có luật system-locale (hostname, issue), cmd: "auditctl -l | grep -c 'k system-locale'", op: ge, value: 3}
+      - {at: all, what: Có luật PAM, cmd: "auditctl -l | grep -c 'k pam'", op: ge, value: 3}
+      - {at: all, what: Có luật phiên đăng nhập (wtmp, btmp, utmp), cmd: "auditctl -l | grep -c 'k session'", op: ge, value: 3}
+      - {at: all, what: Có luật chính sách AppArmor, cmd: "auditctl -l | grep -c 'k mac-policy'", op: ge, value: 2}
+      - {at: all, what: Có luật giả danh người dùng (execve euid khác uid), cmd: "auditctl -l | grep -c 'k user_emulation'", op: ge, value: 1}
+      - {at: all, what: "Log audit tối đa 50 MB mỗi tệp", cmd: "grep -E '^max_log_file ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: "50"}
+      - {at: all, what: Giữ 10 tệp log, cmd: "grep -E '^num_logs ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: "10"}
+      - {at: all, what: Xoay vòng log, cmd: "grep -E '^max_log_file_action ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: rotate}
+      - {at: all, what: Đầy đĩa thì tạm dừng (không làm sập máy), cmd: "grep -E '^disk_full_action ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: suspend}
+      - {at: all, what: Có luật nạp module kernel, cmd: "auditctl -l | grep -c 'k modules'", op: ge, value: 1}
+    rollback: "Xoá /etc/audit/rules.d/90-waap.rules rồi augenrules --load."
+
+  - id: P3.7
+    title: AIDE (toàn vẹn tệp hệ thống)
+    why: Cơ sở dữ liệu băm ban đầu; thay đổi ngoài Ansible bị báo.
+    depends: [P3.6]
+    time: 15 phút (aideinit quét cả hệ tệp)
+    run: ["labs/bin/lab provision --tags aide"]
+    checks:
+      - {at: all-except:firewall, what: Cơ sở dữ liệu AIDE có nội dung, cmd: "test -s /var/lib/aide/aide.db", op: rc0}
+      - {at: all-except:firewall, what: Kiểm AIDE hằng ngày bật, cmd: "systemctl is-enabled dailyaidecheck.timer", op: eq, value: enabled}
+      - {at: all-except:firewall, what: Ngay sau khởi tạo AIDE không báo thay đổi (rc 0), cmd: "aide --check >/dev/null 2>&1", op: rc0}
+    rollback: "rm /var/lib/aide/aide.db rồi chạy lại bước."
+
+  - id: P3.8
+    title: Đồng bộ giờ và vá tự động
+    why: Giờ chuẩn cho cert 24 giờ và log; vá bảo mật tự động, khởi động lại 03:30.
+    depends: [P3.7]
+    time: 2 phút
+    run: ["labs/bin/lab provision --tags updates"]
+    checks:
+      - {at: all, what: chrony chạy, cmd: "systemctl is-active chrony", op: eq, value: active}
+      - {at: all, what: Có ít nhất một nguồn giờ, cmd: "chronyc sources | grep -c '^\\^'", op: ge, value: 1}
+      - {at: all, what: Dùng pool 4 nguồn (chrony khuyến nghị 3 nguồn trở lên; bootstrap), cmd: "grep -c '^pool ntp.ubuntu.com iburst maxsources 4' /etc/chrony/chrony.conf", op: eq, value: "1"}
+      - {at: all, what: Không phục vụ giờ cho ai (cổng 0), cmd: "grep -c '^port 0' /etc/chrony/chrony.conf", op: eq, value: "1"}
+      - {at: all, what: Vá tự động bật, cmd: "grep -c 'Unattended-Upgrade \"1\"' /etc/apt/apt.conf.d/20auto-upgrades", op: eq, value: "1"}
+      - {at: all, what: Chỉ vá bảo mật, cmd: "grep -c 'security' /etc/apt/apt.conf.d/52unattended-upgrades-waap", op: ge, value: 1}
+      - {at: all, what: Giờ khởi động lại, cmd: "grep -o '03:30' /etc/apt/apt.conf.d/52unattended-upgrades-waap", op: eq, value: "03:30"}
+      - {at: all, what: Không khởi động lại khi có người đăng nhập, cmd: "grep -c 'Automatic-Reboot-WithUsers \"false\"' /etc/apt/apt.conf.d/52unattended-upgrades-waap", op: eq, value: "1"}
+    rollback: Xoá các tệp apt.conf.d/20auto-upgrades và 52unattended-upgrades-waap.
+
+  # ------------------------------------------------------------------ P4
+  - id: P4.1
+    title: Xem trước luật firewall máy chủ (không áp dụng)
+    why: Luật input default-deny của từng máy sinh từ ma trận. Đọc trước để chắc không tự chặn đường quản trị.
+    depends: [P3.8]
+    time: 2 phút
+    run: ["labs/bin/lab provision --tags hostfw --check --diff"]
+    checks:
+      - {at: host, what: Mọi luật máy chủ qua nft -c, cmd: "for f in labs/infra/generated/compact/hosts/*.nft; do nft -c -f $f || exit 1; done", op: rc0}
+      - {at: host, what: Có luật SSH từ bastion (N25) ở mọi máy, cmd: "grep -L 'N25' labs/infra/generated/compact/hosts/*.nft | wc -l", op: eq, value: "1"}
+      - {at: host, what: "Đọc diff: không máy nào mất đường SSH từ bastion; luật chỉ mở cổng có dòng trong ma trận", manual: "đọc đầu ra của lệnh run", op: manual}
+    manual_only: false
+    rollback: Bước chỉ xem, không đổi gì.
+
+  - id: P4.2
+    title: Áp firewall máy chủ
+    why: Input default-deny trên từng VM, cộng egress khoá cho vai trò nhạy cảm (kho dữ liệu, OpenBao, WAF) khi seal.
+    depends: [P4.1]
+    time: 2 phút
+    run: ["labs/bin/lab provision --tags hostfw"]
+    checks:
+      - {at: all-except:firewall, what: nftables chạy, cmd: "systemctl is-active nftables", op: eq, value: active}
+      - {at: all-except:firewall, what: Input policy drop, cmd: "nft list chain inet host input | grep -c 'policy drop'", op: eq, value: "1"}
+      - {at: all-except:firewall, what: Luật nạp từ tệp sinh tự động, cmd: "grep -c 'Sinh tự động' /etc/nftables.conf", op: eq, value: "1"}
+      - {at: "role:k8s-cp", what: Node K8s chỉ mở cổng RKE2 cần thiết (6443, 9345 cho worker; không mở all), cmd: "nft list chain inet host input | grep -c 'L02a'", op: eq, value: "1"}
+      - {at: "role:k8s-app", what: Worker không có luật mở 6443 và 9345 cho ai (chỉ server mới có), cmd: "nft list chain inet host input | grep -c 'L02a'", op: eq, value: "0"}
+      - {at: "role:k8s-cp", what: Kubelet 10250 và Canal 9099 chỉ trong vùng Z3, cmd: "nft list chain inet host input | grep 'L02b' | grep -c '10.10.30.'", op: ge, value: 1}
+      - {at: "role:k8s-cp", what: VXLAN udp 8472 chỉ trong vùng Z3, cmd: "nft list chain inet host input | grep 'L02c' | grep -c '10.10.30.'", op: ge, value: 1}
+      - {at: "role:k8s-app", what: Chấp nhận lưu lượng từ giao diện mạng pod (cni0, flannel.1), cmd: "nft list chain inet host input | grep -c 'pod network'", op: eq, value: "1"}
+      - {at: "role:k8s-cp", what: Chấp nhận lưu lượng từ giao diện mạng pod (cni0, flannel.1), cmd: "nft list chain inet host input | grep -c 'pod network'", op: eq, value: "1"}
+      - {at: bastion, what: Bastion vẫn SSH được data-1 (N25), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/22'", op: rc0}
+    rollback: "incus exec <vm> -- nft flush ruleset (tạm), rồi sửa flows.yaml và chạy lại."
+
+  - id: P4.3
+    title: Thăm dò mạng sinh từ ma trận
+    why: Luồng cho phép phải đến được, luồng cấm phải hết thời gian. Kiểm hai chiều bằng chạy thật (T01 đến T07).
+    depends: [P4.2]
+    time: 3 phút
+    run: ["labs/bin/lab nettest"]
+    checks:
+      - {at: host, what: Mọi thăm dò đúng kỳ vọng, cmd: "labs/bin/lab nettest", op: rc0}
+      - {at: edge-1, what: Edge không tới được data-1 5432 (X01), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc_nonzero}
+      - {at: edge-1, what: Edge không tới được bao-1 8200 (X01), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:bao-1}/8200'", op: rc_nonzero}
+      - {at: loadgen, what: Internet giả không tới được data-1 (X02), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc_nonzero}
+      - {at: bao-1, what: OpenBao không gọi ra được vùng khác (X05), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc_nonzero}
+    rollback: Không đổi gì.
+
+  # ------------------------------------------------------------------ P5
+  - id: P5.1
+    title: Tuning cho data-1 (PostgreSQL, RabbitMQ, Redis trên cùng máy)
+    why: Ba dịch vụ dùng chung kernel nên giá trị được gộp; xung đột ghi ở cuối mục này. Hugepage cấp sẵn cho shared_buffers.
+    depends: [P4.3]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags tuning --limit data-1"]
+    checks:
+      - {use: tuning, vms: [data-1]}
+    rollback: "Xoá /etc/sysctl.d/99-zz-waap-tuning.conf và waap-thp-off.service rồi sysctl --system."
+
+  - id: P5.2
+    title: Tuning cho ch-1 (ClickHouse)
+    why: max_map_count cho mmap, THP tắt, swappiness thấp.
+    depends: [P5.1]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags tuning --limit ch-1"]
+    checks:
+      - {use: tuning, vms: [ch-1]}
+    rollback: Như P5.1.
+
+  - id: P5.3
+    title: Tuning cho edge-1 (mạng, hàng đợi, cổng nguồn)
+    why: Hàng đợi accept và SYN đủ lớn cho tải đột biến; dải cổng nguồn rộng để proxy tới origin.
+    depends: [P5.2]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags tuning --limit edge-1"]
+    checks:
+      - {use: tuning, vms: [edge-1]}
+    rollback: Như P5.1.
+
+  - id: P5.4
+    title: Tuning cho bao-1 (OpenBao)
+    why: Không core dump vì bộ nhớ chứa khoá.
+    depends: [P5.3]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags tuning --limit bao-1"]
+    checks:
+      - {use: tuning, vms: [bao-1]}
+    rollback: Như P5.1.
+
+  - id: P5.5
+    title: Tuning cho node K8s (kubelet protect-kernel-defaults)
+    why: kubelet từ chối chạy nếu sysctl lệch giá trị nó mong đợi; inotify và conntrack đủ cho nhiều pod.
+    depends: [P5.4]
+    time: 2 phút
+    run: ["labs/bin/lab provision --tags tuning --limit k8s-cp-1,k8s-wk-1,k8s-wk-2"]
+    checks:
+      - {use: tuning, vms: [k8s-cp-1, k8s-wk-1, k8s-wk-2]}
+    rollback: Như P5.1.
+
+  - id: P5.6
+    title: Pin CPU và giới hạn RAM cho WAF trên edge-1
+    why: WAF không được tranh CPU với L7. edge-1 có 2 vCPU nên L7 ở nhân 0, WAF bị khoá ở nhân 1 bằng slice systemd.
+    depends: [P5.5]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags profile-edge --limit edge-1"]
+    checks:
+      - {at: edge-1, what: WAF chỉ chạy ở nhân 1, cmd: "systemctl show waap-waf.slice -p AllowedCPUs --value", op: eq, value: "1"}
+      - {at: edge-1, what: WAF tối đa 100% một nhân, cmd: "systemctl show waap-waf.slice -p CPUQuotaPerSecUSec --value", op: eq, value: 1s}
+      - {at: edge-1, what: WAF tối đa 1 GiB RAM (byte), cmd: "systemctl show waap-waf.slice -p MemoryMax --value", op: eq, value: "1073741824"}
+      - {at: edge-1, what: L7 tối đa 1 GiB RAM (byte), cmd: "systemctl show waap-edge -p MemoryMax --value", op: eq, value: "1073741824"}
+      - {at: edge-1, what: L7 chỉ có quyền gắn cổng thấp, cmd: "systemctl show waap-edge -p CapabilityBoundingSet --value", op: eq, value: cap_net_bind_service}
+      - {at: edge-1, what: WAF không có capability nào, cmd: "systemctl show waap-waf -p CapabilityBoundingSet --value", op: eq, value: ""}
+      - {at: edge-1, what: L7 chạy bằng user riêng không đăng nhập, cmd: "getent passwd waap-edge | cut -d: -f7", op: eq, value: /usr/sbin/nologin}
+      - {at: edge-1, what: "Pin vCPU của VM vào nhân máy chủ (chỉ máy Linux riêng, đường B)", manual: "incus config get edge-1 limits.cpu; đặt `pin` trong profile rồi tofu apply; ở đường A (Hyper-V) bỏ qua", op: manual}
+    rollback: Xoá waap-waf.slice và drop-in rồi daemon-reload.
+
+  # ------------------------------------------------------------------ P6
+  - id: P6.1
+    title: Gắn đĩa phụ (dữ liệu, WAL, audit, cache)
+    why: "ADR-0048: đĩa riêng cho dữ liệu, WAL, audit, cache; noatime, nodev, nosuid, noexec cho dữ liệu."
+    depends: [P5.6]
+    time: 3 phút
+    run: ["labs/bin/lab provision --tags disks"]
+    checks:
+      - {use: disks, vms: [data-1, ch-1, kafka-1, bao-1, edge-1]}
+    rollback: "umount, bỏ dòng trong /etc/fstab. Không mkfs lại khi đã có dữ liệu."
+
+  # ------------------------------------------------------------------ P7
+  - id: P7.1
+    title: Hồ sơ data (tài khoản backup, thư mục gốc dữ liệu)
+    why: Tài khoản backup riêng không đăng nhập được; thư mục gốc chỉ root và nhóm backup.
+    depends: [P6.1]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags profile-data"]
+    checks:
+      - {at: role:postgres, what: Tài khoản backup không đăng nhập, cmd: "getent passwd waap-backup | cut -d: -f7", op: eq, value: /usr/sbin/nologin}
+      - {at: role:postgres, what: Thư mục gốc dữ liệu quyền 750, cmd: "stat -c %a /var/lib/waap", op: eq, value: "750"}
+      - {at: role:clickhouse, what: Thư mục gốc dữ liệu quyền 750, cmd: "stat -c %a /var/lib/waap", op: eq, value: "750"}
+    rollback: Xoá user waap-backup.
+
+  - id: P7.2
+    title: "Hồ sơ secret (OpenBao: không swap, không core dump, khoá bộ nhớ)"
+    why: Bộ nhớ chứa khoá không được ra đĩa. CAP_IPC_LOCK và LimitMEMLOCK cho mlock.
+    depends: [P7.1]
+    time: 1 phút
+    run: ["labs/bin/lab provision --tags profile-secret"]
+    checks:
+      - {at: bao-1, what: Không có swap, cmd: "swapon --show | wc -l", op: eq, value: "0"}
+      - {at: bao-1, what: Không có dòng swap hoạt động trong fstab, cmd: "grep -vc '^#' /etc/fstab | head -1; grep -c '^[^#].*swap' /etc/fstab", op: eq, value: "0"}
+      - {at: bao-1, what: Core dump systemd tắt, cmd: "grep -c 'Storage=none' /etc/systemd/coredump.conf.d/10-disable.conf", op: eq, value: "1"}
+      - {at: bao-1, what: User openbao không đăng nhập, cmd: "getent passwd openbao | cut -d: -f7", op: eq, value: /usr/sbin/nologin}
+      - {at: bao-1, what: Thư mục audit riêng quyền 750, cmd: "stat -c %a /var/log/openbao-audit", op: eq, value: "750"}
+      - {at: bao-1, what: Thư mục audit thuộc openbao, cmd: "stat -c %U /var/log/openbao-audit", op: eq, value: openbao}
+      - {at: bao-1, what: Cho phép mlock, cmd: "systemctl show openbao -p LimitMEMLOCK --value", op: eq, value: infinity}
+      - {at: bao-1, what: Chỉ có CAP_IPC_LOCK, cmd: "systemctl show openbao -p CapabilityBoundingSet --value", op: eq, value: cap_ipc_lock}
+    rollback: Xoá drop-in openbao.service.d.
+
+  - id: P7.3
+    title: Hồ sơ bastion (WireGuard, ghi phiên, không giữ khoá riêng)
+    why: Cửa quản trị duy nhất; ghi phím gõ vào auditd; MFA TOTP mặc định tắt để không tự khoá.
+    depends: [P7.2]
+    time: 2 phút
+    run: ["labs/bin/lab provision --tags profile-bastion"]
+    checks:
+      - {at: bastion, what: Khoá WireGuard sinh tại chỗ, quyền 600, cmd: "stat -c %a /etc/wireguard/private.key", op: eq, value: "600"}
+      - {at: bastion, what: Ghi phiên bằng pam_tty_audit, cmd: "grep -c pam_tty_audit /etc/pam.d/sshd", op: eq, value: "1"}
+      - {at: bastion, what: Không có khoá riêng của ai trong /home, cmd: "find /home -name 'id_*' -o -name '*.pem' | wc -l", op: eq, value: "0"}
+      - {at: bastion, what: "MFA TOTP (mặc định tắt trong lab; bật khi mọi người đã có TOTP)", manual: "đặt bastion_mfa=true trong group_vars/role_bastion.yml khi sẵn sàng", op: manual}
+    rollback: Gỡ dòng pam_tty_audit khỏi /etc/pam.d/sshd.
+
+  # ------------------------------------------------------------------ P8
+  - id: P8.1
+    title: RKE2 server (control-plane)
+    why: "Platform K8s (RKE2, không dùng k3s). Cần ghim phiên bản và sha256 của tarball (bộ cài từ chối tải nhị phân chưa kiểm). Profile CIS bắt buộc có user etcd và sysctl đúng giá trị; mã hoá secret; tắt ingress mặc định."
+    depends: [P7.3]
+    time: 8 phút (kéo ảnh container lần đầu)
+    run: ["labs/bin/lab provision --tags k8s --limit k8s-cp-1"]
+    checks:
+      - {at: k8s-cp-1, what: rke2-server chạy, cmd: "systemctl is-active rke2-server", op: eq, value: active}
+      - {at: k8s-cp-1, what: Node Ready, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Profile CIS bật, cmd: "grep -c '^profile: cis' /etc/rancher/rke2/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: User etcd không đăng nhập, cmd: "getent passwd etcd | cut -d: -f7", op: eq, value: /sbin/nologin}
+      - {at: k8s-cp-1, what: Dữ liệu etcd thuộc user etcd, cmd: "stat -c %U /var/lib/rancher/rke2/server/db/etcd", op: eq, value: etcd}
+      - {at: k8s-cp-1, what: Cổng supervisor 9345 nghe, cmd: "ss -ltn | grep -c ':9345'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Cổng API 6443 nghe, cmd: "ss -ltn | grep -c ':6443'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Cổng chỉ đọc kubelet 10255 đóng, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
+      - {at: k8s-cp-1, what: Mã hoá secret bật, cmd: "/usr/local/bin/rke2 secrets-encrypt status | grep -c 'Enabled'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: CNI canal đang chạy, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers | grep -c canal", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Không có ingress controller mặc định (ingress do ingress-1 đảm nhiệm), cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers | grep -ciE 'ingress-nginx|traefik'", op: eq, value: "0"}
+      - {at: k8s-cp-1, what: API server dùng cấu hình Pod Security (admission), cmd: "ps -eo args | grep -c '[a]dmission-control-config-file'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: API server có audit log, cmd: "ps -eo args | grep -c '[a]udit-log-path'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Có audit policy mặc định do profile CIS tạo, cmd: "ls /etc/rancher/rke2/audit-policy.yaml", op: rc0}
+      - {at: k8s-cp-1, what: Ngắt kết nối stream rảnh 5 phút, cmd: "grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/rke2/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Token cụm quyền 600, cmd: "stat -c %a /etc/rancher/rke2/token", op: eq, value: "600"}
+      - {at: k8s-cp-1, what: Cấu hình RKE2 quyền 600, cmd: "stat -c %a /etc/rancher/rke2/config.yaml", op: eq, value: "600"}
+      - {at: k8s-cp-1, what: kubeconfig quyền 600, cmd: "stat -c %a /etc/rancher/rke2/rke2.yaml", op: eq, value: "600"}
+      - {at: k8s-cp-1, what: Không swap, cmd: "swapon --show | wc -l", op: eq, value: "0"}
+    rollback: "incus exec k8s-cp-1 -- /usr/local/bin/rke2-uninstall.sh (có trong tarball) hoặc dựng lại VM."
+
+  - id: P8.2
+    title: RKE2 agent (hai worker)
+    why: Hai worker gia nhập cụm qua cổng supervisor 9345.
+    depends: [P8.1]
+    time: 6 phút
+    run: ["labs/bin/lab provision --tags k8s --limit k8s-wk-1,k8s-wk-2"]
+    checks:
+      - {at: k8s-cp-1, what: Ba node Ready, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "3"}
+      - {at: k8s-wk-1, what: Agent chạy, cmd: "systemctl is-active rke2-agent", op: eq, value: active}
+      - {at: k8s-wk-2, what: Agent chạy, cmd: "systemctl is-active rke2-agent", op: eq, value: active}
+      - {at: k8s-wk-1, what: Worker vào được supervisor 9345 của server, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/9345'", op: rc0}
+      - {at: k8s-wk-1, what: Worker vào được API 6443, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/6443'", op: rc0}
+      - {at: k8s-wk-1, what: Worker KHÔNG vào được etcd 2379 của server, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/2379'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Worker KHÔNG vào được etcd peer 2380, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/2380'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Worker KHÔNG SSH được vào server, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/22'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Worker KHÔNG SSH được vào worker khác, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-wk-2}/22'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Server vào được kubelet 10250 của worker, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-wk-2}/10250'", op: rc0}
+      - {at: k8s-cp-1, what: Pod hệ thống đều Running (CNI và đường pod tới API không bị firewall máy chủ chặn), cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers | grep -c ' Running'", op: ge, value: 5}
+      - {at: k8s-wk-1, what: Worker kubelet không mở cổng chỉ đọc, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
+    rollback: "incus exec <worker> -- /usr/local/bin/rke2-uninstall.sh hoặc dựng lại VM."
+
+  - id: P8.3
+    title: PostgreSQL (repo PGDG chính thức)
+    why: "Cài từ repo PGDG với khoá ký ghim fingerprint, không dùng gói Ubuntu; gói bị hold nên chỉ nâng khi đổi biến. Đĩa dữ liệu và WAL riêng, checksum, scram-sha-256, TLS, chỉ nhận từ vùng ứng dụng (Z3)."
+    depends: [P8.2]
+    time: 3 phút
+    run: ["labs/bin/lab services --tags postgres"]
+    checks:
+      - {at: data-1, what: Gói đến từ repo PGDG, không phải kho Ubuntu, cmd: "apt-cache policy postgresql-{pg_version} | grep -c 'apt.postgresql.org'", op: ge, value: 1}
+      - {at: data-1, what: Khoá ký repo PGDG đúng fingerprint đã ghim, cmd: "gpg --batch --show-keys --with-colons /usr/share/keyrings/pgdg.gpg | awk -F: '/^fpr:/{print $10}' | grep -c B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8", op: ge, value: 1}
+      - {at: data-1, what: Gói PostgreSQL bị hold (không tự nâng), cmd: "apt-mark showhold | grep -c 'postgresql-{pg_version}'", op: ge, value: 1}
+      - {at: data-1, what: Ghi lại version đã cài (đọc bằng mắt), manual: "sudo -u postgres psql -tAc 'select version()'; ghi version vào nhật ký", op: manual}
+      - {at: data-1, what: Sẵn sàng nhận kết nối, cmd: "pg_isready -q", op: rc0}
+      - {at: data-1, what: TLS bật, cmd: "sudo -u postgres psql -tAc 'show ssl'", op: eq, value: "on"}
+      - {at: data-1, what: Mã hoá mật khẩu, cmd: "sudo -u postgres psql -tAc 'show password_encryption'", op: eq, value: scram-sha-256}
+      - {at: data-1, what: Thư mục dữ liệu trên đĩa riêng, cmd: "sudo -u postgres psql -tAc 'show data_directory'", op: eq, value: /var/lib/waap/data/pg}
+      - {at: data-1, what: WAL trên đĩa riêng, cmd: "readlink -f /var/lib/waap/data/pg/pg_wal", op: eq, value: /var/lib/waap/wal/pg}
+      - {at: data-1, what: Checksum dữ liệu bật, cmd: "sudo -u postgres psql -tAc 'show data_checksums'", op: eq, value: "on"}
+      - {at: data-1, what: Chỉ nghe IP lab và localhost, cmd: "sudo -u postgres psql -tAc 'show listen_addresses'", op: eq, value: "127.0.0.1,10.10.40.11"}
+      - {at: data-1, what: Số kết nối tối đa, cmd: "sudo -u postgres psql -tAc 'show max_connections'", op: eq, value: "200"}
+      - {at: data-1, what: shared_buffers, cmd: "sudo -u postgres psql -tAc 'show shared_buffers'", op: eq, value: 512MB}
+      - {at: data-1, what: TLS tối thiểu 1.2, cmd: "sudo -u postgres psql -tAc 'show ssl_min_protocol_version'", op: eq, value: TLSv1.2}
+      - {at: data-1, what: effective_cache_size, cmd: "sudo -u postgres psql -tAc 'show effective_cache_size'", op: eq, value: 2GB}
+      - {at: data-1, what: work_mem, cmd: "sudo -u postgres psql -tAc 'show work_mem'", op: eq, value: 4MB}
+      - {at: data-1, what: maintenance_work_mem, cmd: "sudo -u postgres psql -tAc 'show maintenance_work_mem'", op: eq, value: 128MB}
+      - {at: data-1, what: random_page_cost cho SSD, cmd: "sudo -u postgres psql -tAc 'show random_page_cost'", op: eq, value: "1.1"}
+      - {at: data-1, what: effective_io_concurrency cho SSD, cmd: "sudo -u postgres psql -tAc 'show effective_io_concurrency'", op: eq, value: "200"}
+      - {at: data-1, what: Nén WAL, cmd: "sudo -u postgres psql -tAc 'show wal_compression'", op: eq, value: "on"}
+      - {at: data-1, what: max_wal_size, cmd: "sudo -u postgres psql -tAc 'show max_wal_size'", op: eq, value: 2GB}
+      - {at: data-1, what: checkpoint_completion_target, cmd: "sudo -u postgres psql -tAc 'show checkpoint_completion_target'", op: eq, value: "0.9"}
+      - {at: data-1, what: Ghi log checkpoint, cmd: "sudo -u postgres psql -tAc 'show log_checkpoints'", op: eq, value: "on"}
+      - {at: data-1, what: Ghi log chờ khoá, cmd: "sudo -u postgres psql -tAc 'show log_lock_waits'", op: eq, value: "on"}
+      - {at: data-1, what: Đo thời gian I/O, cmd: "sudo -u postgres psql -tAc 'show track_io_timing'", op: eq, value: "on"}
+      - {at: data-1, what: Ngắt giao dịch treo 1 phút, cmd: "sudo -u postgres psql -tAc 'show idle_in_transaction_session_timeout'", op: eq, value: 1min}
+      - {at: data-1, what: Keepalive TCP 60 giây, cmd: "sudo -u postgres psql -tAc 'show tcp_keepalives_idle'", op: eq, value: "60"}
+      - {at: data-1, what: Dùng hugepage nếu có (try), cmd: "sudo -u postgres psql -tAc 'show huge_pages'", op: eq, value: try}
+      - {at: data-1, what: pg_hba có đúng một dòng hostssl, cmd: "grep -c '^hostssl' /etc/postgresql/{pg_version}/main/pg_hba.conf", op: eq, value: "1"}
+      - {at: data-1, what: pg_hba không có trust, cmd: "grep -c trust /etc/postgresql/{pg_version}/main/pg_hba.conf", op: eq, value: "0"}
+      - {at: data-1, what: Ghi log kết nối, cmd: "sudo -u postgres psql -tAc 'show log_connections'", op: eq, value: "on"}
+      - {use: limits, vms: [data-1]}
+      - {at: k8s-wk-1, what: Vùng ứng dụng tới được 5432 (N14), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc0}
+      - {at: edge-1, what: Edge không tới được 5432 (X01), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc_nonzero}
+    rollback: "apt-mark unhold rồi apt purge postgresql-{pg_version}; xoá /var/lib/waap/data/pg và /var/lib/waap/wal/pg."
+
+  - id: P8.4
+    title: RabbitMQ (repo Team RabbitMQ)
+    why: "Erlang và RabbitMQ từ repo của Team RabbitMQ (khoá ký ghim fingerprint), không dùng gói Ubuntu; gói bị hold vì Erlang phải tương thích RabbitMQ. Không tài khoản guest; chỉ nghe IP lab."
+    depends: [P8.3]
+    time: 2 phút
+    run: ["labs/bin/lab services --tags rabbitmq"]
+    checks:
+      - {at: data-1, what: rabbitmq-server đến từ repo Team RabbitMQ, cmd: "apt-cache policy rabbitmq-server | grep -cE 'deb[12].rabbitmq.com'", op: ge, value: 1}
+      - {at: data-1, what: Erlang đến từ repo Team RabbitMQ (không phải bản của Ubuntu), cmd: "apt-cache policy erlang-base | grep -cE 'deb[12].rabbitmq.com'", op: ge, value: 1}
+      - {at: data-1, what: rabbitmq-server bị hold, cmd: "apt-mark showhold | grep -c '^rabbitmq-server$'", op: eq, value: "1"}
+      - {at: data-1, what: Erlang bị hold (không nâng riêng), cmd: "apt-mark showhold | grep -c '^erlang-base$'", op: eq, value: "1"}
+      - {at: data-1, what: Khoá ký repo đúng fingerprint đã ghim, cmd: "gpg --batch --show-keys --with-colons /usr/share/keyrings/rabbitmq-server.gpg | awk -F: '/^fpr:/{print $10}' | grep -c 0A9AF2115F4687BD29803A206B73A36E6026DFCA", op: ge, value: 1}
+      - {at: data-1, what: RabbitMQ chạy, cmd: "systemctl is-active rabbitmq-server", op: eq, value: active}
+      - {at: data-1, what: Không còn user guest, cmd: "rabbitmqctl list_users --silent | grep -c '^guest'", op: eq, value: "0"}
+      - {at: data-1, what: Chỉ nghe IP lab ở 5672, cmd: "ss -ltn | grep -c '10.10.40.11:5672'", op: eq, value: "1"}
+      - {at: data-1, what: Không nghe 0.0.0.0, cmd: "ss -ltn | grep -c '0.0.0.0:5672'", op: eq, value: "0"}
+      - {at: data-1, what: User ứng dụng không là administrator, cmd: "rabbitmqctl list_users --silent | grep '^metap' | grep -c administrator", op: eq, value: "0"}
+      - {at: data-1, what: epmd chỉ nghe loopback, cmd: "ss -ltn | grep ':4369' | grep -vc '127.0.0.1'", op: eq, value: "0"}
+      - {at: data-1, what: Cổng phân tán Erlang chỉ nghe loopback, cmd: "ss -ltn | grep ':25672' | grep -vc '127.0.0.1'", op: eq, value: "0"}
+      - {at: data-1, what: Không có loopback_users=none (không dùng cho production), cmd: "grep -c 'loopback_users' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "0"}
+      - {at: data-1, what: Ngưỡng bộ nhớ tường minh 0.4, cmd: "grep -c '^vm_memory_high_watermark.relative = 0.4' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "1"}
+      - {at: data-1, what: "Ngưỡng đĩa trống >= ngưỡng bộ nhớ (2 GB)", cmd: "grep -c '^disk_free_limit.absolute = 2GB' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "1"}
+      - {use: limits, vms: [data-1]}
+      - {at: k8s-wk-1, what: Cổng 5672 thường chưa mở cho vùng ứng dụng (N15 chỉ mở 5671 TLS; TLS làm ở P2/P5), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5672'", op: rc_nonzero}
+    rollback: "apt-mark unhold rồi apt purge rabbitmq-server."
+
+  - id: P8.5
+    title: Valkey (valkey-central trên data-1, valkey-edge trên edge-1)
+    why: "Valkey thay Redis (Redis 7.4 trở lên đổi giấy phép, ADR-0024 loại). Binary chính thức ghim sha256 vào /opt/valkey/<version>, nâng bằng đổi symlink current. ACL, user default tắt, không loại bỏ khoá (cấu hình, không phải cache), lệnh nguy hiểm chặn bằng ACL."
+    depends: [P8.4]
+    time: 2 phút
+    run: ["labs/bin/lab services --tags valkey"]
+    checks:
+      - {at: data-1, what: Binary nằm trong /opt/valkey/<version> qua symlink current, cmd: "readlink -f /opt/valkey/current | grep -c '^/opt/valkey/'", op: eq, value: "1"}
+      - {at: data-1, what: Version đang chạy khớp thư mục (đọc bằng mắt), manual: "valkey-server --version", op: manual}
+      - {at: data-1, what: Valkey chạy, cmd: "systemctl is-active valkey-server", op: eq, value: active}
+      - {at: edge-1, what: Valkey chạy, cmd: "systemctl is-active valkey-server", op: eq, value: active}
+      - {at: data-1, what: Không xác thực thì bị từ chối, cmd: "valkey-cli -h {ip:data-1} ping", op: contains, value: NOAUTH}
+      - {at: data-1, what: User control ghi được, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1", op: eq, value: OK}
+      - {at: data-1, what: User edge không ghi được, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2", op: contains, value: NOPERM}
+      - {at: data-1, what: User edge đọc được, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe", op: eq, value: "1"}
+      - {at: data-1, what: FLUSHALL bị chặn bằng ACL (-@dangerous), cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} flushall", op: contains, value: NOPERM}
+      - {at: data-1, what: Không loại bỏ khoá, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info memory | grep -c 'maxmemory_policy:noeviction'", op: eq, value: "1"}
+      - {at: data-1, what: AOF bật, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info persistence | grep -c 'aof_enabled:1'", op: eq, value: "1"}
+      - {use: limits, vms: [edge-1]}
+      - {at: data-1, what: Thư mục dữ liệu Valkey ghi được dưới sandbox của unit, cmd: "systemctl show valkey-server -p ReadWritePaths --value", op: contains, value: /var/lib/waap/data/valkey}
+    rollback: "rm /etc/systemd/system/valkey-server.service* và /opt/valkey; xoá user valkey."
+
+  - id: P8.6
+    title: ClickHouse
+    why: "Cài từ repo apt chính thức của ClickHouse (khoá ký ghim fingerprint), ba gói cùng một version và bị hold; chỉ nhận từ vùng ứng dụng; dữ liệu trên đĩa riêng."
+    depends: [P8.5]
+    time: 4 phút
+    run: ["labs/bin/lab services --tags clickhouse"]
+    checks:
+      - {at: ch-1, what: Gói đến từ repo packages.clickhouse.com, cmd: "apt-cache policy clickhouse-server | grep -c 'packages.clickhouse.com'", op: ge, value: 1}
+      - {at: ch-1, what: Ba gói ClickHouse cùng một version, cmd: "dpkg-query -W -f='${Version}\\n' clickhouse-server clickhouse-client clickhouse-common-static | sort -u | wc -l", op: eq, value: "1"}
+      - {at: ch-1, what: Gói ClickHouse bị hold, cmd: "apt-mark showhold | grep -c 'clickhouse'", op: ge, value: 3}
+      - {at: ch-1, what: Khoá ký repo đúng fingerprint đã ghim, cmd: "gpg --batch --show-keys --with-colons /usr/share/keyrings/clickhouse.gpg | awk -F: '/^fpr:/{print $10}' | grep -c 3A9EA1193A97B548BE1457D48919F6BD2B48D754", op: ge, value: 1}
+      - {at: ch-1, what: ClickHouse chạy, cmd: "systemctl is-active clickhouse-server", op: eq, value: active}
+      - {at: ch-1, what: Truy vấn được, cmd: "clickhouse-client -q 'select 1'", op: eq, value: "1"}
+      - {at: ch-1, what: Thư mục dữ liệu trên đĩa riêng, cmd: "clickhouse-client -q \"select value from system.server_settings where name='path'\"", op: eq, value: /var/lib/waap/data/clickhouse/}
+      - {at: ch-1, what: Chỉ nghe IP lab, cmd: "ss -ltn | grep -c '0.0.0.0:9000'", op: eq, value: "0"}
+      - {use: limits, vms: [ch-1]}
+      - {at: ch-1, what: Có tài khoản analytics (có mật khẩu), cmd: "clickhouse-client -q \"select count() from system.users where name='analytics'\"", op: eq, value: "1"}
+      - {at: ch-1, what: 70% RAM cho server, cmd: "clickhouse-client -q \"select value from system.server_settings where name='max_server_memory_usage_to_ram_ratio'\"", op: eq, value: "0.7"}
+      - {at: k8s-wk-1, what: Cổng native 9000 chưa mở cho vùng ứng dụng (N17 chỉ mở 8443 và 9440, TLS làm ở P2/P5), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:ch-1}/9000'", op: rc_nonzero}
+    rollback: "apt-mark unhold rồi apt purge clickhouse-server clickhouse-client clickhouse-common-static."
+
+  - id: P8.7
+    title: egress-1 (squid, đường ra duy nhất có allowlist)
+    why: Chỉ Z3 và ops ra Internet qua proxy; chặn dải riêng và metadata cloud; chỉ domain trong allowlist.
+    depends: [P8.6]
+    time: 2 phút
+    run: ["labs/bin/lab services --tags egress"]
+    checks:
+      - {at: perimeter-1, what: squid chạy, cmd: "systemctl is-active squid", op: eq, value: active}
+      - {at: perimeter-1, what: Nghe 3128 ở IP lab, cmd: "ss -ltn | grep -c '10.10.20.11:3128'", op: eq, value: "1"}
+      - {at: ops-1, what: Tới domain trong allowlist (github.com), cmd: "curl -s -o /dev/null -w '%{http_code}' --max-time 15 -x http://{ip:perimeter-1}:3128 https://github.com", op: re, value: "^(200|301)$"}
+      - {at: ops-1, what: Domain ngoài allowlist bị chặn (CONNECT 403), cmd: "curl -s -o /dev/null -w '%{http_connect}' --max-time 15 -x http://{ip:perimeter-1}:3128 https://example.com", op: eq, value: "403"}
+      - {at: ops-1, what: Dải riêng bị chặn qua proxy, cmd: "curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x http://{ip:perimeter-1}:3128 http://{ip:data-1}/", op: eq, value: "403"}
+      - {at: ops-1, what: Metadata cloud bị chặn qua proxy, cmd: "curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x http://{ip:perimeter-1}:3128 http://169.254.169.254/", op: eq, value: "403"}
+    rollback: "apt purge squid."
+
+  - id: P8.8
+    title: Mirror nội bộ ở registry (aptly, kho artifact, apt-cacher-ng)
+    why: Sau seal các vùng dữ liệu không có đường ra, nên mirror là nơi duy nhất lấy bản database mới. Mirror lấy từ vendor qua egress-1, chụp snapshot, ký lại bằng khoá riêng; client ghim khoá đó. Bản mới chỉ tới client khi chạy promote.
+    depends: [P8.7]
+    time: 10 phút
+    run: ["labs/bin/lab services --tags registry"]
+    checks:
+      - {at: ops-1, what: nginx chạy, cmd: "systemctl is-active nginx", op: eq, value: active}
+      - {at: ops-1, what: apt-cacher-ng chạy, cmd: "systemctl is-active apt-cacher-ng", op: eq, value: active}
+      - {at: ops-1, what: Mirror đã tạo đủ 4 repo vendor, cmd: "sudo -u aptly aptly mirror list -raw | wc -l", op: eq, value: "4"}
+      - {at: ops-1, what: Cả 4 repo đã được publish, cmd: "sudo -u aptly aptly publish list -raw | wc -l", op: eq, value: "4"}
+      - {at: ops-1, what: Mirror phục vụ khoá công khai, cmd: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/apt/mirror-key.asc", op: eq, value: "200"}
+      - {at: ops-1, what: Có timer đồng bộ hằng tuần, cmd: "systemctl is-enabled waap-mirror-sync.timer", op: eq, value: enabled}
+      - {at: host, what: Khoá mirror đã về máy điều khiển (client ghim), cmd: "test -s labs/infra/generated/mirror-key.fpr", op: rc0}
+    rollback: "systemctl disable --now nginx apt-cacher-ng; apt purge aptly. Dữ liệu ở /var/lib/aptly."
+
+  # ------------------------------------------------------------------ P9
+  - id: P9.1
+    title: Seal (gỡ bootstrap)
+    why: Gỡ đường ra Internet tạm của mọi vùng; nguồn vá chuyển sang egress-1; SSH chỉ cert; egress khoá cho vai trò nhạy cảm.
+    depends: [P8.8]
+    time: 8 phút
+    run: ["labs/bin/lab seal"]
+    checks:
+      - {at: fw-1, what: Không còn luật BOOTSTRAP, cmd: "nft list chain inet lab forward | grep -c BOOTSTRAP", op: eq, value: "0"}
+      - {at: all, what: Khoá SSH tĩnh bị tắt, cmd: "sshd -T | awk '/^authorizedkeysfile/{print $2}'", op: eq, value: none}
+      - {at: role:k8s-app, what: apt đi qua apt-cacher-ng của registry, cmd: "grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy", op: eq, value: "1"}
+      - {at: ops-1, what: apt đi qua egress-1, cmd: "grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy", op: eq, value: "1"}
+      - {at: bao-1, what: OpenBao không có đường ra (egress khoá), cmd: "nft list chain inet host output | grep -c 'egress-locked'", op: eq, value: "1"}
+      - {at: data-1, what: Kho dữ liệu không có đường ra, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'", op: rc_nonzero}
+    rollback: "labs/bin/lab fw bootstrap rồi lab provision -e lab_bootstrap=true (chỉ để gỡ lỗi)."
+
+  - id: P9.2
+    title: Kiểm mạng và hạ tầng sau khi seal
+    why: Chạy lại thăm dò mạng và kiểm sống; lần cuối trước khi giao cho các bước triển khai dịch vụ.
+    depends: [P9.1]
+    time: 5 phút
+    run: ["labs/bin/lab nettest", "labs/bin/lab smoke"]
+    checks:
+      - {at: host, what: Thăm dò mạng đúng kỳ vọng, cmd: "labs/bin/lab nettest", op: rc0}
+      - {at: host, what: Kiểm sống hạ tầng, cmd: "labs/bin/lab smoke", op: rc0}
+    rollback: Không đổi gì.
+
+  - id: P9.3
+    title: Cài lại database từ mirror sau khi seal
+    why: Chứng minh vùng dữ liệu (không có đường ra) vẫn cài và nâng được phần mềm, chỉ qua mirror nội bộ.
+    depends: [P9.2]
+    time: 5 phút
+    run: ["labs/bin/lab services --tags postgres"]
+    checks:
+      - {at: data-1, what: Nguồn apt PostgreSQL trỏ vào registry, cmd: "grep -c '{ip:ops-1}/apt/pgdg' /etc/apt/sources.list.d/pgdg.sources", op: eq, value: "1"}
+      - {at: data-1, what: Khoá Signed-By là khoá của mirror, cmd: "gpg --show-keys --with-colons /usr/share/keyrings/pgdg.gpg | awk -F: '/^fpr/{print $10}' | head -1 | wc -c", op: eq, value: "41"}
+      - {at: data-1, what: apt update chỉ qua mirror, cmd: "apt-get update -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.sources -o Dir::Etc::sourceparts=- 2>&1 | grep -c '{ip:ops-1}'", op: re, value: "^[1-9]"}
+      - {at: data-1, what: PostgreSQL còn chạy sau khi chạy lại, cmd: "systemctl is-active postgresql@{pg_version}-main", op: eq, value: active}
+    rollback: Không đổi gì nếu phiên bản đã ghim không đổi.

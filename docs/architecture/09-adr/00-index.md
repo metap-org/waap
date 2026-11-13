@@ -51,5 +51,9 @@ cân nhắc. Quyết định bị thay thế giữ lại với trạng thái "B�
 | [0044](0044-realtime-gateway-and-notifier-runtime.md) | Realtime gateway cho hàng chục nghìn phiên portal và runtime của notifier: Go, Centrifugo, Elixir/Phoenix, managed; chọn Elixir + Phoenix | Chấp nhận |
 | [0045](0045-short-lived-node-certs-and-reenroll.md) | Cert node 24 h tự gia hạn qua node identity service, re-enroll credential cho node offline, thu hồi bằng thời hạn ngắn + danh sách chặn, cert-manager cho dịch vụ, Origin CA cho edge → origin | Chấp nhận |
 | [0046](0046-management-database-tenancy-and-storage.md) | Database Management: tenant = org, bảng chung + database riêng cho Enterprise, PolicyVersion là tài liệu bất biến, registry toàn cục, bảng partition | Chấp nhận |
+| [0047](0047-network-zones-and-default-deny.md) | Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet; lab trên máy ảo | **Đề xuất, chờ chọn** |
+| [0048](0048-node-baseline-and-hardening-profiles.md) | Chuẩn node chung: Ubuntu 24.04 LTS, role Ansible `baseline` cộng 7 hồ sơ theo vai trò, hardening CIS kiểm được | **Đề xuất, chờ chọn** |
+| [0049](0049-gitops-and-devsecops-per-plane.md) | GitOps (Argo CD, repo triển khai riêng) và DevSecOps từng plane: quét secret, license, SBOM, quét và ký image, kiểm chính sách; OpenTofu thay Terraform | **Đề xuất, chờ chọn** |
+| [0050](0050-secret-management-and-rotation.md) | OpenBao là secret manager duy nhất, secret động ngắn hạn, bảng xoay theo 12 loại, unseal Shamir ở lab | **Đề xuất, chờ chọn** |
 
 Quyết định đang chờ: xem [11. Risks and Technical Debt](../11-risks/00-index.md#113-quyết-định-còn-mở).

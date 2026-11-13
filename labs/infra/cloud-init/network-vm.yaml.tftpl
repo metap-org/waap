@@ -1,0 +1,11 @@
+version: 2
+ethernets:
+  lab0:
+    match: { macaddress: "${nic.mac}" }
+    set-name: lab0
+    addresses: [ "${nic.ip}/24" ]
+    routes:
+      - to: default
+        via: ${nic.gw}
+    # DNS qua fw-1 ra bộ phân giải của cầu uplink (chỉ có khi bootstrap; sau seal dùng `infra` ở Z6).
+    nameservers: { addresses: [ "${dns}" ] }

@@ -1,0 +1,6 @@
+---
+- name: Restart wg
+  ansible.builtin.systemd:
+    name: wg-quick@wg0
+    state: restarted
+  listen: restart wg

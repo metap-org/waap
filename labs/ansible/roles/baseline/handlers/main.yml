@@ -1,0 +1,27 @@
+---
+- name: Restart ssh
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted
+  listen: restart ssh
+
+- name: Reload sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: true
+  listen: reload sysctl
+
+- name: Load audit rules
+  ansible.builtin.command: augenrules --load
+  changed_when: true
+  listen: load audit rules
+
+- name: Reload auditd
+  ansible.builtin.command: systemctl kill --signal=SIGHUP auditd
+  changed_when: true
+  listen: reload auditd
+
+- name: Restart chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: restarted
+  listen: restart chrony

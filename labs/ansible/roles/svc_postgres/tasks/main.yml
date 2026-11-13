@@ -1,0 +1,96 @@
+---
+- name: Repo PGDG với khoá ký đã ghim fingerprint
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: pgdg
+    vendor_repo_key_url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    vendor_repo_key_fingerprint: "{{ pg_repo_key_fingerprint }}"
+    vendor_repo_uris: [https://apt.postgresql.org/pub/repos/apt]
+    vendor_repo_suites: ["{{ ansible_facts['distribution_release'] }}-pgdg"]
+
+- name: Cụm PostgreSQL đang có (để chặn nâng version lớn ngầm)
+  ansible.builtin.command: pg_lsclusters --no-header
+  register: pg_existing
+  changed_when: false
+  failed_when: false
+
+- name: Không tự nâng version lớn
+  ansible.builtin.assert:
+    that: >-
+      pg_existing.stdout | trim | length == 0 or
+      (pg_existing.stdout_lines | select('match', '^' ~ pg_version ~ '\\s') | list | length) > 0
+    fail_msg: "Đang có cụm PostgreSQL khác version {{ pg_version }}: {{ pg_existing.stdout }}. Nâng version lớn làm theo labs/UPGRADE.md, không đổi pg_version trực tiếp."
+    quiet: true
+
+- name: Bỏ hold để cài hoặc nâng
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: ["postgresql-{{ pg_version }}", "postgresql-client-{{ pg_version }}"]
+  failed_when: false
+
+- name: Gói PostgreSQL (version nhỏ ghim nếu có pg_pkg_version)
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ pg_version }}{{ ('=' ~ pg_pkg_version) if pg_pkg_version | length > 0 else '' }}"
+      - "postgresql-client-{{ pg_version }}{{ ('=' ~ pg_pkg_version) if pg_pkg_version | length > 0 else '' }}"
+      - python3-psycopg2
+      - ssl-cert
+    state: present
+    update_cache: true
+    allow_downgrade: true
+
+- name: Giữ gói PostgreSQL (nâng chỉ khi đổi biến, không do apt upgrade hay vá tự động)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: ["postgresql-{{ pg_version }}", "postgresql-client-{{ pg_version }}"]
+
+- name: Cụm mới trên đĩa dữ liệu và đĩa WAL riêng (chỉ khi đặt pg_wal; mặc định dùng cụm của gói)
+  ansible.builtin.shell: |
+    set -e
+    pg_dropcluster --stop {{ pg_version }} main || true
+    install -d -o postgres -g postgres -m 0700 {{ pg_data | dirname }}/ {{ pg_wal | dirname }}/
+    pg_createcluster {{ pg_version }} main -d {{ pg_data }} --start -- --waldir={{ pg_wal }} --data-checksums
+  args:
+    creates: "{{ pg_data }}/PG_VERSION"
+    executable: /bin/bash
+  when: pg_wal | length > 0
+
+- name: Cấu hình (nghe trên IP lab, TLS, scram, ghi log kết nối)
+  ansible.builtin.template:
+    src: waap.conf.j2
+    dest: "/etc/postgresql/{{ pg_version }}/main/conf.d/90-waap.conf"
+    mode: "0644"
+    owner: postgres
+    group: postgres
+  notify: restart postgres
+
+- name: pg_hba chỉ từ vùng ứng dụng, bắt buộc TLS
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+    mode: "0640"
+    owner: postgres
+    group: postgres
+  notify: restart postgres
+
+- name: Áp dụng cấu hình trước khi tạo tài khoản
+  ansible.builtin.meta: flush_handlers
+
+- name: Tài khoản ứng dụng
+  community.postgresql.postgresql_user:
+    name: "{{ pg_user }}"
+    password: "{{ pg_password }}"
+    role_attr_flags: CREATEDB
+  become: true
+  become_user: postgres
+  no_log: true
+
+- name: Cơ sở dữ liệu
+  community.postgresql.postgresql_db:
+    name: "{{ pg_db }}"
+    owner: "{{ pg_user }}"
+  become: true
+  become_user: postgres

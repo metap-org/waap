@@ -1,0 +1,3 @@
+---
+data_backup_user: waap-backup
+data_root: /var/lib/waap

@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Điều khiển lab. Chạy trên máy có Incus và OpenTofu (máy ảo Ubuntu trên Hyper-V hoặc Linux native).
+# Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
+#       lab step {list|next|show|run|verify} [<id>]   (chạy từng bước nhỏ, xem labs/CHECKLIST.md)
+#       lab {tf|fw|secrets|services|nettest|smoke}   (P1 lát 2: database, proxy ra; chưa triển khai dịch vụ ứng dụng)
+# Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_VALKEY_VERSION, LAB_VALKEY_SHA256 (ghim binary Valkey từ valkey.io/download), LAB_RKE2_VERSION, LAB_RKE2_SHA256 (ghim RKE2: phiên bản và sha256 của rke2.linux-amd64.tar.gz, tự lấy từ trang phát hành)
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+INFRA="$ROOT/infra"
+PROFILE="${LAB_PROFILE:-compact}"
+GEN="$INFRA/generated"
+SSH_KEY="${LAB_SSH_KEY:-$(cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true)}"
+
+tf() { tofu -chdir="$INFRA/tofu" "$@" -var "profile=$PROFILE" -var "ssh_public_key=$SSH_KEY" -var "generated_dir=$GEN"; }
+# Thứ tự bật: Secret, Data, Internal, Perimeter, Edge (7.6, lab chỉ chạy khi bật).
+UP_ORDER=(fw-1 bao-1 data-1 ch-1 kafka-1 k8s-cp-1 k8s-wk-1 k8s-wk-2 ops-1 bastion perimeter-1 dns-1 edge-1 origin dns-mock loadgen)
+
+need() { command -v "$1" >/dev/null || { echo "thiếu $1"; exit 1; }; }
+
+cmd_check() { python3 "$INFRA/tools/test_gen_nft.py" && python3 "$INFRA/tools/gen_nft.py" check "$PROFILE"; }
+
+cmd_gen() { # gen [--bootstrap]
+  python3 "$INFRA/tools/gen_nft.py" gen "$PROFILE" "$@" -o "$GEN/$PROFILE"
+  python3 "$INFRA/tools/gen_lab.py" inventory "$PROFILE" -o "$GEN/$PROFILE/inventory"
+  nft -c -f "$GEN/$PROFILE/ruleset.nft" 2>/dev/null || echo "(bỏ qua nft -c: không chạy được ở đây)"
+}
+
+cmd_ssh_ca() { # CA SSH của lab (P5 chuyển sang OpenBao ký)
+  need ssh-keygen; mkdir -p "$GEN"
+  [ -f "$GEN/ssh_user_ca" ] || ssh-keygen -q -t ed25519 -N "" -f "$GEN/ssh_user_ca" -C "lab-user-ca"
+  chmod 600 "$GEN/ssh_user_ca"; echo "CA công khai: $GEN/ssh_user_ca.pub"
+}
+
+cmd_token() { [ -f "$GEN/rke2-token" ] || { umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$GEN/rke2-token"; }; }
+
+ansible_run() { # ansible_run <playbook> [tham số]
+  need ansible-playbook; cmd_ssh_ca; cmd_token
+  ( cd "$ROOT/ansible" && ansible-galaxy collection install -r requirements.yml >/dev/null &&
+    ansible-playbook -i "$GEN/$PROFILE/inventory" "$@" \
+      -e "lab_generated_dir=$GEN" -e "rke2_version=${LAB_RKE2_VERSION:-}" -e "rke2_sha256=${LAB_RKE2_SHA256:-}" \
+      -e "valkey_version=${LAB_VALKEY_VERSION:-}" -e "valkey_sha256=${LAB_VALKEY_SHA256:-}" \
+      -e "rke2_token=$(cat "$GEN/rke2-token")" )
+}
+
+cmd_provision() { ansible_run site.yml "$@"; }
+cmd_audit() { ansible_run playbooks/audit.yml "$@"; }
+
+cmd_up() {
+  need tofu; need incus; [ -n "$SSH_KEY" ] || { echo "đặt LAB_SSH_KEY (khoá công khai)"; exit 1; }
+  cmd_check
+  if incus info fw-1 >/dev/null 2>&1; then
+    # Lab đã dựng: chỉ bật lại theo thứ tự.
+    for vm in "${UP_ORDER[@]}"; do incus info "$vm" >/dev/null 2>&1 && incus start "$vm" 2>/dev/null || true; done
+    return
+  fi
+  cmd_gen --bootstrap
+  tf init -input=false
+  tf apply -input=false -auto-approve -target=incus_instance.fw   # fw-1 lên trước
+  echo "chờ cloud-init của fw-1..."; incus exec fw-1 -- cloud-init status --wait
+  tf apply -input=false -auto-approve
+  echo "Lab đã dựng ở chế độ BOOTSTRAP (mọi vùng ra Internet để cài gói). Chạy 'lab provision' rồi 'lab seal'."
+}
+
+cmd_seal() { # gỡ đường ra Internet tạm, về đúng ma trận
+  cmd_gen
+  incus file push "$GEN/$PROFILE/ruleset.nft" fw-1/etc/nftables.conf
+  incus exec fw-1 -- nft -f /etc/nftables.conf
+  cmd_provision -e lab_bootstrap=false --tags packages,access,updates,kernel,hostfw   # khoá SSH tĩnh, apt qua egress, firewall máy chủ không còn bootstrap
+  echo "đã seal: fw-1 chỉ còn luật trong ma trận"
+}
+
+cmd_down() { # snapshot rồi tắt theo thứ tự ngược
+  local snap="down-$(date +%Y%m%d-%H%M%S)"
+  for ((i=${#UP_ORDER[@]}-1; i>=0; i--)); do
+    vm="${UP_ORDER[$i]}"
+    incus info "$vm" >/dev/null 2>&1 || continue
+    incus snapshot create "$vm" "$snap" 2>/dev/null || true
+    incus stop "$vm" 2>/dev/null || true
+  done
+  echo "đã tắt, snapshot $snap"
+}
+
+
+secret() { python3 -c "import yaml;print(yaml.safe_load(open('$GEN/secrets.yml'))['lab_secrets']['$1'])"; }
+
+cmd_secrets() { # mật khẩu và token ngẫu nhiên cho lab; KHÔNG commit. P5 thay bằng OpenBao dynamic secret.
+  mkdir -p "$GEN"
+  ( umask 077; python3 - "$GEN/secrets.yml" <<'PY'
+import os, secrets, sys, yaml
+p = sys.argv[1]
+keys = ["postgres_password", "rabbitmq_password", "redis_control_password", "redis_edge_password", "ingest_token",
+        "analytics_ingest_token", "clearance_secret", "dns_mock_admin_token", "service_password", "control_password",
+        "clickhouse_analytics_password"]
+cur = yaml.safe_load(open(p)) if os.path.exists(p) else {}
+sec = (cur or {}).get("lab_secrets", {})
+added = [k for k in keys if k not in sec]
+for k in added:
+    sec[k] = secrets.token_urlsafe(24)
+yaml.safe_dump({"lab_secrets": sec}, open(p, "w"))
+print(f"secrets.yml: thêm {len(added)} khoá mới, giữ nguyên các khoá cũ")
+PY
+  )
+}
+
+cmd_services() { # PostgreSQL, RabbitMQ, Redis, ClickHouse, egress-1
+  cmd_secrets
+  ansible_run services.yml -e "@$GEN/secrets.yml" "$@"
+}
+
+cmd_nettest() { # thăm dò mạng sinh từ ma trận: luồng cho phép phải đến được, luồng cấm phải hết thời gian (T01 đến T07)
+  need incus; local fail=0 id exp from to port out rc got
+  while read -r id exp from to port; do
+    out="$(incus exec "$from" -- timeout 4 bash -c "exec 3<>/dev/tcp/$to/$port" 2>&1)"; rc=$?
+    if [ $rc -eq 0 ] || echo "$out" | grep -qi "refused"; then got=reach; else got=blocked; fi
+    if [ "$got" = "$exp" ]; then echo "ok   $id $from -> $to:$port ($exp)"; else echo "LỖI $id $from -> $to:$port mong $exp, thấy $got"; fail=1; fi
+  done < <(python3 "$INFRA/tools/gen_nft.py" probes "$PROFILE")
+  return $fail
+}
+
+vm_of() { python3 "$INFRA/tools/gen_lab.py" vm "$PROFILE" "$1"; }
+
+cmd_smoke() { # kiểm hạ tầng theo vai trò (đúng cho mọi profile), không kiểm dịch vụ ứng dụng
+  need incus; local fail=0
+  local pg mq vc ve ch cp ci eg
+  pg="$(vm_of postgres)"; mq="$(vm_of rabbitmq)"; vc="$(vm_of valkey-central)"; ve="$(vm_of valkey-edge)"
+  ch="$(vm_of clickhouse)"; cp="$(vm_of k8s-cp)"; ci="$(vm_of ci-runner)"; eg="$(vm_of egress-1)"
+  local egip; egip="$(incus list "$eg" -c 4 -f csv | cut -d' ' -f1)"
+  local KC="env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl"
+  chk() { if eval "$2" >/dev/null 2>&1; then echo "ok   $1"; else echo "LỖI $1"; fail=1; fi; }
+  chk "postgres sẵn sàng ($pg)" "incus exec $pg -- pg_isready -q"
+  chk "rabbitmq chạy ($mq)" "incus exec $mq -- systemctl is-active --quiet rabbitmq-server"
+  chk "valkey valkey-central chạy ($vc)" "incus exec $vc -- systemctl is-active --quiet valkey-server"
+  chk "valkey valkey-edge chạy ($ve)" "incus exec $ve -- systemctl is-active --quiet valkey-server"
+  chk "clickhouse chạy ($ch)" "incus exec $ch -- systemctl is-active --quiet clickhouse-server"
+  chk "RKE2 server lên ($cp)" "incus exec $cp -- systemctl is-active --quiet rke2-server"
+  chk "mọi node K8s Ready" "incus exec $cp -- $KC wait --for=condition=Ready node --all --timeout=60s"
+  chk "egress-1 chặn đích ngoài allowlist" "! incus exec $ci -- env https_proxy=http://$egip:3128 curl -sf --max-time 8 https://example.com"
+  return $fail
+}
+
+cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
+cmd_status() { incus list -c ns4t -f compact; }
+
+case "${1:-}" in
+  check) cmd_check ;; tf) shift; cmd_tf "$@" ;; fw) shift; cmd_fw "$@" ;; step) shift; cmd_step "$@" ;; secrets) cmd_secrets ;; services) shift; cmd_services "$@" ;;
+  nettest) cmd_nettest ;; smoke) cmd_smoke ;; gen) shift; cmd_gen "$@" ;; ssh-ca) cmd_ssh_ca ;; up) cmd_up ;;
+  provision) shift; cmd_provision "$@" ;; audit) shift; cmd_audit "$@" ;; seal) cmd_seal ;;
+  down) cmd_down ;; destroy) cmd_destroy ;; status) cmd_status ;;
+  *) sed -n '2,4p' "$0"; exit 2 ;;
+esac

@@ -1,0 +1,6 @@
+---
+edge_user: waap-edge
+edge_binary: /opt/waap/bin/waap-edge
+edge_tune_nic: false      # true chỉ trên bare metal (VM không có RSS/IRQ thật)
+edge_nic: eth0
+edge_memory_max: 2G

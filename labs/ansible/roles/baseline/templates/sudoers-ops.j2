@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+Defaults use_pty
+Defaults logfile="/var/log/sudo.log"
+Defaults log_input, log_output
+Defaults!/usr/bin/sudoreplay !log_output
+%{{ ssh_login_group }} ALL=(ALL:ALL) NOPASSWD: ALL

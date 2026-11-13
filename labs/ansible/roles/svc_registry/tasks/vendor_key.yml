@@ -1,0 +1,34 @@
+---
+- name: "Tải khoá của {{ repo.name }}"
+  ansible.builtin.get_url:
+    url: "{{ repo.key_url }}"
+    dest: "/var/cache/vendor-keys-{{ repo.name }}.key"
+    mode: "0600"
+    owner: root
+    group: root
+
+- name: "Fingerprint của khoá {{ repo.name }}"
+  ansible.builtin.shell: >-
+    set -o pipefail; gpg --batch --show-keys --with-colons /var/cache/vendor-keys-{{ repo.name }}.key | awk -F: '/^fpr:/{print $10}'
+  args:
+    executable: /bin/bash
+  register: key_fprs
+  changed_when: false
+
+- name: "Fingerprint phải khớp giá trị đã ghim ({{ repo.name }})"
+  ansible.builtin.assert:
+    that: repo.key_fingerprint | upper in key_fprs.stdout_lines
+    fail_msg: "Khoá của {{ repo.name }} có fingerprint {{ key_fprs.stdout_lines }}, không khớp {{ repo.key_fingerprint }}. Dừng."
+    quiet: true
+
+- name: "Keyring cho aptly ({{ repo.name }})"
+  ansible.builtin.shell: |
+    set -e
+    tmp="$(mktemp -d)"
+    GNUPGHOME="$tmp" gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --import /var/cache/vendor-keys-{{ repo.name }}.key
+    GNUPGHOME="$tmp" gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --export > {{ mirror_data }}/vendor-keys/{{ repo.name }}.gpg
+    chown {{ mirror_user }}:{{ mirror_user }} {{ mirror_data }}/vendor-keys/{{ repo.name }}.gpg
+    rm -rf "$tmp"
+  args:
+    creates: "{{ mirror_data }}/vendor-keys/{{ repo.name }}.gpg"
+    executable: /bin/bash

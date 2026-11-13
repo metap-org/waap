@@ -1,0 +1,18 @@
+---
+# Cài từ repo của Team RabbitMQ (deb1/deb2.rabbitmq.com, Erlang và RabbitMQ cùng một khoá ký), không dùng gói của Ubuntu.
+# Nâng version: đặt rabbitmq_pkg_version (và erlang_pkg_version nếu cần, đúng epoch "1:...") rồi chạy lại.
+# Erlang phải tương thích RabbitMQ (rabbitmq.com/docs/which-erlang): không nâng một mình.
+rabbitmq_pkg_version: ""
+erlang_pkg_version: ""
+rabbitmq_repo_key_url: https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+rabbitmq_repo_key_fingerprint: 0A9AF2115F4687BD29803A206B73A36E6026DFCA
+rabbitmq_repo_hosts: [deb1.rabbitmq.com, deb2.rabbitmq.com]
+erlang_packages: [erlang-base, erlang-asn1, erlang-crypto, erlang-eldap, erlang-ftp, erlang-inets, erlang-mnesia, erlang-os-mon, erlang-parsetools, erlang-public-key, erlang-runtime-tools, erlang-snmp, erlang-ssl, erlang-syntax-tools, erlang-tftp, erlang-tools, erlang-xmerl]
+# Danh sách gói cần cài, có hậu tố version nếu đã ghim (tính ở đây để task gọn).
+rabbit_install_packages: >-
+  {{ (erlang_packages | map('regex_replace', '$', ('=' ~ erlang_pkg_version) if erlang_pkg_version | length > 0 else '') | list)
+     + ['rabbitmq-server' ~ (('=' ~ rabbitmq_pkg_version) if rabbitmq_pkg_version | length > 0 else '')] }}
+rabbit_user: metap
+rabbit_password: "{{ lab_secrets.rabbitmq_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/rabbitmq_password length=24 chars=ascii_letters,digits') }}"
+rabbit_vhost: /
+rabbit_disk_free_limit: 2GB   # >= vm_memory_high_watermark x RAM của VM (5 GiB x 0.4 = 2 GiB)

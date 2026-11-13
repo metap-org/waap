@@ -1,0 +1,21 @@
+<!-- {{ ansible_managed }} -->
+<clickhouse>
+  <users>
+    <!-- Tài khoản default không mật khẩu chỉ được dùng từ chính máy này. -->
+    <default>
+      <networks replace="replace"><ip>127.0.0.1</ip><ip>::1</ip></networks>
+    </default>
+    <!-- Tài khoản cho ứng dụng: có mật khẩu (sha256), giới hạn nguồn, không có quyền quản trị truy cập. -->
+    <{{ clickhouse_app_user }}>
+      <password_sha256_hex>{{ clickhouse_app_password | hash('sha256') }}</password_sha256_hex>
+      <networks replace="replace">
+{% for c in clickhouse_allowed_cidrs %}
+        <ip>{{ c }}</ip>
+{% endfor %}
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>0</access_management>
+    </{{ clickhouse_app_user }}>
+  </users>
+</clickhouse>

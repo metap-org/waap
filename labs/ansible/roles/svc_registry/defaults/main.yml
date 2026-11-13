@@ -1,0 +1,50 @@
+---
+# Mirror nội bộ ở máy `registry` (Z6), giải bài toán "vùng dữ liệu không có đường ra nên không nâng version được":
+#  1. aptly: mirror CHỌN LỌC các repo apt của vendor (PGDG, Team RabbitMQ, ClickHouse), mỗi lần đồng bộ tạo SNAPSHOT,
+#     chỉ khi người vận hành PROMOTE snapshot thì client mới thấy bản mới. Ký lại bằng khoá của mirror, client ghim fingerprint khoá này.
+#  2. Kho artifact tĩnh (tarball Valkey, RKE2) kiểm sha256 trước khi nhận.
+#  3. apt-cacher-ng cho kho Ubuntu (vá bảo mật) kéo qua egress-1.
+# Client đọc qua HTTP: apt đã kiểm chữ ký, tarball kiểm sha256; TLS làm ở P2/P5.
+mirror_base: ""
+mirror_user: aptly
+mirror_data: /var/lib/aptly
+mirror_artifacts_dir: /srv/mirror/artifacts
+mirror_listen: "{{ app_listen_ip }}"
+mirror_local_dir: "{{ lab_generated_dir | default(playbook_dir ~ '/../../infra/generated') }}"
+mirror_signing_name: "WAAP Lab Mirror"
+# Qua egress-1 khi đã seal; lúc bootstrap (egress chưa có) kéo thẳng.
+mirror_egress_proxy: "{{ ('http://' ~ lab_egress_ip ~ ':3128') if (lab_egress_ip is defined and lab_egress_ip | length > 0 and not (lab_bootstrap | default(true))) else '' }}"
+# Phải khớp pg_version của svc_postgres (có test kiểm).
+mirror_pg_version: 17
+mirror_apt_proxy_port: 3142
+mirror_repos:
+  - name: pgdg
+    url: https://apt.postgresql.org/pub/repos/apt
+    dist: "{{ ansible_facts['distribution_release'] }}-pgdg"
+    component: main
+    key_url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    key_fingerprint: B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+    filter: "postgresql-{{ mirror_pg_version }} | postgresql-client-{{ mirror_pg_version }} | postgresql-common | postgresql-client-common | libpq5"
+  - name: rabbitmq-erlang
+    url: "https://deb1.rabbitmq.com/rabbitmq-erlang/ubuntu/{{ ansible_facts['distribution_release'] }}"
+    dist: "{{ ansible_facts['distribution_release'] }}"
+    component: main
+    key_url: https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+    key_fingerprint: 0A9AF2115F4687BD29803A206B73A36E6026DFCA
+    filter: "Name (~ ^erlang)"
+  - name: rabbitmq-server
+    url: "https://deb1.rabbitmq.com/rabbitmq-server/ubuntu/{{ ansible_facts['distribution_release'] }}"
+    dist: "{{ ansible_facts['distribution_release'] }}"
+    component: main
+    key_url: https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+    key_fingerprint: 0A9AF2115F4687BD29803A206B73A36E6026DFCA
+    filter: "rabbitmq-server"
+  - name: clickhouse
+    url: https://packages.clickhouse.com/deb
+    dist: lts
+    component: main
+    key_url: https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key
+    key_fingerprint: 3A9EA1193A97B548BE1457D48919F6BD2B48D754
+    filter: "clickhouse-server | clickhouse-client | clickhouse-common-static"
+# Artifact: {name, filename, url, sha256}. Ghim sha256 lấy từ trang phát hành của vendor.
+mirror_artifacts: []

@@ -1,0 +1,23 @@
+---
+# Chuẩn nền ADR-0048. Mỗi tệp tương ứng một hàng của bảng "Chuẩn nền".
+- name: Packages
+  ansible.builtin.import_tasks: packages.yml
+  tags: [packages]
+- name: Access (ssh, users, sudo)
+  ansible.builtin.import_tasks: access.yml
+  tags: [access]
+- name: Filesystem and modules
+  ansible.builtin.import_tasks: filesystem.yml
+  tags: [filesystem]
+- name: Services
+  ansible.builtin.import_tasks: services.yml
+  tags: [services]
+- name: Kernel and network
+  ansible.builtin.import_tasks: kernel.yml
+  tags: [kernel]
+- name: Audit and integrity
+  ansible.builtin.import_tasks: audit.yml
+  tags: [audit]
+- name: Time and updates
+  ansible.builtin.import_tasks: time_updates.yml
+  tags: [updates]

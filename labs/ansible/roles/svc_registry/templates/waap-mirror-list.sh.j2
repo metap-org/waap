@@ -1,0 +1,6 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Xem snapshot hiện có và bản nào đang được publish cho client.
+export GNUPGHOME="{{ mirror_data }}/.gnupg"
+echo "== Snapshot"; aptly -config=/etc/aptly.conf snapshot list -raw -sort=time
+echo "== Đang publish"; aptly -config=/etc/aptly.conf publish list -raw

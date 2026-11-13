@@ -1,0 +1,67 @@
+---
+- name: Repo ClickHouse (khoá ký ghim fingerprint)
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: clickhouse
+    vendor_repo_key_url: "{{ clickhouse_repo_key_url }}"
+    vendor_repo_key_fingerprint: "{{ clickhouse_repo_key_fingerprint }}"
+    vendor_repo_uris: [https://packages.clickhouse.com/deb]
+    vendor_repo_suites: ["{{ 'stable' if clickhouse_channel == 'stable' else 'lts' }}"]
+
+- name: Bỏ hold để cài hoặc nâng
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: "{{ clickhouse_packages }}"
+  failed_when: false
+
+- name: Gói ClickHouse (cả ba cùng một version)
+  ansible.builtin.apt:
+    name: "{{ clickhouse_packages | map('regex_replace', '$', ch_suffix) | list }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+  vars:
+    ch_suffix: "{{ ('=' ~ clickhouse_pkg_version) if clickhouse_pkg_version | length > 0 else '' }}"
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: Giữ gói ClickHouse
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ clickhouse_packages }}"
+
+- name: Thư mục dữ liệu
+  ansible.builtin.file:
+    path: "{{ clickhouse_data }}"
+    state: directory
+    owner: clickhouse
+    group: clickhouse
+    mode: "0750"
+
+- name: Cấu hình (nghe IP lab, dữ liệu trên đĩa riêng, default không mật khẩu chỉ từ Z3)
+  ansible.builtin.template:
+    src: waap.xml.j2
+    dest: /etc/clickhouse-server/config.d/90-waap.xml
+    mode: "0640"
+    owner: clickhouse
+    group: clickhouse
+  notify: restart clickhouse
+
+- name: Người dùng ứng dụng, default chỉ localhost (users.d)
+  ansible.builtin.template:
+    src: users.xml.j2
+    dest: /etc/clickhouse-server/users.d/90-waap.xml
+    mode: "0640"
+    owner: clickhouse
+    group: clickhouse
+  no_log: true
+  notify: restart clickhouse
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: clickhouse-server
+    enabled: true
+    state: started

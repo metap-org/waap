@@ -1,0 +1,72 @@
+---
+# Cài và hardening theo ADR-0048, chia thành các play và tag nhỏ để chạy từng bước (xem labs/CHECKLIST.md).
+# Chạy:  ansible-playbook site.yml [--limit <vm>] [--tags <tag>] [--check --diff]
+- name: Chuẩn nền (mọi node)
+  hosts: all
+  roles:
+    - baseline
+
+- name: Firewall máy chủ theo ma trận
+  hosts: all
+  roles:
+    - hostfw
+
+- name: Đĩa phụ
+  hosts: all:!role_firewall
+  roles:
+    - role: disks
+      tags: [disks]
+
+- name: Tuning hệ điều hành theo dịch vụ
+  hosts: all:!role_firewall
+  roles:
+    - role: os_tuning
+      tags: [tuning]
+
+- name: Hồ sơ RKE2 node
+  hosts: role_k8s_cp:role_k8s_app
+  roles:
+    - role: profile_rke2_node
+      tags: [k8s]
+
+- name: Hồ sơ edge-l7
+  hosts: role_edge_l7
+  roles:
+    - role: profile_edge_l7
+      tags: [profile-edge]
+
+- name: Hồ sơ edge-waf
+  hosts: role_edge_waf
+  roles:
+    - role: profile_edge_waf
+      tags: [profile-edge]
+
+- name: Hồ sơ data
+  hosts: role_postgres:role_clickhouse:role_kafka:role_rabbitmq
+  roles:
+    - role: profile_data
+      tags: [profile-data]
+
+- name: Hồ sơ secret
+  hosts: role_openbao
+  roles:
+    - role: profile_secret
+      tags: [profile-secret]
+
+- name: Hồ sơ bastion
+  hosts: role_bastion
+  roles:
+    - role: profile_bastion
+      tags: [profile-bastion]
+
+- name: Hồ sơ ops
+  hosts: role_ci_runner
+  roles:
+    - role: profile_ops
+      tags: [profile-ops]
+
+- name: Cập nhật AIDE sau thay đổi hợp lệ
+  hosts: all:!role_firewall
+  roles:
+    - role: aide_refresh
+      tags: [aide]
