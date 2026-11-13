@@ -57,6 +57,58 @@ def inventory(profile, out):
     print(f"ghi {out}/inventory.ini")
 
 
+# (thành phần, vai trò trong profile, role Ansible, lệnh lab, ghi chú). Chỉ liệt kê cái đã có bộ cài hoặc cần nói rõ là chưa có.
+COMPONENTS = [
+    ("PostgreSQL 16", "postgres", "svc_postgres", "lab services --tags postgres", "waap-install postgres", "Đĩa dữ liệu và WAL riêng"),
+    ("RabbitMQ", "rabbitmq", "svc_rabbitmq", "lab services --tags rabbitmq", "waap-install rabbitmq", "Cổng 5672 không TLS; N15 chỉ mở 5671, nên chưa ai ngoài máy này vào được cho tới khi có TLS (P2/P5)"),
+    ("Redis (valkey-central)", "valkey-central", "svc_redis", "lab services --tags redis", "waap-install redis", "Cache và hot key trung tâm"),
+    ("Redis (valkey-edge)", "valkey-edge", "svc_redis", "lab services --tags redis", "waap-install redis", "Nằm ở vùng Edge DMZ theo thiết kế (ADR-0021)"),
+    ("ClickHouse", "clickhouse", "svc_clickhouse", "lab services --tags clickhouse", "waap-install clickhouse", "Cần ghim gói .deb và sha256"),
+    ("RKE2 server", "k8s-cp", "profile_rke2_node", "lab provision --tags k8s --limit <vm>", "waap-install rke2-node", "Cần ghim phiên bản và sha256 của tarball"),
+    ("RKE2 agent", "k8s-app", "profile_rke2_node", "lab provision --tags k8s --limit <vm>", "waap-install rke2-node -e rke2_role=agent", ""),
+    ("egress-1 (squid)", "egress-1", "svc_perimeter", "lab services --tags egress", "waap-install egress", "Đường ra duy nhất có allowlist"),
+    ("Kafka", "kafka", "(chưa có)", "(chưa có)", "(chưa có)", "VM đã có (đĩa dữ liệu) nhưng CHƯA có bộ cài; không dịch vụ nào dùng Kafka ở code hiện tại"),
+    ("Object storage (SeaweedFS)", "object-storage", "(chưa có)", "(chưa có)", "(chưa có)", "Vai trò gắn vào data-1 nhưng CHƯA có bộ cài"),
+    ("OpenBao", "openbao", "(chưa có)", "(chưa có)", "(chưa có)", "VM đã hardening (không swap, không core dump); cài OpenBao là P5"),
+    ("ingress-1, egw-1", "ingress-1", "(chưa có)", "(chưa có)", "(chưa có)", "Chờ triển khai dịch vụ ứng dụng"),
+]
+
+
+def placement(profile):
+    zones, prof, flows = g.load(profile)
+    ips = g.vm_ips(zones, prof)
+    L = ["# Bản đồ cài đặt: thành phần nào ở máy nào, vùng nào, ai được vào",
+         "",
+         f"Sinh tự động bởi `labs/infra/tools/gen_lab.py placement` từ profile `{prof['profile']}` và ma trận luồng. **Không sửa tay.**",
+         "",
+         "| Thành phần | Máy (vùng, IP) | Ai được kết nối tới (từ ma trận) | Cài bằng (lab) | Cài bằng (đứng riêng) | Ghi chú |",
+         "|---|---|---|---|---|---|"]
+    for name, role, ansible, labcmd, solo, note in COMPONENTS:
+        vms = [v for v in prof["vms"] if role in v["roles"]]
+        where = "; ".join(f"`{v['name']}` ({v['zones'][0]}, {ips[v['name']][v['zones'][0]]})" for v in vms) or "(không có trong profile)"
+        reach = []
+        for f in flows["flows"]:
+            if f["dst"] == g.UPLINK or f.get("lab_only"):
+                continue
+            try:
+                dst = g.resolve(f["dst"], zones, prof, ips)
+            except SystemExit:
+                continue
+            if any(role in vm_["roles"] for vm_ in prof["vms"] if vm_["name"] in {d[0] for d in dst}) and f["dst"] in (f"role:{role}", "all-vms", "zone:Z3") or f["dst"] == f"role:{role}":
+                ports = ",".join(str(x) for x in f["ports"])
+                reach.append(f"{f['id']}: {f['src'].replace('role:', '').replace('zone:', 'vùng ')} → {f['proto']}/{ports}")
+        reach = [r for r in reach if not r.startswith(("N25", "N26", "N27"))]
+        reach_txt = "<br>".join(reach) if reach else "(chưa có luồng nào mở tới đây)"
+        L.append(f"| {name} | {where} | {reach_txt} | `{labcmd}` | `{solo}` | {note} |")
+    L += ["", "Luồng quản trị chung (SSH từ `bastion` N25, giám sát từ `obs` N26, NTP và DNS tới `infra` N27) áp dụng cho mọi máy và không lặp lại trong bảng.", "",
+          "## Mỗi thành phần được cài ra sao",
+          "",
+          "- **Lab:** `lab services --tags <thành phần>` chạy Ansible theo nhóm vai trò trong inventory; VM nào mang vai trò đó thì được cài. Từng bước và giá trị mục tiêu ở [CHECKLIST.md](CHECKLIST.md) (P8).",
+          "- **Đứng riêng:** `waap-install <thành phần> --host <ip|local>` cài lên một máy bất kỳ, không cần inventory; truyền `app_allow_from` (CIDR được vào) và `app_ssh_from` để bật firewall riêng.",
+          "- Cả hai đường dùng chung các role `svc_*`, nên cấu hình giống nhau."]
+    return "\n".join(L) + "\n"
+
+
 def diagram(profile):
     zones, prof, flows = g.load(profile)
     ips = g.vm_ips(zones, prof)
@@ -97,9 +149,17 @@ def diagram(profile):
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("inventory"); i.add_argument("profile"); i.add_argument("-o", required=True)
+    pl = sub.add_parser("placement"); pl.add_argument("profile"); pl.add_argument("-o")
     d = sub.add_parser("diagram"); d.add_argument("profile"); d.add_argument("--inject")
     a = ap.parse_args()
-    if a.cmd == "inventory":
+    if a.cmd == "placement":
+        text = placement(a.profile)
+        if a.o:
+            Path(a.o).write_text(text, encoding="utf-8")
+            print("đã ghi", a.o)
+        else:
+            print(text)
+    elif a.cmd == "inventory":
         inventory(a.profile, a.o)
     else:
         text = diagram(a.profile)

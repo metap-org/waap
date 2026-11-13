@@ -4,6 +4,8 @@
 
 ## Chạy từng bước (đọc phần này trước)
 
+Bản đồ thành phần nào cài ở máy nào, vùng nào, ai được vào: [../PLACEMENT.md](../PLACEMENT.md).
+
 Tham số đã rà theo best practice, kèm cơ sở và mức tin cậy: [../PARAMETERS.md](../PARAMETERS.md).
 
 Lab **không** dựng một lần. Có 42 bước nhỏ chia 10 phase, mỗi bước có lệnh riêng, bảng "cấu hình đúng phải là bao nhiêu" và lệnh kiểm tự động: xem [../CHECKLIST.md](../CHECKLIST.md) (sinh tự động, không sửa tay).

@@ -101,6 +101,34 @@ class StepsTests(unittest.TestCase):
                 S.cmd_run(CTX, "P1.2", True, False)
             self.assertIn("P1.1", str(cm.exception))
 
+    def test_placement_doc_is_current(self):
+        import gen_lab
+        self.assertEqual(gen_lab.placement("compact"), (S.LABS / "PLACEMENT.md").read_text(encoding="utf-8"), "chạy `gen_lab.py placement compact -o labs/PLACEMENT.md` rồi commit")
+
+    def test_rke2_nodes_have_port_scoped_rules_not_blanket(self):
+        import gen_nft as g2
+        z, p, f = g2.load("compact")
+        self.assertNotIn("local", f)  # luật "mở hết Z3" đã bỏ
+        wk = g2.render_host(z, p, f, "k8s-wk-1")
+        cp = g2.render_host(z, p, f, "k8s-cp-1")
+        self.assertIn('"L02a"', cp); self.assertNotIn('"L02a"', wk)           # chỉ server nhận 6443 và 9345
+        self.assertNotIn("2379", cp + wk)                                       # etcd không mở cho node nào khác
+        self.assertIn("flannel.1", cp); self.assertIn("flannel.1", wk)          # pod network theo giao diện
+        pr = g2.probes("compact")
+        self.assertTrue(any(x["id"] == "XL1" and x["port"] == 22 and x["expect"] == "blocked" for x in pr))
+        self.assertTrue(any(x["id"] == "XL2" and x["port"] == 2379 for x in pr))
+
+    def test_intra_forbidden_violation_is_detected(self):
+        import gen_nft as g2
+        z, p, f = g2.load("compact")
+        f["flows"].append({"id": "BAD", "src": "role:k8s-app", "dst": "role:k8s-cp", "proto": "tcp", "ports": [2379], "enforce": "host", "covers": []})
+        orig = g2.load
+        g2.load = lambda prof: (z, p, f)
+        try:
+            self.assertTrue(any("XL2" in e for e in g2.check("compact")))
+        finally:
+            g2.load = orig
+
     def test_checklist_doc_is_current(self):
         with tempfile.TemporaryDirectory() as d:
             orig = S.CHECKLIST

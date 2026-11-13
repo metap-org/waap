@@ -34,12 +34,25 @@ flows:
   - { id: N28, src: "zone:Z3", dst: "role:registry", proto: tcp, ports: [443] }
   - { id: N28c, covers: [N28], src: "role:ci-runner", dst: "role:registry", proto: tcp, ports: [443], enforce: host }
   - { id: N29, src: "role:ci-runner", dst: "role:egress-1", proto: tcp, ports: [3128] }
+  # --- Giữa các node RKE2 (cùng vùng Z3, enforce: host). Cổng theo docs.rke2.io/install/requirements.
+  # 6443 và 9345 trên server từ mọi node; 10250 (kubelet) giữa mọi node; Canal VXLAN udp 8472 và health tcp 9099 giữa mọi node.
+  # 2379 và 2380 (etcd) chỉ giữa các server: cụm lab chỉ có một server nên KHÔNG mở cho ai khác.
+  - { id: L02a, src: "role:k8s-app", dst: "role:k8s-cp", proto: tcp, ports: [6443, 9345], enforce: host, covers: [] }
+  - { id: L02b, src: "zone:Z3", dst: "zone:Z3", proto: tcp, ports: [10250, 9099], enforce: host, covers: [] }
+  - { id: L02c, src: "zone:Z3", dst: "zone:Z3", proto: udp, ports: [8472], enforce: host, covers: [] }
   # Chỉ có trong lab: Z0 là "Internet giả" nên cần đường ra Internet thật (NAT qua uplink) cho loadgen, dns-mock.
   - { id: L01, src: "zone:Z0", dst: "uplink", proto: tcp, ports: [80, 443], covers: [], lab_only: true }
 
-# Luật cục bộ ngoài ma trận 7.6: các node K8s nói chuyện với nhau (kubelet, etcd, CNI, DNS cụm). Ma trận chỉ nói về liên vùng.
-local:
-  - { id: L02, hosts: "zone:Z3", note: "K8s nội vùng" }
+# Giao diện mạng pod: lưu lượng từ pod tới node (API server, kubelet, DNS) đi vào bằng giao diện CNI chứ không bằng IP node,
+# nên input default-deny phải chấp nhận theo giao diện, nếu không pod mất API. Canal: cni0 và flannel.1.
+host_interfaces:
+  k8s-cp: ["cni0", "flannel.1"]
+  k8s-app: ["cni0", "flannel.1"]
+
+# Cấm trong cùng vùng (cùng cầu L2 nên fw-1 không thấy; chặn bằng firewall máy chủ). Kiểm bằng `lab nettest`.
+intra_forbidden:
+  - { id: XL1, src: "role:k8s-app", dst: "role:k8s-app", ports: [22, 2379, 2380, 6443, 9345] }   # worker không SSH hay vào API và etcd của worker khác
+  - { id: XL2, src: "role:k8s-app", dst: "role:k8s-cp", ports: [22, 2379, 2380] }                  # worker không vào etcd hay SSH vào server
 
 # Cấm tuyệt đối 7.6 §4.7. Sinh luật không được tạo ra bất kỳ luồng nào trùng (cặp máy nguồn, máy đích).
 # X07 (bastion không phải đường đọc dữ liệu khách) là ngữ nghĩa ứng dụng, kiểm ở P2 bằng test, không phải luật mạng.

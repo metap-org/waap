@@ -365,6 +365,12 @@ steps:
       - {at: all-except:firewall, what: nftables chạy, cmd: "systemctl is-active nftables", op: eq, value: active}
       - {at: all-except:firewall, what: Input policy drop, cmd: "nft list chain inet host input | grep -c 'policy drop'", op: eq, value: "1"}
       - {at: all-except:firewall, what: Luật nạp từ tệp sinh tự động, cmd: "grep -c 'Sinh tự động' /etc/nftables.conf", op: eq, value: "1"}
+      - {at: "role:k8s-cp", what: Node K8s chỉ mở cổng RKE2 cần thiết (6443, 9345 cho worker; không mở all), cmd: "nft list chain inet host input | grep -c 'L02a'", op: eq, value: "1"}
+      - {at: "role:k8s-app", what: Worker không có luật mở 6443 và 9345 cho ai (chỉ server mới có), cmd: "nft list chain inet host input | grep -c 'L02a'", op: eq, value: "0"}
+      - {at: "role:k8s-cp", what: Kubelet 10250 và Canal 9099 chỉ trong vùng Z3, cmd: "nft list chain inet host input | grep 'L02b' | grep -c '10.10.30.'", op: ge, value: 1}
+      - {at: "role:k8s-cp", what: VXLAN udp 8472 chỉ trong vùng Z3, cmd: "nft list chain inet host input | grep 'L02c' | grep -c '10.10.30.'", op: ge, value: 1}
+      - {at: "role:k8s-app", what: Chấp nhận lưu lượng từ giao diện mạng pod (cni0, flannel.1), cmd: "nft list chain inet host input | grep -c 'pod network'", op: eq, value: "1"}
+      - {at: "role:k8s-cp", what: Chấp nhận lưu lượng từ giao diện mạng pod (cni0, flannel.1), cmd: "nft list chain inet host input | grep -c 'pod network'", op: eq, value: "1"}
       - {at: bastion, what: Bastion vẫn SSH được data-1 (N25), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/22'", op: rc0}
     rollback: "incus exec <vm> -- nft flush ruleset (tạm), rồi sửa flows.yaml và chạy lại."
 
@@ -543,6 +549,14 @@ steps:
       - {at: k8s-cp-1, what: Ba node Ready, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "3"}
       - {at: k8s-wk-1, what: Agent chạy, cmd: "systemctl is-active rke2-agent", op: eq, value: active}
       - {at: k8s-wk-2, what: Agent chạy, cmd: "systemctl is-active rke2-agent", op: eq, value: active}
+      - {at: k8s-wk-1, what: Worker vào được supervisor 9345 của server, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/9345'", op: rc0}
+      - {at: k8s-wk-1, what: Worker vào được API 6443, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/6443'", op: rc0}
+      - {at: k8s-wk-1, what: Worker KHÔNG vào được etcd 2379 của server, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/2379'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Worker KHÔNG vào được etcd peer 2380, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/2380'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Worker KHÔNG SSH được vào server, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-cp-1}/22'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Worker KHÔNG SSH được vào worker khác, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-wk-2}/22'", op: rc_nonzero}
+      - {at: k8s-wk-1, what: Server vào được kubelet 10250 của worker, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:k8s-wk-2}/10250'", op: rc0}
+      - {at: k8s-cp-1, what: Pod hệ thống đều Running (CNI và đường pod tới API không bị firewall máy chủ chặn), cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers | grep -c ' Running'", op: ge, value: 5}
       - {at: k8s-wk-1, what: Worker kubelet không mở cổng chỉ đọc, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
     rollback: "incus exec <worker> -- /usr/local/bin/rke2-uninstall.sh hoặc dựng lại VM."
 

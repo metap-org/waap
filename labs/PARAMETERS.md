@@ -68,6 +68,17 @@ Nguồn đã đối chiếu: [RKE2 CIS Hardening Guide](https://docs.rke2.io/sec
 | Ingress mặc định | Tắt (`rke2_disable`); tên thành phần đổi theo phiên bản (ingress-nginx ở bản cũ, có thể là Traefik ở bản mới) | Migration guide của RKE2 cho thấy mặc định đã đổi | B |
 | sysctl kubelet | Bảng `role_k8s_*` ở `os_tuning` (panic_on_oom, overcommit, panic, panic_on_oops, keys, inotify, conntrack) | Profile CIS đòi các giá trị này | B |
 
+## Giữa các node RKE2
+
+| Hạng mục | Hiện trạng | Cơ sở | Tin cậy |
+|---|---|---|---|
+| Cổng giữa node | Firewall máy chủ chỉ mở: 6443 và 9345 trên server cho worker; 10250 (kubelet) và 9099 (Canal health) giữa mọi node; udp 8472 (VXLAN) giữa mọi node. **Không mở 2379 và 2380 (etcd)** vì chỉ có một server | [RKE2 Requirements](https://docs.rke2.io/install/requirements) | A |
+| Cấm trong cùng vùng | Worker không SSH và không vào etcd, API, supervisor của worker khác; không SSH hay vào etcd của server. Kiểm bằng `lab nettest` | Nguyên tắc ít quyền nhất | C |
+| Pod tới node | Chấp nhận theo giao diện (`cni0`, `flannel.1`), vì lưu lượng pod tới API và kubelet vào bằng giao diện CNI chứ không bằng IP node | Hành vi CNI | B |
+| **Chưa làm: NetworkPolicy mặc định chặn** | Tôi không thấy tài liệu RKE2 xác nhận profile CIS tự tạo chính sách chặn mặc định; chưa viết. Thuộc P2 (T08) | CIS 1.23 self-assessment chỉ đòi CNI hỗ trợ NetworkPolicy | cần quyết |
+| **Chưa làm: mã hoá lưu lượng pod** | Canal VXLAN không mã hoá. Các node chung một cầu L2 (Z3), nên nguy cơ nghe lén nằm ở hypervisor. Phương án: Canal với WireGuard, hoặc Cilium với mã hoá trong suốt | Thực hành chung | cần quyết |
+| **Chưa làm: HA control-plane** | Một server nên etcd một node; HA (3 server) cần mở 2379 và 2380 giữa các server và chạy ở profile `full` | RKE2 HA docs | cần quyết |
+
 ## Chỗ lệch best practice có chủ đích
 
 | Chỗ lệch | Vì sao | Khi nào sửa |

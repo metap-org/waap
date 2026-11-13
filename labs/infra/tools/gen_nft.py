@@ -149,6 +149,10 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
          '    ct state invalid drop',
          '    iifname "lo" accept',
          '    icmp type echo-request limit rate 5/second accept comment "ping"']
+    for role in vm["roles"]:
+        ifs = (flows.get("host_interfaces") or {}).get(role)
+        if ifs:
+            L.append(f'    iifname {{ {", ".join(chr(34) + i + chr(34) for i in ifs)} }} accept comment "pod network ({role})"')
     for f in flows["flows"]:
         if f.get("lab_only") and f["dst"] == UPLINK:
             continue
@@ -161,10 +165,6 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
             continue
         ports = ", ".join(str(p) for p in f["ports"])
         L.append(f'    ip saddr {{ {", ".join(s_ips)} }} {f["proto"]} dport {{ {ports} }} accept comment "{f["id"]}"')
-    for loc in flows.get("local", []):
-        members = resolve(loc["hosts"], zones, prof, ips)
-        if any(m[0] == vm_name for m in members):
-            L.append(f'    ip saddr {{ {", ".join(sorted({m[2] for m in members}))} }} accept comment "{loc["id"]} {loc["note"]}"')
     L.append('    limit rate 5/second burst 10 packets log prefix "waap-drop-in: " level info')
     L.append('    counter drop comment "default-deny"')
     L.append("  }")
@@ -186,10 +186,6 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
             if d_ips:
                 ports = ", ".join(str(p) for p in f["ports"])
                 L.append(f'    ip daddr {{ {", ".join(d_ips)} }} {f["proto"]} dport {{ {ports} }} accept comment "{f["id"]}"')
-        for loc in flows.get("local", []):
-            members = resolve(loc["hosts"], zones, prof, ips)
-            if any(m[0] == vm_name for m in members):
-                L.append(f'    ip daddr {{ {", ".join(sorted({m[2] for m in members}))} }} accept comment "{loc["id"]}"')
         L.append('    counter drop comment "egress-locked"')
     else:
         L.append("    type filter hook output priority 0; policy accept;")
@@ -204,13 +200,21 @@ def probes(profile):
     zones, prof, flows = load(profile)
     ips = vm_ips(zones, prof)
     out = []
-    for f in fw_flows(flows):
+    for f in flows["flows"]:
         if f["proto"] != "tcp" or f["dst"] == UPLINK or f.get("lab_only"):
             continue
+        host_enforced = f.get("enforce", "fw") == "host"
         src = sorted(resolve(f["src"], zones, prof, ips)); dst = sorted(resolve(f["dst"], zones, prof, ips))
-        pair = next(((s, d) for s in src for d in dst if s[1] != d[1]), None)
+        # Luồng fw: cặp khác vùng. Luồng host (cùng vùng): cặp khác máy.
+        pair = next(((s_, d) for s_ in src for d in dst if (s_[0] != d[0] if host_enforced else s_[1] != d[1])), None)
         if pair:
             out.append({"id": f["id"], "expect": "reach", "from": pair[0][0], "to": pair[1][2], "port": f["ports"][0]})
+    for x in flows.get("intra_forbidden", []):
+        src = sorted(resolve(x["src"], zones, prof, ips)); dst = sorted(resolve(x["dst"], zones, prof, ips))
+        pair = next(((s_, d) for s_ in src for d in dst if s_[0] != d[0]), None)
+        if pair:
+            for port in x["ports"]:
+                out.append({"id": x["id"], "expect": "blocked", "from": pair[0][0], "to": pair[1][2], "port": port})
     for x in flows["forbidden"]:
         if x["dst"] == UPLINK:
             continue
@@ -237,6 +241,17 @@ def check(profile):
             hit = {(a[0], b[0]) for a in s for b in d if a[1] != b[1]} & {(a[0], b[0]) for a in fs for b in fd}
             if hit:
                 errs.append(f'{f["id"]} vi phạm {x["id"]}: {sorted(hit)[:3]}')
+    # 1b. Cấm cùng vùng: không luồng cho phép nào (host hoặc fw) mở cổng bị cấm giữa cùng cặp máy.
+    for x in flows.get("intra_forbidden", []):
+        xs, xd = resolve(x["src"], zones, prof, ips), resolve(x["dst"], zones, prof, ips)
+        xp = {(a[0], b[0]) for a in xs for b in xd if a[0] != b[0]}
+        for f in flows["flows"]:
+            if f["dst"] == UPLINK or f["proto"] != "tcp":
+                continue
+            fp = {(a[0], b[0]) for a in resolve(f["src"], zones, prof, ips) for b in resolve(f["dst"], zones, prof, ips)}
+            bad = set(f["ports"]) & set(x["ports"])
+            if fp & xp and bad:
+                errs.append(f'{f["id"]} mở cổng {sorted(bad)} bị {x["id"]} cấm')
     # 2. T07 hai chiều với 7.6: mọi dòng ma trận có luật, mọi luật có dòng ma trận.
     md = DOC.read_text(encoding="utf-8")
     doc_ids = set(re.findall(r"^\| (N\d\d) \|", md, re.M))
