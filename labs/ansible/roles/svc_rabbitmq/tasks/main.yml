@@ -10,8 +10,19 @@
     mode: "0644"
     content: |
       listeners.tcp.1 = {{ app_listen_ip }}:5672
-      loopback_users = none
-      default_user_tags.administrator = false
+      # Ngưỡng bộ nhớ và đĩa tường minh; disk_free_limit >= ngưỡng bộ nhớ (khuyến nghị production checklist của RabbitMQ).
+      vm_memory_high_watermark.relative = 0.4
+      disk_free_limit.absolute = {{ rabbit_disk_free_limit }}
+      log.file.level = info
+  notify: restart rabbitmq
+
+- name: epmd và cổng phân tán chỉ nghe loopback (một node, không cần cụm)
+  ansible.builtin.copy:
+    dest: /etc/rabbitmq/rabbitmq-env.conf
+    mode: "0644"
+    content: |
+      ERL_EPMD_ADDRESS=127.0.0.1
+      SERVER_ADDITIONAL_ERL_ARGS="-kernel inet_dist_use_interface {127,0,0,1}"
   notify: restart rabbitmq
 
 - name: Chạy

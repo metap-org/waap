@@ -10,6 +10,12 @@ maxmemory-policy noeviction
 user default off
 user control on >{{ redis_control_password }} ~waf:* +@all -@dangerous +ping
 user edge on >{{ redis_edge_password }} ~waf:* -@all +@read +ping +info
-rename-command FLUSHALL ""
-rename-command FLUSHDB ""
-rename-command CONFIG ""
+# Lệnh nguy hiểm bị chặn bằng ACL (-@dangerous); rename-command đã bị khuyến cáo bỏ.
+tcp-backlog 511
+tcp-keepalive 300
+maxclients 10000
+appendfsync everysec
+aof-use-rdb-preamble yes
+lazyfree-lazy-eviction yes
+lazyfree-lazy-expire yes
+acllog-max-len 128

@@ -15,6 +15,11 @@
   changed_when: true
   listen: load audit rules
 
+- name: Reload auditd
+  ansible.builtin.command: systemctl kill --signal=SIGHUP auditd
+  changed_when: true
+  listen: reload auditd
+
 - name: Restart chrony
   ansible.builtin.systemd:
     name: chrony

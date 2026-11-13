@@ -83,14 +83,22 @@ cmd_down() { # snapshot rồi tắt theo thứ tự ngược
 secret() { python3 -c "import yaml;print(yaml.safe_load(open('$GEN/secrets.yml'))['lab_secrets']['$1'])"; }
 
 cmd_secrets() { # mật khẩu và token ngẫu nhiên cho lab; KHÔNG commit. P5 thay bằng OpenBao dynamic secret.
-  mkdir -p "$GEN"; [ -f "$GEN/secrets.yml" ] && { echo "đã có $GEN/secrets.yml"; return; }
+  mkdir -p "$GEN"
   ( umask 077; python3 - "$GEN/secrets.yml" <<'PY'
-import secrets, sys, yaml
+import os, secrets, sys, yaml
+p = sys.argv[1]
 keys = ["postgres_password", "rabbitmq_password", "redis_control_password", "redis_edge_password", "ingest_token",
-        "analytics_ingest_token", "clearance_secret", "dns_mock_admin_token", "service_password", "control_password"]
-yaml.safe_dump({"lab_secrets": {k: secrets.token_urlsafe(24) for k in keys}}, open(sys.argv[1], "w"))
+        "analytics_ingest_token", "clearance_secret", "dns_mock_admin_token", "service_password", "control_password",
+        "clickhouse_analytics_password"]
+cur = yaml.safe_load(open(p)) if os.path.exists(p) else {}
+sec = (cur or {}).get("lab_secrets", {})
+added = [k for k in keys if k not in sec]
+for k in added:
+    sec[k] = secrets.token_urlsafe(24)
+yaml.safe_dump({"lab_secrets": sec}, open(p, "w"))
+print(f"secrets.yml: thêm {len(added)} khoá mới, giữ nguyên các khoá cũ")
 PY
-  ); echo "đã sinh $GEN/secrets.yml (0600)"
+  )
 }
 
 cmd_services() { # PostgreSQL, RabbitMQ, Redis, ClickHouse, egress-1

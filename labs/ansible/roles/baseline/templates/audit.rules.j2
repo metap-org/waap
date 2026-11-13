@@ -16,6 +16,20 @@
 -a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change
 -w /etc/nftables.conf -p wa -k firewall
 -w /etc/hosts -p wa -k network
+-a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale
+-w /etc/issue -p wa -k system-locale
+-w /etc/issue.net -p wa -k system-locale
+-w /etc/localtime -p wa -k time-change
+-w /etc/pam.d/ -p wa -k pam
+-w /etc/security/ -p wa -k pam
+-w /etc/login.defs -p wa -k pam
+-w /etc/audit/ -p wa -k audit-config
+-w /etc/apparmor/ -p wa -k mac-policy
+-w /etc/apparmor.d/ -p wa -k mac-policy
+-w /var/log/wtmp -p wa -k session
+-w /var/log/btmp -p wa -k session
+-w /var/run/utmp -p wa -k session
+-a always,exit -F arch=b64 -C euid!=uid -F auid!=unset -S execve -k user_emulation
 -w /etc/netplan/ -p wa -k network
 # Module kernel và mount
 -a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules

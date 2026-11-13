@@ -59,6 +59,15 @@ def merge_tuning(ctx, vm_name):
     return sysctl, thp, limits, conflicts
 
 
+def merge_modules(ctx, vm_name):
+    t, vm, mods = ctx["tuning"], vm_of(ctx, vm_name), []
+    for grp in [x for x in t["tuning_precedence"] if x in groups_of(vm)]:
+        for m in t["tuning_by_role"].get(grp, {}).get("modules", []) or []:
+            if m not in mods:
+                mods.append(m)
+    return mods
+
+
 def expand_on(ctx, on):  # selector at
     """Selector -> danh sách 'host' hoặc tên VM."""
     vms = [v["name"] for v in ctx["prof"]["vms"]]
@@ -130,9 +139,13 @@ def generated_checks(ctx, c):
         elif kind == "tuning":
             sysctl, thp, limits, conf = merge_tuning(ctx, name)
             for k, v in sorted(sysctl.items()):
-                out.append(dict(at=name, what=f"sysctl {k}", cmd=f"sysctl -n {k}", op="eq", value=str(v)))
+                # sysctl in giá trị nhiều trường bằng tab; chuẩn hoá thành một dấu cách để so sánh với giá trị khai báo
+                out.append(dict(at=name, what=f"sysctl {k}", cmd=f"sysctl -n {k} | tr -s '[:space:]' ' ' | sed 's/ $//'", op="eq", value=str(v)))
             if thp:
-                out.append(dict(at=name, what="transparent hugepage", cmd="grep -o '\\[[a-z]*\\]' /sys/kernel/mm/transparent_hugepage/enabled", op="eq", value="[never]"))
+                out.append(dict(at=name, what="transparent hugepage enabled", cmd="grep -o '\\[[a-z]*\\]' /sys/kernel/mm/transparent_hugepage/enabled", op="eq", value="[never]"))
+                out.append(dict(at=name, what="transparent hugepage defrag", cmd="grep -o '\\[[a-z]*\\]' /sys/kernel/mm/transparent_hugepage/defrag", op="eq", value="[never]"))
+            for mod in merge_modules(ctx, name):
+                out.append(dict(at=name, what=f"module kernel {mod} đã nạp", cmd=f"lsmod | awk '$1==\"{mod}\"' | wc -l", op="eq", value="1"))
             if "vm.nr_hugepages" in sysctl:
                 out.append(dict(at=name, what="hugepage thực sự cấp được", cmd="awk '/HugePages_Total/{print $2}' /proc/meminfo", op="eq", value=str(sysctl["vm.nr_hugepages"])))
         elif kind == "limits":

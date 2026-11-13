@@ -2,10 +2,10 @@
 - name: Gộp giá trị tuning theo các vai trò của máy này
   ansible.builtin.import_tasks: merge.yml
 
-- name: sysctl theo dịch vụ (đứng trước 99-waap-hardening để luật chung vẫn thắng nếu trùng)
+- name: sysctl theo dịch vụ (nạp sau 99-waap-hardening nên giá trị theo dịch vụ thắng khi trùng khoá)
   ansible.builtin.template:
     src: sysctl-tuning.conf.j2
-    dest: /etc/sysctl.d/95-waap-tuning.conf
+    dest: /etc/sysctl.d/99-zz-waap-tuning.conf
     mode: "0644"
     owner: root
     group: root
@@ -13,11 +13,18 @@
   notify: reload sysctl
   tags: [sysctl]
 
-- name: Nạp module bridge cho node container (cần trước khi áp bridge-nf-call)
+- name: Module kernel cần cho các khoá sysctl (nạp lại sau khởi động)
+  ansible.builtin.copy:
+    content: "{{ tuning_modules | default([]) | join('\n') }}\n"
+    dest: /etc/modules-load.d/waap-tuning.conf
+    mode: "0644"
+  when: tuning_modules | default([]) | length > 0
+
+- name: Nạp module ngay (trước khi áp sysctl)
   community.general.modprobe:
-    name: br_netfilter
+    name: "{{ item }}"
     state: present
-  when: "'net.bridge.bridge-nf-call-iptables' in (tuning_sysctl | default({}))"
+  loop: "{{ tuning_modules | default([]) }}"
 
 - name: Áp sysctl ngay
   ansible.builtin.command: sysctl --system
@@ -35,7 +42,7 @@
       After=sysinit.target local-fs.target
       [Service]
       Type=oneshot
-      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled; echo never > /sys/kernel/mm/transparent_hugepage/defrag'
       [Install]
       WantedBy=multi-user.target
   when: tuning_thp | default('') == 'never'

@@ -1,4 +1,5 @@
 ---
 # egress-1: squid cho đường ra duy nhất có allowlist (7.6 N21, N22, N29). ingress-1 và egw-1 chưa cấu hình ở giai đoạn này.
-egress_allowed_domains: [github.com, ghcr.io, registry.k8s.io, acme-v02.api.letsencrypt.org]
+# Dấu chấm đầu nghĩa là cả tên miền con. Danh sách này là điểm xuất phát, sẽ cần chỉnh khi chạy thật (CDN của registry đổi tên miền).
+egress_allowed_domains: [.ubuntu.com, .github.com, .githubusercontent.com, .ghcr.io, .k8s.io, acme-v02.api.letsencrypt.org]
 egress_allowed_src: ["10.10.30.0/24", "10.10.60.0/24"]   # N21 và N29

@@ -39,6 +39,16 @@
     group: clickhouse
   notify: restart clickhouse
 
+- name: Người dùng ứng dụng, default chỉ localhost (users.d)
+  ansible.builtin.template:
+    src: users.xml.j2
+    dest: /etc/clickhouse-server/users.d/90-waap.xml
+    mode: "0640"
+    owner: clickhouse
+    group: clickhouse
+  no_log: true
+  notify: restart clickhouse
+
 - name: Chạy
   ansible.builtin.systemd:
     name: clickhouse-server

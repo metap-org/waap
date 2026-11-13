@@ -8,6 +8,21 @@
     group: root
   notify: load audit rules
 
+- name: Cấu hình auditd (xoay vòng, hành vi khi đầy đĩa)
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^\s*{{ item.key }}\s*='
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: max_log_file, value: 50 }
+    - { key: num_logs, value: 10 }
+    - { key: max_log_file_action, value: rotate }
+    - { key: space_left_action, value: syslog }
+    - { key: admin_space_left_action, value: suspend }
+    - { key: disk_full_action, value: suspend }
+    - { key: disk_error_action, value: syslog }
+  notify: reload auditd
+
 - name: auditd chạy
   ansible.builtin.systemd:
     name: auditd

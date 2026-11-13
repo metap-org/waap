@@ -120,6 +120,7 @@ def render(zones, prof, flows, bootstrap):
         z = ", ".join(zones["zones"][k]["cidr"] for k in zones["zones"] if k != "Z0")
         L.append(f'    ip saddr {{ {z} }} oifname "uplink" tcp dport {{ 53, 80, 443 }} accept comment "BOOTSTRAP gỡ bằng lab seal"')
         L.append(f'    ip saddr {{ {z} }} oifname "uplink" udp dport {{ 53, 123 }} accept comment "BOOTSTRAP gỡ bằng lab seal"')
+    L.append('    limit rate 5/second burst 10 packets log prefix "waap-drop-fwd: " level info')
     L.append('    counter drop comment "default-deny"')
     L.append("  }")
     L.append("}")
@@ -164,6 +165,7 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
         members = resolve(loc["hosts"], zones, prof, ips)
         if any(m[0] == vm_name for m in members):
             L.append(f'    ip saddr {{ {", ".join(sorted({m[2] for m in members}))} }} accept comment "{loc["id"]} {loc["note"]}"')
+    L.append('    limit rate 5/second burst 10 packets log prefix "waap-drop-in: " level info')
     L.append('    counter drop comment "default-deny"')
     L.append("  }")
     roles = set(vm["roles"])

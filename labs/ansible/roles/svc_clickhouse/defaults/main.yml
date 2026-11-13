@@ -5,4 +5,6 @@ clickhouse_debs: []
 clickhouse_data: /var/lib/clickhouse
 clickhouse_listen: "{{ app_listen_ip }}"
 clickhouse_ttl_days: 30
+clickhouse_app_user: analytics
+clickhouse_app_password: "{{ lab_secrets.clickhouse_analytics_password if (lab_secrets is defined and 'clickhouse_analytics_password' in lab_secrets) else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/clickhouse_analytics_password length=24 chars=ascii_letters,digits') }}"
 clickhouse_allowed_cidrs: ["10.10.30.0/24"]   # nguồn được dùng tài khoản default; đặt theo nơi cài

@@ -10,6 +10,6 @@
         tasks_from: merge.yml
     - name: In kết quả dạng JSON
       ansible.builtin.copy:
-        content: "{{ {'sysctl': tuning_sysctl | default({}), 'thp': tuning_thp | default(''), 'limits': tuning_limits | default({})} | to_json }}"
+        content: "{{ {'sysctl': tuning_sysctl | default({}), 'thp': tuning_thp | default(''), 'limits': tuning_limits | default({}), 'modules': tuning_modules | default([])} | to_json }}"
         dest: "{{ out_file }}"
         mode: "0644"

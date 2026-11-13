@@ -13,6 +13,21 @@
     group: redis
     mode: "0750"
 
+- name: Cho phép ghi vào thư mục dữ liệu (unit Debian khoá ghi ngoài /var/lib/redis)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/redis-server.service.d/20-waap-paths.conf
+    mode: "0644"
+    content: "[Service]\nReadWritePaths={{ redis_dir }}\n"
+  when: redis_dir != '/var/lib/redis'
+  notify: reload systemd
+
+- name: Thư mục drop-in redis
+  ansible.builtin.file:
+    path: /etc/systemd/system/redis-server.service.d
+    state: directory
+    mode: "0755"
+  when: redis_dir != '/var/lib/redis'
+
 - name: Cấu hình Redis với ACL, control ghi và edge chỉ đọc
   ansible.builtin.template:
     src: redis.conf.j2

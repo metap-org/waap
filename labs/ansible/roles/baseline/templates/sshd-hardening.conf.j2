@@ -17,6 +17,17 @@ AuthorizedKeysFile none
 AuthenticationMethods publickey,keyboard-interactive
 {% endif %}
 X11Forwarding no
+HostbasedAuthentication no
+IgnoreRhosts yes
+PermitUserEnvironment no
+PermitTunnel no
+GatewayPorts no
+AllowStreamLocalForwarding no
+GSSAPIAuthentication no
+StrictModes yes
+UsePAM yes
+Compression no
+MaxStartups 10:30:60
 AllowAgentForwarding no
 AllowTcpForwarding {{ 'yes' if ssh_allow_tcp_forwarding | bool else 'no' }}
 MaxAuthTries 3

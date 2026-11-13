@@ -209,6 +209,13 @@ steps:
       - {at: all, what: Hết hạn đăng nhập 30 giây, cmd: "sshd -T | awk '/^logingracetime/{print $2}'", op: eq, value: "30"}
       - {at: all, what: Ngắt phiên rảnh 300 giây, cmd: "sshd -T | awk '/^clientaliveinterval/{print $2}'", op: eq, value: "300"}
       - {at: all, what: Không X11, cmd: "sshd -T | awk '/^x11forwarding/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Cấm xác thực theo máy (hostbased), cmd: "sshd -T | awk '/^hostbasedauthentication/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Bỏ qua rhosts, cmd: "sshd -T | awk '/^ignorerhosts/{print $2}'", op: eq, value: "yes"}
+      - {at: all, what: Cấm biến môi trường do người dùng đặt, cmd: "sshd -T | awk '/^permituserenvironment/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Cấm tunnel, cmd: "sshd -T | awk '/^permittunnel/{print $2}'", op: eq, value: "false"}
+      - {at: all, what: Không GSSAPI, cmd: "sshd -T | awk '/^gssapiauthentication/{print $2}'", op: eq, value: "no"}
+      - {at: all, what: Giới hạn kết nối chưa xác thực, cmd: "sshd -T | awk '/^maxstartups/{print $2}'", op: eq, value: "10:30:60"}
+      - {at: all, what: Chỉ mã hoá hiện đại (không có cbc), cmd: "sshd -T | awk '/^ciphers/{print $2}' | grep -c cbc", op: eq, value: "0"}
       - {at: all-except:bastion, what: Không chuyển tiếp TCP, cmd: "sshd -T | awk '/^allowtcpforwarding/{print $2}'", op: eq, value: "no"}
       - {at: bastion, what: Bastion cho chuyển tiếp TCP (ProxyJump), cmd: "sshd -T | awk '/^allowtcpforwarding/{print $2}'", op: eq, value: "yes"}
       - {at: all, what: Có CA SSH tin cậy, cmd: "sshd -T | grep -c '^trustedusercakeys'", op: eq, value: "1"}
@@ -263,6 +270,12 @@ steps:
       - {at: all, what: Tắt IPv6, cmd: "sysctl -n net.ipv6.conf.all.disable_ipv6", op: eq, value: "1"}
       - {at: all, what: ASLR đầy đủ, cmd: "sysctl -n kernel.randomize_va_space", op: eq, value: "2"}
       - {at: all, what: Che con trỏ kernel, cmd: "sysctl -n kernel.kptr_restrict", op: eq, value: "2"}
+      - {at: all, what: Không nhận redirect an toàn (default), cmd: "sysctl -n net.ipv4.conf.default.secure_redirects", op: eq, value: "0"}
+      - {at: all, what: Ghi log gói lạ (default), cmd: "sysctl -n net.ipv4.conf.default.log_martians", op: eq, value: "1"}
+      - {at: all, what: Chống TIME-WAIT assassination (RFC 1337), cmd: "sysctl -n net.ipv4.tcp_rfc1337", op: eq, value: "1"}
+      - {at: all, what: Tắt SysRq, cmd: "sysctl -n kernel.sysrq", op: eq, value: "0"}
+      - {at: all, what: perf_event chỉ root, cmd: "sysctl -n kernel.perf_event_paranoid", op: eq, value: "3"}
+      - {at: all, what: Cấm nạp kernel mới bằng kexec, cmd: "sysctl -n kernel.kexec_load_disabled", op: eq, value: "1"}
       - {at: all, what: Hạn chế dmesg, cmd: "sysctl -n kernel.dmesg_restrict", op: eq, value: "1"}
       - {at: all, what: ptrace chỉ cha con, cmd: "sysctl -n kernel.yama.ptrace_scope", op: eq, value: "1"}
       - {at: all, what: bpf không đặc quyền tắt (Ubuntu mặc định 2, không hạ được), cmd: "sysctl -n kernel.unprivileged_bpf_disabled", op: eq, value: "2"}
@@ -287,6 +300,15 @@ steps:
       - {at: all, what: Có luật sudoers, cmd: "auditctl -l | grep -c 'k sudoers'", op: ge, value: 2}
       - {at: all, what: Có luật sshd, cmd: "auditctl -l | grep -c 'k sshd'", op: ge, value: 3}
       - {at: all, what: Có luật đổi giờ, cmd: "auditctl -l | grep -c 'k time-change'", op: ge, value: 1}
+      - {at: all, what: Có luật system-locale (hostname, issue), cmd: "auditctl -l | grep -c 'k system-locale'", op: ge, value: 3}
+      - {at: all, what: Có luật PAM, cmd: "auditctl -l | grep -c 'k pam'", op: ge, value: 3}
+      - {at: all, what: Có luật phiên đăng nhập (wtmp, btmp, utmp), cmd: "auditctl -l | grep -c 'k session'", op: ge, value: 3}
+      - {at: all, what: Có luật chính sách AppArmor, cmd: "auditctl -l | grep -c 'k mac-policy'", op: ge, value: 2}
+      - {at: all, what: Có luật giả danh người dùng (execve euid khác uid), cmd: "auditctl -l | grep -c 'k user_emulation'", op: ge, value: 1}
+      - {at: all, what: "Log audit tối đa 50 MB mỗi tệp", cmd: "grep -E '^max_log_file ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: "50"}
+      - {at: all, what: Giữ 10 tệp log, cmd: "grep -E '^num_logs ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: "10"}
+      - {at: all, what: Xoay vòng log, cmd: "grep -E '^max_log_file_action ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: rotate}
+      - {at: all, what: Đầy đĩa thì tạm dừng (không làm sập máy), cmd: "grep -E '^disk_full_action ' /etc/audit/auditd.conf | awk '{print $3}'", op: eq, value: suspend}
       - {at: all, what: Có luật nạp module kernel, cmd: "auditctl -l | grep -c 'k modules'", op: ge, value: 1}
     rollback: "Xoá /etc/audit/rules.d/90-waap.rules rồi augenrules --load."
 
@@ -311,6 +333,7 @@ steps:
     checks:
       - {at: all, what: chrony chạy, cmd: "systemctl is-active chrony", op: eq, value: active}
       - {at: all, what: Có ít nhất một nguồn giờ, cmd: "chronyc sources | grep -c '^\\^'", op: ge, value: 1}
+      - {at: all, what: Dùng pool 4 nguồn (chrony khuyến nghị 3 nguồn trở lên; bootstrap), cmd: "grep -c '^pool ntp.ubuntu.com iburst maxsources 4' /etc/chrony/chrony.conf", op: eq, value: "1"}
       - {at: all, what: Không phục vụ giờ cho ai (cổng 0), cmd: "grep -c '^port 0' /etc/chrony/chrony.conf", op: eq, value: "1"}
       - {at: all, what: Vá tự động bật, cmd: "grep -c 'Unattended-Upgrade \"1\"' /etc/apt/apt.conf.d/20auto-upgrades", op: eq, value: "1"}
       - {at: all, what: Chỉ vá bảo mật, cmd: "grep -c 'security' /etc/apt/apt.conf.d/52unattended-upgrades-waap", op: ge, value: 1}
@@ -368,7 +391,7 @@ steps:
     run: ["labs/bin/lab provision --tags tuning --limit data-1"]
     checks:
       - {use: tuning, vms: [data-1]}
-    rollback: "Xoá /etc/sysctl.d/95-waap-tuning.conf và waap-thp-off.service rồi sysctl --system."
+    rollback: "Xoá /etc/sysctl.d/99-zz-waap-tuning.conf và waap-thp-off.service rồi sysctl --system."
 
   - id: P5.2
     title: Tuning cho ch-1 (ClickHouse)
@@ -491,14 +514,19 @@ steps:
     checks:
       - {at: k8s-cp-1, what: k3s chạy, cmd: "systemctl is-active k3s", op: eq, value: active}
       - {at: k8s-cp-1, what: Node Ready, cmd: "k3s kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: kubelet protect-kernel-defaults, cmd: "grep -c 'protect-kernel-defaults=true' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: kubelet protect-kernel-defaults, cmd: "grep -c '^protect-kernel-defaults: true' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Ngắt kết nối stream rảnh 5 phút, cmd: "grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Có chính sách audit, cmd: "test -s /var/lib/rancher/k3s/server/audit.yaml", op: rc0}
+      - {at: k8s-cp-1, what: Có cấu hình Pod Security (restricted), cmd: "grep -c 'enforce: restricted' /var/lib/rancher/k3s/server/psa.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Giữ log audit 30 ngày, cmd: "grep -c 'audit-log-maxage=30' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Token ServiceAccount không kéo dài tuổi, cmd: "grep -c 'service-account-extend-token-expiration=false' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
       - {at: k8s-cp-1, what: Cổng chỉ đọc 10255 đóng, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
       - {at: k8s-cp-1, what: Mã hoá secret bật, cmd: "k3s secrets-encrypt status | grep -c 'Enabled'", op: ge, value: 1}
       - {at: k8s-cp-1, what: Không có traefik, cmd: "k3s kubectl -n kube-system get pods --no-headers | grep -c traefik", op: eq, value: "0"}
       - {at: k8s-cp-1, what: Token cụm quyền 600, cmd: "stat -c %a /etc/rancher/k3s/token", op: eq, value: "600"}
       - {at: k8s-cp-1, what: Cấu hình k3s quyền 600, cmd: "stat -c %a /etc/rancher/k3s/config.yaml", op: eq, value: "600"}
       - {at: k8s-cp-1, what: Không swap, cmd: "swapon --show | wc -l", op: eq, value: "0"}
-      - {at: k8s-cp-1, what: Có audit log của API, cmd: "test -s /var/log/k3s-audit.log", op: rc0}
+      - {at: k8s-cp-1, what: Có audit log của API, cmd: "test -s /var/lib/rancher/k3s/server/logs/audit.log", op: rc0}
     rollback: "incus exec k8s-cp-1 -- /usr/local/bin/k3s-uninstall.sh (nếu có) hoặc dựng lại VM."
 
   - id: P8.2
@@ -529,6 +557,20 @@ steps:
       - {at: data-1, what: Chỉ nghe IP lab và localhost, cmd: "sudo -u postgres psql -tAc 'show listen_addresses'", op: eq, value: "127.0.0.1,10.10.40.11"}
       - {at: data-1, what: Số kết nối tối đa, cmd: "sudo -u postgres psql -tAc 'show max_connections'", op: eq, value: "200"}
       - {at: data-1, what: shared_buffers, cmd: "sudo -u postgres psql -tAc 'show shared_buffers'", op: eq, value: 512MB}
+      - {at: data-1, what: TLS tối thiểu 1.2, cmd: "sudo -u postgres psql -tAc 'show ssl_min_protocol_version'", op: eq, value: TLSv1.2}
+      - {at: data-1, what: effective_cache_size, cmd: "sudo -u postgres psql -tAc 'show effective_cache_size'", op: eq, value: 2GB}
+      - {at: data-1, what: work_mem, cmd: "sudo -u postgres psql -tAc 'show work_mem'", op: eq, value: 4MB}
+      - {at: data-1, what: maintenance_work_mem, cmd: "sudo -u postgres psql -tAc 'show maintenance_work_mem'", op: eq, value: 128MB}
+      - {at: data-1, what: random_page_cost cho SSD, cmd: "sudo -u postgres psql -tAc 'show random_page_cost'", op: eq, value: "1.1"}
+      - {at: data-1, what: effective_io_concurrency cho SSD, cmd: "sudo -u postgres psql -tAc 'show effective_io_concurrency'", op: eq, value: "200"}
+      - {at: data-1, what: Nén WAL, cmd: "sudo -u postgres psql -tAc 'show wal_compression'", op: eq, value: "on"}
+      - {at: data-1, what: max_wal_size, cmd: "sudo -u postgres psql -tAc 'show max_wal_size'", op: eq, value: 2GB}
+      - {at: data-1, what: checkpoint_completion_target, cmd: "sudo -u postgres psql -tAc 'show checkpoint_completion_target'", op: eq, value: "0.9"}
+      - {at: data-1, what: Ghi log checkpoint, cmd: "sudo -u postgres psql -tAc 'show log_checkpoints'", op: eq, value: "on"}
+      - {at: data-1, what: Ghi log chờ khoá, cmd: "sudo -u postgres psql -tAc 'show log_lock_waits'", op: eq, value: "on"}
+      - {at: data-1, what: Đo thời gian I/O, cmd: "sudo -u postgres psql -tAc 'show track_io_timing'", op: eq, value: "on"}
+      - {at: data-1, what: Ngắt giao dịch treo 1 phút, cmd: "sudo -u postgres psql -tAc 'show idle_in_transaction_session_timeout'", op: eq, value: 1min}
+      - {at: data-1, what: Keepalive TCP 60 giây, cmd: "sudo -u postgres psql -tAc 'show tcp_keepalives_idle'", op: eq, value: "60"}
       - {at: data-1, what: Dùng hugepage nếu có (try), cmd: "sudo -u postgres psql -tAc 'show huge_pages'", op: eq, value: try}
       - {at: data-1, what: pg_hba có đúng một dòng hostssl, cmd: "grep -c '^hostssl' /etc/postgresql/16/main/pg_hba.conf", op: eq, value: "1"}
       - {at: data-1, what: pg_hba không có trust, cmd: "grep -c trust /etc/postgresql/16/main/pg_hba.conf", op: eq, value: "0"}
@@ -550,7 +592,13 @@ steps:
       - {at: data-1, what: Chỉ nghe IP lab ở 5672, cmd: "ss -ltn | grep -c '10.10.40.11:5672'", op: eq, value: "1"}
       - {at: data-1, what: Không nghe 0.0.0.0, cmd: "ss -ltn | grep -c '0.0.0.0:5672'", op: eq, value: "0"}
       - {at: data-1, what: User ứng dụng không là administrator, cmd: "rabbitmqctl list_users --silent | grep '^metap' | grep -c administrator", op: eq, value: "0"}
-      - {at: k8s-wk-1, what: Vùng ứng dụng tới được 5672 (I06 tạm), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5672'", op: rc0}
+      - {at: data-1, what: epmd chỉ nghe loopback, cmd: "ss -ltn | grep ':4369' | grep -vc '127.0.0.1'", op: eq, value: "0"}
+      - {at: data-1, what: Cổng phân tán Erlang chỉ nghe loopback, cmd: "ss -ltn | grep ':25672' | grep -vc '127.0.0.1'", op: eq, value: "0"}
+      - {at: data-1, what: Không có loopback_users=none (không dùng cho production), cmd: "grep -c 'loopback_users' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "0"}
+      - {at: data-1, what: Ngưỡng bộ nhớ tường minh 0.4, cmd: "grep -c '^vm_memory_high_watermark.relative = 0.4' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "1"}
+      - {at: data-1, what: "Ngưỡng đĩa trống >= ngưỡng bộ nhớ (2 GB)", cmd: "grep -c '^disk_free_limit.absolute = 2GB' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "1"}
+      - {use: limits, vms: [data-1]}
+      - {at: k8s-wk-1, what: Cổng 5672 thường chưa mở cho vùng ứng dụng (N15 chỉ mở 5671 TLS; TLS làm ở P2/P5), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5672'", op: rc_nonzero}
     rollback: "apt purge rabbitmq-server."
 
   - id: P8.5
@@ -566,10 +614,11 @@ steps:
       - {at: data-1, what: User control ghi được, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1", op: eq, value: OK}
       - {at: data-1, what: User edge không ghi được, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2", op: contains, value: NOPERM}
       - {at: data-1, what: User edge đọc được, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe", op: eq, value: "1"}
-      - {at: data-1, what: FLUSHALL bị tắt, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} flushall", op: contains, value: unknown}
+      - {at: data-1, what: FLUSHALL bị chặn bằng ACL (-@dangerous), cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} flushall", op: contains, value: NOPERM}
       - {at: data-1, what: Không loại bỏ khoá, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info memory | grep -c 'maxmemory_policy:noeviction'", op: eq, value: "1"}
       - {at: data-1, what: AOF bật, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info persistence | grep -c 'aof_enabled:1'", op: eq, value: "1"}
       - {use: limits, vms: [edge-1]}
+      - {at: data-1, what: Thư mục dữ liệu Redis ghi được dưới sandbox của unit, cmd: "systemctl show redis-server -p ReadWritePaths --value", op: contains, value: /var/lib/waap/data/redis}
     rollback: "apt purge redis-server."
 
   - id: P8.6
@@ -584,7 +633,9 @@ steps:
       - {at: ch-1, what: Thư mục dữ liệu trên đĩa riêng, cmd: "clickhouse-client -q \"select value from system.server_settings where name='path'\"", op: eq, value: /var/lib/waap/data/clickhouse/}
       - {at: ch-1, what: Chỉ nghe IP lab, cmd: "ss -ltn | grep -c '0.0.0.0:9000'", op: eq, value: "0"}
       - {use: limits, vms: [ch-1]}
-      - {at: k8s-wk-1, what: Vùng ứng dụng tới được 9000 (I02 tạm), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:ch-1}/9000'", op: rc_nonzero}
+      - {at: ch-1, what: Có tài khoản analytics (có mật khẩu), cmd: "clickhouse-client -q \"select count() from system.users where name='analytics'\"", op: eq, value: "1"}
+      - {at: ch-1, what: 70% RAM cho server, cmd: "clickhouse-client -q \"select value from system.server_settings where name='max_server_memory_usage_to_ram_ratio'\"", op: eq, value: "0.7"}
+      - {at: k8s-wk-1, what: Cổng native 9000 chưa mở cho vùng ứng dụng (N17 chỉ mở 8443 và 9440, TLS làm ở P2/P5), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:ch-1}/9000'", op: rc_nonzero}
     rollback: "apt purge clickhouse-server clickhouse-client clickhouse-common-static."
 
   - id: P8.7

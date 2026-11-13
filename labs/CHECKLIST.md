@@ -403,6 +403,13 @@ $ labs/bin/lab provision --tags access
 | Hết hạn đăng nhập 30 giây | `all` | = 30 | `sshd -T \| awk '/^logingracetime/{print $2}'` |
 | Ngắt phiên rảnh 300 giây | `all` | = 300 | `sshd -T \| awk '/^clientaliveinterval/{print $2}'` |
 | Không X11 | `all` | = no | `sshd -T \| awk '/^x11forwarding/{print $2}'` |
+| Cấm xác thực theo máy (hostbased) | `all` | = no | `sshd -T \| awk '/^hostbasedauthentication/{print $2}'` |
+| Bỏ qua rhosts | `all` | = yes | `sshd -T \| awk '/^ignorerhosts/{print $2}'` |
+| Cấm biến môi trường do người dùng đặt | `all` | = no | `sshd -T \| awk '/^permituserenvironment/{print $2}'` |
+| Cấm tunnel | `all` | = false | `sshd -T \| awk '/^permittunnel/{print $2}'` |
+| Không GSSAPI | `all` | = no | `sshd -T \| awk '/^gssapiauthentication/{print $2}'` |
+| Giới hạn kết nối chưa xác thực | `all` | = 10:30:60 | `sshd -T \| awk '/^maxstartups/{print $2}'` |
+| Chỉ mã hoá hiện đại (không có cbc) | `all` | = 0 | `sshd -T \| awk '/^ciphers/{print $2}' \| grep -c cbc` |
 | Không chuyển tiếp TCP | `all-except:bastion` | = no | `sshd -T \| awk '/^allowtcpforwarding/{print $2}'` |
 | Bastion cho chuyển tiếp TCP (ProxyJump) | `bastion` | = yes | `sshd -T \| awk '/^allowtcpforwarding/{print $2}'` |
 | Có CA SSH tin cậy | `all` | = 1 | `sshd -T \| grep -c '^trustedusercakeys'` |
@@ -475,6 +482,12 @@ $ labs/bin/lab provision --tags kernel
 | Tắt IPv6 | `all` | = 1 | `sysctl -n net.ipv6.conf.all.disable_ipv6` |
 | ASLR đầy đủ | `all` | = 2 | `sysctl -n kernel.randomize_va_space` |
 | Che con trỏ kernel | `all` | = 2 | `sysctl -n kernel.kptr_restrict` |
+| Không nhận redirect an toàn (default) | `all` | = 0 | `sysctl -n net.ipv4.conf.default.secure_redirects` |
+| Ghi log gói lạ (default) | `all` | = 1 | `sysctl -n net.ipv4.conf.default.log_martians` |
+| Chống TIME-WAIT assassination (RFC 1337) | `all` | = 1 | `sysctl -n net.ipv4.tcp_rfc1337` |
+| Tắt SysRq | `all` | = 0 | `sysctl -n kernel.sysrq` |
+| perf_event chỉ root | `all` | = 3 | `sysctl -n kernel.perf_event_paranoid` |
+| Cấm nạp kernel mới bằng kexec | `all` | = 1 | `sysctl -n kernel.kexec_load_disabled` |
 | Hạn chế dmesg | `all` | = 1 | `sysctl -n kernel.dmesg_restrict` |
 | ptrace chỉ cha con | `all` | = 1 | `sysctl -n kernel.yama.ptrace_scope` |
 | bpf không đặc quyền tắt (Ubuntu mặc định 2 | `all` | = 2 | `sysctl -n kernel.unprivileged_bpf_disabled` |
@@ -505,6 +518,15 @@ $ labs/bin/lab provision --tags audit
 | Có luật sudoers | `all` | ≥ 2 | `auditctl -l \| grep -c 'k sudoers'` |
 | Có luật sshd | `all` | ≥ 3 | `auditctl -l \| grep -c 'k sshd'` |
 | Có luật đổi giờ | `all` | ≥ 1 | `auditctl -l \| grep -c 'k time-change'` |
+| Có luật system-locale (hostname | `all` | ≥ 3 | `auditctl -l \| grep -c 'k system-locale'` |
+| Có luật PAM | `all` | ≥ 3 | `auditctl -l \| grep -c 'k pam'` |
+| Có luật phiên đăng nhập (wtmp | `all` | ≥ 3 | `auditctl -l \| grep -c 'k session'` |
+| Có luật chính sách AppArmor | `all` | ≥ 2 | `auditctl -l \| grep -c 'k mac-policy'` |
+| Có luật giả danh người dùng (execve euid khác uid) | `all` | ≥ 1 | `auditctl -l \| grep -c 'k user_emulation'` |
+| Log audit tối đa 50 MB mỗi tệp | `all` | = 50 | `grep -E '^max_log_file ' /etc/audit/auditd.conf \| awk '{print $3}'` |
+| Giữ 10 tệp log | `all` | = 10 | `grep -E '^num_logs ' /etc/audit/auditd.conf \| awk '{print $3}'` |
+| Xoay vòng log | `all` | = rotate | `grep -E '^max_log_file_action ' /etc/audit/auditd.conf \| awk '{print $3}'` |
+| Đầy đĩa thì tạm dừng (không làm sập máy) | `all` | = suspend | `grep -E '^disk_full_action ' /etc/audit/auditd.conf \| awk '{print $3}'` |
 | Có luật nạp module kernel | `all` | ≥ 1 | `auditctl -l \| grep -c 'k modules'` |
 
 **Hoàn tác:** Xoá /etc/audit/rules.d/90-waap.rules rồi augenrules --load.
@@ -541,6 +563,7 @@ $ labs/bin/lab provision --tags updates
 |---|---|---|---|
 | chrony chạy | `all` | = active | `systemctl is-active chrony` |
 | Có ít nhất một nguồn giờ | `all` | ≥ 1 | `chronyc sources \| grep -c '^\^'` |
+| Dùng pool 4 nguồn (chrony khuyến nghị 3 nguồn trở lên; bootstrap) | `all` | = 1 | `grep -c '^pool ntp.ubuntu.com iburst maxsources 4' /etc/chrony/chrony.conf` |
 | Không phục vụ giờ cho ai (cổng 0) | `all` | = 1 | `grep -c '^port 0' /etc/chrony/chrony.conf` |
 | Vá tự động bật | `all` | = 1 | `grep -c 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades` |
 | Chỉ vá bảo mật | `all` | ≥ 1 | `grep -c 'security' /etc/apt/apt.conf.d/52unattended-upgrades-waap` |
@@ -622,14 +645,17 @@ $ labs/bin/lab provision --tags tuning --limit data-1
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| sysctl net.core.somaxconn | `data-1` | = 1024 | `sysctl -n net.core.somaxconn` |
-| sysctl net.ipv4.tcp_keepalive_time | `data-1` | = 60 | `sysctl -n net.ipv4.tcp_keepalive_time` |
-| sysctl vm.dirty_background_bytes | `data-1` | = 67108864 | `sysctl -n vm.dirty_background_bytes` |
-| sysctl vm.dirty_bytes | `data-1` | = 536870912 | `sysctl -n vm.dirty_bytes` |
-| sysctl vm.nr_hugepages | `data-1` | = 300 | `sysctl -n vm.nr_hugepages` |
-| sysctl vm.overcommit_memory | `data-1` | = 1 | `sysctl -n vm.overcommit_memory` |
-| sysctl vm.swappiness | `data-1` | = 1 | `sysctl -n vm.swappiness` |
-| transparent hugepage | `data-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| sysctl net.core.somaxconn | `data-1` | = 1024 | `sysctl -n net.core.somaxconn \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_keepalive_intvl | `data-1` | = 10 | `sysctl -n net.ipv4.tcp_keepalive_intvl \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_keepalive_probes | `data-1` | = 3 | `sysctl -n net.ipv4.tcp_keepalive_probes \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_keepalive_time | `data-1` | = 60 | `sysctl -n net.ipv4.tcp_keepalive_time \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.dirty_background_bytes | `data-1` | = 67108864 | `sysctl -n vm.dirty_background_bytes \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.dirty_bytes | `data-1` | = 536870912 | `sysctl -n vm.dirty_bytes \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.nr_hugepages | `data-1` | = 300 | `sysctl -n vm.nr_hugepages \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.overcommit_memory | `data-1` | = 1 | `sysctl -n vm.overcommit_memory \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.swappiness | `data-1` | = 1 | `sysctl -n vm.swappiness \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| transparent hugepage enabled | `data-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| transparent hugepage defrag | `data-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/defrag` |
 | hugepage thực sự cấp được | `data-1` | = 300 | `awk '/HugePages_Total/{print $2}' /proc/meminfo` |
 
 **Vì sao các giá trị này:**
@@ -637,7 +663,7 @@ $ labs/bin/lab provision --tags tuning --limit data-1
 - `data-1` (role_valkey_central): Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
 - `data-1` (role_postgres): swappiness thấp để không đẩy shared_buffers ra swap; dirty_* giới hạn để checkpoint không dồn cục; hugepages = shared_buffers 512MB / 2MB = 256, dư khoảng 15%.
 
-**Hoàn tác:** Xoá /etc/sysctl.d/95-waap-tuning.conf và waap-thp-off.service rồi sysctl --system.
+**Hoàn tác:** Xoá /etc/sysctl.d/99-zz-waap-tuning.conf và waap-thp-off.service rồi sysctl --system.
 
 ### P5.2 Tuning cho ch-1 (ClickHouse)
 
@@ -651,9 +677,10 @@ $ labs/bin/lab provision --tags tuning --limit ch-1
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| sysctl vm.max_map_count | `ch-1` | = 262144 | `sysctl -n vm.max_map_count` |
-| sysctl vm.swappiness | `ch-1` | = 1 | `sysctl -n vm.swappiness` |
-| transparent hugepage | `ch-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| sysctl vm.max_map_count | `ch-1` | = 262144 | `sysctl -n vm.max_map_count \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.swappiness | `ch-1` | = 1 | `sysctl -n vm.swappiness \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| transparent hugepage enabled | `ch-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| transparent hugepage defrag | `ch-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/defrag` |
 
 **Vì sao các giá trị này:**
 - `ch-1` (role_clickhouse): ClickHouse mmap nhiều: max_map_count 262144; THP tắt; nhiều file mở cho các part.
@@ -672,19 +699,25 @@ $ labs/bin/lab provision --tags tuning --limit edge-1
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| sysctl fs.file-max | `edge-1` | = 2097152 | `sysctl -n fs.file-max` |
-| sysctl net.core.netdev_max_backlog | `edge-1` | = 16384 | `sysctl -n net.core.netdev_max_backlog` |
-| sysctl net.core.rmem_max | `edge-1` | = 16777216 | `sysctl -n net.core.rmem_max` |
-| sysctl net.core.somaxconn | `edge-1` | = 1024 | `sysctl -n net.core.somaxconn` |
-| sysctl net.core.wmem_max | `edge-1` | = 16777216 | `sysctl -n net.core.wmem_max` |
-| sysctl net.ipv4.ip_local_port_range | `edge-1` | = 10240 65535 | `sysctl -n net.ipv4.ip_local_port_range` |
-| sysctl net.ipv4.tcp_fin_timeout | `edge-1` | = 15 | `sysctl -n net.ipv4.tcp_fin_timeout` |
-| sysctl net.ipv4.tcp_max_syn_backlog | `edge-1` | = 16384 | `sysctl -n net.ipv4.tcp_max_syn_backlog` |
-| sysctl net.ipv4.tcp_slow_start_after_idle | `edge-1` | = 0 | `sysctl -n net.ipv4.tcp_slow_start_after_idle` |
-| sysctl net.ipv4.tcp_tw_reuse | `edge-1` | = 1 | `sysctl -n net.ipv4.tcp_tw_reuse` |
-| sysctl vm.overcommit_memory | `edge-1` | = 1 | `sysctl -n vm.overcommit_memory` |
-| sysctl vm.swappiness | `edge-1` | = 1 | `sysctl -n vm.swappiness` |
-| transparent hugepage | `edge-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| sysctl fs.file-max | `edge-1` | = 2097152 | `sysctl -n fs.file-max \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.core.default_qdisc | `edge-1` | = fq | `sysctl -n net.core.default_qdisc \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.core.netdev_max_backlog | `edge-1` | = 16384 | `sysctl -n net.core.netdev_max_backlog \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.core.rmem_max | `edge-1` | = 16777216 | `sysctl -n net.core.rmem_max \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.core.somaxconn | `edge-1` | = 1024 | `sysctl -n net.core.somaxconn \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.core.wmem_max | `edge-1` | = 16777216 | `sysctl -n net.core.wmem_max \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.ip_local_port_range | `edge-1` | = 10240 65535 | `sysctl -n net.ipv4.ip_local_port_range \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_congestion_control | `edge-1` | = bbr | `sysctl -n net.ipv4.tcp_congestion_control \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_fin_timeout | `edge-1` | = 15 | `sysctl -n net.ipv4.tcp_fin_timeout \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_max_syn_backlog | `edge-1` | = 16384 | `sysctl -n net.ipv4.tcp_max_syn_backlog \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_rmem | `edge-1` | = 4096 87380 16777216 | `sysctl -n net.ipv4.tcp_rmem \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_slow_start_after_idle | `edge-1` | = 0 | `sysctl -n net.ipv4.tcp_slow_start_after_idle \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_tw_reuse | `edge-1` | = 1 | `sysctl -n net.ipv4.tcp_tw_reuse \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.tcp_wmem | `edge-1` | = 4096 65536 16777216 | `sysctl -n net.ipv4.tcp_wmem \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.overcommit_memory | `edge-1` | = 1 | `sysctl -n vm.overcommit_memory \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.swappiness | `edge-1` | = 1 | `sysctl -n vm.swappiness \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| transparent hugepage enabled | `edge-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| transparent hugepage defrag | `edge-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/defrag` |
+| module kernel tcp_bbr đã nạp | `edge-1` | = 1 | `lsmod \| awk '$1=="tcp_bbr"' \| wc -l` |
 
 **Vì sao các giá trị này:**
 - `edge-1` (role_edge_l7): Hàng đợi accept và SYN đủ lớn cho tải đột biến; dải cổng nguồn rộng để proxy tới origin; không chậm lại sau khi nhàn rỗi.
@@ -708,7 +741,8 @@ $ labs/bin/lab provision --tags tuning --limit bao-1
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| sysctl kernel.core_pattern | `bao-1` | = \|/bin/false | `sysctl -n kernel.core_pattern` |
+| sysctl kernel.core_pattern | `bao-1` | = \|/bin/false | `sysctl -n kernel.core_pattern \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.yama.ptrace_scope | `bao-1` | = 2 | `sysctl -n kernel.yama.ptrace_scope \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
 
 **Vì sao các giá trị này:**
 - `bao-1` (role_openbao): Không core dump: bộ nhớ chứa khoá. Không swap (profile_secret).
@@ -727,36 +761,51 @@ $ labs/bin/lab provision --tags tuning --limit k8s-cp-1,k8s-wk-1,k8s-wk-2
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| sysctl fs.inotify.max_user_instances | `k8s-cp-1` | = 8192 | `sysctl -n fs.inotify.max_user_instances` |
-| sysctl fs.inotify.max_user_watches | `k8s-cp-1` | = 524288 | `sysctl -n fs.inotify.max_user_watches` |
-| sysctl kernel.panic | `k8s-cp-1` | = 10 | `sysctl -n kernel.panic` |
-| sysctl kernel.panic_on_oops | `k8s-cp-1` | = 1 | `sysctl -n kernel.panic_on_oops` |
-| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-cp-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables` |
-| sysctl net.bridge.bridge-nf-call-iptables | `k8s-cp-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables` |
-| sysctl net.ipv4.ip_forward | `k8s-cp-1` | = 1 | `sysctl -n net.ipv4.ip_forward` |
-| sysctl net.netfilter.nf_conntrack_max | `k8s-cp-1` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max` |
-| sysctl vm.overcommit_memory | `k8s-cp-1` | = 1 | `sysctl -n vm.overcommit_memory` |
-| sysctl vm.panic_on_oom | `k8s-cp-1` | = 0 | `sysctl -n vm.panic_on_oom` |
-| sysctl fs.inotify.max_user_instances | `k8s-wk-1` | = 8192 | `sysctl -n fs.inotify.max_user_instances` |
-| sysctl fs.inotify.max_user_watches | `k8s-wk-1` | = 524288 | `sysctl -n fs.inotify.max_user_watches` |
-| sysctl kernel.panic | `k8s-wk-1` | = 10 | `sysctl -n kernel.panic` |
-| sysctl kernel.panic_on_oops | `k8s-wk-1` | = 1 | `sysctl -n kernel.panic_on_oops` |
-| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-wk-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables` |
-| sysctl net.bridge.bridge-nf-call-iptables | `k8s-wk-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables` |
-| sysctl net.ipv4.ip_forward | `k8s-wk-1` | = 1 | `sysctl -n net.ipv4.ip_forward` |
-| sysctl net.netfilter.nf_conntrack_max | `k8s-wk-1` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max` |
-| sysctl vm.overcommit_memory | `k8s-wk-1` | = 1 | `sysctl -n vm.overcommit_memory` |
-| sysctl vm.panic_on_oom | `k8s-wk-1` | = 0 | `sysctl -n vm.panic_on_oom` |
-| sysctl fs.inotify.max_user_instances | `k8s-wk-2` | = 8192 | `sysctl -n fs.inotify.max_user_instances` |
-| sysctl fs.inotify.max_user_watches | `k8s-wk-2` | = 524288 | `sysctl -n fs.inotify.max_user_watches` |
-| sysctl kernel.panic | `k8s-wk-2` | = 10 | `sysctl -n kernel.panic` |
-| sysctl kernel.panic_on_oops | `k8s-wk-2` | = 1 | `sysctl -n kernel.panic_on_oops` |
-| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-wk-2` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables` |
-| sysctl net.bridge.bridge-nf-call-iptables | `k8s-wk-2` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables` |
-| sysctl net.ipv4.ip_forward | `k8s-wk-2` | = 1 | `sysctl -n net.ipv4.ip_forward` |
-| sysctl net.netfilter.nf_conntrack_max | `k8s-wk-2` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max` |
-| sysctl vm.overcommit_memory | `k8s-wk-2` | = 1 | `sysctl -n vm.overcommit_memory` |
-| sysctl vm.panic_on_oom | `k8s-wk-2` | = 0 | `sysctl -n vm.panic_on_oom` |
+| sysctl fs.inotify.max_user_instances | `k8s-cp-1` | = 8192 | `sysctl -n fs.inotify.max_user_instances \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl fs.inotify.max_user_watches | `k8s-cp-1` | = 524288 | `sysctl -n fs.inotify.max_user_watches \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.keys.root_maxbytes | `k8s-cp-1` | = 25000000 | `sysctl -n kernel.keys.root_maxbytes \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.keys.root_maxkeys | `k8s-cp-1` | = 1000000 | `sysctl -n kernel.keys.root_maxkeys \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.panic | `k8s-cp-1` | = 10 | `sysctl -n kernel.panic \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.panic_on_oops | `k8s-cp-1` | = 1 | `sysctl -n kernel.panic_on_oops \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-cp-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.bridge.bridge-nf-call-iptables | `k8s-cp-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.ip_forward | `k8s-cp-1` | = 1 | `sysctl -n net.ipv4.ip_forward \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.netfilter.nf_conntrack_max | `k8s-cp-1` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.overcommit_memory | `k8s-cp-1` | = 1 | `sysctl -n vm.overcommit_memory \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.panic_on_oom | `k8s-cp-1` | = 0 | `sysctl -n vm.panic_on_oom \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| module kernel overlay đã nạp | `k8s-cp-1` | = 1 | `lsmod \| awk '$1=="overlay"' \| wc -l` |
+| module kernel br_netfilter đã nạp | `k8s-cp-1` | = 1 | `lsmod \| awk '$1=="br_netfilter"' \| wc -l` |
+| module kernel nf_conntrack đã nạp | `k8s-cp-1` | = 1 | `lsmod \| awk '$1=="nf_conntrack"' \| wc -l` |
+| sysctl fs.inotify.max_user_instances | `k8s-wk-1` | = 8192 | `sysctl -n fs.inotify.max_user_instances \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl fs.inotify.max_user_watches | `k8s-wk-1` | = 524288 | `sysctl -n fs.inotify.max_user_watches \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.keys.root_maxbytes | `k8s-wk-1` | = 25000000 | `sysctl -n kernel.keys.root_maxbytes \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.keys.root_maxkeys | `k8s-wk-1` | = 1000000 | `sysctl -n kernel.keys.root_maxkeys \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.panic | `k8s-wk-1` | = 10 | `sysctl -n kernel.panic \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.panic_on_oops | `k8s-wk-1` | = 1 | `sysctl -n kernel.panic_on_oops \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-wk-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.bridge.bridge-nf-call-iptables | `k8s-wk-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.ip_forward | `k8s-wk-1` | = 1 | `sysctl -n net.ipv4.ip_forward \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.netfilter.nf_conntrack_max | `k8s-wk-1` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.overcommit_memory | `k8s-wk-1` | = 1 | `sysctl -n vm.overcommit_memory \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.panic_on_oom | `k8s-wk-1` | = 0 | `sysctl -n vm.panic_on_oom \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| module kernel overlay đã nạp | `k8s-wk-1` | = 1 | `lsmod \| awk '$1=="overlay"' \| wc -l` |
+| module kernel br_netfilter đã nạp | `k8s-wk-1` | = 1 | `lsmod \| awk '$1=="br_netfilter"' \| wc -l` |
+| module kernel nf_conntrack đã nạp | `k8s-wk-1` | = 1 | `lsmod \| awk '$1=="nf_conntrack"' \| wc -l` |
+| sysctl fs.inotify.max_user_instances | `k8s-wk-2` | = 8192 | `sysctl -n fs.inotify.max_user_instances \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl fs.inotify.max_user_watches | `k8s-wk-2` | = 524288 | `sysctl -n fs.inotify.max_user_watches \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.keys.root_maxbytes | `k8s-wk-2` | = 25000000 | `sysctl -n kernel.keys.root_maxbytes \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.keys.root_maxkeys | `k8s-wk-2` | = 1000000 | `sysctl -n kernel.keys.root_maxkeys \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.panic | `k8s-wk-2` | = 10 | `sysctl -n kernel.panic \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl kernel.panic_on_oops | `k8s-wk-2` | = 1 | `sysctl -n kernel.panic_on_oops \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-wk-2` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.bridge.bridge-nf-call-iptables | `k8s-wk-2` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.ipv4.ip_forward | `k8s-wk-2` | = 1 | `sysctl -n net.ipv4.ip_forward \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl net.netfilter.nf_conntrack_max | `k8s-wk-2` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.overcommit_memory | `k8s-wk-2` | = 1 | `sysctl -n vm.overcommit_memory \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| sysctl vm.panic_on_oom | `k8s-wk-2` | = 0 | `sysctl -n vm.panic_on_oom \| tr -s '[:space:]' ' ' \| sed 's/ $//'` |
+| module kernel overlay đã nạp | `k8s-wk-2` | = 1 | `lsmod \| awk '$1=="overlay"' \| wc -l` |
+| module kernel br_netfilter đã nạp | `k8s-wk-2` | = 1 | `lsmod \| awk '$1=="br_netfilter"' \| wc -l` |
+| module kernel nf_conntrack đã nạp | `k8s-wk-2` | = 1 | `lsmod \| awk '$1=="nf_conntrack"' \| wc -l` |
 
 **Vì sao các giá trị này:**
 - `k8s-cp-1` (role_k8s_cp): kubelet protect-kernel-defaults đòi đúng các giá trị này; inotify đủ cho nhiều pod; conntrack đủ cho kube-proxy.
@@ -901,14 +950,19 @@ $ labs/bin/lab provision --tags k8s --limit k8s-cp-1
 |---|---|---|---|
 | k3s chạy | `k8s-cp-1` | = active | `systemctl is-active k3s` |
 | Node Ready | `k8s-cp-1` | = 1 | `k3s kubectl get nodes --no-headers \| grep -c ' Ready'` |
-| kubelet protect-kernel-defaults | `k8s-cp-1` | = 1 | `grep -c 'protect-kernel-defaults=true' /etc/rancher/k3s/config.yaml` |
+| kubelet protect-kernel-defaults | `k8s-cp-1` | = 1 | `grep -c '^protect-kernel-defaults: true' /etc/rancher/k3s/config.yaml` |
+| Ngắt kết nối stream rảnh 5 phút | `k8s-cp-1` | = 1 | `grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/k3s/config.yaml` |
+| Có chính sách audit | `k8s-cp-1` | lệnh thành công (rc=0) | `test -s /var/lib/rancher/k3s/server/audit.yaml` |
+| Có cấu hình Pod Security (restricted) | `k8s-cp-1` | = 1 | `grep -c 'enforce: restricted' /var/lib/rancher/k3s/server/psa.yaml` |
+| Giữ log audit 30 ngày | `k8s-cp-1` | = 1 | `grep -c 'audit-log-maxage=30' /etc/rancher/k3s/config.yaml` |
+| Token ServiceAccount không kéo dài tuổi | `k8s-cp-1` | = 1 | `grep -c 'service-account-extend-token-expiration=false' /etc/rancher/k3s/config.yaml` |
 | Cổng chỉ đọc 10255 đóng | `k8s-cp-1` | = 0 | `ss -ltn \| grep -c ':10255'` |
 | Mã hoá secret bật | `k8s-cp-1` | ≥ 1 | `k3s secrets-encrypt status \| grep -c 'Enabled'` |
 | Không có traefik | `k8s-cp-1` | = 0 | `k3s kubectl -n kube-system get pods --no-headers \| grep -c traefik` |
 | Token cụm quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/k3s/token` |
 | Cấu hình k3s quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/k3s/config.yaml` |
 | Không swap | `k8s-cp-1` | = 0 | `swapon --show \| wc -l` |
-| Có audit log của API | `k8s-cp-1` | lệnh thành công (rc=0) | `test -s /var/log/k3s-audit.log` |
+| Có audit log của API | `k8s-cp-1` | lệnh thành công (rc=0) | `test -s /var/lib/rancher/k3s/server/logs/audit.log` |
 
 **Hoàn tác:** incus exec k8s-cp-1 -- /usr/local/bin/k3s-uninstall.sh (nếu có) hoặc dựng lại VM.
 
@@ -951,6 +1005,20 @@ $ labs/bin/lab services --tags postgres
 | Chỉ nghe IP lab và localhost | `data-1` | = 127.0.0.1,10.10.40.11 | `sudo -u postgres psql -tAc 'show listen_addresses'` |
 | Số kết nối tối đa | `data-1` | = 200 | `sudo -u postgres psql -tAc 'show max_connections'` |
 | shared_buffers | `data-1` | = 512MB | `sudo -u postgres psql -tAc 'show shared_buffers'` |
+| TLS tối thiểu 1.2 | `data-1` | = TLSv1.2 | `sudo -u postgres psql -tAc 'show ssl_min_protocol_version'` |
+| effective_cache_size | `data-1` | = 2GB | `sudo -u postgres psql -tAc 'show effective_cache_size'` |
+| work_mem | `data-1` | = 4MB | `sudo -u postgres psql -tAc 'show work_mem'` |
+| maintenance_work_mem | `data-1` | = 128MB | `sudo -u postgres psql -tAc 'show maintenance_work_mem'` |
+| random_page_cost cho SSD | `data-1` | = 1.1 | `sudo -u postgres psql -tAc 'show random_page_cost'` |
+| effective_io_concurrency cho SSD | `data-1` | = 200 | `sudo -u postgres psql -tAc 'show effective_io_concurrency'` |
+| Nén WAL | `data-1` | = on | `sudo -u postgres psql -tAc 'show wal_compression'` |
+| max_wal_size | `data-1` | = 2GB | `sudo -u postgres psql -tAc 'show max_wal_size'` |
+| checkpoint_completion_target | `data-1` | = 0.9 | `sudo -u postgres psql -tAc 'show checkpoint_completion_target'` |
+| Ghi log checkpoint | `data-1` | = on | `sudo -u postgres psql -tAc 'show log_checkpoints'` |
+| Ghi log chờ khoá | `data-1` | = on | `sudo -u postgres psql -tAc 'show log_lock_waits'` |
+| Đo thời gian I/O | `data-1` | = on | `sudo -u postgres psql -tAc 'show track_io_timing'` |
+| Ngắt giao dịch treo 1 phút | `data-1` | = 1min | `sudo -u postgres psql -tAc 'show idle_in_transaction_session_timeout'` |
+| Keepalive TCP 60 giây | `data-1` | = 60 | `sudo -u postgres psql -tAc 'show tcp_keepalives_idle'` |
 | Dùng hugepage nếu có (try) | `data-1` | = try | `sudo -u postgres psql -tAc 'show huge_pages'` |
 | pg_hba có đúng một dòng hostssl | `data-1` | = 1 | `grep -c '^hostssl' /etc/postgresql/16/main/pg_hba.conf` |
 | pg_hba không có trust | `data-1` | = 0 | `grep -c trust /etc/postgresql/16/main/pg_hba.conf` |
@@ -980,7 +1048,15 @@ $ labs/bin/lab services --tags rabbitmq
 | Chỉ nghe IP lab ở 5672 | `data-1` | = 1 | `ss -ltn \| grep -c '10.10.40.11:5672'` |
 | Không nghe 0.0.0.0 | `data-1` | = 0 | `ss -ltn \| grep -c '0.0.0.0:5672'` |
 | User ứng dụng không là administrator | `data-1` | = 0 | `rabbitmqctl list_users --silent \| grep '^metap' \| grep -c administrator` |
-| Vùng ứng dụng tới được 5672 (I06 tạm) | `k8s-wk-1` | lệnh thành công (rc=0) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5672'` |
+| epmd chỉ nghe loopback | `data-1` | = 0 | `ss -ltn \| grep ':4369' \| grep -vc '127.0.0.1'` |
+| Cổng phân tán Erlang chỉ nghe loopback | `data-1` | = 0 | `ss -ltn \| grep ':25672' \| grep -vc '127.0.0.1'` |
+| Không có loopback_users=none (không dùng cho production) | `data-1` | = 0 | `grep -c 'loopback_users' /etc/rabbitmq/rabbitmq.conf` |
+| Ngưỡng bộ nhớ tường minh 0.4 | `data-1` | = 1 | `grep -c '^vm_memory_high_watermark.relative = 0.4' /etc/rabbitmq/rabbitmq.conf` |
+| Ngưỡng đĩa trống >= ngưỡng bộ nhớ (2 GB) | `data-1` | = 1 | `grep -c '^disk_free_limit.absolute = 2GB' /etc/rabbitmq/rabbitmq.conf` |
+| postgresql@16-main: LimitNOFILE | `data-1` | = 65536 | `systemctl show postgresql@16-main -p LimitNOFILE --value` |
+| rabbitmq-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show rabbitmq-server -p LimitNOFILE --value` |
+| redis-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
+| Cổng 5672 thường chưa mở cho vùng ứng dụng (N15 chỉ mở 5671 TLS; TLS làm ở P2/P5) | `k8s-wk-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5672'` |
 
 **Hoàn tác:** apt purge rabbitmq-server.
 
@@ -1002,10 +1078,11 @@ $ labs/bin/lab services --tags redis
 | User control ghi được | `data-1` | = OK | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1` |
 | User edge không ghi được | `data-1` | chứa NOPERM | `redis-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2` |
 | User edge đọc được | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe` |
-| FLUSHALL bị tắt | `data-1` | chứa unknown | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} flushall` |
+| FLUSHALL bị chặn bằng ACL (-@dangerous) | `data-1` | chứa NOPERM | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} flushall` |
 | Không loại bỏ khoá | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info memory \| grep -c 'maxmemory_policy:noeviction'` |
 | AOF bật | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info persistence \| grep -c 'aof_enabled:1'` |
 | redis-server: LimitNOFILE | `edge-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
+| Thư mục dữ liệu Redis ghi được dưới sandbox của unit | `data-1` | chứa /var/lib/waap/data/redis | `systemctl show redis-server -p ReadWritePaths --value` |
 
 **Hoàn tác:** apt purge redis-server.
 
@@ -1026,7 +1103,9 @@ $ labs/bin/lab services --tags clickhouse
 | Thư mục dữ liệu trên đĩa riêng | `ch-1` | = /var/lib/waap/data/clickhouse/ | `clickhouse-client -q "select value from system.server_settings where name='path'"` |
 | Chỉ nghe IP lab | `ch-1` | = 0 | `ss -ltn \| grep -c '0.0.0.0:9000'` |
 | clickhouse-server: LimitNOFILE | `ch-1` | = 262144 | `systemctl show clickhouse-server -p LimitNOFILE --value` |
-| Vùng ứng dụng tới được 9000 (I02 tạm) | `k8s-wk-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.12/9000'` |
+| Có tài khoản analytics (có mật khẩu) | `ch-1` | = 1 | `clickhouse-client -q "select count() from system.users where name='analytics'"` |
+| 70% RAM cho server | `ch-1` | = 0.7 | `clickhouse-client -q "select value from system.server_settings where name='max_server_memory_usage_to_ram_ratio'"` |
+| Cổng native 9000 chưa mở cho vùng ứng dụng (N17 chỉ mở 8443 và 9440 | `k8s-wk-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.12/9000'` |
 
 **Hoàn tác:** apt purge clickhouse-server clickhouse-client clickhouse-common-static.
 

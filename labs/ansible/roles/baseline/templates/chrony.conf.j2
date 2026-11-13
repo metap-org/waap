@@ -1,7 +1,11 @@
 # {{ ansible_managed }}
+{% if ntp_servers == ['ntp.ubuntu.com'] %}
+pool ntp.ubuntu.com iburst maxsources 4
+{% else %}
 {% for s in ntp_servers %}
 server {{ s }} iburst
 {% endfor %}
+{% endif %}
 driftfile /var/lib/chrony/chrony.drift
 makestep 1.0 3
 rtcsync

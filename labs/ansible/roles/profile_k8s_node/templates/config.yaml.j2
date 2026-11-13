@@ -1,13 +1,11 @@
 # {{ ansible_managed }}
+# Theo CIS Hardening Guide của k3s (docs.k3s.io/security/hardening-guide).
 node-ip: {{ app_listen_ip }}
 token-file: /etc/rancher/k3s/token
+# kubelet thoát nếu sysctl lệch giá trị nó mong đợi (xem os_tuning cho role k8s).
+protect-kernel-defaults: true
 kubelet-arg:
-  - protect-kernel-defaults=true
-  - read-only-port=0
-  - anonymous-auth=false
-  - authorization-mode=Webhook
   - streaming-connection-idle-timeout=5m
-  - make-iptables-util-chains=true
 {% if k3s_role == 'server' %}
 write-kubeconfig-mode: "0600"
 secrets-encryption: true
@@ -17,16 +15,15 @@ disable:
 tls-san:
   - {{ app_listen_ip }}
 kube-apiserver-arg:
-  - anonymous-auth=false
-  - audit-log-path=/var/log/k3s-audit.log
+  - admission-control-config-file=/var/lib/rancher/k3s/server/psa.yaml
+  - audit-policy-file=/var/lib/rancher/k3s/server/audit.yaml
+  - audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log
   - audit-log-maxage=30
   - audit-log-maxbackup=10
   - audit-log-maxsize=100
-  - profiling=false
+  - service-account-extend-token-expiration=false
 kube-controller-manager-arg:
-  - profiling=false
-kube-scheduler-arg:
-  - profiling=false
+  - terminated-pod-gc-threshold=10
 {% else %}
 server: {{ k3s_api_endpoint }}
 {% endif %}

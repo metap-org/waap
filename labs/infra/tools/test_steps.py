@@ -41,16 +41,14 @@ class StepsTests(unittest.TestCase):
         self.assertEqual(S.merge_tuning(CTX, "k8s-wk-1")[0]["net.ipv4.ip_forward"], 1)
         self.assertEqual(S.merge_tuning(CTX, "bao-1")[0]["kernel.core_pattern"], "|/bin/false")
 
-    def test_baseline_does_not_override_tuning(self):
-        # file 99-waap-hardening chạy sau 95-waap-tuning: không khoá nào của tuning được trùng với khoá baseline (trừ ip_forward, đã xử lý qua sysctl_ip_forward)
-        base = (S.LABS / "ansible/roles/baseline/templates/sysctl-hardening.conf.j2").read_text(encoding="utf-8")
-        base_keys = {l.split("=")[0].strip() for l in base.splitlines() if "=" in l and not l.startswith("#")}
-        for name in ("data-1", "ch-1", "edge-1", "bao-1", "k8s-cp-1", "k8s-wk-1"):
-            for k in S.merge_tuning(CTX, name)[0]:
-                if k in base_keys:
-                    self.assertEqual(k, "net.ipv4.ip_forward", f"{name}: {k} bị baseline ghi đè")
-        for g in ("role_k8s_cp", "role_k8s_app"):
-            self.assertIn("sysctl_ip_forward: 1", (S.LABS / f"ansible/group_vars/{g}.yml").read_text(encoding="utf-8"))
+    def test_tuning_file_loads_after_baseline_hardening(self):
+        # sysctl --system nạp theo thứ tự tên tệp: tuning phải đứng sau baseline để giá trị theo dịch vụ thắng khi trùng khoá
+        tasks = (S.LABS / "ansible/roles/os_tuning/tasks/main.yml").read_text(encoding="utf-8")
+        base = (S.LABS / "ansible/roles/baseline/tasks/kernel.yml").read_text(encoding="utf-8")
+        import re
+        t_name = re.search(r"/etc/sysctl.d/([\w.-]+)", tasks)[1]
+        b_name = re.search(r"/etc/sysctl.d/([\w.-]+)", base)[1]
+        self.assertGreater(t_name, b_name)
 
     def test_ansible_merge_equals_python_merge(self):
         import shutil
@@ -68,6 +66,7 @@ class StepsTests(unittest.TestCase):
             sysctl, thp, limits, _ = S.merge_tuning(CTX, vm["name"])
             self.assertEqual({k: str(v) for k, v in got["sysctl"].items()}, {k: str(v) for k, v in sysctl.items()}, vm["name"])
             self.assertEqual(got["thp"], thp, vm["name"])
+            self.assertEqual(got["modules"], S.merge_modules(CTX, vm["name"]), vm["name"])
             self.assertEqual(got["limits"], limits, vm["name"])
 
     def test_vm_boot_checks_follow_profile(self):

@@ -43,6 +43,29 @@
     group: root
   no_log: true
 
+- name: Thư mục dữ liệu server k3s (audit, PSA)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  loop: [/var/lib/rancher/k3s/server, /var/lib/rancher/k3s/server/logs]
+  when: k3s_role == 'server'
+
+- name: Chính sách audit và Pod Security (chỉ server)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/var/lib/rancher/k3s/server/{{ item.dest }}"
+    mode: "0600"
+    owner: root
+    group: root
+  loop:
+    - { src: audit.yaml.j2, dest: audit.yaml }
+    - { src: psa.yaml.j2, dest: psa.yaml }
+  when: k3s_role == 'server'
+  notify: restart k3s
+
 - name: Cấu hình k3s (kubelet đã khoá, mã hoá secret, tắt traefik và servicelb)
   ansible.builtin.template:
     src: config.yaml.j2
