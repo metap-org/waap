@@ -16,8 +16,25 @@
 2. Đọc ghi chú phát hành của vendor, đặc biệt thay đổi phá vỡ tương thích.
 3. Chạy bước kiểm tương ứng trước và sau (`lab step verify P8.x`).
 
-## Lỗ hổng cần quyết: vùng dữ liệu không có đường ra
+## Mirror nội bộ ở registry (quyết định 2026-11-13: giữ repo vendor, thêm mirror)
 
-Theo ma trận 7.6, Z4 (dữ liệu) và Z5 (secret) **không có đường ra Internet** (X04), nên sau khi `lab seal` các máy này **không tới được repo của vendor** để nâng version. Hai hướng:
-- **(a) Bản sao nội bộ**: đặt mirror apt và nơi lưu tarball ở `registry` (Z6), thêm luồng từ Z4 và Z5 tới `registry`. Phù hợp production; cần chốt thiết kế (cùng loại vấn đề với vá bảo mật ở `infra/README.md`).
-- **(b) Cửa sổ nâng**: mở tạm đường ra cho đúng máy cần nâng bằng `lab fw bootstrap`, nâng, rồi `lab seal`. Chấp nhận được cho lab, không cho production.
+Sau `lab seal`, Z4 và Z5 không có đường ra (X04), nên không tới được repo vendor. Giải pháp: `registry` (Z6) giữ bản sao có kiểm soát; các máy khác chỉ nói chuyện với nó (flow M01). Dựng bằng `lab services --tags registry` (bước P8.8).
+
+**Cách hoạt động**
+- aptly mirror 4 repo (PGDG, RabbitMQ Erlang, RabbitMQ server, ClickHouse) có **lọc** (`-filter`, `-filter-with-deps`) nên chỉ lấy gói cần, không cả kho.
+- Mỗi lần đồng bộ tạo một **snapshot**. Snapshot chưa tới client cho tới khi bạn **promote**.
+- Mirror **ký lại** bằng khoá riêng của nó. Client ghim fingerprint khoá đó (`infra/generated/mirror-key.fpr`) và vẫn chỉ tin repo đã ký.
+- Tarball (Valkey, RKE2) nằm ở `/artifacts/<tên>/`, kiểm sha256 khi nhận và khi client tải.
+- apt-cacher-ng (cổng 3142) cache bản vá Ubuntu cho Z2, Z3, Z4, Z6.
+- Timer hằng tuần (Chủ nhật 02:17) chỉ đồng bộ và chụp snapshot, **không bao giờ promote**.
+
+**Quy trình nâng một database**
+1. Trên registry: `waap-mirror-sync` rồi `waap-mirror-list` xem snapshot mới và gói mới.
+2. Đọc ghi chú phát hành, chụp snapshot VM đích.
+3. `waap-mirror-promote <repo> <snapshot|latest>` cho phép client thấy bản mới.
+4. Đổi đúng một biến pin (`pg_pkg_version`, ...) rồi `lab services --tags postgres`.
+5. `lab step verify P8.x`.
+
+**Hoàn tác:** `waap-mirror-promote <repo> <snapshot cũ>` (publish switch) rồi pin về bản cũ.
+
+**Mirror chưa phủ Z1 và Z5.** X01 và X05 cấm khởi tạo kết nối tới Z6, nên hai vùng này không kéo được. Cần quyết (đề xuất: mô hình đẩy từ Z6, cùng loại vấn đề với N27); xem `infra/README.md`.

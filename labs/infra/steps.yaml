@@ -687,17 +687,33 @@ steps:
       - {at: ops-1, what: Metadata cloud bị chặn qua proxy, cmd: "curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x http://{ip:perimeter-1}:3128 http://169.254.169.254/", op: eq, value: "403"}
     rollback: "apt purge squid."
 
+  - id: P8.8
+    title: Mirror nội bộ ở registry (aptly, kho artifact, apt-cacher-ng)
+    why: Sau seal các vùng dữ liệu không có đường ra, nên mirror là nơi duy nhất lấy bản database mới. Mirror lấy từ vendor qua egress-1, chụp snapshot, ký lại bằng khoá riêng; client ghim khoá đó. Bản mới chỉ tới client khi chạy promote.
+    depends: [P8.7]
+    time: 10 phút
+    run: ["labs/bin/lab services --tags registry"]
+    checks:
+      - {at: ops-1, what: nginx chạy, cmd: "systemctl is-active nginx", op: eq, value: active}
+      - {at: ops-1, what: apt-cacher-ng chạy, cmd: "systemctl is-active apt-cacher-ng", op: eq, value: active}
+      - {at: ops-1, what: Mirror đã tạo đủ 4 repo vendor, cmd: "sudo -u aptly aptly mirror list -raw | wc -l", op: eq, value: "4"}
+      - {at: ops-1, what: Cả 4 repo đã được publish, cmd: "sudo -u aptly aptly publish list -raw | wc -l", op: eq, value: "4"}
+      - {at: ops-1, what: Mirror phục vụ khoá công khai, cmd: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/apt/mirror-key.asc", op: eq, value: "200"}
+      - {at: ops-1, what: Có timer đồng bộ hằng tuần, cmd: "systemctl is-enabled waap-mirror-sync.timer", op: eq, value: enabled}
+      - {at: host, what: Khoá mirror đã về máy điều khiển (client ghim), cmd: "test -s labs/infra/generated/mirror-key.fpr", op: rc0}
+    rollback: "systemctl disable --now nginx apt-cacher-ng; apt purge aptly. Dữ liệu ở /var/lib/aptly."
+
   # ------------------------------------------------------------------ P9
   - id: P9.1
     title: Seal (gỡ bootstrap)
     why: Gỡ đường ra Internet tạm của mọi vùng; nguồn vá chuyển sang egress-1; SSH chỉ cert; egress khoá cho vai trò nhạy cảm.
-    depends: [P8.7]
+    depends: [P8.8]
     time: 8 phút
     run: ["labs/bin/lab seal"]
     checks:
       - {at: fw-1, what: Không còn luật BOOTSTRAP, cmd: "nft list chain inet lab forward | grep -c BOOTSTRAP", op: eq, value: "0"}
       - {at: all, what: Khoá SSH tĩnh bị tắt, cmd: "sshd -T | awk '/^authorizedkeysfile/{print $2}'", op: eq, value: none}
-      - {at: role:k8s-app, what: apt đi qua egress-1, cmd: "grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy", op: eq, value: "1"}
+      - {at: role:k8s-app, what: apt đi qua apt-cacher-ng của registry, cmd: "grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy", op: eq, value: "1"}
       - {at: ops-1, what: apt đi qua egress-1, cmd: "grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy", op: eq, value: "1"}
       - {at: bao-1, what: OpenBao không có đường ra (egress khoá), cmd: "nft list chain inet host output | grep -c 'egress-locked'", op: eq, value: "1"}
       - {at: data-1, what: Kho dữ liệu không có đường ra, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'", op: rc_nonzero}
@@ -713,3 +729,16 @@ steps:
       - {at: host, what: Thăm dò mạng đúng kỳ vọng, cmd: "labs/bin/lab nettest", op: rc0}
       - {at: host, what: Kiểm sống hạ tầng, cmd: "labs/bin/lab smoke", op: rc0}
     rollback: Không đổi gì.
+
+  - id: P9.3
+    title: Cài lại database từ mirror sau khi seal
+    why: Chứng minh vùng dữ liệu (không có đường ra) vẫn cài và nâng được phần mềm, chỉ qua mirror nội bộ.
+    depends: [P9.2]
+    time: 5 phút
+    run: ["labs/bin/lab services --tags postgres"]
+    checks:
+      - {at: data-1, what: Nguồn apt PostgreSQL trỏ vào registry, cmd: "grep -c '{ip:ops-1}/apt/pgdg' /etc/apt/sources.list.d/pgdg.sources", op: eq, value: "1"}
+      - {at: data-1, what: Khoá Signed-By là khoá của mirror, cmd: "gpg --show-keys --with-colons /usr/share/keyrings/pgdg.gpg | awk -F: '/^fpr/{print $10}' | head -1 | wc -c", op: eq, value: "41"}
+      - {at: data-1, what: apt update chỉ qua mirror, cmd: "apt-get update -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.sources -o Dir::Etc::sourceparts=- 2>&1 | grep -c '{ip:ops-1}'", op: re, value: "^[1-9]"}
+      - {at: data-1, what: PostgreSQL còn chạy sau khi chạy lại, cmd: "systemctl is-active postgresql@{pg_version}-main", op: eq, value: active}
+    rollback: Không đổi gì nếu phiên bản đã ghim không đổi.

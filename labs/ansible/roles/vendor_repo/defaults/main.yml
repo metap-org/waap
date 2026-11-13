@@ -2,4 +2,9 @@
 # Repo apt của vendor với khoá ký được ghim bằng fingerprint (không curl | apt-key, không tin khoá tải về mà không kiểm).
 # Bắt buộc: vendor_repo_name, vendor_repo_key_url, vendor_repo_key_fingerprint, vendor_repo_uris, vendor_repo_suites.
 vendor_repo_components: main
+# Mirror nội bộ (svc_registry): khi đặt mirror_base, client lấy gói từ mirror và tin KHOÁ CỦA MIRROR (ghim fingerprint),
+# không còn cần ra Internet. Tên suite giữ nguyên như upstream; mỗi repo nằm ở <mirror_base>/apt/<tên>.
+mirror_base: ""
+mirror_local_dir: "{{ lab_generated_dir | default(playbook_dir ~ '/../../infra/generated') }}"
+mirror_key_fingerprint: "{{ lookup('ansible.builtin.file', mirror_local_dir ~ '/mirror-key.fpr') | trim }}"
 vendor_repo_types: deb

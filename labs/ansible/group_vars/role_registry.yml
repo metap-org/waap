@@ -1,0 +1,3 @@
+---
+# Registry là nơi kéo gói từ ngoài, nên đi qua egress-1 (không qua chính apt-cacher-ng của nó).
+apt_proxy: "{{ '' if lab_bootstrap else 'http://' ~ lab_egress_ip ~ ':3128' }}"

@@ -6,6 +6,10 @@ ansible_incus_remote: local
 ansible_incus_host: "{{ inventory_hostname }}"
 app_listen_ip: "{{ lab_ip }}"     # lab: IP trong vùng; cài độc lập (apps/) lấy IP mặc định của máy
 lab_bootstrap: true           # true: còn khoá SSH tĩnh, apt ra Internet trực tiếp. `lab seal` đặt false.
+# Mirror nội bộ ở registry và apt-cacher-ng: dùng khi đã seal và đã có registry. Lúc bootstrap kéo thẳng từ vendor.
+mirror_base: "{{ ('http://' ~ lab_registry_ip) if (not lab_bootstrap and lab_registry_ip | default('') | length > 0) else '' }}"
+# Vá Ubuntu qua apt-cacher-ng của registry, cho các vùng có luồng tới registry (Z2, Z3, Z4, Z6). Z0, Z1, Z5 chưa có: xem infra/README.md.
+apt_proxy: "{{ ('http://' ~ lab_registry_ip ~ ':3142') if (not lab_bootstrap and lab_registry_ip | default('') | length > 0 and lab_zone in ['Z2', 'Z3', 'Z4', 'Z6']) else '' }}"
 lab_generated_dir: "{{ playbook_dir }}/../infra/generated"
 # --- truy cập ---
 ssh_user_ca_pub_file: "{{ lab_generated_dir }}/ssh_user_ca.pub"   # `lab ssh-ca` sinh; P5 chuyển sang OpenBao ký

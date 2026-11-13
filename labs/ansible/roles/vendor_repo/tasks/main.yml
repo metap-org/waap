@@ -1,4 +1,11 @@
 ---
+- name: Nguồn thực tế (mirror nội bộ nếu có, không thì vendor)
+  ansible.builtin.set_fact:
+    vr_key_url: "{{ (mirror_base ~ '/apt/mirror-key.asc') if mirror_base | length > 0 else vendor_repo_key_url }}"
+    vr_fingerprint: "{{ mirror_key_fingerprint if mirror_base | length > 0 else vendor_repo_key_fingerprint }}"
+    vr_uris: "{{ [mirror_base ~ '/apt/' ~ vendor_repo_name] if mirror_base | length > 0 else vendor_repo_uris }}"
+  when: vendor_repo_name is defined
+
 - name: Kiểm tham số
   ansible.builtin.assert:
     that:
@@ -27,7 +34,7 @@
 
 - name: Tải khoá ký
   ansible.builtin.get_url:
-    url: "{{ vendor_repo_key_url }}"
+    url: "{{ vr_key_url }}"
     dest: "/var/cache/vendor-keys/{{ vendor_repo_name }}.key"
     mode: "0600"
     owner: root
@@ -43,20 +50,24 @@
 
 - name: Fingerprint phải khớp giá trị đã ghim (nếu lệch thì dừng, không cài)
   ansible.builtin.assert:
-    that: vendor_repo_key_fingerprint | upper in vendor_key_fprs.stdout_lines
-    fail_msg: "Khoá của {{ vendor_repo_name }} có fingerprint {{ vendor_key_fprs.stdout_lines }}, không khớp {{ vendor_repo_key_fingerprint }}. Dừng."
+    that: vr_fingerprint | upper in vendor_key_fprs.stdout_lines
+    fail_msg: "Khoá của {{ vendor_repo_name }} có fingerprint {{ vendor_key_fprs.stdout_lines }}, không khớp {{ vr_fingerprint }}. Dừng."
     quiet: true
 
-- name: Chuyển khoá thành keyring nhị phân dùng cho Signed-By
+- name: Chuyển khoá thành keyring nhị phân dùng cho Signed-By (thay nếu khác, để đổi nguồn vendor và mirror)
   ansible.builtin.shell: |
     set -e
     tmp="$(mktemp -d)"
     gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --import /var/cache/vendor-keys/{{ vendor_repo_name }}.key
-    gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --export > /usr/share/keyrings/{{ vendor_repo_name }}.gpg
+    gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --export > "$tmp/out.gpg"
+    if cmp -s "$tmp/out.gpg" /usr/share/keyrings/{{ vendor_repo_name }}.gpg; then rm -rf "$tmp"; exit 0; fi
+    install -m 0644 "$tmp/out.gpg" /usr/share/keyrings/{{ vendor_repo_name }}.gpg
     rm -rf "$tmp"
+    echo CHANGED
   args:
-    creates: "/usr/share/keyrings/{{ vendor_repo_name }}.gpg"
     executable: /bin/bash
+  register: vendor_keyring
+  changed_when: "'CHANGED' in vendor_keyring.stdout"
 
 - name: Nguồn apt (deb822, Signed-By trỏ đúng keyring)
   ansible.builtin.copy:
@@ -66,7 +77,7 @@
     group: root
     content: |
       Types: {{ vendor_repo_types }}
-      URIs: {{ vendor_repo_uris | join(' ') }}
+      URIs: {{ vr_uris | join(' ') }}
       Suites: {{ vendor_repo_suites | join(' ') }}
       Components: {{ vendor_repo_components }}
       Signed-By: /usr/share/keyrings/{{ vendor_repo_name }}.gpg
@@ -75,4 +86,4 @@
 - name: Cập nhật danh sách gói khi nguồn đổi  # noqa no-handler
   ansible.builtin.apt:
     update_cache: true
-  when: vendor_sources.changed
+  when: vendor_sources.changed or vendor_keyring.changed

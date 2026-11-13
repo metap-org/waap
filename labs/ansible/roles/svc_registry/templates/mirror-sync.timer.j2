@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Đồng bộ mirror hằng tuần (chỉ tạo snapshot)
+
+[Timer]
+OnCalendar=Sun 02:17
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

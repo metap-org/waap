@@ -1164,13 +1164,35 @@ $ labs/bin/lab services --tags egress
 
 **Hoàn tác:** apt purge squid.
 
+### P8.8 Mirror nội bộ ở registry (aptly, kho artifact, apt-cacher-ng)
+
+**Vì sao:** Sau seal các vùng dữ liệu không có đường ra, nên mirror là nơi duy nhất lấy bản database mới. Mirror lấy từ vendor qua egress-1, chụp snapshot, ký lại bằng khoá riêng; client ghim khoá đó. Bản mới chỉ tới client khi chạy promote.
+
+**Phụ thuộc:** P8.7  ·  **Thời gian dự kiến:** 10 phút
+
+```
+$ labs/bin/lab services --tags registry
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| nginx chạy | `ops-1` | = active | `systemctl is-active nginx` |
+| apt-cacher-ng chạy | `ops-1` | = active | `systemctl is-active apt-cacher-ng` |
+| Mirror đã tạo đủ 4 repo vendor | `ops-1` | = 4 | `sudo -u aptly aptly mirror list -raw \| wc -l` |
+| Cả 4 repo đã được publish | `ops-1` | = 4 | `sudo -u aptly aptly publish list -raw \| wc -l` |
+| Mirror phục vụ khoá công khai | `ops-1` | = 200 | `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/apt/mirror-key.asc` |
+| Có timer đồng bộ hằng tuần | `ops-1` | = enabled | `systemctl is-enabled waap-mirror-sync.timer` |
+| Khoá mirror đã về máy điều khiển (client ghim) | `host` | lệnh thành công (rc=0) | `test -s labs/infra/generated/mirror-key.fpr` |
+
+**Hoàn tác:** systemctl disable --now nginx apt-cacher-ng; apt purge aptly. Dữ liệu ở /var/lib/aptly.
+
 ## P9. Khoá (seal)
 
 ### P9.1 Seal (gỡ bootstrap)
 
 **Vì sao:** Gỡ đường ra Internet tạm của mọi vùng; nguồn vá chuyển sang egress-1; SSH chỉ cert; egress khoá cho vai trò nhạy cảm.
 
-**Phụ thuộc:** P8.7  ·  **Thời gian dự kiến:** 8 phút
+**Phụ thuộc:** P8.8  ·  **Thời gian dự kiến:** 8 phút
 
 ```
 $ labs/bin/lab seal
@@ -1180,7 +1202,7 @@ $ labs/bin/lab seal
 |---|---|---|---|
 | Không còn luật BOOTSTRAP | `fw-1` | = 0 | `nft list chain inet lab forward \| grep -c BOOTSTRAP` |
 | Khoá SSH tĩnh bị tắt | `all` | = none | `sshd -T \| awk '/^authorizedkeysfile/{print $2}'` |
-| apt đi qua egress-1 | `role:k8s-app` | = 1 | `grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy` |
+| apt đi qua apt-cacher-ng của registry | `role:k8s-app` | = 1 | `grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy` |
 | apt đi qua egress-1 | `ops-1` | = 1 | `grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy` |
 | OpenBao không có đường ra (egress khoá) | `bao-1` | = 1 | `nft list chain inet host output \| grep -c 'egress-locked'` |
 | Kho dữ liệu không có đường ra | `data-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'` |
@@ -1204,4 +1226,23 @@ $ labs/bin/lab smoke
 | Kiểm sống hạ tầng | `host` | lệnh thành công (rc=0) | `labs/bin/lab smoke` |
 
 **Hoàn tác:** Không đổi gì.
+
+### P9.3 Cài lại database từ mirror sau khi seal
+
+**Vì sao:** Chứng minh vùng dữ liệu (không có đường ra) vẫn cài và nâng được phần mềm, chỉ qua mirror nội bộ.
+
+**Phụ thuộc:** P9.2  ·  **Thời gian dự kiến:** 5 phút
+
+```
+$ labs/bin/lab services --tags postgres
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Nguồn apt PostgreSQL trỏ vào registry | `data-1` | = 1 | `grep -c '10.10.60.12/apt/pgdg' /etc/apt/sources.list.d/pgdg.sources` |
+| Khoá Signed-By là khoá của mirror | `data-1` | = 41 | `gpg --show-keys --with-colons /usr/share/keyrings/pgdg.gpg \| awk -F: '/^fpr/{print $10}' \| head -1 \| wc -c` |
+| apt update chỉ qua mirror | `data-1` | khớp /^[1-9]/ | `apt-get update -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.sources -o Dir::Etc::sourceparts=- 2>&1 \| grep -c '10.10.60.12'` |
+| PostgreSQL còn chạy sau khi chạy lại | `data-1` | = active | `systemctl is-active postgresql@17-main` |
+
+**Hoàn tác:** Không đổi gì nếu phiên bản đã ghim không đổi.
 

@@ -37,7 +37,17 @@ Quyết định của chủ dự án (2026-11-13): database chạy trên VM; **k
 
 **Nâng version dễ ở chỗ nào:** đổi đúng một biến (`pg_pkg_version`, `rabbitmq_pkg_version`, `clickhouse_pkg_version`, `valkey_version` cùng `valkey_sha256`) rồi chạy lại role. Gói `hold` nên `apt upgrade` hay vá tự động không đụng tới database; nâng là việc có chủ đích. PostgreSQL version lớn **không** tự động (role từ chối), vì nâng lớn cần `pg_upgradecluster` và kiểm tra.
 
-**Cần người duyệt:** các mục B ở bảng trên, và quyết định về đường ra cho vùng dữ liệu để nâng sau khi seal (cuối [UPGRADE.md](UPGRADE.md)).
+**Mirror nội bộ (đề xuất của Claude, chờ duyệt)**
+
+| Phần | Lựa chọn | Tin cậy |
+|---|---|---|
+| Công cụ | aptly 1.5.0 (Ubuntu noble universe): mirror có lọc, snapshot, publish/switch, ký lại bằng khoá riêng | A (đã chạy thử trên repo giả ký bằng khoá "vendor": lọc đúng, bản mới chỉ hiện sau promote, client ghim khoá mirror cài đúng bản) |
+| Chưa chạy trên máy thật | cú pháp lọc gói của từng vendor (`Name (~ ^erlang)`), kích thước mirror, `mirror edit` | B, kiểm khi chạy P8.8 lần đầu |
+| Truyền tải | HTTP thuần cổng 80 | Chấp nhận được vì apt kiểm chữ ký, tarball kiểm sha256; TLS ở P2/P5 |
+| Artifact | Valkey, RKE2: URL theo `mirror_base`, sha256 ghim | B (danh sách `mirror_artifacts` chưa điền, cần phiên bản đã ghim) |
+| Đường ra | M02 qua egress-1, allowlist thêm `.postgresql.org .rabbitmq.com .clickhouse.com .valkey.io` | B |
+
+**Cần người duyệt:** các mục B ở bảng trên, và cách vá Z1 và Z5 (X01/X05 cấm tới Z6).
 
 ## Hệ điều hành chung (baseline)
 

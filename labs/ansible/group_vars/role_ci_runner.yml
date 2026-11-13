@@ -1,3 +1,1 @@
 ---
-# Có đường ra qua egress-1 theo ma trận (N21 cho Z3, N29 cho ci-runner).
-apt_proxy: "{{ '' if lab_bootstrap else 'http://' ~ lab_egress_ip ~ ':3128' }}"

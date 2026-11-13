@@ -140,6 +140,43 @@ class StepsTests(unittest.TestCase):
         finally:
             g2.load = orig
 
+    def test_mirror_pg_version_matches_installed_pg_version(self):
+        import yaml
+        r = S.LABS / "ansible/roles"
+        mirror = yaml.safe_load((r / "svc_registry/defaults/main.yml").read_text(encoding="utf-8"))
+        pg = yaml.safe_load((r / "svc_postgres/defaults/main.yml").read_text(encoding="utf-8"))
+        self.assertEqual(str(mirror["mirror_pg_version"]), str(pg["pg_version"]), "mirror lọc theo bản major khác bản được cài")
+
+    def test_mirror_repo_names_match_vendor_repo_names(self):
+        import re, yaml
+        r = S.LABS / "ansible/roles"
+        mirror = yaml.safe_load((r / "svc_registry/defaults/main.yml").read_text(encoding="utf-8"))
+        names = {m["name"] for m in mirror["mirror_repos"]}
+        used = set()
+        for role in ("svc_postgres", "svc_rabbitmq", "svc_clickhouse"):
+            used |= set(re.findall(r"vendor_repo_name: (\S+)", (r / role / "tasks/main.yml").read_text(encoding="utf-8")))
+        self.assertEqual(names, used, "tên repo ở mirror phải trùng tên client dùng, vì client trỏ tới <mirror>/apt/<tên>")
+
+    def test_registry_scripts_render_and_parse(self):
+        import shutil
+        if not shutil.which("ansible-playbook"):
+            self.skipTest("không có ansible")
+        play = S.LABS / "ansible/tests/render_registry.yml"
+        out = Path(tempfile.mkdtemp())
+        res = subprocess.run(["ansible-playbook", "-c", "local", "-i", "localhost,", str(play), "-e", f"outdir={out}"],
+                             cwd=S.LABS / "ansible", capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        for f in sorted(out.glob("waap-mirror-*.sh")):
+            self.assertEqual(subprocess.run(["bash", "-n", str(f)]).returncode, 0, f.name)
+        self.assertTrue(list(out.glob("waap-mirror-*.sh")))
+
+    def test_mirror_flows_exclude_zones_that_x01_x05_forbid(self):
+        import gen_nft as g2
+        z, p, f = g2.load("compact")
+        ids = {x["id"]: x for x in f["flows"]}
+        self.assertIn("M01", ids)
+        self.assertEqual(ids["M01"]["src"], "all-vms-except:[Z0,Z1,Z5]")
+
     def test_checklist_doc_is_current(self):
         with tempfile.TemporaryDirectory() as d:
             orig = S.CHECKLIST

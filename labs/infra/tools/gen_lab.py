@@ -43,7 +43,7 @@ def inventory(profile, out):
             if role in v["roles"]:
                 return ips[v["name"]][v["zones"][0]]
         return ""
-    for var, role in (("lab_infra_ip", "infra"), ("lab_egress_ip", "egress-1"), ("lab_bastion_ip", "bastion"), ("lab_obs_ip", "obs")):
+    for var, role in (("lab_infra_ip", "infra"), ("lab_egress_ip", "egress-1"), ("lab_bastion_ip", "bastion"), ("lab_obs_ip", "obs"), ("lab_registry_ip", "registry")):
         L.append(f"{var}={ip_of(role)}")
     Path(out).mkdir(parents=True, exist_ok=True)
     (Path(out) / "inventory.ini").write_text("\n".join(L) + "\n")
@@ -66,6 +66,7 @@ COMPONENTS = [
     ("ClickHouse", "clickhouse", "svc_clickhouse", "lab services --tags clickhouse", "waap-install clickhouse", "Repo apt chính thức của ClickHouse, 3 gói cùng version, bị hold"),
     ("RKE2 server", "k8s-cp", "profile_rke2_node", "lab provision --tags k8s --limit <vm>", "waap-install rke2-node", "Cần ghim phiên bản và sha256 của tarball"),
     ("RKE2 agent", "k8s-app", "profile_rke2_node", "lab provision --tags k8s --limit <vm>", "waap-install rke2-node -e rke2_role=agent", ""),
+    ("Mirror nội bộ (aptly + artifact + apt-cacher-ng)", "registry", "svc_registry", "lab services --tags registry", "waap-install registry", "Nguồn gói duy nhất cho vùng không có đường ra"),
     ("egress-1 (squid)", "egress-1", "svc_perimeter", "lab services --tags egress", "waap-install egress", "Đường ra duy nhất có allowlist"),
     ("Kafka", "kafka", "(chưa có)", "(chưa có)", "(chưa có)", "VM đã có (đĩa dữ liệu) nhưng CHƯA có bộ cài; không dịch vụ nào dùng Kafka ở code hiện tại"),
     ("Object storage (SeaweedFS)", "object-storage", "(chưa có)", "(chưa có)", "(chưa có)", "Vai trò gắn vào data-1 nhưng CHƯA có bộ cài"),

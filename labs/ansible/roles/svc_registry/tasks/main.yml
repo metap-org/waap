@@ -1,0 +1,181 @@
+---
+- name: Gói (aptly, nginx, apt-cacher-ng)
+  ansible.builtin.apt:
+    name: [aptly, nginx, apt-cacher-ng, gnupg, curl, ca-certificates]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Người dùng aptly không đăng nhập được
+  ansible.builtin.user:
+    name: "{{ mirror_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ mirror_data }}"
+    create_home: false
+
+- name: Thư mục dữ liệu và khoá
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(mirror_user) }}"
+    group: "{{ item.owner | default(mirror_user) }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ mirror_data }}", mode: "0755" }
+    - { path: "{{ mirror_data }}/.gnupg", mode: "0700" }
+    - { path: "{{ mirror_data }}/vendor-keys", mode: "0750" }
+    - { path: "{{ mirror_data }}/public", mode: "0755" }
+    - { path: "{{ mirror_artifacts_dir | dirname }}", mode: "0755", owner: root }
+    - { path: "{{ mirror_artifacts_dir }}", mode: "0755" }
+
+- name: Cấu hình aptly
+  ansible.builtin.template:
+    src: aptly.conf.j2
+    dest: /etc/aptly.conf
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Khoá ký của mirror (client ghim fingerprint khoá này, không còn tin khoá của vendor)
+  ansible.builtin.shell: >-
+    runuser -u {{ mirror_user }} -- env GNUPGHOME={{ mirror_data }}/.gnupg
+    gpg --batch --passphrase '' --quick-gen-key "{{ mirror_signing_name }} <mirror@waap.lab>" default default never
+  args:
+    creates: "{{ mirror_data }}/.gnupg/pubring.kbx"
+
+- name: Fingerprint khoá ký của mirror
+  ansible.builtin.shell: >-
+    set -o pipefail; runuser -u {{ mirror_user }} -- env GNUPGHOME={{ mirror_data }}/.gnupg
+    gpg --list-keys --with-colons "{{ mirror_signing_name }}" | awk -F: '/^fpr:/{print $10; exit}'
+  args:
+    executable: /bin/bash
+  register: mirror_key_fpr
+  changed_when: false
+
+- name: Xuất khoá công khai để client tải
+  ansible.builtin.shell: >-
+    runuser -u {{ mirror_user }} -- env GNUPGHOME={{ mirror_data }}/.gnupg
+    gpg --armor --export "{{ mirror_key_fpr.stdout }}" > {{ mirror_data }}/public/mirror-key.asc
+  changed_when: false
+
+- name: Lấy khoá công khai và fingerprint về máy điều khiển (client ghim từ đây)
+  ansible.builtin.fetch:
+    src: "{{ mirror_data }}/public/mirror-key.asc"
+    dest: "{{ mirror_local_dir }}/mirror-key.asc"
+    flat: true
+
+- name: Ghi fingerprint ở máy điều khiển
+  ansible.builtin.copy:
+    content: "{{ mirror_key_fpr.stdout }}\n"
+    dest: "{{ mirror_local_dir }}/mirror-key.fpr"
+    mode: "0644"
+  delegate_to: localhost
+  become: false
+
+- name: Khoá ký của các vendor (kiểm fingerprint trước khi tin)
+  ansible.builtin.include_tasks: vendor_key.yml
+  loop: "{{ mirror_repos }}"
+  loop_control:
+    loop_var: repo
+    label: "{{ repo.name }}"
+
+- name: Các mirror đang có
+  ansible.builtin.command: runuser -u {{ mirror_user }} -- aptly -config=/etc/aptly.conf mirror list -raw
+  register: mirrors_now
+  changed_when: false
+
+- name: Tạo mirror chọn lọc (chỉ các gói cần, kèm phụ thuộc, chỉ amd64)
+  ansible.builtin.command: >-
+    runuser -u {{ mirror_user }} -- env GNUPGHOME={{ mirror_data }}/.gnupg
+    aptly -config=/etc/aptly.conf mirror create -keyring={{ mirror_data }}/vendor-keys/{{ item.name }}.gpg
+    -architectures=amd64 -filter='{{ item.filter }}' -filter-with-deps {{ item.name }} {{ item.url }} {{ item.dist }} {{ item.component }}
+  loop: "{{ mirror_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in mirrors_now.stdout_lines
+  changed_when: true
+
+- name: Cập nhật bộ lọc nếu đổi (ví dụ nâng version lớn PostgreSQL)
+  ansible.builtin.command: >-
+    runuser -u {{ mirror_user }} -- aptly -config=/etc/aptly.conf mirror edit -filter='{{ item.filter }}' -filter-with-deps {{ item.name }}
+  loop: "{{ mirror_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
+
+- name: Script vận hành mirror
+  ansible.builtin.template:
+    src: "{{ item }}.sh.j2"
+    dest: "/usr/local/sbin/{{ item }}"
+    mode: "0755"
+    owner: root
+    group: root
+  loop: [waap-mirror-sync, waap-mirror-promote, waap-mirror-list, waap-mirror-artifact]
+
+- name: Các bản đang publish
+  ansible.builtin.command: runuser -u {{ mirror_user }} -- env GNUPGHOME={{ mirror_data }}/.gnupg aptly -config=/etc/aptly.conf publish list -raw
+  register: published_now
+  changed_when: false
+
+- name: Lần đầu, đồng bộ và publish bản đầu tiên (các lần sau chỉ promote khi có chủ đích)
+  ansible.builtin.shell: >-
+    runuser -u {{ mirror_user }} -- /usr/local/sbin/waap-mirror-sync {{ item.name }} &&
+    runuser -u {{ mirror_user }} -- /usr/local/sbin/waap-mirror-promote {{ item.name }} latest
+  loop: "{{ mirror_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (item.name ~ ' ' ~ item.dist) not in published_now.stdout_lines
+  changed_when: true
+
+- name: Nhận artifact đã ghim sha256
+  ansible.builtin.command: >-
+    runuser -u {{ mirror_user }} -- /usr/local/sbin/waap-mirror-artifact {{ item.name }} {{ item.filename }} {{ item.url }} {{ item.sha256 }}
+  loop: "{{ mirror_artifacts }}"
+  loop_control:
+    label: "{{ item.name }}/{{ item.filename }}"
+  changed_when: true
+
+- name: Unit và timer đồng bộ hằng tuần (chỉ tạo snapshot, không tự publish)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: mirror-sync.service.j2, dest: waap-mirror-sync.service }
+    - { src: mirror-sync.timer.j2, dest: waap-mirror-sync.timer }
+  notify: reload systemd
+
+- name: Bật timer
+  ansible.builtin.systemd:
+    name: waap-mirror-sync.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: nginx phục vụ kho apt và artifact (chỉ đọc)
+  ansible.builtin.template:
+    src: mirror-nginx.conf.j2
+    dest: /etc/nginx/conf.d/mirror.conf
+    mode: "0644"
+  notify: restart nginx
+
+- name: Bỏ site mặc định của nginx
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: apt-cacher-ng cho kho Ubuntu
+  ansible.builtin.template:
+    src: acng.conf.j2
+    dest: /etc/apt-cacher-ng/zz_waap.conf
+    mode: "0644"
+  notify: restart acng
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [nginx, apt-cacher-ng]

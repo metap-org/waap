@@ -4,7 +4,8 @@
 rke2_version: ""                 # ví dụ v1.xx.y+rke2r1
 rke2_sha256: ""                  # sha256 của rke2.linux-amd64.tar.gz
 rke2_token: ""                   # lab: sinh bằng `lab` (generated/rke2-token); P5: lấy từ OpenBao
-rke2_tarball_url: "https://github.com/rancher/rke2/releases/download/{{ rke2_version | urlencode }}/rke2.linux-amd64.tar.gz"
+mirror_base: ""
+rke2_tarball_url: "{{ (mirror_base ~ '/artifacts/rke2/rke2-' ~ rke2_version ~ '.linux-amd64.tar.gz') if mirror_base | length > 0 else ('https://github.com/rancher/rke2/releases/download/' ~ (rke2_version | urlencode) ~ '/rke2.linux-amd64.tar.gz') }}"
 # Tên profile CIS phụ thuộc phiên bản RKE2 (tài liệu hướng dẫn dùng "cis-1.23" ở bản cũ, tham chiếu cấu hình ghi "cis"): xác nhận theo bản ghim.
 rke2_profile: cis
 rke2_cni: canal

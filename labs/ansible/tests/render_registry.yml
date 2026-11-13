@@ -1,0 +1,21 @@
+---
+# Dựng các script của registry để kiểm cú pháp, không cần máy thật:
+#   ansible-playbook -c local -i localhost, tests/render_registry.yml -e outdir=/tmp/x
+- hosts: localhost
+  gather_facts: false
+  become: false
+  vars_files: [vars.yml]
+  vars:
+    outdir: /tmp/render-registry
+    mirror_pg_version: 17
+  pre_tasks:
+    - ansible.builtin.include_vars: ../roles/svc_registry/defaults/main.yml
+    - ansible.builtin.set_fact: { ansible_facts: { distribution_release: noble } }
+    - ansible.builtin.file: { path: "{{ outdir }}", state: directory, mode: "0755" }
+  tasks:
+    - name: Dựng script
+      ansible.builtin.template:
+        src: "../roles/svc_registry/templates/{{ item }}.sh.j2"
+        dest: "{{ outdir }}/{{ item }}.sh"
+        mode: "0755"
+      loop: [waap-mirror-sync, waap-mirror-promote, waap-mirror-list, waap-mirror-artifact]

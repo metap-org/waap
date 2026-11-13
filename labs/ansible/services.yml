@@ -3,6 +3,19 @@
 # Chạy sau site.yml:  ansible-playbook services.yml -e @../infra/generated/secrets.yml
 # Profile full có hai máy postgres nhưng cấu hình sao chép (replication) CHƯA viết, nên chỉ cài node đầu; node thứ hai
 # được hardening và có đĩa nhưng chưa có PostgreSQL. Cài nó thành bản độc lập sẽ gây hiểu nhầm là đã có replica.
+- name: egress-1 (proxy ra có allowlist)
+  hosts: role_egress_1
+  roles:
+    - role: svc_perimeter
+      tags: [egress]
+
+# Mirror nội bộ: chạy sau egress-1 (cần đường ra có allowlist để kéo từ vendor) và TRƯỚC khi nâng version database.
+- name: Mirror nội bộ ở registry (aptly, kho artifact, apt-cacher-ng)
+  hosts: role_registry
+  roles:
+    - role: svc_registry
+      tags: [registry]
+
 - name: PostgreSQL (node đầu)
   hosts: role_postgres[0]
   roles:
@@ -26,9 +39,3 @@
   roles:
     - role: svc_clickhouse
       tags: [clickhouse]
-
-- name: egress-1 (proxy ra có allowlist)
-  hosts: role_egress_1
-  roles:
-    - role: svc_perimeter
-      tags: [egress]

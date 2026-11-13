@@ -5,7 +5,9 @@
 valkey_version: ""        # ví dụ 9.0.7 (lấy ở valkey.io/download)
 valkey_sha256: ""         # sha256 của tarball noble x86_64 trên trang release, tự kiểm
 # URL mặc định theo mẫu của valkey.io; cần người duyệt đối chiếu với trang release của bản ghim.
-valkey_tarball_url: "https://download.valkey.io/releases/valkey-{{ valkey_version }}-noble-x86_64.tar.gz"
+mirror_base: ""
+valkey_filename: "valkey-{{ valkey_version }}-noble-x86_64.tar.gz"
+valkey_tarball_url: "{{ (mirror_base ~ '/artifacts/valkey/' ~ valkey_filename) if mirror_base | length > 0 else ('https://download.valkey.io/releases/' ~ valkey_filename) }}"
 valkey_home: /opt/valkey
 valkey_user: valkey
 valkey_dir: /var/lib/valkey

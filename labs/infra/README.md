@@ -92,3 +92,10 @@ Khi khảo sát code để dự định lát này, thấy code hiện có lệch
 4. `analytics-api` dùng cổng native 9000 không TLS của ClickHouse, N17 chỉ mở 8443 và 9440.
 5. Chưa có ingress controller trong K8s (N04, N09 nói cổng 443).
 6. Kafka (ADR-0018) và OpenBao (P5) không dịch vụ nào dùng ở code hiện tại.
+
+## Luồng mirror (đề xuất bổ sung 7.6, chờ duyệt)
+
+- **M01** mọi VM trừ Z0, Z1, Z5 tới `registry` tcp 80 (mirror apt và artifact) và 3142 (apt-cacher-ng).
+- **M02** `registry` tới `egress-1` tcp 3128 để kéo từ vendor.
+- Cả hai `covers: []` vì không có trong 7.6; cần thêm vào 7.6 nếu được duyệt.
+- **Quyết định mở:** Z1 và Z5 không tới được registry vì X01 và X05. Hướng đề xuất là mô hình đẩy từ Z6 (cùng loại với N27), hoặc cửa sổ bootstrap có kiểm soát. Chưa làm.

@@ -1,0 +1,25 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Cho client thấy một snapshot (lần đầu thì publish, các lần sau thì switch). Dùng để NÂNG version hoặc HOÀN TÁC (chọn snapshot cũ).
+# Dùng: waap-mirror-promote <repo> <snapshot|latest>
+set -euo pipefail
+export GNUPGHOME="{{ mirror_data }}/.gnupg"
+A="aptly -config=/etc/aptly.conf"
+repo="${1:?repo}"; snap="${2:?snapshot hoặc latest}"
+case "$repo" in
+{% for r in mirror_repos %}
+  {{ r.name }}) dist="{{ r.dist }}" ;;
+{% endfor %}
+  *) echo "repo lạ: $repo" >&2; exit 2 ;;
+esac
+if [ "$snap" = latest ]; then
+  snap="$($A snapshot list -raw -sort=time | grep "^$repo-" | tail -1)"
+  [ -n "$snap" ] || { echo "chưa có snapshot của $repo (chạy waap-mirror-sync)" >&2; exit 1; }
+fi
+key="$(gpg --list-keys --with-colons "{{ mirror_signing_name }}" | awk -F: '/^fpr:/{print $10; exit}')"
+if $A publish list -raw | grep -qE "(^|[ /])${repo}[ /]${dist}\$|^${repo} ${dist}\$"; then
+  $A publish switch -batch -gpg-key="$key" -skip-contents "$dist" "$repo" "$snap"
+else
+  $A publish snapshot -batch -gpg-key="$key" -distribution="$dist" -skip-contents "$snap" "$repo"
+fi
+echo "đã publish $repo/$dist <- $snap"
