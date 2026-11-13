@@ -3,7 +3,7 @@
 # Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
 #       lab step {list|next|show|run|verify} [<id>]   (chạy từng bước nhỏ, xem labs/CHECKLIST.md)
 #       lab {tf|fw|secrets|services|nettest|smoke}   (P1 lát 2: database, proxy ra; chưa triển khai dịch vụ ứng dụng)
-# Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_K3S_VERSION, LAB_K3S_SHA256 (ghim k3s, tự lấy từ trang phát hành)
+# Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_RKE2_VERSION, LAB_RKE2_SHA256 (ghim RKE2: phiên bản và sha256 của rke2.linux-amd64.tar.gz, tự lấy từ trang phát hành)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INFRA="$ROOT/infra"
@@ -31,14 +31,14 @@ cmd_ssh_ca() { # CA SSH của lab (P5 chuyển sang OpenBao ký)
   chmod 600 "$GEN/ssh_user_ca"; echo "CA công khai: $GEN/ssh_user_ca.pub"
 }
 
-cmd_token() { [ -f "$GEN/k3s-token" ] || { umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$GEN/k3s-token"; }; }
+cmd_token() { [ -f "$GEN/rke2-token" ] || { umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$GEN/rke2-token"; }; }
 
 ansible_run() { # ansible_run <playbook> [tham số]
   need ansible-playbook; cmd_ssh_ca; cmd_token
   ( cd "$ROOT/ansible" && ansible-galaxy collection install -r requirements.yml >/dev/null &&
     ansible-playbook -i "$GEN/$PROFILE/inventory" "$@" \
-      -e "lab_generated_dir=$GEN" -e "k3s_version=${LAB_K3S_VERSION:-}" -e "k3s_sha256=${LAB_K3S_SHA256:-}" \
-      -e "k3s_token=$(cat "$GEN/k3s-token")" )
+      -e "lab_generated_dir=$GEN" -e "rke2_version=${LAB_RKE2_VERSION:-}" -e "rke2_sha256=${LAB_RKE2_SHA256:-}" \
+      -e "rke2_token=$(cat "$GEN/rke2-token")" )
 }
 
 cmd_provision() { ansible_run site.yml "$@"; }
@@ -123,8 +123,8 @@ cmd_smoke() { # kiểm hạ tầng, không kiểm dịch vụ ứng dụng
   chk "rabbitmq chạy" "incus exec data-1 -- systemctl is-active --quiet rabbitmq-server"
   chk "redis chạy trên edge-1 và data-1" "incus exec edge-1 -- systemctl is-active --quiet redis-server && incus exec data-1 -- systemctl is-active --quiet redis-server"
   chk "clickhouse chạy" "incus exec ch-1 -- systemctl is-active --quiet clickhouse-server"
-  chk "k3s server lên" "incus exec k8s-cp-1 -- systemctl is-active --quiet k3s"
-  chk "mọi node K8s Ready" "incus exec k8s-cp-1 -- k3s kubectl wait --for=condition=Ready node --all --timeout=60s"
+  chk "RKE2 server lên" "incus exec k8s-cp-1 -- systemctl is-active --quiet rke2-server"
+  chk "mọi node K8s Ready" "incus exec k8s-cp-1 -- env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl wait --for=condition=Ready node --all --timeout=60s"
   chk "egress-1 chặn đích ngoài allowlist" "! incus exec ops-1 -- env https_proxy=http://10.10.20.11:3128 curl -sf --max-time 8 https://example.com"
   return $fail
 }

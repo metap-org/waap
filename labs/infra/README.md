@@ -61,7 +61,7 @@ labs/bin/lab down    # snapshot và tắt theo thứ tự ngược
 
 ## P1 lát 2: database và proxy ra (phạm vi dừng ở hạ tầng)
 
-Lát 2 dừng ở **VM, mạng, platform (k3s), database và hardening OS**. Chưa triển khai service ứng dụng nào.
+Lát 2 dừng ở **VM, mạng, platform (RKE2), database và hardening OS**. Chưa triển khai service ứng dụng nào.
 
 Thứ tự chạy (trên máy lab):
 
@@ -69,7 +69,7 @@ Thứ tự chạy (trên máy lab):
 lab up && lab provision          # VM, firewall, hardening
 lab services                     # PostgreSQL, RabbitMQ, Redis, ClickHouse, egress-1
 lab nettest                      # thăm dò mạng sinh từ ma trận (cho phép phải đến được, cấm phải hết thời gian)
-lab smoke                        # database, k3s và egress chạy
+lab smoke                        # database, RKE2 và egress chạy
 lab seal && lab nettest          # gỡ bootstrap rồi chạy lại
 ```
 

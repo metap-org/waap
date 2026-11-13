@@ -7,17 +7,17 @@
 - **B**: theo benchmark hoặc tài liệu vendor mà tôi nắm, **chưa đối chiếu lại từng điều khoản** trong phiên này; cần người duyệt xác nhận.
 - **C**: lựa chọn kỹ thuật cho lab (ước lượng theo kích thước VM), chưa đo.
 
-Nguồn đã đối chiếu: [k3s CIS Hardening Guide](https://docs.k3s.io/security/hardening-guide), [RabbitMQ Production Checklist](https://www.rabbitmq.com/docs/production-checklist).
+Nguồn đã đối chiếu: [RKE2 CIS Hardening Guide](https://docs.rke2.io/security/hardening_guide), [RKE2 Installation Methods](https://docs.rke2.io/install/methods), [RKE2 CIS self-assessment 1.23](https://docs.rke2.io/security/cis_self_assessment123), [RabbitMQ Production Checklist](https://www.rabbitmq.com/docs/production-checklist). Nền K8s là **RKE2** (chủ dự án chọn; không dùng k3s).
 
 ## Đã sửa trong lần rà soát này
 
 | Lỗi | Hậu quả nếu để nguyên | Sửa |
 |---|---|---|
-| k3s không bật audit mặc định; chỉ khai `audit-log-path` mà không có policy | Log audit rỗng (A) | Thêm `audit.yaml` (Metadata) và `psa.yaml`, khai `audit-policy-file`, `admission-control-config-file` |
+| Cấu hình audit và Pod Security tự viết cho k3s (k3s không bật audit mặc định) | Không còn áp dụng: nền K8s đổi sang RKE2, profile CIS của RKE2 tự tạo audit policy mặc định và cấu hình Pod Security theo profile (A) | Bỏ phần tự viết; dùng `profile: cis` |
 | `loopback_users = none` trong RabbitMQ | Tài liệu RabbitMQ nói rõ không dùng cho production (A) | Bỏ; thêm ngưỡng bộ nhớ và `disk_free_limit` tường minh |
 | Redis: unit Debian khoá ghi ngoài `/var/lib/redis`, lab đặt dữ liệu ở đĩa riêng | Redis không ghi được AOF (B) | Drop-in `ReadWritePaths` |
 | ClickHouse cấu hình user trong `config.d` và dùng `default` không mật khẩu | `config.d/<users>` có thể không được áp dụng; tài khoản mặc định yếu (B) | `users.d`; `default` chỉ localhost; tài khoản `analytics` có sha256 và giới hạn nguồn |
-| sysctl của K8s thiếu `kernel.keys.root_maxkeys/root_maxbytes`; chưa nạp `nf_conntrack` | kubelet `protect-kernel-defaults` có thể từ chối chạy; khoá conntrack không tồn tại (B) | Thêm khoá và module (`overlay`, `br_netfilter`, `nf_conntrack`) |
+| sysctl của K8s thiếu `kernel.keys.root_maxkeys/root_maxbytes`; chưa nạp `nf_conntrack` | Profile CIS bật `protect-kernel-defaults`, kubelet có thể từ chối chạy; khoá conntrack không tồn tại (B) | Thêm khoá và module (`overlay`, `br_netfilter`, `nf_conntrack`) |
 | `ip_forward=0` của baseline ghi đè K8s; `ptrace_scope=1` ghi đè OpenBao | Node K8s mất forwarding; OpenBao yếu hơn dự định | Tuning nạp sau baseline (`99-zz-*`), có test |
 | `unprivileged_bpf_disabled=1` | Ubuntu mặc định 2, không hạ được nên `sysctl --system` lỗi (B) | Đặt 2 |
 | `sysctl -n` in giá trị nhiều trường bằng tab (`ip_local_port_range`, `tcp_rmem`) | Lệnh kiểm so sánh sai | Chuẩn hoá khoảng trắng trước khi so |
@@ -50,20 +50,23 @@ Nguồn đã đối chiếu: [k3s CIS Hardening Guide](https://docs.k3s.io/secur
 | Edge L7 | `somaxconn=65535`, `netdev_max_backlog=16384`, `tcp_max_syn_backlog=16384`, `ip_local_port_range 10240-65535`, `tcp_tw_reuse=1`, `tcp_fin_timeout=15`, buffer 16 MiB, `tcp_slow_start_after_idle=0`, BBR và `fq` | Thực hành proxy và CDN | B |
 | WAF | Slice riêng: `AllowedCPUs`, `CPUQuota`, `MemoryMax`, không capability | ADR-0048 | C (số theo 2 vCPU) |
 | OpenBao | Không swap, không core dump (`core_pattern`, `Storage=none`), `ptrace_scope=2`, `CAP_IPC_LOCK`, `LimitMEMLOCK=infinity` | Khuyến nghị hardening OpenBao/Vault | B |
-| k3s node | `ip_forward=1`, `bridge-nf-call-*=1`, `overcommit_memory=1`, `panic_on_oom=0`, `kernel.panic=10`, `panic_on_oops=1`, `keys.root_maxkeys=1000000`, `root_maxbytes=25000000`, inotify 8192/524288, `nf_conntrack_max=262144` | k3s hardening guide: có sysctl kubelet (**A**); inotify, conntrack, keys: **B** | A, B |
+| Node K8s (RKE2) | `ip_forward=1`, `bridge-nf-call-*=1`, `overcommit_memory=1`, `panic_on_oom=0`, `kernel.panic=10`, `panic_on_oops=1`, `keys.root_maxkeys=1000000`, `root_maxbytes=25000000`, inotify 8192/524288, `nf_conntrack_max=262144` | Profile CIS của RKE2 đòi sysctl cho kubelet (**A** về việc cần có); **danh sách và giá trị chính xác chưa đối chiếu** với tệp sysctl đi kèm tarball ở bản ghim; inotify, conntrack: **B** | B |
 
-## k3s
+## RKE2
 
 | Tham số | Giá trị | Cơ sở | Tin cậy |
 |---|---|---|---|
-| `protect-kernel-defaults` | `true` (khoá cấp trên, không lặp trong `kubelet-arg`) | CIS Hardening Guide | A |
-| `secrets-encryption` | `true` | CIS Hardening Guide | A |
-| Audit | `audit-policy-file`, `audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log`, `maxage=30`, `maxbackup=10`, `maxsize=100`; policy mức Metadata | CIS Hardening Guide (k3s không bật audit mặc định) | A |
-| Pod Security | `psa.yaml`: enforce, audit, warn = `restricted`; miễn `kube-system` | CIS Hardening Guide | A |
-| `service-account-extend-token-expiration` | `false` | CIS Hardening Guide | A |
-| `terminated-pod-gc-threshold` | `10` | CIS Hardening Guide | A |
-| `streaming-connection-idle-timeout` | `5m` | CIS Hardening Guide | A |
-| `traefik`, `servicelb` | tắt | Quyết định của dự án (ingress do `ingress-1` đảm nhiệm) | C |
+| Cách cài | Tarball ghim phiên bản và sha256, giải nén vào `/usr/local` (nhị phân và unit systemd); không tải gì chưa kiểm | Installation Methods của RKE2 | A |
+| Cổng | 6443 (API) và 9345 (supervisor, agent gia nhập) mở giữa các node | Requirements của RKE2 | A |
+| `profile` | `cis` (biến `rke2_profile`; tên profile phụ thuộc phiên bản RKE2, hướng dẫn bản cũ dùng `cis-1.23`) | Hardening Guide, Server Config Reference nói hai giá trị khác nhau theo bản | A (có profile) / B (tên đúng theo bản ghim) |
+| User `etcd` | Bắt buộc có (nologin) khi dùng profile CIS; thiếu thì RKE2 từ chối chạy; dữ liệu etcd thuộc `etcd:etcd` | CIS 1.23 self-assessment | A |
+| Audit policy | Profile CIS tạo sẵn policy mặc định, vận hành viên tuỳ chỉnh sau | Hardening Guide | A |
+| Pod Security | Chọn theo profile (Pod Security Standards từ v1.25) | Hardening Guide | A |
+| `secrets-encryption` | `true` | Thực hành RKE2/CIS | B |
+| `streaming-connection-idle-timeout` | `5m`; `terminated-pod-gc-threshold=10` | CIS | B |
+| CNI | `canal` (mặc định RKE2, có NetworkPolicy) | Mặc định RKE2 | B |
+| Ingress mặc định | Tắt (`rke2_disable`); tên thành phần đổi theo phiên bản (ingress-nginx ở bản cũ, có thể là Traefik ở bản mới) | Migration guide của RKE2 cho thấy mặc định đã đổi | B |
+| sysctl kubelet | Bảng `role_k8s_*` ở `os_tuning` (panic_on_oom, overcommit, panic, panic_on_oops, keys, inotify, conntrack) | Profile CIS đòi các giá trị này | B |
 
 ## Chỗ lệch best practice có chủ đích
 
@@ -74,7 +77,7 @@ Nguồn đã đối chiếu: [k3s CIS Hardening Guide](https://docs.k3s.io/secur
 | TLS của PostgreSQL tự ký, `sslmode=require` không kiểm chứng chứng chỉ; RabbitMQ và Redis chưa TLS | Client Go của metap chưa chắc nhận CA tuỳ chỉnh | P2 và P5 (mTLS từ OpenBao) |
 | `sudo NOPASSWD` cho nhóm `ops` | Tài khoản không có mật khẩu; xác thực bằng SSH cert ngắn hạn | Giữ, kèm ghi log vào/ra của sudo |
 | `auditd -f 1` (ghi lỗi) thay vì `-f 2` (panic) | Lab; panic khi audit lỗi là quá mạnh | Production cân nhắc `-f 2` |
-| PSA `restricted` bắt buộc toàn cụm | Theo hướng dẫn k3s CIS | Namespace cần nới phải đặt nhãn riêng; sẽ ảnh hưởng khi triển khai dịch vụ |
+| Pod Security theo profile CIS của RKE2 | Profile CIS chọn mức Pod Security; mức cụ thể phải đọc ở bản ghim | Namespace cần nới phải đặt nhãn riêng; sẽ ảnh hưởng khi triển khai dịch vụ |
 | `overcommit_memory=1` trên data-1 | Gộp PostgreSQL với Redis | Khi tách máy |
 | Squid allowlist | Điểm xuất phát; CDN của registry đổi tên miền | Tinh chỉnh khi chạy thật |
 | Chưa vá được vùng không có đường ra (Z1, Z2, Z4, Z5) | Thiếu bản sao apt nội bộ ở Z6 | Cần chốt thiết kế (xem `infra/README.md`) |
@@ -82,7 +85,7 @@ Nguồn đã đối chiếu: [k3s CIS Hardening Guide](https://docs.k3s.io/secur
 ## Cần người duyệt xác nhận (mức B)
 
 Số liệu theo benchmark nên đối chiếu với CIS Ubuntu 24.04 phiên bản đang dùng, tài liệu PostgreSQL 16, Redis, ClickHouse mới nhất, trước khi coi là chốt. Đặc biệt:
-1. Danh sách sysctl mà kubelet kiểm với `protect-kernel-defaults` ở phiên bản k3s sẽ ghim.
+1. Danh sách sysctl mà profile CIS của RKE2 kiểm ở phiên bản sẽ ghim, tên profile (`cis` hay `cis-1.xx`), và tên thành phần ingress cần tắt.
 2. `ERL_EPMD_ADDRESS` và `inet_dist_use_interface` của RabbitMQ ở phiên bản trong Ubuntu 24.04.
 3. Cú pháp `users.d` và `password_sha256_hex` của ClickHouse ở phiên bản sẽ ghim.
 4. Các giá trị kích thước (`shared_buffers`, hugepage, `MemoryMax`) cần đo lại trên VM thật.

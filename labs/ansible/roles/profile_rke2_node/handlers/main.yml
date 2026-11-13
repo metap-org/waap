@@ -4,8 +4,8 @@
     daemon_reload: true
   listen: daemon reload
 
-- name: Restart k3s
+- name: Restart rke2
   ansible.builtin.systemd:
-    name: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"
+    name: "rke2-{{ rke2_role }}"
     state: restarted
-  listen: restart k3s
+  listen: restart rke2

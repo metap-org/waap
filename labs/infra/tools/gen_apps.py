@@ -11,7 +11,7 @@ SIMPLE = {
     "redis": ("svc_redis", [("tcp", [6379])], {}, "Redis có ACL: user control ghi, user edge chỉ đọc waf:*. Dùng cho valkey-edge và valkey-central."),
     "clickhouse": ("svc_clickhouse", [("tcp", [9000])], {"clickhouse_allowed_cidrs": "{{ app_allow_from }}"}, "ClickHouse. Cần ghim clickhouse_debs (url, sha256)."),
     "egress": ("svc_perimeter", [("tcp", [3128])], {"egress_allowed_src": "{{ app_allow_from }}"}, "squid ra Internet có allowlist, chặn dải riêng và metadata."),
-    "k3s-node": ("profile_k8s_node", [("tcp", [6443, 10250])], {}, "Node k3s (server hoặc agent: -e k3s_role=agent -e k3s_api_endpoint=...). Cần k3s_version, k3s_sha256, k3s_token."),
+    "rke2-node": ("profile_rke2_node", [("tcp", [6443, 9345, 10250])], {}, "Node RKE2 (server hoặc agent: -e rke2_role=agent -e rke2_api_endpoint=...). Cần rke2_version, rke2_sha256, rke2_token."),
 }
 
 PRE = """  pre_tasks:

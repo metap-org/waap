@@ -19,6 +19,6 @@
         - { src: ../roles/baseline/templates/audit.rules.j2, dest: audit.rules }
         - { src: ../roles/baseline/templates/chrony.conf.j2, dest: chrony.conf }
         - { src: ../roles/baseline/templates/sudoers-ops.j2, dest: sudoers }
-        - { src: ../roles/profile_k8s_node/templates/config.yaml.j2, dest: k3s-server.yaml }
+        - { src: ../roles/profile_rke2_node/templates/config.yaml.j2, dest: rke2-server.yaml }
         - { src: ../roles/profile_bastion/templates/wg0.conf.j2, dest: wg0.conf }
         - { src: ../roles/hardened_unit/templates/hardening.conf.j2, dest: unit.conf }

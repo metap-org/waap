@@ -1,6 +1,6 @@
 ---
 profile: production
-# Tên task tiếng Việt có thể mở đầu bằng thuật ngữ kỹ thuật viết thường; biến dùng chung kiểu `k3s_*`, `hu_*` có tiền tố riêng.
+# Tên task tiếng Việt có thể mở đầu bằng thuật ngữ kỹ thuật viết thường; biến dùng chung kiểu `rke2_*`, `hu_*` có tiền tố riêng.
 skip_list:
   - name[casing]
   - var-naming[no-role-prefix]

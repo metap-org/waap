@@ -1,0 +1,14 @@
+---
+# RKE2 (không dùng k3s). Cài bằng tarball: giải nén vào /usr/local (nhị phân, unit systemd, sysctl mẫu).
+# Không tải nhị phân khi chưa ghim phiên bản và sha256 (lấy từ trang phát hành, tự kiểm).
+rke2_version: ""                 # ví dụ v1.xx.y+rke2r1
+rke2_sha256: ""                  # sha256 của rke2.linux-amd64.tar.gz
+rke2_token: ""                   # lab: sinh bằng `lab` (generated/rke2-token); P5: lấy từ OpenBao
+rke2_tarball_url: "https://github.com/rancher/rke2/releases/download/{{ rke2_version | urlencode }}/rke2.linux-amd64.tar.gz"
+# Tên profile CIS phụ thuộc phiên bản RKE2 (tài liệu hướng dẫn dùng "cis-1.23" ở bản cũ, tham chiếu cấu hình ghi "cis"): xác nhận theo bản ghim.
+rke2_profile: cis
+rke2_cni: canal
+# Tên thành phần ingress mặc định đổi theo phiên bản (rke2-ingress-nginx ở bản cũ; bản mới có thể là Traefik). Ingress do ingress-1 ở Z2 đảm nhiệm nên tắt.
+rke2_disable: [rke2-ingress-nginx]
+rke2_api_endpoint: "{{ ('https://' ~ hostvars[groups['role_k8s_cp'][0]].lab_ip ~ ':9345') if groups['role_k8s_cp'] is defined else '' }}"
+rke2_role: "{{ 'server' if inventory_hostname in (groups['role_k8s_cp'] | default([])) else 'agent' }}"

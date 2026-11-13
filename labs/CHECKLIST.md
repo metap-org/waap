@@ -936,11 +936,11 @@ $ labs/bin/lab provision --tags profile-bastion
 
 ## P8. Platform và database
 
-### P8.1 k3s server (control-plane)
+### P8.1 RKE2 server (control-plane)
 
-**Vì sao:** Platform K8s nhẹ. Cần ghim phiên bản và sha256 (bộ cài từ chối tải nhị phân chưa kiểm). Kubelet khoá chặt, mã hoá secret, tắt traefik và servicelb.
+**Vì sao:** Platform K8s (RKE2, không dùng k3s). Cần ghim phiên bản và sha256 của tarball (bộ cài từ chối tải nhị phân chưa kiểm). Profile CIS bắt buộc có user etcd và sysctl đúng giá trị; mã hoá secret; tắt ingress mặc định.
 
-**Phụ thuộc:** P7.3  ·  **Thời gian dự kiến:** 3 phút
+**Phụ thuộc:** P7.3  ·  **Thời gian dự kiến:** 8 phút (kéo ảnh container lần đầu)
 
 ```
 $ labs/bin/lab provision --tags k8s --limit k8s-cp-1
@@ -948,29 +948,33 @@ $ labs/bin/lab provision --tags k8s --limit k8s-cp-1
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| k3s chạy | `k8s-cp-1` | = active | `systemctl is-active k3s` |
-| Node Ready | `k8s-cp-1` | = 1 | `k3s kubectl get nodes --no-headers \| grep -c ' Ready'` |
-| kubelet protect-kernel-defaults | `k8s-cp-1` | = 1 | `grep -c '^protect-kernel-defaults: true' /etc/rancher/k3s/config.yaml` |
-| Ngắt kết nối stream rảnh 5 phút | `k8s-cp-1` | = 1 | `grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/k3s/config.yaml` |
-| Có chính sách audit | `k8s-cp-1` | lệnh thành công (rc=0) | `test -s /var/lib/rancher/k3s/server/audit.yaml` |
-| Có cấu hình Pod Security (restricted) | `k8s-cp-1` | = 1 | `grep -c 'enforce: restricted' /var/lib/rancher/k3s/server/psa.yaml` |
-| Giữ log audit 30 ngày | `k8s-cp-1` | = 1 | `grep -c 'audit-log-maxage=30' /etc/rancher/k3s/config.yaml` |
-| Token ServiceAccount không kéo dài tuổi | `k8s-cp-1` | = 1 | `grep -c 'service-account-extend-token-expiration=false' /etc/rancher/k3s/config.yaml` |
-| Cổng chỉ đọc 10255 đóng | `k8s-cp-1` | = 0 | `ss -ltn \| grep -c ':10255'` |
-| Mã hoá secret bật | `k8s-cp-1` | ≥ 1 | `k3s secrets-encrypt status \| grep -c 'Enabled'` |
-| Không có traefik | `k8s-cp-1` | = 0 | `k3s kubectl -n kube-system get pods --no-headers \| grep -c traefik` |
-| Token cụm quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/k3s/token` |
-| Cấu hình k3s quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/k3s/config.yaml` |
+| rke2-server chạy | `k8s-cp-1` | = active | `systemctl is-active rke2-server` |
+| Node Ready | `k8s-cp-1` | = 1 | `env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers \| grep -c ' Ready'` |
+| Profile CIS bật | `k8s-cp-1` | = 1 | `grep -c '^profile: cis' /etc/rancher/rke2/config.yaml` |
+| User etcd không đăng nhập | `k8s-cp-1` | = /sbin/nologin | `getent passwd etcd \| cut -d: -f7` |
+| Dữ liệu etcd thuộc user etcd | `k8s-cp-1` | = etcd | `stat -c %U /var/lib/rancher/rke2/server/db/etcd` |
+| Cổng supervisor 9345 nghe | `k8s-cp-1` | ≥ 1 | `ss -ltn \| grep -c ':9345'` |
+| Cổng API 6443 nghe | `k8s-cp-1` | ≥ 1 | `ss -ltn \| grep -c ':6443'` |
+| Cổng chỉ đọc kubelet 10255 đóng | `k8s-cp-1` | = 0 | `ss -ltn \| grep -c ':10255'` |
+| Mã hoá secret bật | `k8s-cp-1` | ≥ 1 | `/usr/local/bin/rke2 secrets-encrypt status \| grep -c 'Enabled'` |
+| CNI canal đang chạy | `k8s-cp-1` | ≥ 1 | `env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers \| grep -c canal` |
+| Không có ingress controller mặc định (ingress do ingress-1 đảm nhiệm) | `k8s-cp-1` | = 0 | `env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers \| grep -ciE 'ingress-nginx\|traefik'` |
+| API server dùng cấu hình Pod Security (admission) | `k8s-cp-1` | ≥ 1 | `ps -eo args \| grep -c '[a]dmission-control-config-file'` |
+| API server có audit log | `k8s-cp-1` | ≥ 1 | `ps -eo args \| grep -c '[a]udit-log-path'` |
+| Có audit policy mặc định do profile CIS tạo | `k8s-cp-1` | lệnh thành công (rc=0) | `ls /etc/rancher/rke2/audit-policy.yaml` |
+| Ngắt kết nối stream rảnh 5 phút | `k8s-cp-1` | = 1 | `grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/rke2/config.yaml` |
+| Token cụm quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/rke2/token` |
+| Cấu hình RKE2 quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/rke2/config.yaml` |
+| kubeconfig quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/rke2/rke2.yaml` |
 | Không swap | `k8s-cp-1` | = 0 | `swapon --show \| wc -l` |
-| Có audit log của API | `k8s-cp-1` | lệnh thành công (rc=0) | `test -s /var/lib/rancher/k3s/server/logs/audit.log` |
 
-**Hoàn tác:** incus exec k8s-cp-1 -- /usr/local/bin/k3s-uninstall.sh (nếu có) hoặc dựng lại VM.
+**Hoàn tác:** incus exec k8s-cp-1 -- /usr/local/bin/rke2-uninstall.sh (có trong tarball) hoặc dựng lại VM.
 
-### P8.2 k3s agent (hai worker)
+### P8.2 RKE2 agent (hai worker)
 
-**Vì sao:** Hai worker gia nhập cụm.
+**Vì sao:** Hai worker gia nhập cụm qua cổng supervisor 9345.
 
-**Phụ thuộc:** P8.1  ·  **Thời gian dự kiến:** 3 phút
+**Phụ thuộc:** P8.1  ·  **Thời gian dự kiến:** 6 phút
 
 ```
 $ labs/bin/lab provision --tags k8s --limit k8s-wk-1,k8s-wk-2
@@ -978,11 +982,12 @@ $ labs/bin/lab provision --tags k8s --limit k8s-wk-1,k8s-wk-2
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| Ba node Ready | `k8s-cp-1` | = 3 | `k3s kubectl get nodes --no-headers \| grep -c ' Ready'` |
-| Agent chạy | `k8s-wk-1` | = active | `systemctl is-active k3s-agent` |
-| Agent chạy | `k8s-wk-2` | = active | `systemctl is-active k3s-agent` |
+| Ba node Ready | `k8s-cp-1` | = 3 | `env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers \| grep -c ' Ready'` |
+| Agent chạy | `k8s-wk-1` | = active | `systemctl is-active rke2-agent` |
+| Agent chạy | `k8s-wk-2` | = active | `systemctl is-active rke2-agent` |
+| Worker kubelet không mở cổng chỉ đọc | `k8s-wk-1` | = 0 | `ss -ltn \| grep -c ':10255'` |
 
-**Hoàn tác:** dựng lại VM worker.
+**Hoàn tác:** incus exec <worker> -- /usr/local/bin/rke2-uninstall.sh hoặc dựng lại VM.
 
 ### P8.3 PostgreSQL 16
 

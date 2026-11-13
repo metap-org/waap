@@ -506,40 +506,45 @@ steps:
 
   # ------------------------------------------------------------------ P8
   - id: P8.1
-    title: k3s server (control-plane)
-    why: Platform K8s nhẹ. Cần ghim phiên bản và sha256 (bộ cài từ chối tải nhị phân chưa kiểm). Kubelet khoá chặt, mã hoá secret, tắt traefik và servicelb.
+    title: RKE2 server (control-plane)
+    why: "Platform K8s (RKE2, không dùng k3s). Cần ghim phiên bản và sha256 của tarball (bộ cài từ chối tải nhị phân chưa kiểm). Profile CIS bắt buộc có user etcd và sysctl đúng giá trị; mã hoá secret; tắt ingress mặc định."
     depends: [P7.3]
-    time: 3 phút
+    time: 8 phút (kéo ảnh container lần đầu)
     run: ["labs/bin/lab provision --tags k8s --limit k8s-cp-1"]
     checks:
-      - {at: k8s-cp-1, what: k3s chạy, cmd: "systemctl is-active k3s", op: eq, value: active}
-      - {at: k8s-cp-1, what: Node Ready, cmd: "k3s kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: kubelet protect-kernel-defaults, cmd: "grep -c '^protect-kernel-defaults: true' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: Ngắt kết nối stream rảnh 5 phút, cmd: "grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: Có chính sách audit, cmd: "test -s /var/lib/rancher/k3s/server/audit.yaml", op: rc0}
-      - {at: k8s-cp-1, what: Có cấu hình Pod Security (restricted), cmd: "grep -c 'enforce: restricted' /var/lib/rancher/k3s/server/psa.yaml", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: Giữ log audit 30 ngày, cmd: "grep -c 'audit-log-maxage=30' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: Token ServiceAccount không kéo dài tuổi, cmd: "grep -c 'service-account-extend-token-expiration=false' /etc/rancher/k3s/config.yaml", op: eq, value: "1"}
-      - {at: k8s-cp-1, what: Cổng chỉ đọc 10255 đóng, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
-      - {at: k8s-cp-1, what: Mã hoá secret bật, cmd: "k3s secrets-encrypt status | grep -c 'Enabled'", op: ge, value: 1}
-      - {at: k8s-cp-1, what: Không có traefik, cmd: "k3s kubectl -n kube-system get pods --no-headers | grep -c traefik", op: eq, value: "0"}
-      - {at: k8s-cp-1, what: Token cụm quyền 600, cmd: "stat -c %a /etc/rancher/k3s/token", op: eq, value: "600"}
-      - {at: k8s-cp-1, what: Cấu hình k3s quyền 600, cmd: "stat -c %a /etc/rancher/k3s/config.yaml", op: eq, value: "600"}
+      - {at: k8s-cp-1, what: rke2-server chạy, cmd: "systemctl is-active rke2-server", op: eq, value: active}
+      - {at: k8s-cp-1, what: Node Ready, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Profile CIS bật, cmd: "grep -c '^profile: cis' /etc/rancher/rke2/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: User etcd không đăng nhập, cmd: "getent passwd etcd | cut -d: -f7", op: eq, value: /sbin/nologin}
+      - {at: k8s-cp-1, what: Dữ liệu etcd thuộc user etcd, cmd: "stat -c %U /var/lib/rancher/rke2/server/db/etcd", op: eq, value: etcd}
+      - {at: k8s-cp-1, what: Cổng supervisor 9345 nghe, cmd: "ss -ltn | grep -c ':9345'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Cổng API 6443 nghe, cmd: "ss -ltn | grep -c ':6443'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Cổng chỉ đọc kubelet 10255 đóng, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
+      - {at: k8s-cp-1, what: Mã hoá secret bật, cmd: "/usr/local/bin/rke2 secrets-encrypt status | grep -c 'Enabled'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: CNI canal đang chạy, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers | grep -c canal", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Không có ingress controller mặc định (ingress do ingress-1 đảm nhiệm), cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl -n kube-system get pods --no-headers | grep -ciE 'ingress-nginx|traefik'", op: eq, value: "0"}
+      - {at: k8s-cp-1, what: API server dùng cấu hình Pod Security (admission), cmd: "ps -eo args | grep -c '[a]dmission-control-config-file'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: API server có audit log, cmd: "ps -eo args | grep -c '[a]udit-log-path'", op: ge, value: 1}
+      - {at: k8s-cp-1, what: Có audit policy mặc định do profile CIS tạo, cmd: "ls /etc/rancher/rke2/audit-policy.yaml", op: rc0}
+      - {at: k8s-cp-1, what: Ngắt kết nối stream rảnh 5 phút, cmd: "grep -c 'streaming-connection-idle-timeout=5m' /etc/rancher/rke2/config.yaml", op: eq, value: "1"}
+      - {at: k8s-cp-1, what: Token cụm quyền 600, cmd: "stat -c %a /etc/rancher/rke2/token", op: eq, value: "600"}
+      - {at: k8s-cp-1, what: Cấu hình RKE2 quyền 600, cmd: "stat -c %a /etc/rancher/rke2/config.yaml", op: eq, value: "600"}
+      - {at: k8s-cp-1, what: kubeconfig quyền 600, cmd: "stat -c %a /etc/rancher/rke2/rke2.yaml", op: eq, value: "600"}
       - {at: k8s-cp-1, what: Không swap, cmd: "swapon --show | wc -l", op: eq, value: "0"}
-      - {at: k8s-cp-1, what: Có audit log của API, cmd: "test -s /var/lib/rancher/k3s/server/logs/audit.log", op: rc0}
-    rollback: "incus exec k8s-cp-1 -- /usr/local/bin/k3s-uninstall.sh (nếu có) hoặc dựng lại VM."
+    rollback: "incus exec k8s-cp-1 -- /usr/local/bin/rke2-uninstall.sh (có trong tarball) hoặc dựng lại VM."
 
   - id: P8.2
-    title: k3s agent (hai worker)
-    why: Hai worker gia nhập cụm.
+    title: RKE2 agent (hai worker)
+    why: Hai worker gia nhập cụm qua cổng supervisor 9345.
     depends: [P8.1]
-    time: 3 phút
+    time: 6 phút
     run: ["labs/bin/lab provision --tags k8s --limit k8s-wk-1,k8s-wk-2"]
     checks:
-      - {at: k8s-cp-1, what: Ba node Ready, cmd: "k3s kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "3"}
-      - {at: k8s-wk-1, what: Agent chạy, cmd: "systemctl is-active k3s-agent", op: eq, value: active}
-      - {at: k8s-wk-2, what: Agent chạy, cmd: "systemctl is-active k3s-agent", op: eq, value: active}
-    rollback: "dựng lại VM worker."
+      - {at: k8s-cp-1, what: Ba node Ready, cmd: "env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get nodes --no-headers | grep -c ' Ready'", op: eq, value: "3"}
+      - {at: k8s-wk-1, what: Agent chạy, cmd: "systemctl is-active rke2-agent", op: eq, value: active}
+      - {at: k8s-wk-2, what: Agent chạy, cmd: "systemctl is-active rke2-agent", op: eq, value: active}
+      - {at: k8s-wk-1, what: Worker kubelet không mở cổng chỉ đọc, cmd: "ss -ltn | grep -c ':10255'", op: eq, value: "0"}
+    rollback: "incus exec <worker> -- /usr/local/bin/rke2-uninstall.sh hoặc dựng lại VM."
 
   - id: P8.3
     title: PostgreSQL 16

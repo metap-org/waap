@@ -6,9 +6,9 @@ bastion_mfa: true
 sysctl_ip_forward: 0
 audit_immutable: true
 ntp_servers: [10.10.60.12]
-k3s_role: server
+rke2_role: server
 lab_ip: 10.10.30.11
-k3s_api_endpoint: https://10.10.30.11:6443
+rke2_api_endpoint: https://10.10.30.11:9345
 ansible_managed: "Quản lý bởi Ansible"
 wg_address: 10.10.99.1/24
 wg_listen_port: 51820
@@ -19,3 +19,6 @@ hu_read_write_paths: [/var/cache/waap-edge]
 hu_extra: "LimitNOFILE=1048576"
 ssh_user_ca_pub_file: "/tmp/ca.pub"
 app_listen_ip: 10.10.30.11
+rke2_profile: cis
+rke2_cni: canal
+rke2_disable: [rke2-ingress-nginx]

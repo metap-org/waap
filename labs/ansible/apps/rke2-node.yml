@@ -1,18 +1,18 @@
 ---
-# Node k3s (server hoặc agent: -e k3s_role=agent -e k3s_api_endpoint=...). Cần k3s_version, k3s_sha256, k3s_token.
-# Chạy: labs/bin/waap-install k3s-node --host <ip|local> [-e biến=giá-trị ...] [--harden]
-- name: Cài k3s-node
+# Node RKE2 (server hoặc agent: -e rke2_role=agent -e rke2_api_endpoint=...). Cần rke2_version, rke2_sha256, rke2_token.
+# Chạy: labs/bin/waap-install rke2-node --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài rke2-node
   hosts: all
   become: true
   vars:
-    app_fw_ports: [{"proto": "tcp", "ports": [6443, 10250]}]
+    app_fw_ports: [{"proto": "tcp", "ports": [6443, 9345, 10250]}]
   pre_tasks:
     - name: Chuẩn nền hardening (khi --harden)
       ansible.builtin.import_role:
         name: baseline
       when: app_harden | bool
   roles:
-    - profile_k8s_node
+    - profile_rke2_node
   post_tasks:
     - name: Firewall riêng của ứng dụng (khi có app_allow_from)
       ansible.builtin.include_role:

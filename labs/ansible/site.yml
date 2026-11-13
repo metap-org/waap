@@ -23,10 +23,10 @@
     - role: os_tuning
       tags: [tuning]
 
-- name: Hồ sơ k8s-node
+- name: Hồ sơ RKE2 node
   hosts: role_k8s_cp:role_k8s_app
   roles:
-    - role: profile_k8s_node
+    - role: profile_rke2_node
       tags: [k8s]
 
 - name: Hồ sơ edge-l7

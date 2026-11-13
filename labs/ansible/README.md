@@ -10,7 +10,7 @@
 | `hostfw` | Firewall máy chủ nftables default-deny, **sinh từ ma trận 7.6** (`gen_nft.py`); phủ cả luồng cùng vùng mà `fw-1` không thấy; khoá đường ra cho vai trò nhạy cảm (`edge-waf`, `openbao`, kho dữ liệu) |
 | `hardened_unit` | Drop-in systemd chuẩn: `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, tập capability tối thiểu, `MemoryMax`, bộ lọc syscall |
 | `disks` | Đĩa phụ cho dữ liệu, WAL, audit, cache (xfs, `noatime,nodev,nosuid`, `noexec` cho dữ liệu); LUKS có sẵn, mặc định tắt ở lab |
-| `profile_k8s_node` | k3s: kubelet khoá (`protect-kernel-defaults`, tắt cổng chỉ đọc, `anonymous-auth=false`), mã hoá secret, audit log API, tắt traefik và servicelb; không swap |
+| `profile_rke2_node` | RKE2 (không dùng k3s): cài bằng tarball đã ghim sha256, profile CIS (kubelet khoá, audit policy mặc định, Pod Security theo profile), user `etcd`, mã hoá secret, CNI canal, tắt ingress mặc định; không swap |
 | `profile_edge_l7` | sysctl mạng, user riêng, chỉ `CAP_NET_BIND_SERVICE`, cache `noatime`, script RSS cho bare metal (tắt ở VM) |
 | `profile_edge_waf` | Slice systemd riêng (CPU và RAM), không capability, không đường ra |
 | `profile_data` | Đĩa riêng, tài khoản backup, tắt THP |
@@ -35,7 +35,7 @@ labs/bin/waap-install postgres --host 10.0.1.5 --harden \
 | Nhóm | Thành phần |
 |---|---|
 | Database | `postgres`, `rabbitmq`, `redis`, `clickhouse` |
-| Platform | `k3s-node` (server hoặc agent) |
+| Platform | `rke2-node` (server hoặc agent) |
 | Mạng | `egress` (squid, đường ra duy nhất có allowlist) |
 
 - **Tham số rõ ràng, không ngầm theo vùng:** IP nghe mặc định là IP của máy; `app_allow_from` là danh sách CIDR được tới thành phần (cũng là danh sách PostgreSQL, ClickHouse, squid chấp nhận).
@@ -52,15 +52,15 @@ labs/bin/waap-install postgres --host 10.0.1.5 --harden \
 | `svc_postgres` | PostgreSQL 16, đĩa dữ liệu và WAL riêng (khi đặt `pg_wal`), checksum, scram, `hostssl` chỉ từ nguồn khai báo |
 | `svc_rabbitmq` | RabbitMQ, xoá `guest`, tài khoản ứng dụng |
 | `svc_redis` | Redis 7.0 (BSD, từ apt), ACL, `noeviction` |
-| `svc_clickhouse` | Chỉ cài gói `.deb` đã ghim kèm sha256 (như k3s) |
+| `svc_clickhouse` | Chỉ cài gói `.deb` đã ghim kèm sha256 (như RKE2) |
 | `svc_perimeter` | Chỉ `egress-1`: squid có allowlist, chặn dải riêng và metadata. `ingress-1` và `egw-1` chưa cấu hình (chờ triển khai dịch vụ) |
 
 ## Cách dùng
 
 ```
 labs/bin/lab ssh-ca                      # CA SSH của lab
-export LAB_K3S_VERSION=v1.xx.y+k3s1      # ghim: lấy từ trang phát hành k3s
-export LAB_K3S_SHA256=<sha256 của nhị phân>   # tự kiểm, bộ cài không tải nhị phân chưa ghim
+export LAB_RKE2_VERSION=v1.xx.y+rke2r1   # ghim: lấy từ trang phát hành RKE2
+export LAB_RKE2_SHA256=<sha256 của rke2.linux-amd64.tar.gz>   # tự kiểm, bộ cài không tải tarball chưa ghim
 labs/bin/lab provision                   # site.yml trên mọi node
 labs/bin/lab seal                        # gỡ bootstrap, đổi sang apt qua egress, firewall chỉ còn ma trận
 labs/bin/lab audit                       # Lynis, chỉ số hardening mỗi node
@@ -71,9 +71,9 @@ Kết nối ở lab dùng `community.general.incus` (không cần SSH); sau P2 c
 
 ## Đã kiểm chứng và chưa
 
-- **Đã chạy:** `ansible-lint` (profile production) sạch; `ansible-playbook --syntax-check` cho `site.yml` và `audit.yml`; dựng thật các template mẫu (sshd, sysctl, audit, chrony, sudoers, k3s config, wg0, drop-in systemd) và đọc lại kết quả (k3s config là YAML hợp lệ); luật nftables cho `fw-1` và cho 15 máy qua `nft -c`. Có job CI `labs-infra`.
-- **Chưa chạy được (không có Incus, quyền ảo hoá, Ubuntu thật ở đây):** chạy `site.yml` trên máy thật, `sshd -t` thật, nạp luật auditd, `aideinit`, k3s lên được, `lab seal` không tự khoá mình. Kỳ vọng phải sửa khi chạy lần đầu.
-- **Lát 2 đã kiểm:** `ansible-lint` và `--syntax-check` cho `services.yml` và 6 playbook `apps/`. **Chưa kiểm:** mọi role `svc_*` và `k3s-node` trên máy thật.
+- **Đã chạy:** `ansible-lint` (profile production) sạch; `ansible-playbook --syntax-check` cho `site.yml` và `audit.yml`; dựng thật các template mẫu (sshd, sysctl, audit, chrony, sudoers, RKE2 config, wg0, drop-in systemd) và đọc lại kết quả (RKE2 config là YAML hợp lệ); luật nftables cho `fw-1` và cho 15 máy qua `nft -c`. Có job CI `labs-infra`.
+- **Chưa chạy được (không có Incus, quyền ảo hoá, Ubuntu thật ở đây):** chạy `site.yml` trên máy thật, `sshd -t` thật, nạp luật auditd, `aideinit`, RKE2 lên được, `lab seal` không tự khoá mình. Kỳ vọng phải sửa khi chạy lần đầu.
+- **Lát 2 đã kiểm:** `ansible-lint` và `--syntax-check` cho `services.yml` và 6 playbook `apps/`. **Chưa kiểm:** mọi role `svc_*` và `rke2-node` trên máy thật.
 - **Chưa viết:** RKE2, Vector gửi log về `obs`, phân vùng `/var` `/var/log` `/var/log/audit` riêng (image cloud chỉ có một phân vùng gốc), SSH cert do OpenBao ký (P5), ngưỡng điểm CIS (L5 chưa chốt), OpenSCAP với nội dung CIS (chưa xác minh gói nào có cho Ubuntu 24.04 mà không cần Ubuntu Pro).
 
 ## Lưu ý an toàn
