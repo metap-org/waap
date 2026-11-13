@@ -9,6 +9,7 @@ ntp_servers: [10.10.60.12]
 rke2_role: server
 lab_ip: 10.10.30.11
 rke2_api_endpoint: https://10.10.30.11:9345
+rke2_server_ips: [10.10.30.11]
 ansible_managed: "Quản lý bởi Ansible"
 wg_address: 10.10.99.1/24
 wg_listen_port: 51820
@@ -22,3 +23,4 @@ app_listen_ip: 10.10.30.11
 rke2_profile: cis
 rke2_cni: canal
 rke2_disable: [rke2-ingress-nginx]
+rke2_first_server: true
