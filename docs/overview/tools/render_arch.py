@@ -25,12 +25,21 @@ _DOCS = os.path.normpath(os.path.join(_HERE, "..", ".."))
 DOC_SETS = {
     "architecture": ("v1-waap-architecture.html", "WAAP Architecture", "arc42 · bản xem từ docs/architecture"),
     "requirements": ("v1-waap-requirements.html", "WAAP Requirements", "bản xem từ docs/requirements"),
+    "lab": ("v1-waap-lab.html", "WAAP Lab", "hạ tầng lab · bản xem từ labs/"),
 }
+# Bộ lab nằm ngoài docs/ (labs/ ở gốc repo) và không theo cấu trúc arc42, nên có thư mục nguồn và thứ tự file riêng.
+SET_DIRS = {"lab": os.path.join(_DOCS, "..", "labs")}
+LAB_ORDER = [
+    "README.md", "PLAN.md", "UPGRADE.md", "PARAMETERS.md", "PLACEMENT.md", "PLACEMENT.full.md", "CHECKLIST.md",
+    "infra/README.md", "ansible/README.md",
+]
 
 SRC = OUT = None
 
 
 def collect():
+    if os.path.basename(os.path.normpath(SRC)) == "labs":
+        return [f for f in LAB_ORDER if os.path.exists(os.path.join(SRC, f))]
     files = []
     for root, _, names in os.walk(SRC):
         for n in names:
@@ -140,6 +149,8 @@ def render_set(src, out, title_text, brand, brand_sub):
         )
         is_folder_index = p.endswith("00-index.md")
         cls = "top" if (depth <= 1 and is_folder_index) or p == "index.md" else "sub"
+        if os.path.basename(os.path.normpath(SRC)) == "labs":
+            cls = "top" if depth == 0 else "sub"
         if "08-components" in p and not p.endswith("08-components/00-index.md"):
             cls = "sub2"
         nav.append(f'<a class="{cls}" href="#{fid}">{html.escape(title)}</a>')
@@ -158,11 +169,11 @@ def render_set(src, out, title_text, brand, brand_sub):
 
 if len(sys.argv) == 3:
     src, out = sys.argv[1], sys.argv[2]
-    name = os.path.basename(os.path.normpath(src))
+    name = {"labs": "lab"}.get(os.path.basename(os.path.normpath(src)), os.path.basename(os.path.normpath(src)))
     _, t, sub = DOC_SETS.get(name, (None, "WAAP Docs", f"bản xem từ {src}"))
     render_set(src, out, t, t, sub)
 elif len(sys.argv) == 1:
     for name, (page, t, sub) in DOC_SETS.items():
-        render_set(os.path.join(_DOCS, name), os.path.join(_HERE, "..", page), t, t, sub)
+        render_set(SET_DIRS.get(name, os.path.join(_DOCS, name)), os.path.join(_HERE, "..", page), t, t, sub)
 else:
     sys.exit(__doc__)

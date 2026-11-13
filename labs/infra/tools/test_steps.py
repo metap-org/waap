@@ -170,6 +170,63 @@ class StepsTests(unittest.TestCase):
             self.assertEqual(subprocess.run(["bash", "-n", str(f)]).returncode, 0, f.name)
         self.assertTrue(list(out.glob("waap-mirror-*.sh")))
 
+    def test_push_prepare_picks_only_newer_unheld_packages(self):
+        import shutil
+        if not shutil.which("ansible-playbook"):
+            self.skipTest("không có ansible")
+        base = Path(tempfile.mkdtemp())
+        push, out, bin_ = base / "push", base / "out", base / "bin"
+        for d in (push, out, bin_):
+            d.mkdir()
+        play = S.LABS / "ansible/tests/render_registry.yml"
+        res = subprocess.run(["ansible-playbook", "-c", "local", "-i", "localhost,", str(play), "-e", f"outdir={out}", "-e", f"mirror_push_dir={push}"],
+                             cwd=S.LABS / "ansible", capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        (bin_ / "apt-get").write_text('#!/bin/bash\nif [ "$1" = update ]; then exit 0; fi\nshift; [ "$1" = -qq ] && shift\nfor a in "$@"; do touch "${a%%=*}_${a#*=}.deb"; done\n')
+        (bin_ / "apt-cache").write_text('#!/bin/bash\ncase "$2" in openssl) v=3.0.2;; curl) v=8.0;; held) v=9.9;; gone) v="(none)";; *) v="";; esac\necho "$2:"; echo "  Candidate: $v"\n')
+        for f in bin_.iterdir():
+            f.chmod(0o755)
+        (push / "z5-1.installed").write_text("openssl 3.0.1\ncurl 8.0\nheld 1.0\ngone 1.0\nunknown 1.0\n")
+        (push / "z5-1.held").write_text("held\n")
+        env = {"PATH": f"{bin_}:/usr/bin:/bin"}
+        res = subprocess.run(["bash", str(out / "waap-mirror-push-prepare.sh"), "z5-1"], capture_output=True, text=True, env=env)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        names = subprocess.run(["tar", "-tf", str(push / "z5-1.tar")], capture_output=True, text=True).stdout.split()
+        self.assertIn("./openssl_3.0.2.deb", names)
+        self.assertIn("./MANIFEST", names)
+        self.assertFalse([n for n in names if any(x in n for x in ("curl", "held", "gone", "unknown"))], names)
+        self.assertTrue((push / "z5-1.tar.sha256").exists())
+        (push / "z5-2.installed").write_text("curl 8.0\n")
+        res = subprocess.run(["bash", str(out / "waap-mirror-push-prepare.sh"), "z5-2"], capture_output=True, text=True, env=env)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertFalse((push / "z5-2.tar").exists())
+        bad = subprocess.run(["bash", str(out / "waap-mirror-push-prepare.sh"), "../x"], capture_output=True, text=True, env=env)
+        self.assertNotEqual(bad.returncode, 0)
+
+    def test_z1_reaches_egress_but_z5_has_no_path_out(self):
+        import gen_nft as g2
+        z, p, f = g2.load("compact")
+        ids = {x["id"]: x for x in f["flows"]}
+        self.assertEqual(ids["M03"]["src"], "zone:Z1")
+        self.assertEqual(ids["M03"]["dst"], "role:egress-1")
+        for fl in f["flows"]:
+            self.assertNotEqual(fl.get("src"), "zone:Z5", f"Z5 không được có luồng đi ra: {fl['id']}")
+            if "all-vms" in str(fl.get("src")):
+                self.assertTrue("Z5" in str(fl.get("src")) or fl["id"] in ("N25", "N29"), fl["id"])
+
+    def test_lab_html_is_current_and_has_no_broken_anchors(self):
+        import importlib.util, re
+        if importlib.util.find_spec("markdown_it") is None:
+            self.skipTest("không có markdown-it-py")
+        root = S.LABS.parent
+        out = Path(tempfile.mkdtemp()) / "lab.html"
+        res = subprocess.run([sys.executable, str(root / "docs/overview/tools/render_arch.py"), str(S.LABS), str(out)], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        got = out.read_text(encoding="utf-8")
+        ids = set(re.findall(r'id="([^"]+)"', got))
+        self.assertEqual([x for x in set(re.findall(r'href="#([^"]+)"', got)) if x not in ids], [])
+        self.assertEqual(got, (root / "docs/overview/v1-waap-lab.html").read_text(encoding="utf-8"), "chạy `python3 docs/overview/tools/render_arch.py` rồi commit")
+
     def test_mirror_flows_exclude_zones_that_x01_x05_forbid(self):
         import gen_nft as g2
         z, p, f = g2.load("compact")

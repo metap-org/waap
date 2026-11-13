@@ -39,6 +39,7 @@
     mode: "0600"
     owner: root
     group: root
+  environment: "{{ {'https_proxy': download_proxy} if download_proxy | default('') | length > 0 else {} }}"
 
 - name: Đọc fingerprint của khoá vừa tải
   ansible.builtin.shell: >-

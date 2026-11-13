@@ -364,7 +364,7 @@ jobs:
       - name: Cài công cụ
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q nftables
-          python3 -m pip install -q pyyaml ansible ansible-lint
+          python3 -m pip install -q pyyaml ansible ansible-lint markdown-it-py
       - name: Sinh luật và kiểm T07 hai chiều (7.6 <-> luật, cấm tuyệt đối)
         run: |
           python3 labs/infra/tools/test_gen_nft.py
@@ -387,4 +387,5 @@ jobs:
           for f in apps/*.yml; do ansible-playbook "$f" --syntax-check -i localhost,; done
           ansible-playbook site.yml --syntax-check
           ansible-playbook services.yml --syntax-check -e "{lab_secrets: {}}"
+          ansible-playbook push.yml --syntax-check
           ANSIBLE_ROLES_PATH=roles ansible-playbook -c local -i localhost, -e @tests/vars.yml tests/render.yml

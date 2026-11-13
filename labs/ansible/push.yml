@@ -1,0 +1,11 @@
+---
+# Đẩy bản vá vào máy không tự kéo được (mặc định: mọi máy vai trò openbao, tức Z5). Chạy sau khi registry đã dựng.
+#   ansible-playbook push.yml -e @../infra/generated/secrets.yml            # Z5
+#   ansible-playbook push.yml -e push_hosts=role_valkey_edge ...              # một nhóm khác
+# Chỉ đẩy gói MỚI HƠN bản đang cài và không bị hold; gói database đã hold phải nâng bằng pin như bình thường.
+- name: Đẩy gói cập nhật từ registry
+  hosts: "{{ push_hosts | default('role_openbao') }}"
+  gather_facts: false
+  roles:
+    - role: pkg_push
+      tags: [push]

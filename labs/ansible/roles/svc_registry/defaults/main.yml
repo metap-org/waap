@@ -9,6 +9,7 @@ mirror_base: ""
 mirror_user: aptly
 mirror_data: /var/lib/aptly
 mirror_artifacts_dir: /srv/mirror/artifacts
+mirror_push_dir: /srv/mirror/push   # trung chuyển gói cho máy không kéo được (Z5), xem push.yml
 mirror_listen: "{{ app_listen_ip }}"
 mirror_local_dir: "{{ lab_generated_dir | default(playbook_dir ~ '/../../infra/generated') }}"
 mirror_signing_name: "WAAP Lab Mirror"

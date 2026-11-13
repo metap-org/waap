@@ -11,6 +11,7 @@ HTML trong giao diện repo. Cần mạng để tải font và Mermaid từ CDN;
 |---|---|---|
 | [`v1-waap-architecture.html`](v1-waap-architecture.html) | Toàn bộ tài liệu arc42 (mục 1–12, ADR) trong một trang, có mục lục | **Hiện hành**, sinh từ `../architecture/` |
 | [`v1-waap-requirements.html`](v1-waap-requirements.html) | Bản đồ phân rã chức năng, requirements, phân tích nghiệp vụ | **Hiện hành**, sinh từ `../requirements/`; link chéo sang trang kiến trúc và ngược lại |
+| [`v1-waap-lab.html`](v1-waap-lab.html) | Tài liệu hạ tầng lab: kế hoạch, nâng version, tham số, bố trí, checklist từng bước, ma trận luồng, role Ansible | **Hiện hành**, sinh từ `../../labs/*.md` (`lab docs` hoặc lệnh dưới); link sang bộ kiến trúc |
 | [`v1-waap-enterprise-blueprint.html`](v1-waap-enterprise-blueprint.html) | Blueprint nghiệp vụ WAAP enterprise: nhóm năng lực, 4 plane, lộ trình | Ảnh chụp 2026-11-05; phần kiến trúc đã được thay bằng bản arc42 |
 | [`v1-waap-architecture-draft.html`](v1-waap-architecture-draft.html) | Kiến trúc nháp level 1–2, chưa gắn công nghệ | Ảnh chụp 2026-11-05; chưa có edge hai tầng, CDN, sharding |
 | [`v1-waap-architecture-c1-c3.html`](v1-waap-architecture-c1-c3.html) | Bản C1–C3 đầu tiên | Ảnh chụp 2026-11-05; lựa chọn công nghệ ở đây (Go cho mọi plane, edge một tầng) đã bị thay bởi ADR-0030, ADR-0031, ADR-0033 |
@@ -26,8 +27,8 @@ pip install -r docs/overview/tools/requirements.txt
 python3 docs/overview/tools/render_arch.py
 ```
 
-Không tham số: render cả hai bộ, ghi đè `docs/overview/v1-waap-architecture.html` và
-`docs/overview/v1-waap-requirements.html`, chạy được từ thư mục nào cũng được. Link từ bộ này sang bộ kia thành
+Không tham số: render cả ba bộ, ghi đè `docs/overview/v1-waap-architecture.html`,
+`docs/overview/v1-waap-requirements.html` và `docs/overview/v1-waap-lab.html`, chạy được từ thư mục nào cũng được. Link từ bộ này sang bộ kia thành
 link sang trang HTML của bộ kia, nên hai file phải nằm cùng thư mục. Muốn ghi ra file khác (ví dụ `v2-…`):
 `python3 docs/overview/tools/render_arch.py docs/architecture docs/overview/v2-waap-architecture.html`.
 

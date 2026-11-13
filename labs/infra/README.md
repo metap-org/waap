@@ -98,4 +98,6 @@ Khi khảo sát code để dự định lát này, thấy code hiện có lệch
 - **M01** mọi VM trừ Z0, Z1, Z5 tới `registry` tcp 80 (mirror apt và artifact) và 3142 (apt-cacher-ng).
 - **M02** `registry` tới `egress-1` tcp 3128 để kéo từ vendor.
 - Cả hai `covers: []` vì không có trong 7.6; cần thêm vào 7.6 nếu được duyệt.
-- **Quyết định mở:** Z1 và Z5 không tới được registry vì X01 và X05. Hướng đề xuất là mô hình đẩy từ Z6 (cùng loại với N27), hoặc cửa sổ bootstrap có kiểm soát. Chưa làm.
+- **M03** `zone:Z1` tới `egress-1` tcp 3128 (cũng `covers: []`, đề xuất). Egress-1 nằm ở Z2, không có trong danh sách cấm của X01. Squid được mở thêm nguồn `10.10.10.0/24`.
+- **Z5 không có luồng đi ra** (X05 cấm mọi vùng). Bản vá được **đẩy vào** bằng `lab push` (`ansible/push.yml`, role `pkg_push`) qua bastion (N25), không thêm luồng nào; một test khẳng định không luồng nào có nguồn là Z5.
+- Chờ duyệt: ghi M01 đến M03 và cơ chế đẩy vào 7.6.

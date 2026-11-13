@@ -34,6 +34,7 @@
     dest: "/var/cache/valkey-{{ valkey_version }}.tar.gz"
     checksum: "sha256:{{ valkey_sha256 }}"
     mode: "0644"
+  environment: "{{ {'https_proxy': download_proxy} if download_proxy | default('') | length > 0 else {} }}"
 
 - name: Giải nén vào thư mục của version
   ansible.builtin.unarchive:

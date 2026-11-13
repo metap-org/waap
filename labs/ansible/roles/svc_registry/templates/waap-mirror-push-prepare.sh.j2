@@ -1,0 +1,31 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Chuẩn bị gói để ĐẨY sang máy không có đường kéo (Z5). Dùng: waap-mirror-push-prepare <tên-máy>
+# Đọc /srv/mirror/push/<máy>.installed (dòng "gói phiên bản") và <máy>.held, so với bản ứng viên trên registry,
+# chỉ lấy gói mới hơn và không bị hold; xuất <máy>.tar và <máy>.tar.sha256, hoặc không xuất gì nếu không có gì để cập nhật.
+set -euo pipefail
+host="${1:?cần tên máy}"
+[[ "$host" =~ ^[a-zA-Z0-9._-]+$ ]] || { echo "tên máy không hợp lệ" >&2; exit 2; }
+dir="{{ mirror_push_dir }}"
+installed="$dir/$host.installed"; held="$dir/$host.held"
+[ -s "$installed" ] || { echo "thiếu $installed" >&2; exit 2; }
+[ -e "$held" ] || : > "$held"
+rm -f "$dir/$host.tar" "$dir/$host.tar.sha256"
+work="$(mktemp -d "$dir/work.XXXXXX")"; trap 'rm -rf "$work"' EXIT
+apt-get update -qq
+: > "$work/want"
+while read -r pkg ver; do
+  [ -n "$pkg" ] && [ -n "$ver" ] || continue
+  grep -qxF "$pkg" "$held" && continue
+  cand="$(apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/{print $2; exit}')"
+  [ -n "$cand" ] && [ "$cand" != "(none)" ] || continue
+  dpkg --compare-versions "$cand" gt "$ver" || continue
+  echo "$pkg=$cand" >> "$work/want"
+done < "$installed"
+if [ ! -s "$work/want" ]; then echo "Không có gói nào cần cập nhật cho $host."; exit 0; fi
+mkdir "$work/debs"
+( cd "$work/debs" && xargs -a "$work/want" apt-get download -qq )
+cp "$work/want" "$work/debs/MANIFEST"
+tar -C "$work/debs" -cf "$dir/$host.tar" .
+( cd "$dir" && sha256sum "$host.tar" > "$host.tar.sha256" )
+echo "Đã chuẩn bị $(wc -l < "$work/want") gói cho $host: $dir/$host.tar"
