@@ -258,7 +258,7 @@ flowchart TB
 | 16 GB | `core` | khoảng 8 | khoảng 10 GB; bỏ Kafka và ClickHouse thật |
 | 32 GB | `min` | khoảng 10 | khoảng 24 GB; bốn plane thu nhỏ, đủ các vùng mạng |
 | **64 GB** | `compact` | khoảng 15 | khoảng 48 GB; HA nhẹ (K8s ba node) |
-| **128 GB** | `full` | khoảng 30 | khoảng 90 GB; hai PoP giả, K8s và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật |
+| **128 GB** | `full` | khoảng 30 | khoảng 90 GB; hai PoP giả, K8s (3 server, etcd HA, mã hoá lưu lượng pod) và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật |
 
 Chủ dự án dự kiến nâng máy lên 64 đến 128 GB RAM: bắt đầu bằng profile nhỏ, chuyển lên `compact` rồi `full` khi có máy. Với máy 64 đến 128 GB nên dùng **một máy Linux riêng** làm máy chủ lab (Incus chạy trực tiếp, không lồng trong máy ảo khác): lab chạy nhanh hơn, và có card mạng thật để thử tinh chỉnh edge (RSS, IRQ affinity) mà máy ảo lồng không thử được. CPU từ 16 nhân, NVMe từ 1 TB.
 

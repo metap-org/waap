@@ -74,6 +74,13 @@ Phụ thuộc: P0 (bố cục và quyết định L1 đến L4).
 Phụ thuộc: P1.
 
 - Áp vùng mạng ở [§2.2](#22-vùng-mạng-trust-zone-đề-xuất) bằng: VLAN hoặc mạng ảo tách; firewall máy chủ (nftables) default-deny; NetworkPolicy trong K8s; không route chéo.
+- **NetworkPolicy trong RKE2 (chủ dự án chốt 2026-11-13: làm ở P2, không làm ở lát hạ tầng hiện tại).** Việc cần làm:
+  - Xác minh profile `cis` của RKE2 có tự tạo chính sách mặc định không (tài liệu chưa xác nhận); nếu không, tự viết.
+  - Mỗi namespace có chính sách chặn mặc định cả ingress và egress, rồi mở lại: DNS (CoreDNS), trong cùng namespace, và từng luồng giữa các plane theo ma trận (T08: pod Management không nói được với pod Analytics ngoài đường đã khai).
+  - Áp bằng thư mục manifest tự triển khai của RKE2; namespace ứng dụng gắn nhãn Pod Security riêng nếu cần nới.
+  - Canal dùng engine Calico nên hỗ trợ cả ingress và egress; kiểm bằng pod thử trong CI của lab.
+  - Chỉ làm được có ý nghĩa khi đã có namespace và dịch vụ ứng dụng, nên đứng sau bước triển khai dịch vụ.
+- **Để profile `full` (chủ dự án chốt 2026-11-13):** HA control-plane (3 server, mở etcd 2379 và 2380 giữa các server), mã hoá lưu lượng pod (Canal với WireGuard hoặc Cilium). Profile `compact` giữ một server và Canal VXLAN không mã hoá.
 - mTLS cho mọi liên kết nội bộ theo 8.19: cert ngắn hạn do OpenBao cấp, gia hạn tự động.
 - Truy cập quản trị chỉ qua bastion (WireGuard + MFA); tắt SSH trực tiếp.
 - **Kiểm thử âm** (phải có, chạy lại được trong CI):
