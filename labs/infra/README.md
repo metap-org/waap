@@ -93,11 +93,10 @@ Khi khảo sát code để dự định lát này, thấy code hiện có lệch
 5. Chưa có ingress controller trong K8s (N04, N09 nói cổng 443).
 6. Kafka (ADR-0018) và OpenBao (P5) không dịch vụ nào dùng ở code hiện tại.
 
-## Luồng mirror (đề xuất bổ sung 7.6, chờ duyệt)
+## Luồng mirror (đã ghi vào 7.6 §4.6, chờ chủ dự án duyệt)
 
 - **M01** mọi VM trừ Z0, Z1, Z5 tới `registry` tcp 80 (mirror apt và artifact) và 3142 (apt-cacher-ng).
 - **M02** `registry` tới `egress-1` tcp 3128 để kéo từ vendor.
-- Cả hai `covers: []` vì không có trong 7.6; cần thêm vào 7.6 nếu được duyệt.
-- **M03** `zone:Z1` tới `egress-1` tcp 3128 (cũng `covers: []`, đề xuất). Egress-1 nằm ở Z2, không có trong danh sách cấm của X01. Squid được mở thêm nguồn `10.10.10.0/24`.
+- **M03** `zone:Z1` tới `egress-1` tcp 3128. Egress-1 nằm ở Z2, không có trong danh sách cấm của X01. Squid được mở thêm nguồn `10.10.10.0/24`.
 - **Z5 không có luồng đi ra** (X05 cấm mọi vùng). Bản vá được **đẩy vào** bằng `lab push` (`ansible/push.yml`, role `pkg_push`) qua bastion (N25), không thêm luồng nào; một test khẳng định không luồng nào có nguồn là Z5.
-- Chờ duyệt: ghi M01 đến M03 và cơ chế đẩy vào 7.6.
+- M01 đến M03 và cơ chế đẩy vào Z5 đã ghi ở 7.6 §4.6 và §4.6.1; điểm cần duyệt (M03 lệch lý do của X01) ở 7.6 §7.
