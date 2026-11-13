@@ -18,3 +18,4 @@ hu_memory_max: 2G
 hu_read_write_paths: [/var/cache/waap-edge]
 hu_extra: "LimitNOFILE=1048576"
 ssh_user_ca_pub_file: "/tmp/ca.pub"
+app_listen_ip: 10.10.30.11
