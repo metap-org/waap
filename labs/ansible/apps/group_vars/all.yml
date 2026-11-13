@@ -5,4 +5,3 @@ app_secret_dir: "{{ lookup('env', 'HOME') }}/.waap-install/secrets"   # mật kh
 app_harden: false        # true: áp thêm chuẩn nền hardening (roles/baseline) trước khi cài
 app_allow_from: []       # CIDR được tới ứng dụng; có giá trị thì bật firewall máy chủ (cần thêm app_ssh_from)
 app_ssh_from: []
-app_bin_dir: "{{ playbook_dir }}/../../infra/generated/bin"

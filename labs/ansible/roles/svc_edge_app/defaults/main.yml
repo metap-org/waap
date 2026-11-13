@@ -1,9 +1,0 @@
----
-edge_binary_src: "{{ lab_generated_dir }}/bin/waap-edge"
-edge_listen: "0.0.0.0:8080"
-edge_redis_password: "{{ lab_secrets.redis_edge_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/redis_edge_password length=24 chars=ascii_letters,digits') }}"
-edge_ingest_token: "{{ lab_secrets.ingest_token if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/ingest_token length=24 chars=ascii_letters,digits') }}"
-edge_clearance_secret: "{{ lab_secrets.clearance_secret if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/clearance_secret length=24 chars=ascii_letters,digits') }}"
-edge_redis_url: "redis://edge:{{ edge_redis_password }}@127.0.0.1:6379"
-# Địa chỉ nhận telemetry (egw-1 hoặc control-plane). Lab lấy từ inventory; cài độc lập thì truyền vào.
-edge_ingest_url: "{{ 'http://' ~ hostvars[groups['role_egw_1'][0]].lab_ip ~ ':8443/ingest/events' if groups['role_egw_1'] is defined else '' }}"

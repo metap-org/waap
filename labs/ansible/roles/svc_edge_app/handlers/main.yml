@@ -1,6 +1,0 @@
----
-- name: Restart waap-edge
-  ansible.builtin.systemd:
-    name: waap-edge
-    state: restarted
-  listen: restart waap-edge

@@ -372,15 +372,6 @@ jobs:
           python3 labs/infra/tools/gen_nft.py gen compact --bootstrap -o labs/infra/generated/compact
           python3 labs/infra/tools/gen_nft.py gen compact -o labs/infra/generated/compact
           for f in labs/infra/generated/compact/ruleset.nft labs/infra/generated/compact/hosts/*.nft; do sudo nft -c -f "$f"; done
-      - name: Manifest K8s render được và không còn biến chưa điền
-        run: |
-          python3 - <<'PY'
-          import string, subprocess, yaml
-          env = dict(l.split('=', 1) for l in subprocess.check_output(['python3', 'labs/infra/tools/gen_lab.py', 'env', 'compact'], text=True).split('\n') if l)
-          env['TAG'] = 'ci'
-          docs = [d for d in yaml.safe_load_all(string.Template(open('labs/k8s/waap.yaml.tmpl').read()).substitute(env)) if d]
-          assert len(docs) >= 10, len(docs)
-          PY
       - name: Ansible lint, syntax và render template
         working-directory: labs/ansible
         run: |

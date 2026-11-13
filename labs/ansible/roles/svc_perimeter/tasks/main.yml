@@ -1,48 +1,18 @@
 ---
-- name: Cần địa chỉ backend khi dựng ingress hoặc egw
-  ansible.builtin.assert:
-    that: perimeter_backend_nodes | length > 0 or not (perimeter_ingress | bool or perimeter_egw | bool)
-    fail_msg: "Truyền perimeter_backend_nodes (danh sách IP node ứng dụng)."
-    quiet: true
-
-- name: Gói (nginx cho ingress và egw, squid cho egress)
+- name: Gói squid
   ansible.builtin.apt:
-    name: [nginx, squid, ssl-cert]
+    name: squid
     state: present
-
-- name: Bỏ site mặc định
-  ansible.builtin.file:
-    path: /etc/nginx/sites-enabled/default
-    state: absent
-  notify: restart nginx
-
-- name: ingress-1, cổng vào portal (TLS tự ký của lab, chuyển tới NodePort portal)
-  ansible.builtin.template:
-    src: ingress.conf.j2
-    dest: /etc/nginx/conf.d/10-ingress.conf
-    mode: "0644"
-  when: perimeter_ingress | bool
-  notify: restart nginx
-
-- name: egw-1, relay telemetry của edge tới control-plane (chỉ chuyển tiếp, không giữ dữ liệu)
-  ansible.builtin.template:
-    src: egw.conf.j2
-    dest: /etc/nginx/conf.d/20-egw.conf
-    mode: "0644"
-  when: perimeter_egw | bool
-  notify: restart nginx
 
 - name: egress-1, proxy ra Internet có allowlist
   ansible.builtin.template:
     src: squid.conf.j2
     dest: /etc/squid/squid.conf
     mode: "0644"
-  when: perimeter_egress | bool
   notify: restart squid
 
 - name: Chạy
   ansible.builtin.systemd:
-    name: "{{ item }}"
+    name: squid
     enabled: true
     state: started
-  loop: [nginx, squid]

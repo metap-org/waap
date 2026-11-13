@@ -1,9 +1,0 @@
----
-# Ví dụ cho waap-install alerting-service: -e @apps/examples/alerting-service.yml (thay các dấu ...)
-app_env:
-  {}
-app_env_secret:
-  DATABASE_URL: "..."
-  RABBITMQ_URL: "..."
-  JWKS_URL: "..."
-  ANALYTICS_URL: "..."

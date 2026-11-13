@@ -1,7 +1,0 @@
----
-# Ví dụ cho waap-install zones-service: -e @apps/examples/zones-service.yml (thay các dấu ...)
-app_env:
-  JWKS_KEYS_DIR: "..."
-app_env_secret:
-  DATABASE_URL: "..."
-  RABBITMQ_URL: "..."

@@ -19,46 +19,41 @@
 | `profile_ops` | Runner không giữ secret, đường ra qua `egress-1` |
 | `aide_refresh` | Chạy cuối: thay đổi do Ansible là hợp lệ, thay đổi ngoài Ansible bị AIDE báo |
 
-## Cài từng ứng dụng đứng riêng (`waap-install`)
+## Cài từng thành phần hạ tầng đứng riêng (`waap-install`)
 
-Mỗi ứng dụng cài được **độc lập trên một máy bất kỳ**, bất kể vùng mạng, không cần lab, inventory hay ma trận luồng. Lab chỉ là một nơi gọi cùng các role này.
+Phạm vi dừng ở **VM, mạng, platform, database và hardening OS**. Chưa có triển khai từng service ứng dụng (zones-service, edge, control-plane, ...): đó là bước sau, chưa làm.
+
+Mỗi thành phần cài được **độc lập trên một máy bất kỳ**, bất kể vùng mạng, không cần lab hay inventory. Lab chỉ là một nơi gọi cùng các role này.
 
 ```
-labs/bin/waap-install list                                   # 18 ứng dụng
-labs/bin/waap-install redis --host local                     # cài lên chính máy này
+labs/bin/waap-install list
+labs/bin/waap-install redis --host local
 labs/bin/waap-install postgres --host 10.0.1.5 --harden \
     -e 'app_allow_from=["10.0.2.0/24"]' -e 'app_ssh_from=["10.0.9.5/32"]'
-labs/bin/waap-install zones-service --host 10.0.3.7 -e @labs/ansible/apps/examples/zones-service.yml
 ```
 
-| Nhóm | Ứng dụng |
+| Nhóm | Thành phần |
 |---|---|
-| Kho dữ liệu | `postgres`, `rabbitmq`, `redis`, `clickhouse` |
-| Biên | `ingress`, `egw`, `egress` |
-| Edge | `edge` (cần `redis` cùng máy hoặc `edge_redis_url`) |
-| K8s | `k3s-node` (server hoặc agent) |
-| Dịch vụ Go (systemd, không cần K8s) | `zones-service`, `scanning-service`, `alerting-service`, `graphql-gateway`, `analytics-api`, `config-distributor` |
-| Hỗ trợ lab | `origin`, `loadgen`, `dns-mock` |
+| Database | `postgres`, `rabbitmq`, `redis`, `clickhouse` |
+| Platform | `k3s-node` (server hoặc agent) |
+| Mạng | `egress` (squid, đường ra duy nhất có allowlist) |
 
-- **Tham số rõ ràng, không ngầm theo vùng:** IP nghe mặc định là IP của máy; `app_allow_from` là danh sách CIDR được tới ứng dụng (cũng là danh sách PostgreSQL, ClickHouse, squid chấp nhận); thiếu địa chỉ bắt buộc thì báo lỗi ngay.
-- **Mật khẩu tự sinh** lần đầu, lưu ở `~/.waap-install/secrets/<host>/` trên máy chạy lệnh, dùng lại các lần sau (idempotent). Ghi đè bằng `-e`.
-- **`--harden`** áp thêm chuẩn nền (`baseline`) trước khi cài. Khi chưa có CA SSH thì giữ khoá SSH tĩnh, **không tự khoá bạn**.
-- **Firewall riêng:** chỉ bật khi có `app_allow_from`, bắt buộc kèm `app_ssh_from` (nếu không, từ chối chạy). Luật input default-deny, chỉ mở cổng của ứng dụng.
-- **Dịch vụ Go** chạy bằng systemd với drop-in hardening chuẩn (`NoNewPrivileges`, `ProtectSystem=strict`, bỏ hết capability, `MemoryMax`), biến môi trường ở `/etc/waap/<app>.env` (0640 root:nhóm dịch vụ). Cần nhị phân từ `labs/bin/lab build` (hoặc `-e app_bin_dir=...`). `apps/examples/` có danh sách khoá bắt buộc; thiếu khoá thì dừng sớm.
-- Danh sách ứng dụng sinh từ `labs/infra/tools/gen_apps.py`; sửa ở đó rồi chạy lại, CI kiểm không lệch.
-- **Đã chạy thật** (trong sandbox không có systemd): `zones-service` chạy tới bước nạp systemd, tạo đúng người dùng, tệp env 0640, unit và drop-in (đọc lại được); `systemd-analyze verify` không báo lỗi. Thiếu khoá bắt buộc thì dừng với thông báo rõ. **Chưa chạy được:** cài gói apt (sandbox thiếu `python3-apt`) và bật dịch vụ systemd, nên `postgres`, `redis`... mới qua kiểm cú pháp, lint và chế độ `--check`.
+- **Tham số rõ ràng, không ngầm theo vùng:** IP nghe mặc định là IP của máy; `app_allow_from` là danh sách CIDR được tới thành phần (cũng là danh sách PostgreSQL, ClickHouse, squid chấp nhận).
+- **Mật khẩu tự sinh** lần đầu, lưu ở `~/.waap-install/secrets/<host>/` trên máy chạy lệnh, dùng lại các lần sau. Ghi đè bằng `-e`.
+- **`--harden`** áp thêm chuẩn nền (`baseline`). Khi chưa có CA SSH thì giữ khoá SSH tĩnh, **không tự khoá bạn**.
+- **Firewall riêng:** chỉ bật khi có `app_allow_from`, bắt buộc kèm `app_ssh_from` (nếu không, từ chối chạy). Luật input default-deny, chỉ mở cổng của thành phần.
+- Danh sách sinh từ `labs/infra/tools/gen_apps.py`; sửa ở đó rồi chạy lại, CI kiểm không lệch.
+- **Đã chạy thật** (sandbox không có systemd): cơ chế biến, mật khẩu tự sinh và chạy tới bước nạp systemd; `--check` chạy qua nhiều tác vụ. **Chưa chạy được:** cài gói apt (sandbox thiếu `python3-apt`) và bật dịch vụ systemd, nên các role mới qua syntax, lint và `--check`.
 
 ## Dịch vụ (P1 lát 2, `services.yml`)
 
 | Role | Nội dung |
 |---|---|
-| `svc_postgres` | PostgreSQL 16 trên đĩa dữ liệu và đĩa WAL riêng, checksum, scram, `hostssl` chỉ từ Z3 |
+| `svc_postgres` | PostgreSQL 16, đĩa dữ liệu và WAL riêng (khi đặt `pg_wal`), checksum, scram, `hostssl` chỉ từ nguồn khai báo |
 | `svc_rabbitmq` | RabbitMQ, xoá `guest`, tài khoản ứng dụng |
-| `svc_redis` | Redis 7.0 (BSD, từ apt) với ACL: `control` ghi, `edge` chỉ đọc `waf:*`; không loại bỏ khoá (`noeviction`) |
-| `svc_clickhouse` | Chỉ cài gói `.deb` đã ghim kèm sha256 (như k3s); không tải gói chưa kiểm |
-| `svc_perimeter` | nginx cho `ingress-1` và `egw-1` (relay telemetry), squid cho `egress-1` (allowlist, chặn dải riêng và metadata) |
-| `svc_origin`, `svc_loadgen`, `svc_dns_mock` | Origin giả, kịch bản tải, dns-mock |
-| `svc_edge_app` | Triển khai `waap-edge` (ngoài K8s theo ADR-0023), biến môi trường chỉ nhóm dịch vụ đọc được |
+| `svc_redis` | Redis 7.0 (BSD, từ apt), ACL, `noeviction` |
+| `svc_clickhouse` | Chỉ cài gói `.deb` đã ghim kèm sha256 (như k3s) |
+| `svc_perimeter` | Chỉ `egress-1`: squid có allowlist, chặn dải riêng và metadata. `ingress-1` và `egw-1` chưa cấu hình (chờ triển khai dịch vụ) |
 
 ## Cách dùng
 
@@ -78,7 +73,7 @@ Kết nối ở lab dùng `community.general.incus` (không cần SSH); sau P2 c
 
 - **Đã chạy:** `ansible-lint` (profile production) sạch; `ansible-playbook --syntax-check` cho `site.yml` và `audit.yml`; dựng thật các template mẫu (sshd, sysctl, audit, chrony, sudoers, k3s config, wg0, drop-in systemd) và đọc lại kết quả (k3s config là YAML hợp lệ); luật nftables cho `fw-1` và cho 15 máy qua `nft -c`. Có job CI `labs-infra`.
 - **Chưa chạy được (không có Incus, quyền ảo hoá, Ubuntu thật ở đây):** chạy `site.yml` trên máy thật, `sshd -t` thật, nạp luật auditd, `aideinit`, k3s lên được, `lab seal` không tự khoá mình. Kỳ vọng phải sửa khi chạy lần đầu.
-- **Lát 2 đã kiểm:** `ansible-lint` và `--syntax-check` cho `services.yml`; các binary `waap-edge`, `dns-mock`, `waf-config-distributor`, `db-migrate` biên dịch thật bằng Go 1.26; manifest K8s render và đọc lại được 16 tài liệu YAML. **Chưa kiểm:** `docker build` các ảnh (không có Docker daemon ở đây), `kubectl apply`, mọi role `svc_*` trên máy thật.
+- **Lát 2 đã kiểm:** `ansible-lint` và `--syntax-check` cho `services.yml` và 6 playbook `apps/`. **Chưa kiểm:** mọi role `svc_*` và `k3s-node` trên máy thật.
 - **Chưa viết:** RKE2, Vector gửi log về `obs`, phân vùng `/var` `/var/log` `/var/log/audit` riêng (image cloud chỉ có một phân vùng gốc), SSH cert do OpenBao ký (P5), ngưỡng điểm CIS (L5 chưa chốt), OpenSCAP với nội dung CIS (chưa xác minh gói nào có cho Ubuntu 24.04 mà không cần Ubuntu Pro).
 
 ## Lưu ý an toàn

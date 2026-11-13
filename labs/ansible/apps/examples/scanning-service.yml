@@ -1,8 +1,0 @@
----
-# Ví dụ cho waap-install scanning-service: -e @apps/examples/scanning-service.yml (thay các dấu ...)
-app_env:
-  {}
-app_env_secret:
-  DATABASE_URL: "..."
-  RABBITMQ_URL: "..."
-  JWKS_URL: "..."
