@@ -1,2 +1,2 @@
 ---
-redis_dir: /var/lib/waap/data/redis
+valkey_dir: /var/lib/waap/data/valkey

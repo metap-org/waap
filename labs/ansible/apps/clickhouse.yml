@@ -1,5 +1,5 @@
 ---
-# ClickHouse. Cần ghim clickhouse_debs (url, sha256).
+# ClickHouse từ repo apt chính thức (khoá ký ghim fingerprint). Nâng version bằng clickhouse_pkg_version.
 # Chạy: labs/bin/waap-install clickhouse --host <ip|local> [-e biến=giá-trị ...] [--harden]
 - name: Cài clickhouse
   hosts: all

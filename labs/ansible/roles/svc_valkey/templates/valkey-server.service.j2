@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Valkey
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ valkey_user }}
+Group={{ valkey_user }}
+ExecStart={{ valkey_home }}/current/bin/valkey-server /etc/valkey/valkey.conf --supervised systemd --daemonize no
+Restart=on-failure
+RestartSec=3s
+Type=notify
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -15,13 +15,29 @@ Nguồn đã đối chiếu: [RKE2 CIS Hardening Guide](https://docs.rke2.io/sec
 |---|---|---|
 | Cấu hình audit và Pod Security tự viết cho k3s (k3s không bật audit mặc định) | Không còn áp dụng: nền K8s đổi sang RKE2, profile CIS của RKE2 tự tạo audit policy mặc định và cấu hình Pod Security theo profile (A) | Bỏ phần tự viết; dùng `profile: cis` |
 | `loopback_users = none` trong RabbitMQ | Tài liệu RabbitMQ nói rõ không dùng cho production (A) | Bỏ; thêm ngưỡng bộ nhớ và `disk_free_limit` tường minh |
-| Redis: unit Debian khoá ghi ngoài `/var/lib/redis`, lab đặt dữ liệu ở đĩa riêng | Redis không ghi được AOF (B) | Drop-in `ReadWritePaths` |
+| Redis: unit Debian khoá ghi ngoài `/var/lib/redis`, lab đặt dữ liệu ở đĩa riêng | Redis không ghi được AOF (B) | Không còn áp dụng: đã chuyển sang Valkey với unit tự viết và `ReadWritePaths` đúng thư mục dữ liệu |
 | ClickHouse cấu hình user trong `config.d` và dùng `default` không mật khẩu | `config.d/<users>` có thể không được áp dụng; tài khoản mặc định yếu (B) | `users.d`; `default` chỉ localhost; tài khoản `analytics` có sha256 và giới hạn nguồn |
 | sysctl của K8s thiếu `kernel.keys.root_maxkeys/root_maxbytes`; chưa nạp `nf_conntrack` | Profile CIS bật `protect-kernel-defaults`, kubelet có thể từ chối chạy; khoá conntrack không tồn tại (B) | Thêm khoá và module (`overlay`, `br_netfilter`, `nf_conntrack`) |
 | `ip_forward=0` của baseline ghi đè K8s; `ptrace_scope=1` ghi đè OpenBao | Node K8s mất forwarding; OpenBao yếu hơn dự định | Tuning nạp sau baseline (`99-zz-*`), có test |
 | `unprivileged_bpf_disabled=1` | Ubuntu mặc định 2, không hạ được nên `sysctl --system` lỗi (B) | Đặt 2 |
 | `sysctl -n` in giá trị nhiều trường bằng tab (`ip_local_port_range`, `tcp_rmem`) | Lệnh kiểm so sánh sai | Chuẩn hoá khoảng trắng trước khi so |
 | squid: `dstdomain` chỉ khớp đúng tên; thiếu `.ubuntu.com` | Vùng ứng dụng không vá được sau seal; tên miền con bị chặn | Dấu chấm đầu (gồm tên miền con), thêm `.ubuntu.com`, `.githubusercontent.com`; `cache deny all`; chặn thêm dải CGNAT và IPv6 nội bộ |
+
+## Nguồn cài đặt và nâng version
+
+Quyết định của chủ dự án (2026-11-13): database chạy trên VM; **không cài bằng gói kho Ubuntu**, dùng nguồn chính thức của vendor để nâng version dễ. Quy trình nâng ở [UPGRADE.md](UPGRADE.md).
+
+| Thành phần | Nguồn | Cách bảo vệ chuỗi cung ứng | Tin cậy |
+|---|---|---|---|
+| PostgreSQL | Repo PGDG `apt.postgresql.org`, suite `noble-pgdg`; khoá `ACCC4CF8.asc`, fingerprint `B97B 0AFC AA1A 47F0 44F2 44A0 7FCC 7D46 ACCC 4CF8` | `Signed-By` trỏ keyring riêng; role so fingerprint của khoá tải về với giá trị ghim, lệch thì dừng; gói `hold` | A ([PostgreSQL download](https://www.postgresql.org/download/linux/ubuntu/), [wiki Apt](https://wiki.postgresql.org/wiki/Apt)) |
+| RabbitMQ và Erlang | Repo Team RabbitMQ `deb1`/`deb2.rabbitmq.com` (kho cũ `ppa1`/`ppa2` đã ngừng từ 2025-11-01), một khoá cho cả Erlang và server | Như trên; apt pin ưu tiên repo này hơn Ubuntu (Origin của repo mới là `RabbitMQ`); `hold` cả Erlang | A (repo, khoá chung, hướng nâng: [blog](https://www.rabbitmq.com/blog/2025/07/16/debian-apt-repositories-are-moving), [install-debian](https://www.rabbitmq.com/docs/install-debian)); B (URL khoá và fingerprint `0A9A F211 5F46 87BD 2980 3A20 6B73 A36E 6026 DFCA` theo trí nhớ, role dừng nếu lệch) |
+| ClickHouse | Repo `packages.clickhouse.com/deb`, kênh `stable` hoặc `lts`; khoá `repomd.xml.key` | Như trên; ba gói cùng version và `hold` | A (cách thêm repo: [docs](https://clickhouse.com/docs/install/debian_ubuntu)); B (fingerprint đầy đủ `3A9EA119…2B48D754` chỉ khớp ID dài 8919F6BD2B48D754 trong tài liệu) |
+| Valkey | Binary chính thức cho Ubuntu noble x86_64 trên [valkey.io/download](https://valkey.io/download/), mỗi release có sha256 | Ghim version và sha256, `get_url` kiểm checksum; `/opt/valkey/<version>` và symlink `current` | A (có binary noble kèm sha256); B (mẫu URL tải và cấu trúc thư mục trong tarball chưa xác minh) |
+| Lý do không dùng Redis | Redis 7.4 trở lên đổi giấy phép (ADR-0024 loại); kho Ubuntu 24.04 chỉ có bản cũ | | |
+
+**Nâng version dễ ở chỗ nào:** đổi đúng một biến (`pg_pkg_version`, `rabbitmq_pkg_version`, `clickhouse_pkg_version`, `valkey_version` cùng `valkey_sha256`) rồi chạy lại role. Gói `hold` nên `apt upgrade` hay vá tự động không đụng tới database; nâng là việc có chủ đích. PostgreSQL version lớn **không** tự động (role từ chối), vì nâng lớn cần `pg_upgradecluster` và kiểm tra.
+
+**Cần người duyệt:** các mục B ở bảng trên, và quyết định về đường ra cho vùng dữ liệu để nâng sau khi seal (cuối [UPGRADE.md](UPGRADE.md)).
 
 ## Hệ điều hành chung (baseline)
 
@@ -44,7 +60,7 @@ Nguồn đã đối chiếu: [RKE2 CIS Hardening Guide](https://docs.rke2.io/sec
 | PostgreSQL | `swappiness=1`; `dirty_background_bytes=64MiB`, `dirty_bytes=512MiB`; hugepage 300 (shared_buffers 512MB / 2MB = 256, dư 15%); THP `enabled` và `defrag` = never; `random_page_cost=1.1`, `effective_io_concurrency=200`; `wal_compression`, `max_wal_size=2GB`, log checkpoint, lock wait, temp file; TLS ≥ 1.2; scram | Tài liệu PostgreSQL "Managing Kernel Resources", khuyến nghị SSD | B |
 | PostgreSQL, ngoại lệ | `overcommit_memory=1` (PostgreSQL khuyến nghị 2) | data-1 gộp Redis, Redis cần 1. Đổi lại 2 khi PostgreSQL ở máy riêng | B |
 | PostgreSQL, kích thước | `shared_buffers=512MB` (~10%, không phải 25%), `effective_cache_size=2GB`, `work_mem=4MB`, `max_connections=200` | VM 5 GiB dùng chung Redis và RabbitMQ | C |
-| Redis | `overcommit_memory=1`, `somaxconn=1024` (≥ tcp-backlog 511), THP never, `noeviction`, AOF `everysec`, lệnh nguy hiểm chặn bằng ACL, user `default` tắt | Redis admin docs | B |
+| Valkey (thay Redis) | `overcommit_memory=1`, `somaxconn=1024` (≥ tcp-backlog 511), THP never, `noeviction`, AOF `everysec`, lệnh nguy hiểm chặn bằng ACL, user `default` tắt | Tài liệu Valkey/Redis | B |
 | RabbitMQ | `LimitNOFILE=65536`; keepalive 60/10/3; `vm_memory_high_watermark=0.4`, `disk_free_limit=2GB` (≥ ngưỡng bộ nhớ); bỏ `guest`; epmd và cổng phân tán chỉ loopback | Production checklist (watermark, disk, fd, loopback_users: **A**); keepalive và epmd: **B** | A, B |
 | ClickHouse | `max_map_count=262144`, `LimitNOFILE=262144`, THP never, `max_server_memory_usage_to_ram_ratio=0.7`, `default` chỉ localhost, user riêng có sha256 | Tài liệu ClickHouse "Usage Recommendations" | B |
 | Edge L7 | `somaxconn=65535`, `netdev_max_backlog=16384`, `tcp_max_syn_backlog=16384`, `ip_local_port_range 10240-65535`, `tcp_tw_reuse=1`, `tcp_fin_timeout=15`, buffer 16 MiB, `tcp_slow_start_after_idle=0`, BBR và `fq` | Thực hành proxy và CDN | B |

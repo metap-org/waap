@@ -1,0 +1,5 @@
+---
+# Repo apt của vendor với khoá ký được ghim bằng fingerprint (không curl | apt-key, không tin khoá tải về mà không kiểm).
+# Bắt buộc: vendor_repo_name, vendor_repo_key_url, vendor_repo_key_fingerprint, vendor_repo_uris, vendor_repo_suites.
+vendor_repo_components: main
+vendor_repo_types: deb

@@ -561,12 +561,16 @@ steps:
     rollback: "incus exec <worker> -- /usr/local/bin/rke2-uninstall.sh hoặc dựng lại VM."
 
   - id: P8.3
-    title: PostgreSQL 16
-    why: Đĩa dữ liệu và WAL riêng, checksum, scram-sha-256, TLS, chỉ nhận từ vùng ứng dụng (Z3).
+    title: PostgreSQL (repo PGDG chính thức)
+    why: "Cài từ repo PGDG với khoá ký ghim fingerprint, không dùng gói Ubuntu; gói bị hold nên chỉ nâng khi đổi biến. Đĩa dữ liệu và WAL riêng, checksum, scram-sha-256, TLS, chỉ nhận từ vùng ứng dụng (Z3)."
     depends: [P8.2]
     time: 3 phút
     run: ["labs/bin/lab services --tags postgres"]
     checks:
+      - {at: data-1, what: Gói đến từ repo PGDG, không phải kho Ubuntu, cmd: "apt-cache policy postgresql-{pg_version} | grep -c 'apt.postgresql.org'", op: ge, value: 1}
+      - {at: data-1, what: Khoá ký repo PGDG đúng fingerprint đã ghim, cmd: "gpg --batch --show-keys --with-colons /usr/share/keyrings/pgdg.gpg | awk -F: '/^fpr:/{print $10}' | grep -c B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8", op: ge, value: 1}
+      - {at: data-1, what: Gói PostgreSQL bị hold (không tự nâng), cmd: "apt-mark showhold | grep -c 'postgresql-{pg_version}'", op: ge, value: 1}
+      - {at: data-1, what: Ghi lại version đã cài (đọc bằng mắt), manual: "sudo -u postgres psql -tAc 'select version()'; ghi version vào nhật ký", op: manual}
       - {at: data-1, what: Sẵn sàng nhận kết nối, cmd: "pg_isready -q", op: rc0}
       - {at: data-1, what: TLS bật, cmd: "sudo -u postgres psql -tAc 'show ssl'", op: eq, value: "on"}
       - {at: data-1, what: Mã hoá mật khẩu, cmd: "sudo -u postgres psql -tAc 'show password_encryption'", op: eq, value: scram-sha-256}
@@ -591,21 +595,26 @@ steps:
       - {at: data-1, what: Ngắt giao dịch treo 1 phút, cmd: "sudo -u postgres psql -tAc 'show idle_in_transaction_session_timeout'", op: eq, value: 1min}
       - {at: data-1, what: Keepalive TCP 60 giây, cmd: "sudo -u postgres psql -tAc 'show tcp_keepalives_idle'", op: eq, value: "60"}
       - {at: data-1, what: Dùng hugepage nếu có (try), cmd: "sudo -u postgres psql -tAc 'show huge_pages'", op: eq, value: try}
-      - {at: data-1, what: pg_hba có đúng một dòng hostssl, cmd: "grep -c '^hostssl' /etc/postgresql/16/main/pg_hba.conf", op: eq, value: "1"}
-      - {at: data-1, what: pg_hba không có trust, cmd: "grep -c trust /etc/postgresql/16/main/pg_hba.conf", op: eq, value: "0"}
+      - {at: data-1, what: pg_hba có đúng một dòng hostssl, cmd: "grep -c '^hostssl' /etc/postgresql/{pg_version}/main/pg_hba.conf", op: eq, value: "1"}
+      - {at: data-1, what: pg_hba không có trust, cmd: "grep -c trust /etc/postgresql/{pg_version}/main/pg_hba.conf", op: eq, value: "0"}
       - {at: data-1, what: Ghi log kết nối, cmd: "sudo -u postgres psql -tAc 'show log_connections'", op: eq, value: "on"}
       - {use: limits, vms: [data-1]}
       - {at: k8s-wk-1, what: Vùng ứng dụng tới được 5432 (N14), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc0}
       - {at: edge-1, what: Edge không tới được 5432 (X01), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5432'", op: rc_nonzero}
-    rollback: "apt purge postgresql-16; xoá /var/lib/waap/data/pg và /var/lib/waap/wal/pg."
+    rollback: "apt-mark unhold rồi apt purge postgresql-{pg_version}; xoá /var/lib/waap/data/pg và /var/lib/waap/wal/pg."
 
   - id: P8.4
-    title: RabbitMQ
-    why: Không tài khoản guest; chỉ nghe IP lab.
+    title: RabbitMQ (repo Team RabbitMQ)
+    why: "Erlang và RabbitMQ từ repo của Team RabbitMQ (khoá ký ghim fingerprint), không dùng gói Ubuntu; gói bị hold vì Erlang phải tương thích RabbitMQ. Không tài khoản guest; chỉ nghe IP lab."
     depends: [P8.3]
     time: 2 phút
     run: ["labs/bin/lab services --tags rabbitmq"]
     checks:
+      - {at: data-1, what: rabbitmq-server đến từ repo Team RabbitMQ, cmd: "apt-cache policy rabbitmq-server | grep -cE 'deb[12].rabbitmq.com'", op: ge, value: 1}
+      - {at: data-1, what: Erlang đến từ repo Team RabbitMQ (không phải bản của Ubuntu), cmd: "apt-cache policy erlang-base | grep -cE 'deb[12].rabbitmq.com'", op: ge, value: 1}
+      - {at: data-1, what: rabbitmq-server bị hold, cmd: "apt-mark showhold | grep -c '^rabbitmq-server$'", op: eq, value: "1"}
+      - {at: data-1, what: Erlang bị hold (không nâng riêng), cmd: "apt-mark showhold | grep -c '^erlang-base$'", op: eq, value: "1"}
+      - {at: data-1, what: Khoá ký repo đúng fingerprint đã ghim, cmd: "gpg --batch --show-keys --with-colons /usr/share/keyrings/rabbitmq-server.gpg | awk -F: '/^fpr:/{print $10}' | grep -c 0A9AF2115F4687BD29803A206B73A36E6026DFCA", op: ge, value: 1}
       - {at: data-1, what: RabbitMQ chạy, cmd: "systemctl is-active rabbitmq-server", op: eq, value: active}
       - {at: data-1, what: Không còn user guest, cmd: "rabbitmqctl list_users --silent | grep -c '^guest'", op: eq, value: "0"}
       - {at: data-1, what: Chỉ nghe IP lab ở 5672, cmd: "ss -ltn | grep -c '10.10.40.11:5672'", op: eq, value: "1"}
@@ -618,35 +627,41 @@ steps:
       - {at: data-1, what: "Ngưỡng đĩa trống >= ngưỡng bộ nhớ (2 GB)", cmd: "grep -c '^disk_free_limit.absolute = 2GB' /etc/rabbitmq/rabbitmq.conf", op: eq, value: "1"}
       - {use: limits, vms: [data-1]}
       - {at: k8s-wk-1, what: Cổng 5672 thường chưa mở cho vùng ứng dụng (N15 chỉ mở 5671 TLS; TLS làm ở P2/P5), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:data-1}/5672'", op: rc_nonzero}
-    rollback: "apt purge rabbitmq-server."
+    rollback: "apt-mark unhold rồi apt purge rabbitmq-server."
 
   - id: P8.5
-    title: Redis (valkey-central trên data-1, valkey-edge trên edge-1)
-    why: ACL, user default tắt, không loại bỏ khoá (cấu hình, không phải cache), tắt lệnh nguy hiểm.
+    title: Valkey (valkey-central trên data-1, valkey-edge trên edge-1)
+    why: "Valkey thay Redis (Redis 7.4 trở lên đổi giấy phép, ADR-0024 loại). Binary chính thức ghim sha256 vào /opt/valkey/<version>, nâng bằng đổi symlink current. ACL, user default tắt, không loại bỏ khoá (cấu hình, không phải cache), lệnh nguy hiểm chặn bằng ACL."
     depends: [P8.4]
     time: 2 phút
-    run: ["labs/bin/lab services --tags redis"]
+    run: ["labs/bin/lab services --tags valkey"]
     checks:
-      - {at: data-1, what: Redis chạy, cmd: "systemctl is-active redis-server", op: eq, value: active}
-      - {at: edge-1, what: Redis chạy, cmd: "systemctl is-active redis-server", op: eq, value: active}
-      - {at: data-1, what: Không xác thực thì bị từ chối, cmd: "redis-cli -h {ip:data-1} ping", op: contains, value: NOAUTH}
-      - {at: data-1, what: User control ghi được, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1", op: eq, value: OK}
-      - {at: data-1, what: User edge không ghi được, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2", op: contains, value: NOPERM}
-      - {at: data-1, what: User edge đọc được, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe", op: eq, value: "1"}
-      - {at: data-1, what: FLUSHALL bị chặn bằng ACL (-@dangerous), cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} flushall", op: contains, value: NOPERM}
-      - {at: data-1, what: Không loại bỏ khoá, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info memory | grep -c 'maxmemory_policy:noeviction'", op: eq, value: "1"}
-      - {at: data-1, what: AOF bật, cmd: "redis-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info persistence | grep -c 'aof_enabled:1'", op: eq, value: "1"}
+      - {at: data-1, what: Binary nằm trong /opt/valkey/<version> qua symlink current, cmd: "readlink -f /opt/valkey/current | grep -c '^/opt/valkey/'", op: eq, value: "1"}
+      - {at: data-1, what: Version đang chạy khớp thư mục (đọc bằng mắt), manual: "valkey-server --version", op: manual}
+      - {at: data-1, what: Valkey chạy, cmd: "systemctl is-active valkey-server", op: eq, value: active}
+      - {at: edge-1, what: Valkey chạy, cmd: "systemctl is-active valkey-server", op: eq, value: active}
+      - {at: data-1, what: Không xác thực thì bị từ chối, cmd: "valkey-cli -h {ip:data-1} ping", op: contains, value: NOAUTH}
+      - {at: data-1, what: User control ghi được, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1", op: eq, value: OK}
+      - {at: data-1, what: User edge không ghi được, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2", op: contains, value: NOPERM}
+      - {at: data-1, what: User edge đọc được, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe", op: eq, value: "1"}
+      - {at: data-1, what: FLUSHALL bị chặn bằng ACL (-@dangerous), cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} flushall", op: contains, value: NOPERM}
+      - {at: data-1, what: Không loại bỏ khoá, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info memory | grep -c 'maxmemory_policy:noeviction'", op: eq, value: "1"}
+      - {at: data-1, what: AOF bật, cmd: "valkey-cli -h {ip:data-1} --no-auth-warning --user control --pass {secret:redis_control_password} info persistence | grep -c 'aof_enabled:1'", op: eq, value: "1"}
       - {use: limits, vms: [edge-1]}
-      - {at: data-1, what: Thư mục dữ liệu Redis ghi được dưới sandbox của unit, cmd: "systemctl show redis-server -p ReadWritePaths --value", op: contains, value: /var/lib/waap/data/redis}
-    rollback: "apt purge redis-server."
+      - {at: data-1, what: Thư mục dữ liệu Valkey ghi được dưới sandbox của unit, cmd: "systemctl show valkey-server -p ReadWritePaths --value", op: contains, value: /var/lib/waap/data/valkey}
+    rollback: "rm /etc/systemd/system/valkey-server.service* và /opt/valkey; xoá user valkey."
 
   - id: P8.6
     title: ClickHouse
-    why: Chỉ cài gói đã ghim sha256 (LAB_CLICKHOUSE_DEBS); chỉ nhận từ vùng ứng dụng; dữ liệu trên đĩa riêng.
+    why: "Cài từ repo apt chính thức của ClickHouse (khoá ký ghim fingerprint), ba gói cùng một version và bị hold; chỉ nhận từ vùng ứng dụng; dữ liệu trên đĩa riêng."
     depends: [P8.5]
     time: 4 phút
     run: ["labs/bin/lab services --tags clickhouse"]
     checks:
+      - {at: ch-1, what: Gói đến từ repo packages.clickhouse.com, cmd: "apt-cache policy clickhouse-server | grep -c 'packages.clickhouse.com'", op: ge, value: 1}
+      - {at: ch-1, what: Ba gói ClickHouse cùng một version, cmd: "dpkg-query -W -f='${Version}\\n' clickhouse-server clickhouse-client clickhouse-common-static | sort -u | wc -l", op: eq, value: "1"}
+      - {at: ch-1, what: Gói ClickHouse bị hold, cmd: "apt-mark showhold | grep -c 'clickhouse'", op: ge, value: 3}
+      - {at: ch-1, what: Khoá ký repo đúng fingerprint đã ghim, cmd: "gpg --batch --show-keys --with-colons /usr/share/keyrings/clickhouse.gpg | awk -F: '/^fpr:/{print $10}' | grep -c 3A9EA1193A97B548BE1457D48919F6BD2B48D754", op: ge, value: 1}
       - {at: ch-1, what: ClickHouse chạy, cmd: "systemctl is-active clickhouse-server", op: eq, value: active}
       - {at: ch-1, what: Truy vấn được, cmd: "clickhouse-client -q 'select 1'", op: eq, value: "1"}
       - {at: ch-1, what: Thư mục dữ liệu trên đĩa riêng, cmd: "clickhouse-client -q \"select value from system.server_settings where name='path'\"", op: eq, value: /var/lib/waap/data/clickhouse/}
@@ -655,7 +670,7 @@ steps:
       - {at: ch-1, what: Có tài khoản analytics (có mật khẩu), cmd: "clickhouse-client -q \"select count() from system.users where name='analytics'\"", op: eq, value: "1"}
       - {at: ch-1, what: 70% RAM cho server, cmd: "clickhouse-client -q \"select value from system.server_settings where name='max_server_memory_usage_to_ram_ratio'\"", op: eq, value: "0.7"}
       - {at: k8s-wk-1, what: Cổng native 9000 chưa mở cho vùng ứng dụng (N17 chỉ mở 8443 và 9440, TLS làm ở P2/P5), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:ch-1}/9000'", op: rc_nonzero}
-    rollback: "apt purge clickhouse-server clickhouse-client clickhouse-common-static."
+    rollback: "apt-mark unhold rồi apt purge clickhouse-server clickhouse-client clickhouse-common-static."
 
   - id: P8.7
     title: egress-1 (squid, đường ra duy nhất có allowlist)

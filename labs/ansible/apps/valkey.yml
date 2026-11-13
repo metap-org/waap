@@ -1,7 +1,7 @@
 ---
-# Redis có ACL: user control ghi, user edge chỉ đọc waf:*. Dùng cho valkey-edge và valkey-central.
-# Chạy: labs/bin/waap-install redis --host <ip|local> [-e biến=giá-trị ...] [--harden]
-- name: Cài redis
+# Valkey (binary chính thức, ghim sha256) có ACL: user control ghi, user edge chỉ đọc waf:*. Cần valkey_version, valkey_sha256.
+# Chạy: labs/bin/waap-install valkey --host <ip|local> [-e biến=giá-trị ...] [--harden]
+- name: Cài valkey
   hosts: all
   become: true
   vars:
@@ -12,7 +12,7 @@
         name: baseline
       when: app_harden | bool
   roles:
-    - svc_redis
+    - svc_valkey
   post_tasks:
     - name: Firewall riêng của ứng dụng (khi có app_allow_from)
       ansible.builtin.include_role:

@@ -1,5 +1,5 @@
 ---
-# RabbitMQ, không guest, tài khoản ứng dụng.
+# RabbitMQ và Erlang từ repo Team RabbitMQ (khoá ký ghim fingerprint), không guest.
 # Chạy: labs/bin/waap-install rabbitmq --host <ip|local> [-e biến=giá-trị ...] [--harden]
 - name: Cài rabbitmq
   hosts: all

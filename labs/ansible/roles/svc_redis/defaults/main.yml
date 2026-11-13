@@ -1,5 +1,0 @@
----
-redis_control_password: "{{ lab_secrets.redis_control_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/redis_control_password length=24 chars=ascii_letters,digits') }}"
-redis_edge_password: "{{ lab_secrets.redis_edge_password if lab_secrets is defined else lookup('ansible.builtin.password', app_secret_dir ~ '/' ~ inventory_hostname ~ '/redis_edge_password length=24 chars=ascii_letters,digits') }}"
-redis_dir: /var/lib/redis
-redis_maxmemory: 256mb

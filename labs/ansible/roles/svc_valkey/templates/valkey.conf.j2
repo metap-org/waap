@@ -2,14 +2,14 @@
 bind 127.0.0.1 {{ app_listen_ip }}
 protected-mode yes
 port 6379
-dir {{ redis_dir }}
+dir {{ valkey_dir }}
 appendonly yes
-maxmemory {{ redis_maxmemory }}
+maxmemory {{ valkey_maxmemory }}
 maxmemory-policy noeviction
 # Bộ luật là cấu hình, không phải cache: không được bị loại bỏ (control-plane README).
 user default off
-user control on >{{ redis_control_password }} ~waf:* +@all -@dangerous +ping
-user edge on >{{ redis_edge_password }} ~waf:* -@all +@read +ping +info
+user control on >{{ valkey_control_password }} ~waf:* +@all -@dangerous +ping
+user edge on >{{ valkey_edge_password }} ~waf:* -@all +@read +ping +info
 # Lệnh nguy hiểm bị chặn bằng ACL (-@dangerous); rename-command đã bị khuyến cáo bỏ.
 tcp-backlog 511
 tcp-keepalive 300

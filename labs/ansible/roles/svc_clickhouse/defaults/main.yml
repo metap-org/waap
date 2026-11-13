@@ -1,7 +1,12 @@
 ---
-# ClickHouse không có trong apt của Ubuntu. Ghim các gói .deb và checksum từ trang phát hành (tự kiểm), như RKE2.
-# Mỗi phần tử: {url, sha256}. Thứ tự cài: common-static, server, client.
-clickhouse_debs: []
+# Cài từ repo apt chính thức của ClickHouse (packages.clickhouse.com), không dùng gói của Ubuntu (không có).
+# Kênh: stable hoặc lts. Nâng version: đặt clickhouse_pkg_version cho CẢ BA gói cùng một version rồi chạy lại.
+clickhouse_channel: lts
+clickhouse_pkg_version: ""
+clickhouse_repo_key_url: https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key
+# Fingerprint đầy đủ của khoá repo; ID dài 8919F6BD2B48D754 khớp tài liệu ClickHouse, phần còn lại cần người duyệt đối chiếu.
+clickhouse_repo_key_fingerprint: 3A9EA1193A97B548BE1457D48919F6BD2B48D754
+clickhouse_packages: [clickhouse-common-static, clickhouse-server, clickhouse-client]
 clickhouse_data: /var/lib/clickhouse
 clickhouse_listen: "{{ app_listen_ip }}"
 clickhouse_ttl_days: 30

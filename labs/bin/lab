@@ -3,7 +3,7 @@
 # Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
 #       lab step {list|next|show|run|verify} [<id>]   (chạy từng bước nhỏ, xem labs/CHECKLIST.md)
 #       lab {tf|fw|secrets|services|nettest|smoke}   (P1 lát 2: database, proxy ra; chưa triển khai dịch vụ ứng dụng)
-# Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_RKE2_VERSION, LAB_RKE2_SHA256 (ghim RKE2: phiên bản và sha256 của rke2.linux-amd64.tar.gz, tự lấy từ trang phát hành)
+# Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_VALKEY_VERSION, LAB_VALKEY_SHA256 (ghim binary Valkey từ valkey.io/download), LAB_RKE2_VERSION, LAB_RKE2_SHA256 (ghim RKE2: phiên bản và sha256 của rke2.linux-amd64.tar.gz, tự lấy từ trang phát hành)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INFRA="$ROOT/infra"
@@ -38,6 +38,7 @@ ansible_run() { # ansible_run <playbook> [tham số]
   ( cd "$ROOT/ansible" && ansible-galaxy collection install -r requirements.yml >/dev/null &&
     ansible-playbook -i "$GEN/$PROFILE/inventory" "$@" \
       -e "lab_generated_dir=$GEN" -e "rke2_version=${LAB_RKE2_VERSION:-}" -e "rke2_sha256=${LAB_RKE2_SHA256:-}" \
+      -e "valkey_version=${LAB_VALKEY_VERSION:-}" -e "valkey_sha256=${LAB_VALKEY_SHA256:-}" \
       -e "rke2_token=$(cat "$GEN/rke2-token")" )
 }
 
@@ -103,7 +104,7 @@ PY
 
 cmd_services() { # PostgreSQL, RabbitMQ, Redis, ClickHouse, egress-1
   cmd_secrets
-  ansible_run services.yml -e "@$GEN/secrets.yml" -e "clickhouse_debs=${LAB_CLICKHOUSE_DEBS:-[]}" "$@"
+  ansible_run services.yml -e "@$GEN/secrets.yml" "$@"
 }
 
 cmd_nettest() { # thăm dò mạng sinh từ ma trận: luồng cho phép phải đến được, luồng cấm phải hết thời gian (T01 đến T07)
@@ -128,8 +129,8 @@ cmd_smoke() { # kiểm hạ tầng theo vai trò (đúng cho mọi profile), kh�
   chk() { if eval "$2" >/dev/null 2>&1; then echo "ok   $1"; else echo "LỖI $1"; fail=1; fi; }
   chk "postgres sẵn sàng ($pg)" "incus exec $pg -- pg_isready -q"
   chk "rabbitmq chạy ($mq)" "incus exec $mq -- systemctl is-active --quiet rabbitmq-server"
-  chk "redis valkey-central chạy ($vc)" "incus exec $vc -- systemctl is-active --quiet redis-server"
-  chk "redis valkey-edge chạy ($ve)" "incus exec $ve -- systemctl is-active --quiet redis-server"
+  chk "valkey valkey-central chạy ($vc)" "incus exec $vc -- systemctl is-active --quiet valkey-server"
+  chk "valkey valkey-edge chạy ($ve)" "incus exec $ve -- systemctl is-active --quiet valkey-server"
   chk "clickhouse chạy ($ch)" "incus exec $ch -- systemctl is-active --quiet clickhouse-server"
   chk "RKE2 server lên ($cp)" "incus exec $cp -- systemctl is-active --quiet rke2-server"
   chk "mọi node K8s Ready" "incus exec $cp -- $KC wait --for=condition=Ready node --all --timeout=60s"

@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+{% for h in rabbitmq_repo_hosts %}
+Package: erlang* rabbitmq-server
+Pin: origin {{ h }}
+Pin-Priority: 1001
+
+{% endfor %}

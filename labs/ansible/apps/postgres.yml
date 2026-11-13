@@ -1,5 +1,5 @@
 ---
-# PostgreSQL 16, scram, TLS, chỉ nhận từ app_allow_from.
+# PostgreSQL từ repo PGDG chính thức (pg_version, mặc định 17), scram, TLS, chỉ nhận từ app_allow_from.
 # Chạy: labs/bin/waap-install postgres --host <ip|local> [-e biến=giá-trị ...] [--harden]
 - name: Cài postgres
   hosts: all

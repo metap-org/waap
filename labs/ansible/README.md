@@ -34,7 +34,7 @@ labs/bin/waap-install postgres --host 10.0.1.5 --harden \
 
 | Nhóm | Thành phần |
 |---|---|
-| Database | `postgres`, `rabbitmq`, `redis`, `clickhouse` |
+| Database | `postgres`, `rabbitmq`, `valkey`, `clickhouse` |
 | Platform | `rke2-node` (server hoặc agent) |
 | Mạng | `egress` (squid, đường ra duy nhất có allowlist) |
 
@@ -49,16 +49,18 @@ labs/bin/waap-install postgres --host 10.0.1.5 --harden \
 
 | Role | Nội dung |
 |---|---|
-| `svc_postgres` | PostgreSQL 16, đĩa dữ liệu và WAL riêng (khi đặt `pg_wal`), checksum, scram, `hostssl` chỉ từ nguồn khai báo |
-| `svc_rabbitmq` | RabbitMQ, xoá `guest`, tài khoản ứng dụng |
-| `svc_redis` | Redis 7.0 (BSD, từ apt), ACL, `noeviction` |
-| `svc_clickhouse` | Chỉ cài gói `.deb` đã ghim kèm sha256 (như RKE2) |
+| `vendor_repo` | Repo apt của vendor với khoá ký **ghim fingerprint** (tải khoá, đọc fingerprint, so với giá trị đã ghim, lệch thì dừng; dùng `Signed-By`, không `apt-key`) |
+| `svc_postgres` | PostgreSQL từ repo **PGDG** chính thức (`pg_version`, mặc định 17), gói bị `hold`; đĩa dữ liệu và WAL riêng, checksum, scram, `hostssl` chỉ từ nguồn khai báo; chặn nâng version lớn ngầm |
+| `svc_rabbitmq` | RabbitMQ và Erlang từ repo **Team RabbitMQ** (`deb1`/`deb2.rabbitmq.com`, cùng một khoá), ưu tiên hơn gói Ubuntu bằng apt pin, gói bị `hold`; xoá `guest`; epmd chỉ loopback |
+| `svc_valkey` | **Valkey** (thay Redis) từ binary chính thức ghim sha256, `/opt/valkey/<version>` và symlink `current`; ACL, `noeviction`, AOF; unit có sandbox |
+| `svc_clickhouse` | ClickHouse từ repo apt chính thức (kênh `lts` hoặc `stable`), ba gói cùng version và bị `hold`; user `analytics` có mật khẩu |
 | `svc_perimeter` | Chỉ `egress-1`: squid có allowlist, chặn dải riêng và metadata. `ingress-1` và `egw-1` chưa cấu hình (chờ triển khai dịch vụ) |
 
 ## Cách dùng
 
 ```
 labs/bin/lab ssh-ca                      # CA SSH của lab
+export LAB_VALKEY_VERSION=9.x.y; export LAB_VALKEY_SHA256=<sha256 tarball noble x86_64 trên trang release>
 export LAB_RKE2_VERSION=v1.xx.y+rke2r1   # ghim: lấy từ trang phát hành RKE2
 export LAB_RKE2_SHA256=<sha256 của rke2.linux-amd64.tar.gz>   # tự kiểm, bộ cài không tải tarball chưa ghim
 labs/bin/lab provision                   # site.yml trên mọi node

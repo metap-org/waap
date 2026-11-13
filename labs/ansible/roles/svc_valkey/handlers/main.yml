@@ -4,8 +4,8 @@
     daemon_reload: true
   listen: reload systemd
 
-- name: Restart redis
+- name: Restart valkey
   ansible.builtin.systemd:
-    name: redis-server
+    name: valkey-server
     state: restarted
-  listen: restart redis
+  listen: restart valkey

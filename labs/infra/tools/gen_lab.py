@@ -59,11 +59,11 @@ def inventory(profile, out):
 
 # (thành phần, vai trò trong profile, role Ansible, lệnh lab, ghi chú). Chỉ liệt kê cái đã có bộ cài hoặc cần nói rõ là chưa có.
 COMPONENTS = [
-    ("PostgreSQL 16", "postgres", "svc_postgres", "lab services --tags postgres", "waap-install postgres", "Đĩa dữ liệu và WAL riêng. Profile full có node thứ hai nhưng sao chép (replication) CHƯA viết, nên chỉ cài node đầu"),
-    ("RabbitMQ", "rabbitmq", "svc_rabbitmq", "lab services --tags rabbitmq", "waap-install rabbitmq", "Cổng 5672 không TLS; N15 chỉ mở 5671, nên chưa ai ngoài máy này vào được cho tới khi có TLS (P2/P5)"),
-    ("Redis (valkey-central)", "valkey-central", "svc_redis", "lab services --tags redis", "waap-install redis", "Cache và hot key trung tâm"),
-    ("Redis (valkey-edge)", "valkey-edge", "svc_redis", "lab services --tags redis", "waap-install redis", "Nằm ở vùng Edge DMZ theo thiết kế (ADR-0021)"),
-    ("ClickHouse", "clickhouse", "svc_clickhouse", "lab services --tags clickhouse", "waap-install clickhouse", "Cần ghim gói .deb và sha256"),
+    ("PostgreSQL (PGDG)", "postgres", "svc_postgres", "lab services --tags postgres", "waap-install postgres", "Repo PGDG chính thức, gói bị hold; đĩa dữ liệu và WAL riêng. Profile full có node thứ hai nhưng sao chép (replication) CHƯA viết, nên chỉ cài node đầu"),
+    ("RabbitMQ (repo Team RabbitMQ)", "rabbitmq", "svc_rabbitmq", "lab services --tags rabbitmq", "waap-install rabbitmq", "Erlang và RabbitMQ cùng repo, gói bị hold. Cổng 5672 không TLS; N15 chỉ mở 5671, nên chưa ai ngoài máy này vào được cho tới khi có TLS (P2/P5)"),
+    ("Valkey (valkey-central)", "valkey-central", "svc_valkey", "lab services --tags valkey", "waap-install valkey", "Binary chính thức ghim sha256, /opt/valkey/<version>; cache và hot key trung tâm"),
+    ("Valkey (valkey-edge)", "valkey-edge", "svc_valkey", "lab services --tags valkey", "waap-install valkey", "Nằm ở vùng Edge DMZ theo thiết kế (ADR-0021)"),
+    ("ClickHouse", "clickhouse", "svc_clickhouse", "lab services --tags clickhouse", "waap-install clickhouse", "Repo apt chính thức của ClickHouse, 3 gói cùng version, bị hold"),
     ("RKE2 server", "k8s-cp", "profile_rke2_node", "lab provision --tags k8s --limit <vm>", "waap-install rke2-node", "Cần ghim phiên bản và sha256 của tarball"),
     ("RKE2 agent", "k8s-app", "profile_rke2_node", "lab provision --tags k8s --limit <vm>", "waap-install rke2-node -e rke2_role=agent", ""),
     ("egress-1 (squid)", "egress-1", "svc_perimeter", "lab services --tags egress", "waap-install egress", "Đường ra duy nhất có allowlist"),

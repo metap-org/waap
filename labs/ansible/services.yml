@@ -15,11 +15,11 @@
     - role: svc_rabbitmq
       tags: [rabbitmq]
 
-- name: Redis (valkey-central và valkey-edge)
+- name: Valkey (valkey-central và valkey-edge)
   hosts: role_valkey_central:role_valkey_edge
   roles:
-    - role: svc_redis
-      tags: [redis]
+    - role: svc_valkey
+      tags: [valkey]
 
 - name: ClickHouse
   hosts: role_clickhouse

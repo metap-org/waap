@@ -96,8 +96,13 @@ def fw_forward_accepts(ctx, bootstrap=True):
     return sum(1 for l in chain.splitlines() if " accept comment " in l and "stateful" not in l)
 
 
+def pg_version():
+    d = yaml.safe_load((LABS / "ansible/roles/svc_postgres/defaults/main.yml").read_text(encoding="utf-8"))
+    return str(d["pg_version"])
+
+
 def subst(ctx, s):
-    s = s.replace("{fw_rules}", str(fw_forward_accepts(ctx)))
+    s = s.replace("{fw_rules}", str(fw_forward_accepts(ctx))).replace("{pg_version}", pg_version())
     s = re.sub(r"\{ip:([a-z0-9-]+)\}", lambda m: next(iter(ctx["ips"][m[1]].values())), s)
     return s
 
@@ -155,7 +160,8 @@ def generated_checks(ctx, c):
             _, _, limits, _ = merge_tuning(ctx, name)
             for unit, lim in sorted(limits.items()):
                 for k, v in lim.items():
-                    out.append(dict(at=name, what=f"{unit}: {k}", cmd=f"systemctl show {unit} -p {k} --value", op="eq", value=str(v)))
+                    real = f"postgresql@{pg_version()}-main" if unit == "postgresql@" else unit
+                    out.append(dict(at=name, what=f"{real}: {k}", cmd=f"systemctl show {real} -p {k} --value", op="eq", value=str(v)))
         elif kind == "disks":
             for d in vm.get("disks", []):
                 gb = int(re.match(r"\d+", d["size"])[0])

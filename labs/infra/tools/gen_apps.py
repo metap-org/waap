@@ -6,10 +6,10 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parent.parent.parent / "ansible" / "apps"
 
 SIMPLE = {
-    "postgres": ("svc_postgres", [("tcp", [5432])], {"pg_allowed_cidrs": "{{ app_allow_from }}"}, "PostgreSQL 16, scram, TLS, chỉ nhận từ app_allow_from."),
-    "rabbitmq": ("svc_rabbitmq", [("tcp", [5672])], {}, "RabbitMQ, không guest, tài khoản ứng dụng."),
-    "redis": ("svc_redis", [("tcp", [6379])], {}, "Redis có ACL: user control ghi, user edge chỉ đọc waf:*. Dùng cho valkey-edge và valkey-central."),
-    "clickhouse": ("svc_clickhouse", [("tcp", [9000])], {"clickhouse_allowed_cidrs": "{{ app_allow_from }}"}, "ClickHouse. Cần ghim clickhouse_debs (url, sha256)."),
+    "postgres": ("svc_postgres", [("tcp", [5432])], {"pg_allowed_cidrs": "{{ app_allow_from }}"}, "PostgreSQL từ repo PGDG chính thức (pg_version, mặc định 17), scram, TLS, chỉ nhận từ app_allow_from."),
+    "rabbitmq": ("svc_rabbitmq", [("tcp", [5672])], {}, "RabbitMQ và Erlang từ repo Team RabbitMQ (khoá ký ghim fingerprint), không guest."),
+    "valkey": ("svc_valkey", [("tcp", [6379])], {}, "Valkey (binary chính thức, ghim sha256) có ACL: user control ghi, user edge chỉ đọc waf:*. Cần valkey_version, valkey_sha256."),
+    "clickhouse": ("svc_clickhouse", [("tcp", [9000])], {"clickhouse_allowed_cidrs": "{{ app_allow_from }}"}, "ClickHouse từ repo apt chính thức (khoá ký ghim fingerprint). Nâng version bằng clickhouse_pkg_version."),
     "egress": ("svc_perimeter", [("tcp", [3128])], {"egress_allowed_src": "{{ app_allow_from }}"}, "squid ra Internet có allowlist, chặn dải riêng và metadata."),
     "rke2-node": ("profile_rke2_node", [("tcp", [6443, 9345, 10250])], {}, "Node RKE2 (server hoặc agent: -e rke2_role=agent -e rke2_api_endpoint=...). Cần rke2_version, rke2_sha256, rke2_token."),
 }

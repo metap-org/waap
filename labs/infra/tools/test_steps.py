@@ -37,7 +37,7 @@ class StepsTests(unittest.TestCase):
         sysctl, thp, limits, conflicts = S.merge_tuning(CTX, "data-1")
         self.assertEqual(sysctl["vm.nr_hugepages"], 300)
         self.assertEqual(thp, "never")
-        self.assertEqual(limits["postgresql@16-main"]["LimitNOFILE"], 65536)
+        self.assertEqual(limits["postgresql@"]["LimitNOFILE"], 65536)
         self.assertEqual(S.merge_tuning(CTX, "k8s-wk-1")[0]["net.ipv4.ip_forward"], 1)
         self.assertEqual(S.merge_tuning(CTX, "bao-1")[0]["kernel.core_pattern"], "|/bin/false")
 

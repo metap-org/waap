@@ -1,0 +1,78 @@
+---
+- name: Kiểm tham số
+  ansible.builtin.assert:
+    that:
+      - vendor_repo_name is defined
+      - vendor_repo_key_url is defined
+      - vendor_repo_key_fingerprint | length == 40
+      - vendor_repo_uris is defined
+      - vendor_repo_suites is defined
+    fail_msg: "vendor_repo cần tên, URL khoá, fingerprint 40 ký tự hex, uris và suites."
+    quiet: true
+
+- name: Gói để kiểm khoá và dùng repo https
+  ansible.builtin.apt:
+    name: [gnupg, ca-certificates, apt-transport-https]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Thư mục tạm cho khoá
+  ansible.builtin.file:
+    path: /var/cache/vendor-keys
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+
+- name: Tải khoá ký
+  ansible.builtin.get_url:
+    url: "{{ vendor_repo_key_url }}"
+    dest: "/var/cache/vendor-keys/{{ vendor_repo_name }}.key"
+    mode: "0600"
+    owner: root
+    group: root
+
+- name: Đọc fingerprint của khoá vừa tải
+  ansible.builtin.shell: >-
+    set -o pipefail; gpg --batch --show-keys --with-colons /var/cache/vendor-keys/{{ vendor_repo_name }}.key | awk -F: '/^fpr:/{print $10}'
+  args:
+    executable: /bin/bash
+  register: vendor_key_fprs
+  changed_when: false
+
+- name: Fingerprint phải khớp giá trị đã ghim (nếu lệch thì dừng, không cài)
+  ansible.builtin.assert:
+    that: vendor_repo_key_fingerprint | upper in vendor_key_fprs.stdout_lines
+    fail_msg: "Khoá của {{ vendor_repo_name }} có fingerprint {{ vendor_key_fprs.stdout_lines }}, không khớp {{ vendor_repo_key_fingerprint }}. Dừng."
+    quiet: true
+
+- name: Chuyển khoá thành keyring nhị phân dùng cho Signed-By
+  ansible.builtin.shell: |
+    set -e
+    tmp="$(mktemp -d)"
+    gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --import /var/cache/vendor-keys/{{ vendor_repo_name }}.key
+    gpg --batch --no-default-keyring --keyring "$tmp/k.kbx" --export > /usr/share/keyrings/{{ vendor_repo_name }}.gpg
+    rm -rf "$tmp"
+  args:
+    creates: "/usr/share/keyrings/{{ vendor_repo_name }}.gpg"
+    executable: /bin/bash
+
+- name: Nguồn apt (deb822, Signed-By trỏ đúng keyring)
+  ansible.builtin.copy:
+    dest: "/etc/apt/sources.list.d/{{ vendor_repo_name }}.sources"
+    mode: "0644"
+    owner: root
+    group: root
+    content: |
+      Types: {{ vendor_repo_types }}
+      URIs: {{ vendor_repo_uris | join(' ') }}
+      Suites: {{ vendor_repo_suites | join(' ') }}
+      Components: {{ vendor_repo_components }}
+      Signed-By: /usr/share/keyrings/{{ vendor_repo_name }}.gpg
+  register: vendor_sources
+
+- name: Cập nhật danh sách gói khi nguồn đổi  # noqa no-handler
+  ansible.builtin.apt:
+    update_cache: true
+  when: vendor_sources.changed

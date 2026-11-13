@@ -666,7 +666,7 @@ $ labs/bin/lab provision --tags tuning --limit data-1
 
 **Vì sao các giá trị này:**
 - `data-1` (role_rabbitmq): Keepalive 60 giây để phát hiện kết nối chết sớm; nhiều kết nối nên cần nhiều file descriptor.
-- `data-1` (role_valkey_central): Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
+- `data-1` (role_valkey_central): Valkey (và Redis) cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
 - `data-1` (role_postgres): swappiness thấp để không đẩy shared_buffers ra swap; dirty_* giới hạn để checkpoint không dồn cục; hugepages = shared_buffers 512MB / 2MB = 256, dư khoảng 15%.
 
 **Hoàn tác:** Xoá /etc/sysctl.d/99-zz-waap-tuning.conf và waap-thp-off.service rồi sysctl --system.
@@ -728,7 +728,7 @@ $ labs/bin/lab provision --tags tuning --limit edge-1
 **Vì sao các giá trị này:**
 - `edge-1` (role_edge_l7): Hàng đợi accept và SYN đủ lớn cho tải đột biến; dải cổng nguồn rộng để proxy tới origin; không chậm lại sau khi nhàn rỗi.
 - `edge-1` (role_edge_waf): WAF tách CPU và RAM qua slice systemd (profile_edge_waf), không đổi sysctl riêng.
-- `edge-1` (role_valkey_edge): Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
+- `edge-1` (role_valkey_edge): Valkey (và Redis) cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
 
 **Xung đột giá trị khi gộp vai trò (vai trò sau thắng, xem `tuning_precedence`):**
 - `edge-1`: net.core.somaxconn (đã chọn 65535 → 1024 theo vai trò role_valkey_edge)
@@ -1003,9 +1003,9 @@ $ labs/bin/lab provision --tags k8s --limit k8s-wk-1,k8s-wk-2
 
 **Hoàn tác:** incus exec <worker> -- /usr/local/bin/rke2-uninstall.sh hoặc dựng lại VM.
 
-### P8.3 PostgreSQL 16
+### P8.3 PostgreSQL (repo PGDG chính thức)
 
-**Vì sao:** Đĩa dữ liệu và WAL riêng, checksum, scram-sha-256, TLS, chỉ nhận từ vùng ứng dụng (Z3).
+**Vì sao:** Cài từ repo PGDG với khoá ký ghim fingerprint, không dùng gói Ubuntu; gói bị hold nên chỉ nâng khi đổi biến. Đĩa dữ liệu và WAL riêng, checksum, scram-sha-256, TLS, chỉ nhận từ vùng ứng dụng (Z3).
 
 **Phụ thuộc:** P8.2  ·  **Thời gian dự kiến:** 3 phút
 
@@ -1015,6 +1015,10 @@ $ labs/bin/lab services --tags postgres
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
+| Gói đến từ repo PGDG | `data-1` | ≥ 1 | `apt-cache policy postgresql-17 \| grep -c 'apt.postgresql.org'` |
+| Khoá ký repo PGDG đúng fingerprint đã ghim | `data-1` | ≥ 1 | `gpg --batch --show-keys --with-colons /usr/share/keyrings/pgdg.gpg \| awk -F: '/^fpr:/{print $10}' \| grep -c B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8` |
+| Gói PostgreSQL bị hold (không tự nâng) | `data-1` | ≥ 1 | `apt-mark showhold \| grep -c 'postgresql-17'` |
+| Ghi lại version đã cài (đọc bằng mắt) | `data-1` | THỦ CÔNG (sudo -u postgres psql -tAc 'select version()'; ghi version vào nhật ký) | |
 | Sẵn sàng nhận kết nối | `data-1` | lệnh thành công (rc=0) | `pg_isready -q` |
 | TLS bật | `data-1` | = on | `sudo -u postgres psql -tAc 'show ssl'` |
 | Mã hoá mật khẩu | `data-1` | = scram-sha-256 | `sudo -u postgres psql -tAc 'show password_encryption'` |
@@ -1039,20 +1043,20 @@ $ labs/bin/lab services --tags postgres
 | Ngắt giao dịch treo 1 phút | `data-1` | = 1min | `sudo -u postgres psql -tAc 'show idle_in_transaction_session_timeout'` |
 | Keepalive TCP 60 giây | `data-1` | = 60 | `sudo -u postgres psql -tAc 'show tcp_keepalives_idle'` |
 | Dùng hugepage nếu có (try) | `data-1` | = try | `sudo -u postgres psql -tAc 'show huge_pages'` |
-| pg_hba có đúng một dòng hostssl | `data-1` | = 1 | `grep -c '^hostssl' /etc/postgresql/16/main/pg_hba.conf` |
-| pg_hba không có trust | `data-1` | = 0 | `grep -c trust /etc/postgresql/16/main/pg_hba.conf` |
+| pg_hba có đúng một dòng hostssl | `data-1` | = 1 | `grep -c '^hostssl' /etc/postgresql/17/main/pg_hba.conf` |
+| pg_hba không có trust | `data-1` | = 0 | `grep -c trust /etc/postgresql/17/main/pg_hba.conf` |
 | Ghi log kết nối | `data-1` | = on | `sudo -u postgres psql -tAc 'show log_connections'` |
-| postgresql@16-main: LimitNOFILE | `data-1` | = 65536 | `systemctl show postgresql@16-main -p LimitNOFILE --value` |
+| postgresql@17-main: LimitNOFILE | `data-1` | = 65536 | `systemctl show postgresql@17-main -p LimitNOFILE --value` |
 | rabbitmq-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show rabbitmq-server -p LimitNOFILE --value` |
-| redis-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
+| valkey-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show valkey-server -p LimitNOFILE --value` |
 | Vùng ứng dụng tới được 5432 (N14) | `k8s-wk-1` | lệnh thành công (rc=0) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
 | Edge không tới được 5432 (X01) | `edge-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
 
-**Hoàn tác:** apt purge postgresql-16; xoá /var/lib/waap/data/pg và /var/lib/waap/wal/pg.
+**Hoàn tác:** apt-mark unhold rồi apt purge postgresql-{pg_version}; xoá /var/lib/waap/data/pg và /var/lib/waap/wal/pg.
 
-### P8.4 RabbitMQ
+### P8.4 RabbitMQ (repo Team RabbitMQ)
 
-**Vì sao:** Không tài khoản guest; chỉ nghe IP lab.
+**Vì sao:** Erlang và RabbitMQ từ repo của Team RabbitMQ (khoá ký ghim fingerprint), không dùng gói Ubuntu; gói bị hold vì Erlang phải tương thích RabbitMQ. Không tài khoản guest; chỉ nghe IP lab.
 
 **Phụ thuộc:** P8.3  ·  **Thời gian dự kiến:** 2 phút
 
@@ -1062,6 +1066,11 @@ $ labs/bin/lab services --tags rabbitmq
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
+| rabbitmq-server đến từ repo Team RabbitMQ | `data-1` | ≥ 1 | `apt-cache policy rabbitmq-server \| grep -cE 'deb[12].rabbitmq.com'` |
+| Erlang đến từ repo Team RabbitMQ (không phải bản của Ubuntu) | `data-1` | ≥ 1 | `apt-cache policy erlang-base \| grep -cE 'deb[12].rabbitmq.com'` |
+| rabbitmq-server bị hold | `data-1` | = 1 | `apt-mark showhold \| grep -c '^rabbitmq-server$'` |
+| Erlang bị hold (không nâng riêng) | `data-1` | = 1 | `apt-mark showhold \| grep -c '^erlang-base$'` |
+| Khoá ký repo đúng fingerprint đã ghim | `data-1` | ≥ 1 | `gpg --batch --show-keys --with-colons /usr/share/keyrings/rabbitmq-server.gpg \| awk -F: '/^fpr:/{print $10}' \| grep -c 0A9AF2115F4687BD29803A206B73A36E6026DFCA` |
 | RabbitMQ chạy | `data-1` | = active | `systemctl is-active rabbitmq-server` |
 | Không còn user guest | `data-1` | = 0 | `rabbitmqctl list_users --silent \| grep -c '^guest'` |
 | Chỉ nghe IP lab ở 5672 | `data-1` | = 1 | `ss -ltn \| grep -c '10.10.40.11:5672'` |
@@ -1072,42 +1081,44 @@ $ labs/bin/lab services --tags rabbitmq
 | Không có loopback_users=none (không dùng cho production) | `data-1` | = 0 | `grep -c 'loopback_users' /etc/rabbitmq/rabbitmq.conf` |
 | Ngưỡng bộ nhớ tường minh 0.4 | `data-1` | = 1 | `grep -c '^vm_memory_high_watermark.relative = 0.4' /etc/rabbitmq/rabbitmq.conf` |
 | Ngưỡng đĩa trống >= ngưỡng bộ nhớ (2 GB) | `data-1` | = 1 | `grep -c '^disk_free_limit.absolute = 2GB' /etc/rabbitmq/rabbitmq.conf` |
-| postgresql@16-main: LimitNOFILE | `data-1` | = 65536 | `systemctl show postgresql@16-main -p LimitNOFILE --value` |
+| postgresql@17-main: LimitNOFILE | `data-1` | = 65536 | `systemctl show postgresql@17-main -p LimitNOFILE --value` |
 | rabbitmq-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show rabbitmq-server -p LimitNOFILE --value` |
-| redis-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
+| valkey-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show valkey-server -p LimitNOFILE --value` |
 | Cổng 5672 thường chưa mở cho vùng ứng dụng (N15 chỉ mở 5671 TLS; TLS làm ở P2/P5) | `k8s-wk-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5672'` |
 
-**Hoàn tác:** apt purge rabbitmq-server.
+**Hoàn tác:** apt-mark unhold rồi apt purge rabbitmq-server.
 
-### P8.5 Redis (valkey-central trên data-1, valkey-edge trên edge-1)
+### P8.5 Valkey (valkey-central trên data-1, valkey-edge trên edge-1)
 
-**Vì sao:** ACL, user default tắt, không loại bỏ khoá (cấu hình, không phải cache), tắt lệnh nguy hiểm.
+**Vì sao:** Valkey thay Redis (Redis 7.4 trở lên đổi giấy phép, ADR-0024 loại). Binary chính thức ghim sha256 vào /opt/valkey/<version>, nâng bằng đổi symlink current. ACL, user default tắt, không loại bỏ khoá (cấu hình, không phải cache), lệnh nguy hiểm chặn bằng ACL.
 
 **Phụ thuộc:** P8.4  ·  **Thời gian dự kiến:** 2 phút
 
 ```
-$ labs/bin/lab services --tags redis
+$ labs/bin/lab services --tags valkey
 ```
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
-| Redis chạy | `data-1` | = active | `systemctl is-active redis-server` |
-| Redis chạy | `edge-1` | = active | `systemctl is-active redis-server` |
-| Không xác thực thì bị từ chối | `data-1` | chứa NOAUTH | `redis-cli -h 10.10.40.11 ping` |
-| User control ghi được | `data-1` | = OK | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1` |
-| User edge không ghi được | `data-1` | chứa NOPERM | `redis-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2` |
-| User edge đọc được | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe` |
-| FLUSHALL bị chặn bằng ACL (-@dangerous) | `data-1` | chứa NOPERM | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} flushall` |
-| Không loại bỏ khoá | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info memory \| grep -c 'maxmemory_policy:noeviction'` |
-| AOF bật | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info persistence \| grep -c 'aof_enabled:1'` |
-| redis-server: LimitNOFILE | `edge-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
-| Thư mục dữ liệu Redis ghi được dưới sandbox của unit | `data-1` | chứa /var/lib/waap/data/redis | `systemctl show redis-server -p ReadWritePaths --value` |
+| Binary nằm trong /opt/valkey/<version> qua symlink current | `data-1` | = 1 | `readlink -f /opt/valkey/current \| grep -c '^/opt/valkey/'` |
+| Version đang chạy khớp thư mục (đọc bằng mắt) | `data-1` | THỦ CÔNG (valkey-server --version) | |
+| Valkey chạy | `data-1` | = active | `systemctl is-active valkey-server` |
+| Valkey chạy | `edge-1` | = active | `systemctl is-active valkey-server` |
+| Không xác thực thì bị từ chối | `data-1` | chứa NOAUTH | `valkey-cli -h 10.10.40.11 ping` |
+| User control ghi được | `data-1` | = OK | `valkey-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1` |
+| User edge không ghi được | `data-1` | chứa NOPERM | `valkey-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2` |
+| User edge đọc được | `data-1` | = 1 | `valkey-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe` |
+| FLUSHALL bị chặn bằng ACL (-@dangerous) | `data-1` | chứa NOPERM | `valkey-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} flushall` |
+| Không loại bỏ khoá | `data-1` | = 1 | `valkey-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info memory \| grep -c 'maxmemory_policy:noeviction'` |
+| AOF bật | `data-1` | = 1 | `valkey-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info persistence \| grep -c 'aof_enabled:1'` |
+| valkey-server: LimitNOFILE | `edge-1` | = 65536 | `systemctl show valkey-server -p LimitNOFILE --value` |
+| Thư mục dữ liệu Valkey ghi được dưới sandbox của unit | `data-1` | chứa /var/lib/waap/data/valkey | `systemctl show valkey-server -p ReadWritePaths --value` |
 
-**Hoàn tác:** apt purge redis-server.
+**Hoàn tác:** rm /etc/systemd/system/valkey-server.service* và /opt/valkey; xoá user valkey.
 
 ### P8.6 ClickHouse
 
-**Vì sao:** Chỉ cài gói đã ghim sha256 (LAB_CLICKHOUSE_DEBS); chỉ nhận từ vùng ứng dụng; dữ liệu trên đĩa riêng.
+**Vì sao:** Cài từ repo apt chính thức của ClickHouse (khoá ký ghim fingerprint), ba gói cùng một version và bị hold; chỉ nhận từ vùng ứng dụng; dữ liệu trên đĩa riêng.
 
 **Phụ thuộc:** P8.5  ·  **Thời gian dự kiến:** 4 phút
 
@@ -1117,6 +1128,10 @@ $ labs/bin/lab services --tags clickhouse
 
 | Kiểm | Ở đâu | Phải là | Lệnh |
 |---|---|---|---|
+| Gói đến từ repo packages.clickhouse.com | `ch-1` | ≥ 1 | `apt-cache policy clickhouse-server \| grep -c 'packages.clickhouse.com'` |
+| Ba gói ClickHouse cùng một version | `ch-1` | = 1 | `dpkg-query -W -f='${Version}\n' clickhouse-server clickhouse-client clickhouse-common-static \| sort -u \| wc -l` |
+| Gói ClickHouse bị hold | `ch-1` | ≥ 3 | `apt-mark showhold \| grep -c 'clickhouse'` |
+| Khoá ký repo đúng fingerprint đã ghim | `ch-1` | ≥ 1 | `gpg --batch --show-keys --with-colons /usr/share/keyrings/clickhouse.gpg \| awk -F: '/^fpr:/{print $10}' \| grep -c 3A9EA1193A97B548BE1457D48919F6BD2B48D754` |
 | ClickHouse chạy | `ch-1` | = active | `systemctl is-active clickhouse-server` |
 | Truy vấn được | `ch-1` | = 1 | `clickhouse-client -q 'select 1'` |
 | Thư mục dữ liệu trên đĩa riêng | `ch-1` | = /var/lib/waap/data/clickhouse/ | `clickhouse-client -q "select value from system.server_settings where name='path'"` |
@@ -1126,7 +1141,7 @@ $ labs/bin/lab services --tags clickhouse
 | 70% RAM cho server | `ch-1` | = 0.7 | `clickhouse-client -q "select value from system.server_settings where name='max_server_memory_usage_to_ram_ratio'"` |
 | Cổng native 9000 chưa mở cho vùng ứng dụng (N17 chỉ mở 8443 và 9440 | `k8s-wk-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.12/9000'` |
 
-**Hoàn tác:** apt purge clickhouse-server clickhouse-client clickhouse-common-static.
+**Hoàn tác:** apt-mark unhold rồi apt purge clickhouse-server clickhouse-client clickhouse-common-static.
 
 ### P8.7 egress-1 (squid, đường ra duy nhất có allowlist)
 

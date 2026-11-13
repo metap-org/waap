@@ -1,26 +1,37 @@
 ---
-- name: Chỉ cài bản đã ghim
-  ansible.builtin.assert:
-    that:
-      - clickhouse_debs | length >= 2
-      - clickhouse_debs | map(attribute='sha256') | map('length') | unique == [64]
-    fail_msg: "Ghim clickhouse_debs (url, sha256 từng gói) trước khi cài. Không tải gói chưa kiểm."
-    quiet: true
+- name: Repo ClickHouse (khoá ký ghim fingerprint)
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: clickhouse
+    vendor_repo_key_url: "{{ clickhouse_repo_key_url }}"
+    vendor_repo_key_fingerprint: "{{ clickhouse_repo_key_fingerprint }}"
+    vendor_repo_uris: [https://packages.clickhouse.com/deb]
+    vendor_repo_suites: ["{{ 'stable' if clickhouse_channel == 'stable' else 'lts' }}"]
 
-- name: Tải gói đã ghim
-  ansible.builtin.get_url:
-    url: "{{ item.url }}"
-    dest: "/var/cache/{{ item.url | basename }}"
-    checksum: "sha256:{{ item.sha256 }}"
-    mode: "0644"
-  loop: "{{ clickhouse_debs }}"
+- name: Bỏ hold để cài hoặc nâng
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: "{{ clickhouse_packages }}"
+  failed_when: false
 
-- name: Cài gói
+- name: Gói ClickHouse (cả ba cùng một version)
   ansible.builtin.apt:
-    deb: "/var/cache/{{ item.url | basename }}"
-  loop: "{{ clickhouse_debs }}"
+    name: "{{ clickhouse_packages | map('regex_replace', '$', ch_suffix) | list }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+  vars:
+    ch_suffix: "{{ ('=' ~ clickhouse_pkg_version) if clickhouse_pkg_version | length > 0 else '' }}"
   environment:
     DEBIAN_FRONTEND: noninteractive
+
+- name: Giữ gói ClickHouse
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ clickhouse_packages }}"
 
 - name: Thư mục dữ liệu
   ansible.builtin.file:

@@ -1,8 +1,51 @@
 ---
-- name: Gói RabbitMQ
+- name: Repo Erlang của Team RabbitMQ (khoá ký ghim fingerprint)
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: rabbitmq-erlang
+    vendor_repo_key_url: "{{ rabbitmq_repo_key_url }}"
+    vendor_repo_key_fingerprint: "{{ rabbitmq_repo_key_fingerprint }}"
+    vendor_repo_uris: "{{ rabbitmq_repo_hosts | map('regex_replace', '^(.*)$', 'https://\\1/rabbitmq-erlang/ubuntu/' ~ ansible_facts['distribution_release']) | list }}"
+    vendor_repo_suites: ["{{ ansible_facts['distribution_release'] }}"]
+
+- name: Repo RabbitMQ server
+  ansible.builtin.include_role:
+    name: vendor_repo
+  vars:
+    vendor_repo_name: rabbitmq-server
+    vendor_repo_key_url: "{{ rabbitmq_repo_key_url }}"
+    vendor_repo_key_fingerprint: "{{ rabbitmq_repo_key_fingerprint }}"
+    vendor_repo_uris: "{{ rabbitmq_repo_hosts | map('regex_replace', '^(.*)$', 'https://\\1/rabbitmq-server/ubuntu/' ~ ansible_facts['distribution_release']) | list }}"
+    vendor_repo_suites: ["{{ ansible_facts['distribution_release'] }}"]
+
+- name: Ưu tiên gói của Team RabbitMQ hơn gói cùng tên của Ubuntu
+  ansible.builtin.template:
+    src: apt-pin.j2
+    dest: /etc/apt/preferences.d/rabbitmq
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Bỏ hold để cài hoặc nâng
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: "{{ erlang_packages + ['rabbitmq-server'] }}"
+  failed_when: false
+
+- name: Gói Erlang và RabbitMQ
   ansible.builtin.apt:
-    name: rabbitmq-server
+    name: "{{ rabbit_install_packages }}"
     state: present
+    update_cache: true
+    allow_downgrade: true
+
+- name: Giữ gói (Erlang và RabbitMQ chỉ đổi khi đổi biến)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ erlang_packages + ['rabbitmq-server'] }}"
 
 - name: Nghe trên IP lab, không guest
   ansible.builtin.copy:

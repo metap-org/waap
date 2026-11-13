@@ -26,16 +26,16 @@ tuning_by_role:
       vm.nr_hugepages: 300
     thp: never
     limits:
-      "postgresql@16-main": { LimitNOFILE: 65536 }
+      "postgresql@": { LimitNOFILE: 65536 }       # drop-in cho mọi cụm, không phụ thuộc version
   role_valkey_central: &redis
-    why: "Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi."
+    why: "Valkey (và Redis) cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi."
     sysctl:
       vm.overcommit_memory: 1
       vm.swappiness: 1
       net.core.somaxconn: 1024
     thp: never
     limits:
-      "redis-server": { LimitNOFILE: 65536 }
+      "valkey-server": { LimitNOFILE: 65536 }
   role_valkey_edge: *redis
   role_rabbitmq:
     why: "Keepalive 60 giây để phát hiện kết nối chết sớm; nhiều kết nối nên cần nhiều file descriptor."
