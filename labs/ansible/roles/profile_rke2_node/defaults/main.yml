@@ -11,4 +11,9 @@ rke2_cni: canal
 # Tên thành phần ingress mặc định đổi theo phiên bản (rke2-ingress-nginx ở bản cũ; bản mới có thể là Traefik). Ingress do ingress-1 ở Z2 đảm nhiệm nên tắt.
 rke2_disable: [rke2-ingress-nginx]
 rke2_api_endpoint: "{{ ('https://' ~ hostvars[groups['role_k8s_cp'][0]].lab_ip ~ ':9345') if groups['role_k8s_cp'] is defined else '' }}"
+# HA: server đầu tiên khởi tạo cụm, các server sau và agent gia nhập qua cổng 9345 của server đầu. Chạy lần lượt: server đầu xong rồi mới đến các server sau.
+rke2_first_server: "{{ groups['role_k8s_cp'][0] if groups['role_k8s_cp'] is defined else inventory_hostname }}"
+rke2_server_ips: "{{ (groups['role_k8s_cp'] | default([inventory_hostname])) | map('extract', hostvars, 'lab_ip') | list if groups['role_k8s_cp'] is defined else [app_listen_ip] }}"
+# Mã hoá lưu lượng pod bằng WireGuard (Canal). Profile full bật; compact giữ VXLAN không mã hoá. Cần udp 51820 giữa mọi node.
+rke2_pod_encryption: false
 rke2_role: "{{ 'server' if inventory_hostname in (groups['role_k8s_cp'] | default([])) else 'agent' }}"

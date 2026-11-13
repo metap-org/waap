@@ -371,9 +371,12 @@ jobs:
           python3 labs/infra/tools/steps.py validate
           python3 labs/infra/tools/test_steps.py
           python3 labs/infra/tools/gen_nft.py check compact
+          python3 labs/infra/tools/gen_nft.py check full
           python3 labs/infra/tools/gen_nft.py gen compact --bootstrap -o labs/infra/generated/compact
           python3 labs/infra/tools/gen_nft.py gen compact -o labs/infra/generated/compact
           for f in labs/infra/generated/compact/ruleset.nft labs/infra/generated/compact/hosts/*.nft; do sudo nft -c -f "$f"; done
+          python3 labs/infra/tools/gen_nft.py gen full --bootstrap -o labs/infra/generated/full
+          for f in labs/infra/generated/full/ruleset.nft labs/infra/generated/full/hosts/*.nft; do sudo nft -c -f "$f"; done
       - name: Ansible lint, syntax và render template
         working-directory: labs/ansible
         run: |

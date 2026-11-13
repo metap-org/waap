@@ -4,7 +4,7 @@ Sinh tự động bởi `labs/infra/tools/gen_lab.py placement` từ profile `co
 
 | Thành phần | Máy (vùng, IP) | Ai được kết nối tới (từ ma trận) | Cài bằng (lab) | Cài bằng (đứng riêng) | Ghi chú |
 |---|---|---|---|---|---|
-| PostgreSQL 16 | `data-1` (Z4, 10.10.40.11) | N14: vùng Z3 → tcp/5432<br>N23: postgres → tcp/5432 | `lab services --tags postgres` | `waap-install postgres` | Đĩa dữ liệu và WAL riêng |
+| PostgreSQL 16 | `data-1` (Z4, 10.10.40.11) | N14: vùng Z3 → tcp/5432<br>N23: postgres → tcp/5432 | `lab services --tags postgres` | `waap-install postgres` | Đĩa dữ liệu và WAL riêng. Profile full có node thứ hai nhưng sao chép (replication) CHƯA viết, nên chỉ cài node đầu |
 | RabbitMQ | `data-1` (Z4, 10.10.40.11) | N15: vùng Z3 → tcp/5671 | `lab services --tags rabbitmq` | `waap-install rabbitmq` | Cổng 5672 không TLS; N15 chỉ mở 5671, nên chưa ai ngoài máy này vào được cho tới khi có TLS (P2/P5) |
 | Redis (valkey-central) | `data-1` (Z4, 10.10.40.11) | N18: vùng Z3 → tcp/6379 | `lab services --tags redis` | `waap-install redis` | Cache và hot key trung tâm |
 | Redis (valkey-edge) | `edge-1` (Z1, 10.10.10.11) | N11: edge-l7 → tcp/6379 | `lab services --tags redis` | `waap-install redis` | Nằm ở vùng Edge DMZ theo thiết kế (ADR-0021) |

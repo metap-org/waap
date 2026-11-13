@@ -116,41 +116,26 @@ cmd_nettest() { # thăm dò mạng sinh từ ma trận: luồng cho phép phải
   return $fail
 }
 
-cmd_smoke() { # kiểm hạ tầng, không kiểm dịch vụ ứng dụng
+vm_of() { python3 "$INFRA/tools/gen_lab.py" vm "$PROFILE" "$1"; }
+
+cmd_smoke() { # kiểm hạ tầng theo vai trò (đúng cho mọi profile), không kiểm dịch vụ ứng dụng
   need incus; local fail=0
+  local pg mq vc ve ch cp ci eg
+  pg="$(vm_of postgres)"; mq="$(vm_of rabbitmq)"; vc="$(vm_of valkey-central)"; ve="$(vm_of valkey-edge)"
+  ch="$(vm_of clickhouse)"; cp="$(vm_of k8s-cp)"; ci="$(vm_of ci-runner)"; eg="$(vm_of egress-1)"
+  local egip; egip="$(incus list "$eg" -c 4 -f csv | cut -d' ' -f1)"
+  local KC="env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl"
   chk() { if eval "$2" >/dev/null 2>&1; then echo "ok   $1"; else echo "LỖI $1"; fail=1; fi; }
-  chk "postgres sẵn sàng" "incus exec data-1 -- pg_isready -q"
-  chk "rabbitmq chạy" "incus exec data-1 -- systemctl is-active --quiet rabbitmq-server"
-  chk "redis chạy trên edge-1 và data-1" "incus exec edge-1 -- systemctl is-active --quiet redis-server && incus exec data-1 -- systemctl is-active --quiet redis-server"
-  chk "clickhouse chạy" "incus exec ch-1 -- systemctl is-active --quiet clickhouse-server"
-  chk "RKE2 server lên" "incus exec k8s-cp-1 -- systemctl is-active --quiet rke2-server"
-  chk "mọi node K8s Ready" "incus exec k8s-cp-1 -- env KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl wait --for=condition=Ready node --all --timeout=60s"
-  chk "egress-1 chặn đích ngoài allowlist" "! incus exec ops-1 -- env https_proxy=http://10.10.20.11:3128 curl -sf --max-time 8 https://example.com"
+  chk "postgres sẵn sàng ($pg)" "incus exec $pg -- pg_isready -q"
+  chk "rabbitmq chạy ($mq)" "incus exec $mq -- systemctl is-active --quiet rabbitmq-server"
+  chk "redis valkey-central chạy ($vc)" "incus exec $vc -- systemctl is-active --quiet redis-server"
+  chk "redis valkey-edge chạy ($ve)" "incus exec $ve -- systemctl is-active --quiet redis-server"
+  chk "clickhouse chạy ($ch)" "incus exec $ch -- systemctl is-active --quiet clickhouse-server"
+  chk "RKE2 server lên ($cp)" "incus exec $cp -- systemctl is-active --quiet rke2-server"
+  chk "mọi node K8s Ready" "incus exec $cp -- $KC wait --for=condition=Ready node --all --timeout=60s"
+  chk "egress-1 chặn đích ngoài allowlist" "! incus exec $ci -- env https_proxy=http://$egip:3128 curl -sf --max-time 8 https://example.com"
   return $fail
 }
-
-cmd_tf() { # tf net | tf fw | tf vm <tên>...   (dựng từng phần, không dựng cả lab)
-  need tofu; [ -n "$SSH_KEY" ] || { echo "đặt LAB_SSH_KEY (khoá công khai)"; exit 1; }
-  local what="${1:-}"; shift || true; local targets=()
-  case "$what" in
-    net) targets=(-target=incus_network.zone -target=incus_network.uplink) ;;
-    fw) targets=(-target=incus_instance.fw) ;;
-    vm) [ $# -gt 0 ] || { echo "lab tf vm <tên>..."; exit 2; }
-        local n; for n in "$@"; do targets+=("-target=incus_instance.vm[\"$n\"]"); done ;;
-    *) echo "lab tf {net|fw|vm <tên>...}"; exit 2 ;;
-  esac
-  [ -f "$GEN/$PROFILE/ruleset.nft" ] || cmd_gen --bootstrap
-  tf init -input=false >/dev/null
-  tf apply -input=false -auto-approve "${targets[@]}"
-}
-
-cmd_fw() { # fw bootstrap | fw sealed: nạp lại luật của fw-1 mà không dựng lại VM
-  case "${1:-}" in bootstrap) cmd_gen --bootstrap ;; sealed) cmd_gen ;; *) echo "lab fw {bootstrap|sealed}"; exit 2 ;; esac
-  incus file push "$GEN/$PROFILE/ruleset.nft" fw-1/etc/nftables.conf
-  incus exec fw-1 -- nft -f /etc/nftables.conf
-}
-
-cmd_step() { python3 "$INFRA/tools/steps.py" --profile "$PROFILE" "$@"; }
 
 cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
 cmd_status() { incus list -c ns4t -f compact; }

@@ -54,7 +54,12 @@ class StepsTests(unittest.TestCase):
         import shutil
         if not shutil.which("ansible-playbook"):
             self.skipTest("không có ansible")
-        for vm in CTX["prof"]["vms"]:
+        import gen_nft as g3
+        allvms = [(CTX, v) for v in CTX["prof"]["vms"]]
+        zf, pf, ff = g3.load("full")
+        fctx = {"prof": pf, "tuning": CTX["tuning"]}
+        allvms += [(fctx, v) for v in pf["vms"]]
+        for ctx_, vm in allvms:
             groups = sorted(S.groups_of(vm))
             with tempfile.TemporaryDirectory() as d:
                 out = Path(d) / "m.json"
@@ -63,10 +68,10 @@ class StepsTests(unittest.TestCase):
                                    cwd=S.LABS / "ansible", capture_output=True, text=True, env={**__import__("os").environ, "ANSIBLE_ROLES_PATH": "roles"})
                 self.assertEqual(r.returncode, 0, r.stdout[-400:] + r.stderr[-400:])
                 got = json.loads(out.read_text())
-            sysctl, thp, limits, _ = S.merge_tuning(CTX, vm["name"])
+            sysctl, thp, limits, _ = S.merge_tuning(ctx_, vm["name"])
             self.assertEqual({k: str(v) for k, v in got["sysctl"].items()}, {k: str(v) for k, v in sysctl.items()}, vm["name"])
             self.assertEqual(got["thp"], thp, vm["name"])
-            self.assertEqual(got["modules"], S.merge_modules(CTX, vm["name"]), vm["name"])
+            self.assertEqual(got["modules"], S.merge_modules(ctx_, vm["name"]), vm["name"])
             self.assertEqual(got["limits"], limits, vm["name"])
 
     def test_vm_boot_checks_follow_profile(self):
@@ -104,6 +109,12 @@ class StepsTests(unittest.TestCase):
     def test_placement_doc_is_current(self):
         import gen_lab
         self.assertEqual(gen_lab.placement("compact"), (S.LABS / "PLACEMENT.md").read_text(encoding="utf-8"), "chạy `gen_lab.py placement compact -o labs/PLACEMENT.md` rồi commit")
+        self.assertEqual(gen_lab.placement("full"), (S.LABS / "PLACEMENT.full.md").read_text(encoding="utf-8"), "chạy `gen_lab.py placement full -o labs/PLACEMENT.full.md` rồi commit")
+
+    def test_steps_for_full_not_yet_available_is_explicit(self):
+        with self.assertRaises(SystemExit) as cm:
+            S.load("full")
+        self.assertIn("chưa có bước", str(cm.exception))
 
     def test_rke2_nodes_have_port_scoped_rules_not_blanket(self):
         import gen_nft as g2

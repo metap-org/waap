@@ -2,9 +2,15 @@
 
 Đề xuất của Claude, chờ duyệt. Thiết kế ở [7.6](../../docs/architecture/07-deployment/06-network-zones-and-flows.md), ADR-0047 đến 0050. Kế hoạch ở [../PLAN.md](../PLAN.md).
 
+## Profile full (bản nháp chờ review)
+
+`profiles/full.yaml`: 33 máy, khoảng 95 GB RAM cho VM (cần khoảng 103 GB tính cả máy chủ 128 GB). Đã có: danh sách máy và IP, luật mạng riêng cho full (etcd HA 2379 và 2380 chỉ giữa các server, WireGuard udp 51820 giữa mọi node; compact không có hai luật này), cấu hình RKE2 cho server thứ hai trở đi gia nhập cụm và bật Canal WireGuard, bảng tuning, sơ đồ ở 7.6 §5.2, [bản đồ thành phần](../PLACEMENT.full.md). Test sinh luật, `check` và gộp tuning chạy cho cả hai profile.
+
+**Chưa có cho full:** `steps.full.yaml` (checklist từng bước; `steps.yaml` viết cho tên máy của compact, `lab step` báo rõ khi chạy với full), bộ cài sao chép PostgreSQL (nên chỉ cài node đầu, `pg-2` mới hardening), Kafka, SeaweedFS, OpenBao (P5), ingress-1, egw-1, registry, infra, obs. Mã hoá lưu lượng pod bằng WireGuard dựa trên tài liệu RKE2 ([Network Options](https://docs.rke2.io/networking/basic_network_options)) nhưng chưa chạy thật. Dùng: `LAB_PROFILE=full labs/bin/lab ...`.
+
 ## Chạy từng bước (đọc phần này trước)
 
-Bản đồ thành phần nào cài ở máy nào, vùng nào, ai được vào: [../PLACEMENT.md](../PLACEMENT.md).
+Bản đồ thành phần nào cài ở máy nào, vùng nào, ai được vào: [../PLACEMENT.md](../PLACEMENT.md) (compact), [../PLACEMENT.full.md](../PLACEMENT.full.md) (full).
 
 Tham số đã rà theo best practice, kèm cơ sở và mức tin cậy: [../PARAMETERS.md](../PARAMETERS.md).
 

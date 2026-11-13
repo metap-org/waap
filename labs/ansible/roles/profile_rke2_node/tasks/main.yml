@@ -51,6 +51,24 @@
     group: root
   notify: restart rke2
 
+- name: Thư mục manifest tự triển khai của RKE2 (chỉ server)
+  ansible.builtin.file:
+    path: /var/lib/rancher/rke2/server/manifests
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  when: rke2_role == 'server' and rke2_pod_encryption | bool
+
+- name: Mã hoá lưu lượng pod bằng WireGuard (Canal)
+  ansible.builtin.template:
+    src: canal-wireguard.yaml.j2
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-canal-config.yaml
+    mode: "0600"
+    owner: root
+    group: root
+  when: rke2_role == 'server' and rke2_pod_encryption | bool
+
 - name: Tải tarball đã ghim và kiểm checksum
   ansible.builtin.get_url:
     url: "{{ rke2_tarball_url }}"

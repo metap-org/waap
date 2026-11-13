@@ -80,7 +80,7 @@ Phụ thuộc: P1.
   - Áp bằng thư mục manifest tự triển khai của RKE2; namespace ứng dụng gắn nhãn Pod Security riêng nếu cần nới.
   - Canal dùng engine Calico nên hỗ trợ cả ingress và egress; kiểm bằng pod thử trong CI của lab.
   - Chỉ làm được có ý nghĩa khi đã có namespace và dịch vụ ứng dụng, nên đứng sau bước triển khai dịch vụ.
-- **Để profile `full` (chủ dự án chốt 2026-11-13):** HA control-plane (3 server, mở etcd 2379 và 2380 giữa các server), mã hoá lưu lượng pod (Canal với WireGuard hoặc Cilium). Profile `compact` giữ một server và Canal VXLAN không mã hoá.
+- **Để profile `full` (chủ dự án chốt 2026-11-13; bản nháp `profiles/full.yaml` đã viết 2026-11-13, chờ review):** HA control-plane (3 server, etcd 2379 và 2380 chỉ giữa các server), mã hoá lưu lượng pod bằng Canal WireGuard. Profile `compact` giữ một server và Canal VXLAN không mã hoá. Chưa có checklist từng bước cho full, bộ cài replica PostgreSQL, OpenBao, Kafka.
 - mTLS cho mọi liên kết nội bộ theo 8.19: cert ngắn hạn do OpenBao cấp, gia hạn tự động.
 - Truy cập quản trị chỉ qua bastion (WireGuard + MFA); tắt SSH trực tiếp.
 - **Kiểm thử âm** (phải có, chạy lại được trong CI):

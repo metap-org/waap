@@ -9,7 +9,45 @@ class GenTests(unittest.TestCase):
         self.zones, self.prof, self.flows = g.load("compact")
 
     def test_matrix_matches_doc_and_no_forbidden(self):
-        self.assertEqual(g.check("compact"), [])
+        for p in ("compact", "full"):
+            with self.subTest(profile=p):
+                self.assertEqual(g.check(p), [])
+
+    def test_full_profile_is_consistent(self):
+        z, prof, flows = g.load("full")
+        names = [v["name"] for v in prof["vms"]]
+        self.assertEqual(len(names), len(set(names)))
+        seen = set()
+        for v in prof["vms"]:
+            for zn in v["zones"]:
+                key = (zn, v["host"])
+                self.assertNotIn(key, seen, f"trùng IP {key}")
+                seen.add(key)
+        self.assertEqual(len([v for v in prof["vms"] if "k8s-cp" in v["roles"]]), 3)
+        self.assertEqual(len([v for v in prof["vms"] if "openbao" in v["roles"]]), 3)
+        ips = g.vm_ips(z, prof)
+        # etcd chỉ giữa server với nhau; worker không bao giờ có trong nguồn
+        cp1 = g.render_host(z, prof, flows, "k8s-cp-1")
+        self.assertIn("L02d", cp1)
+        for wk in ("k8s-wk-1", "k8s-wk-2", "k8s-wk-3"):
+            self.assertNotIn(ips[wk]["Z3"], next(l for l in cp1.splitlines() if "L02d" in l))
+        self.assertNotIn("2379", g.render_host(z, prof, flows, "k8s-wk-1"))
+        self.assertIn("L02e", cp1)  # WireGuard cho pod
+        # full-only: compact không có
+        _, _, fc = g.load("compact")
+        self.assertFalse(any(f["id"] in ("L02d", "L02e") for f in fc["flows"]))
+
+    def test_every_profile_renders_valid_nft_files(self):
+        import shutil
+        for p in ("compact", "full"):
+            with self.subTest(profile=p):
+                z, prof, flows = g.load(p)
+                for bs in (True, False):
+                    text, _ = g.render(z, prof, flows, bs)
+                    self.assertIn("policy drop", text)
+                    for v in prof["vms"]:
+                        if "firewall" not in v["roles"]:
+                            self.assertIn("policy drop", g.render_host(z, prof, flows, v["name"], bs))
 
     def test_default_deny_and_no_host_enforced_rules(self):
         text, _ = g.render(self.zones, self.prof, self.flows, bootstrap=False)

@@ -59,7 +59,7 @@ def inventory(profile, out):
 
 # (thành phần, vai trò trong profile, role Ansible, lệnh lab, ghi chú). Chỉ liệt kê cái đã có bộ cài hoặc cần nói rõ là chưa có.
 COMPONENTS = [
-    ("PostgreSQL 16", "postgres", "svc_postgres", "lab services --tags postgres", "waap-install postgres", "Đĩa dữ liệu và WAL riêng"),
+    ("PostgreSQL 16", "postgres", "svc_postgres", "lab services --tags postgres", "waap-install postgres", "Đĩa dữ liệu và WAL riêng. Profile full có node thứ hai nhưng sao chép (replication) CHƯA viết, nên chỉ cài node đầu"),
     ("RabbitMQ", "rabbitmq", "svc_rabbitmq", "lab services --tags rabbitmq", "waap-install rabbitmq", "Cổng 5672 không TLS; N15 chỉ mở 5671, nên chưa ai ngoài máy này vào được cho tới khi có TLS (P2/P5)"),
     ("Redis (valkey-central)", "valkey-central", "svc_redis", "lab services --tags redis", "waap-install redis", "Cache và hot key trung tâm"),
     ("Redis (valkey-edge)", "valkey-edge", "svc_redis", "lab services --tags redis", "waap-install redis", "Nằm ở vùng Edge DMZ theo thiết kế (ADR-0021)"),
@@ -149,10 +149,14 @@ def diagram(profile):
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("inventory"); i.add_argument("profile"); i.add_argument("-o", required=True)
+    vmq = sub.add_parser("vm"); vmq.add_argument("profile"); vmq.add_argument("role")
     pl = sub.add_parser("placement"); pl.add_argument("profile"); pl.add_argument("-o")
-    d = sub.add_parser("diagram"); d.add_argument("profile"); d.add_argument("--inject")
+    d = sub.add_parser("diagram"); d.add_argument("profile"); d.add_argument("--inject"); d.add_argument("--marker", default="lab-diagram")
     a = ap.parse_args()
-    if a.cmd == "placement":
+    if a.cmd == "vm":
+        _, prof_, _ = g.load(a.profile)
+        print(next((v["name"] for v in prof_["vms"] if a.role in v["roles"]), ""))
+    elif a.cmd == "placement":
         text = placement(a.profile)
         if a.o:
             Path(a.o).write_text(text, encoding="utf-8")
@@ -166,9 +170,9 @@ def main():
         if not a.inject:
             print(text); return
         p = Path(a.inject); s = p.read_text(encoding="utf-8")
-        pat = re.compile(r"(<!-- lab-diagram:start -->\n).*?(<!-- lab-diagram:end -->)", re.S)
+        pat = re.compile(rf"(<!-- {a.marker}:start -->\n).*?(<!-- {a.marker}:end -->)", re.S)
         if not pat.search(s):
-            sys.exit("thiếu marker lab-diagram trong tệp")
+            sys.exit(f"thiếu marker {a.marker} trong tệp")
         p.write_text(pat.sub(lambda m: m[1] + text + m[2], s), encoding="utf-8")
         print("đã chèn sơ đồ vào", p)
 

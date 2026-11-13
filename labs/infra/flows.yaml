@@ -40,6 +40,11 @@ flows:
   - { id: L02a, src: "role:k8s-app", dst: "role:k8s-cp", proto: tcp, ports: [6443, 9345], enforce: host, covers: [] }
   - { id: L02b, src: "zone:Z3", dst: "zone:Z3", proto: tcp, ports: [10250, 9099], enforce: host, covers: [] }
   - { id: L02c, src: "zone:Z3", dst: "zone:Z3", proto: udp, ports: [8472], enforce: host, covers: [] }
+  # --- Chỉ profile full ---
+  # etcd HA: giữa các server với nhau (không bao giờ cho worker). Chỉ có tác dụng khi có từ 2 server.
+  - { id: L02d, src: "role:k8s-cp", dst: "role:k8s-cp", proto: tcp, ports: [2379, 2380], enforce: host, covers: [], profiles: [full] }
+  # Mã hoá lưu lượng pod bằng WireGuard (Canal): udp 51820 giữa mọi node (docs.rke2.io/install/requirements). VXLAN 8472 vẫn mở cho lúc chuyển đổi.
+  - { id: L02e, src: "zone:Z3", dst: "zone:Z3", proto: udp, ports: [51820], enforce: host, covers: [], profiles: [full] }
   # Chỉ có trong lab: Z0 là "Internet giả" nên cần đường ra Internet thật (NAT qua uplink) cho loadgen, dns-mock.
   - { id: L01, src: "zone:Z0", dst: "uplink", proto: tcp, ports: [80, 443], covers: [], lab_only: true }
 

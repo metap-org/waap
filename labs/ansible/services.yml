@@ -1,8 +1,10 @@
 ---
 # Hạ tầng dữ liệu và biên (P1 lát 2). Dừng ở mức database và proxy ra; KHÔNG triển khai dịch vụ ứng dụng.
 # Chạy sau site.yml:  ansible-playbook services.yml -e @../infra/generated/secrets.yml
-- name: PostgreSQL
-  hosts: role_postgres
+# Profile full có hai máy postgres nhưng cấu hình sao chép (replication) CHƯA viết, nên chỉ cài node đầu; node thứ hai
+# được hardening và có đĩa nhưng chưa có PostgreSQL. Cài nó thành bản độc lập sẽ gây hiểu nhầm là đã có replica.
+- name: PostgreSQL (node đầu)
+  hosts: role_postgres[0]
   roles:
     - role: svc_postgres
       tags: [postgres]

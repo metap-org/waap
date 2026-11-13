@@ -8810,6 +8810,133 @@ Cổng là mặc định, có thể đổi.</p>
 </table>
 <p>Đĩa cấp phát tối đa khoảng 398 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
 &lt;!-- lab-diagram:end --&gt;</p>
+<h3 id="f-07-deployment-06-network-zones-and-flows--52-lab-128-gb-profile-full-bản-nháp-chờ-review">5.2 Lab 128 GB (profile <code>full</code>, bản nháp chờ review)</h3>
+<p>Sinh tự động từ <code>labs/infra/profiles/full.yaml</code> bằng <code>python3 labs/infra/tools/gen_lab.py diagram full --inject &lt;tệp này&gt; --marker lab-diagram-full</code>; không sửa tay giữa hai marker. Khác <code>compact</code>: hai PoP edge, K8s 3 server (etcd HA) và 3 worker, mã hoá lưu lượng pod bằng WireGuard, OpenBao 3 node, PostgreSQL có node thứ hai, mỗi kho dữ liệu một máy riêng, vùng biên và vùng vận hành tách vai trò. Danh sách thành phần theo máy: <a href="../../../labs/PLACEMENT.full.md" target="_blank" rel="noopener"><code>labs/PLACEMENT.full.md</code></a>.</p>
+<p>&lt;!-- lab-diagram-full:start --&gt;</p>
+<div class="diagram"><pre class="mermaid">flowchart TB
+  subgraph Z0[&quot;Z0 Internet giả lập&quot;]
+    origin[&quot;origin&lt;br/&gt;0.11 · 512MiB&quot;]
+    loadgen[&quot;loadgen&lt;br/&gt;0.12 · 2GiB&quot;]
+    dns_mock[&quot;dns-mock&lt;br/&gt;0.13 · 512MiB&quot;]
+  end
+  subgraph Z1[&quot;Z1 Edge DMZ · 10.10.10.0/24&quot;]
+    edge_l7_1[&quot;edge-l7-1&lt;br/&gt;10.11 · 2GiB&quot;]
+    edge_l7_2[&quot;edge-l7-2&lt;br/&gt;10.12 · 2GiB&quot;]
+    edge_waf_1[&quot;edge-waf-1&lt;br/&gt;10.13 · 2GiB&quot;]
+    dns_1[&quot;dns-1&lt;br/&gt;10.14 · 512MiB&quot;]
+    valkey_edge[&quot;valkey-edge&lt;br/&gt;10.15 · 1GiB&quot;]
+  end
+  subgraph Z2[&quot;Z2 Biên · 10.10.20.0/24&quot;]
+    ingress_1[&quot;ingress-1&lt;br/&gt;20.11 · 1GiB&quot;]
+    egw_1[&quot;egw-1&lt;br/&gt;20.12 · 1GiB&quot;]
+    egress_1[&quot;egress-1&lt;br/&gt;20.13 · 1GiB&quot;]
+  end
+  subgraph Z3[&quot;Z3 Ứng dụng · 10.10.30.0/24&quot;]
+    k8s_cp_1[&quot;k8s-cp-1&lt;br/&gt;30.11 · 4GiB&quot;]
+    k8s_cp_2[&quot;k8s-cp-2&lt;br/&gt;30.12 · 4GiB&quot;]
+    k8s_cp_3[&quot;k8s-cp-3&lt;br/&gt;30.13 · 4GiB&quot;]
+    k8s_wk_1[&quot;k8s-wk-1&lt;br/&gt;30.21 · 8GiB&quot;]
+    k8s_wk_2[&quot;k8s-wk-2&lt;br/&gt;30.22 · 8GiB&quot;]
+    k8s_wk_3[&quot;k8s-wk-3&lt;br/&gt;30.23 · 8GiB&quot;]
+  end
+  subgraph Z4[&quot;Z4 Dữ liệu · 10.10.40.0/24&quot;]
+    pg_1[&quot;pg-1&lt;br/&gt;40.11 · 6GiB&quot;]
+    pg_2[&quot;pg-2&lt;br/&gt;40.12 · 6GiB&quot;]
+    ch_1[&quot;ch-1&lt;br/&gt;40.13 · 8GiB&quot;]
+    kafka_1[&quot;kafka-1&lt;br/&gt;40.14 · 4GiB&quot;]
+    mq_1[&quot;mq-1&lt;br/&gt;40.15 · 3GiB&quot;]
+    cache_1[&quot;cache-1&lt;br/&gt;40.16 · 1GiB&quot;]
+    s3_1[&quot;s3-1&lt;br/&gt;40.17 · 2GiB&quot;]
+  end
+  subgraph Z5[&quot;Z5 Secret · 10.10.50.0/24&quot;]
+    bao_1[&quot;bao-1&lt;br/&gt;50.11 · 1GiB&quot;]
+    bao_2[&quot;bao-2&lt;br/&gt;50.12 · 1GiB&quot;]
+    bao_3[&quot;bao-3&lt;br/&gt;50.13 · 1GiB&quot;]
+  end
+  subgraph Z6[&quot;Z6 Vận hành · 10.10.60.0/24&quot;]
+    bastion[&quot;bastion&lt;br/&gt;60.11 · 512MiB&quot;]
+    ci_runner[&quot;ci-runner&lt;br/&gt;60.12 · 4GiB&quot;]
+    registry[&quot;registry&lt;br/&gt;60.13 · 2GiB&quot;]
+    infra[&quot;infra&lt;br/&gt;60.14 · 1GiB&quot;]
+    obs[&quot;obs&lt;br/&gt;60.15 · 4GiB&quot;]
+  end
+  FW{{&quot;fw-1&lt;br/&gt;nftables, router L3 duy nhất&quot;}}
+  Z0 --- FW
+  Z1 --- FW
+  Z2 --- FW
+  Z3 --- FW
+  Z4 --- FW
+  Z5 --- FW
+  Z6 --- FW
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>Máy</th>
+<th>RAM (GB)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Z0</td>
+<td>origin, loadgen, dns-mock</td>
+<td>3.0</td>
+</tr>
+<tr>
+<td>Z1</td>
+<td>edge-l7-1, edge-l7-2, edge-waf-1, dns-1, valkey-edge</td>
+<td>7.5</td>
+</tr>
+<tr>
+<td>Z2</td>
+<td>ingress-1, egw-1, egress-1</td>
+<td>3.0</td>
+</tr>
+<tr>
+<td>Z3</td>
+<td>k8s-cp-1, k8s-cp-2, k8s-cp-3, k8s-wk-1, k8s-wk-2, k8s-wk-3</td>
+<td>36.0</td>
+</tr>
+<tr>
+<td>Z4</td>
+<td>pg-1, pg-2, ch-1, kafka-1, mq-1, cache-1, s3-1</td>
+<td>30.0</td>
+</tr>
+<tr>
+<td>Z5</td>
+<td>bao-1, bao-2, bao-3</td>
+<td>3.0</td>
+</tr>
+<tr>
+<td>Z6</td>
+<td>bastion, ci-runner, registry, infra, obs</td>
+<td>11.5</td>
+</tr>
+<tr>
+<td>(router)</td>
+<td>fw-1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td><strong>Tổng VM</strong></td>
+<td>33 máy</td>
+<td><strong>95.0</strong></td>
+</tr>
+<tr>
+<td>Dự trữ máy chủ</td>
+<td>hệ điều hành, Incus, đệm đĩa</td>
+<td>8 (ước lượng)</td>
+</tr>
+<tr>
+<td><strong>Cần</strong></td>
+<td></td>
+<td><strong>103.0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Đĩa cấp phát tối đa khoảng 768 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
+&lt;!-- lab-diagram-full:end --&gt;</p>
 <p><strong>Chọn theo RAM của máy chủ lab</strong> (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến <code>profile</code>, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:</p>
 <table>
 <thead>
@@ -8842,8 +8969,8 @@ Cổng là mặc định, có thể đổi.</p>
 <tr>
 <td><strong>128 GB</strong></td>
 <td><code>full</code></td>
-<td>khoảng 30</td>
-<td>khoảng 90 GB; hai PoP giả, K8s (3 server, etcd HA, mã hoá lưu lượng pod) và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật</td>
+<td>33</td>
+<td>khoảng 95 GB cho VM (cần khoảng 103 GB tính cả máy chủ); hai PoP giả, K8s (3 server, etcd HA, mã hoá lưu lượng pod) và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật</td>
 </tr>
 </tbody>
 </table>

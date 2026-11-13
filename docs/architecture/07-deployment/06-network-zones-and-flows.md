@@ -251,6 +251,86 @@ flowchart TB
 Đĩa cấp phát tối đa khoảng 398 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
 <!-- lab-diagram:end -->
 
+### 5.2 Lab 128 GB (profile `full`, bản nháp chờ review)
+
+Sinh tự động từ `labs/infra/profiles/full.yaml` bằng `python3 labs/infra/tools/gen_lab.py diagram full --inject <tệp này> --marker lab-diagram-full`; không sửa tay giữa hai marker. Khác `compact`: hai PoP edge, K8s 3 server (etcd HA) và 3 worker, mã hoá lưu lượng pod bằng WireGuard, OpenBao 3 node, PostgreSQL có node thứ hai, mỗi kho dữ liệu một máy riêng, vùng biên và vùng vận hành tách vai trò. Danh sách thành phần theo máy: [`labs/PLACEMENT.full.md`](../../../labs/PLACEMENT.full.md).
+
+<!-- lab-diagram-full:start -->
+```mermaid
+flowchart TB
+  subgraph Z0["Z0 Internet giả lập"]
+    origin["origin<br/>0.11 · 512MiB"]
+    loadgen["loadgen<br/>0.12 · 2GiB"]
+    dns_mock["dns-mock<br/>0.13 · 512MiB"]
+  end
+  subgraph Z1["Z1 Edge DMZ · 10.10.10.0/24"]
+    edge_l7_1["edge-l7-1<br/>10.11 · 2GiB"]
+    edge_l7_2["edge-l7-2<br/>10.12 · 2GiB"]
+    edge_waf_1["edge-waf-1<br/>10.13 · 2GiB"]
+    dns_1["dns-1<br/>10.14 · 512MiB"]
+    valkey_edge["valkey-edge<br/>10.15 · 1GiB"]
+  end
+  subgraph Z2["Z2 Biên · 10.10.20.0/24"]
+    ingress_1["ingress-1<br/>20.11 · 1GiB"]
+    egw_1["egw-1<br/>20.12 · 1GiB"]
+    egress_1["egress-1<br/>20.13 · 1GiB"]
+  end
+  subgraph Z3["Z3 Ứng dụng · 10.10.30.0/24"]
+    k8s_cp_1["k8s-cp-1<br/>30.11 · 4GiB"]
+    k8s_cp_2["k8s-cp-2<br/>30.12 · 4GiB"]
+    k8s_cp_3["k8s-cp-3<br/>30.13 · 4GiB"]
+    k8s_wk_1["k8s-wk-1<br/>30.21 · 8GiB"]
+    k8s_wk_2["k8s-wk-2<br/>30.22 · 8GiB"]
+    k8s_wk_3["k8s-wk-3<br/>30.23 · 8GiB"]
+  end
+  subgraph Z4["Z4 Dữ liệu · 10.10.40.0/24"]
+    pg_1["pg-1<br/>40.11 · 6GiB"]
+    pg_2["pg-2<br/>40.12 · 6GiB"]
+    ch_1["ch-1<br/>40.13 · 8GiB"]
+    kafka_1["kafka-1<br/>40.14 · 4GiB"]
+    mq_1["mq-1<br/>40.15 · 3GiB"]
+    cache_1["cache-1<br/>40.16 · 1GiB"]
+    s3_1["s3-1<br/>40.17 · 2GiB"]
+  end
+  subgraph Z5["Z5 Secret · 10.10.50.0/24"]
+    bao_1["bao-1<br/>50.11 · 1GiB"]
+    bao_2["bao-2<br/>50.12 · 1GiB"]
+    bao_3["bao-3<br/>50.13 · 1GiB"]
+  end
+  subgraph Z6["Z6 Vận hành · 10.10.60.0/24"]
+    bastion["bastion<br/>60.11 · 512MiB"]
+    ci_runner["ci-runner<br/>60.12 · 4GiB"]
+    registry["registry<br/>60.13 · 2GiB"]
+    infra["infra<br/>60.14 · 1GiB"]
+    obs["obs<br/>60.15 · 4GiB"]
+  end
+  FW{{"fw-1<br/>nftables, router L3 duy nhất"}}
+  Z0 --- FW
+  Z1 --- FW
+  Z2 --- FW
+  Z3 --- FW
+  Z4 --- FW
+  Z5 --- FW
+  Z6 --- FW
+```
+
+| Vùng | Máy | RAM (GB) |
+|---|---|---|
+| Z0 | origin, loadgen, dns-mock | 3.0 |
+| Z1 | edge-l7-1, edge-l7-2, edge-waf-1, dns-1, valkey-edge | 7.5 |
+| Z2 | ingress-1, egw-1, egress-1 | 3.0 |
+| Z3 | k8s-cp-1, k8s-cp-2, k8s-cp-3, k8s-wk-1, k8s-wk-2, k8s-wk-3 | 36.0 |
+| Z4 | pg-1, pg-2, ch-1, kafka-1, mq-1, cache-1, s3-1 | 30.0 |
+| Z5 | bao-1, bao-2, bao-3 | 3.0 |
+| Z6 | bastion, ci-runner, registry, infra, obs | 11.5 |
+| (router) | fw-1 | 1.0 |
+| **Tổng VM** | 33 máy | **95.0** |
+| Dự trữ máy chủ | hệ điều hành, Incus, đệm đĩa | 8 (ước lượng) |
+| **Cần** | | **103.0** |
+
+Đĩa cấp phát tối đa khoảng 768 GB (thin provisioning nên dùng thực tế ít hơn). Số RAM là ước lượng thô, chưa đo.
+<!-- lab-diagram-full:end -->
+
 **Chọn theo RAM của máy chủ lab** (ước lượng thô, chưa đo; đề xuất, chờ chủ dự án duyệt). Mã dựng lab viết theo một biến `profile`, đổi máy chủ chỉ đổi biến, không đổi thiết kế mạng:
 
 | RAM máy chủ | Profile | Máy | RAM lab cần (ước lượng) |
@@ -258,7 +338,7 @@ flowchart TB
 | 16 GB | `core` | khoảng 8 | khoảng 10 GB; bỏ Kafka và ClickHouse thật |
 | 32 GB | `min` | khoảng 10 | khoảng 24 GB; bốn plane thu nhỏ, đủ các vùng mạng |
 | **64 GB** | `compact` | khoảng 15 | khoảng 48 GB; HA nhẹ (K8s ba node) |
-| **128 GB** | `full` | khoảng 30 | khoảng 90 GB; hai PoP giả, K8s (3 server, etcd HA, mã hoá lưu lượng pod) và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật |
+| **128 GB** | `full` | 33 | khoảng 95 GB cho VM (cần khoảng 103 GB tính cả máy chủ); hai PoP giả, K8s (3 server, etcd HA, mã hoá lưu lượng pod) và OpenBao đủ HA, dư chỗ cho chaos và dữ liệu Analytics thật |
 
 Chủ dự án dự kiến nâng máy lên 64 đến 128 GB RAM: bắt đầu bằng profile nhỏ, chuyển lên `compact` rồi `full` khi có máy. Với máy 64 đến 128 GB nên dùng **một máy Linux riêng** làm máy chủ lab (Incus chạy trực tiếp, không lồng trong máy ảo khác): lab chạy nhanh hơn, và có card mạng thật để thử tinh chỉnh edge (RSS, IRQ affinity) mà máy ảo lồng không thử được. CPU từ 16 nhân, NVMe từ 1 TB.
 

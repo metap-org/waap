@@ -29,7 +29,10 @@ import gen_nft as g  # noqa: E402
 # ---------- dữ liệu ----------
 def load(profile="compact"):
     zones, prof, flows = g.load(profile)
-    steps = yaml.safe_load(STEPS_FILE.read_text(encoding="utf-8"))
+    sf = STEPS_FILE if profile == "compact" else INFRA / f"steps.{profile}.yaml"
+    if not sf.exists():
+        raise SystemExit(f"chưa có bước chạy từng bước cho profile {profile}: {sf.name}. steps.yaml hiện viết cho compact (tên máy cụ thể); profile {profile} mới có danh sách máy, luật mạng và tuning, chưa có checklist.")
+    steps = yaml.safe_load(sf.read_text(encoding="utf-8"))
     tuning = yaml.safe_load(TUNING_FILE.read_text(encoding="utf-8"))
     return {"zones": zones, "prof": prof, "flows": flows, "steps": steps, "tuning": tuning, "ips": g.vm_ips(zones, prof)}
 

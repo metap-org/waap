@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Canal dùng WireGuard để mã hoá lưu lượng pod giữa các node (docs.rke2.io/networking/basic_network_options).
+# Sau khi áp lần đầu cần khởi động lại daemonset: kubectl -n kube-system rollout restart ds rke2-canal
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-canal
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    flannel:
+      backend: "wireguard"

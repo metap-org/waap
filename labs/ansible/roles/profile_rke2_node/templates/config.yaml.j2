@@ -15,9 +15,15 @@ disable:
   - {{ d }}
 {% endfor %}
 tls-san:
-  - {{ app_listen_ip }}
+{% for ip in rke2_server_ips %}
+  - {{ ip }}
+{% endfor %}
 kube-controller-manager-arg:
   - terminated-pod-gc-threshold=10
+{% if inventory_hostname != rke2_first_server %}
+# Server thứ hai trở đi gia nhập cụm do server đầu khởi tạo (etcd HA)
+server: {{ rke2_api_endpoint }}
+{% endif %}
 {% else %}
 server: {{ rke2_api_endpoint }}
 {% endif %}

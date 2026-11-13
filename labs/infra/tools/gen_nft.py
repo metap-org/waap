@@ -20,6 +20,8 @@ def load(profile):
     zones = yaml.safe_load((HERE / "zones.yaml").read_text())
     prof = yaml.safe_load((HERE / "profiles" / f"{profile}.yaml").read_text())
     flows = yaml.safe_load((HERE / "flows.yaml").read_text())
+    # Luồng có `profiles: [...]` chỉ áp dụng cho các profile đó (ví dụ etcd HA và WireGuard chỉ có ở full).
+    flows["flows"] = [f for f in flows["flows"] if not f.get("profiles") or prof["profile"] in f["profiles"]]
     return zones, prof, flows
 
 
@@ -160,7 +162,7 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
         if not any(d[0] == vm_name for d in dst):
             continue
         src = resolve(f["src"], zones, prof, ips)
-        s_ips = sorted({x[2] for x in src if x[0] != vm_name or f["src"] == f["dst"]})
+        s_ips = sorted({x[2] for x in src if x[0] != vm_name})
         if not s_ips:
             continue
         ports = ", ".join(str(p) for p in f["ports"])
@@ -182,7 +184,7 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
             if not any(x[0] == vm_name for x in src):
                 continue
             dst = resolve(f["dst"], zones, prof, ips)
-            d_ips = sorted({d[2] for d in dst if d[0] != vm_name or f["src"] == f["dst"]})
+            d_ips = sorted({d[2] for d in dst if d[0] != vm_name})
             if d_ips:
                 ports = ", ".join(str(p) for p in f["ports"])
                 L.append(f'    ip daddr {{ {", ".join(d_ips)} }} {f["proto"]} dport {{ {ports} }} accept comment "{f["id"]}"')
