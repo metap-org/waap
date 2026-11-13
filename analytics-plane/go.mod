@@ -1,6 +1,6 @@
 module github.com/metap-org/waap/analytics-plane
 
-go 1.26.10
+go 1.26.11
 
 // Only github.com/metap-org/metap/pkg/kit/* may be imported from metap (standard-library-only
 // helpers; ADR-0009: Analytics is not built on metap). Enforced by .golangci.yml (depguard).

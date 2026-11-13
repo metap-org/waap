@@ -1,6 +1,6 @@
 module github.com/metap-org/waap/management-plane
 
-go 1.26.10
+go 1.26.11
 
 // Non-Go siblings of this module: keep `go ./...` from walking web/node_modules.
 ignore (
