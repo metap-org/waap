@@ -1,0 +1,88 @@
+---
+# Một nguồn sự thật cho giá trị tối ưu hệ điều hành theo dịch vụ. `labs/infra/tools/steps.py` đọc đúng tệp này để sinh
+# checklist và lệnh kiểm, nên số ở đây là số reviewer sẽ thấy trong labs/CHECKLIST.md.
+# Một VM có nhiều vai trò (compact gộp) thì gộp theo thứ tự tuning_precedence, vai trò sau thắng khi trùng khoá.
+tuning_groups: "{{ group_names }}"   # test ghi đè để mô phỏng nhóm của một VM
+tuning_precedence:
+  - role_k8s_cp
+  - role_k8s_app
+  - role_edge_l7
+  - role_edge_waf
+  - role_valkey_edge
+  - role_clickhouse
+  - role_rabbitmq
+  - role_valkey_central
+  - role_postgres
+  - role_openbao
+
+tuning_by_role:
+  role_postgres:
+    why: "swappiness thấp để không đẩy shared_buffers ra swap; dirty_* giới hạn để checkpoint không dồn cục; hugepages = shared_buffers 512MB / 2MB = 256, dư khoảng 15%."
+    sysctl:
+      vm.swappiness: 1
+      vm.dirty_background_bytes: 67108864     # 64 MiB
+      vm.dirty_bytes: 536870912               # 512 MiB
+      vm.overcommit_memory: 1                 # PostgreSQL khuyến nghị 2, nhưng data-1 gộp Redis cần 1; đổi lại 2 khi PostgreSQL ở máy riêng
+      vm.nr_hugepages: 300
+    thp: never
+    limits:
+      "postgresql@16-main": { LimitNOFILE: 65536 }
+  role_valkey_central: &redis
+    why: "Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi."
+    sysctl:
+      vm.overcommit_memory: 1
+      vm.swappiness: 1
+      net.core.somaxconn: 1024
+    thp: never
+    limits:
+      "redis-server": { LimitNOFILE: 65536 }
+  role_valkey_edge: *redis
+  role_rabbitmq:
+    why: "Keepalive 60 giây để phát hiện kết nối chết sớm; nhiều kết nối nên cần nhiều file descriptor."
+    sysctl:
+      vm.swappiness: 1
+      net.ipv4.tcp_keepalive_time: 60
+    limits:
+      "rabbitmq-server": { LimitNOFILE: 65536 }
+  role_clickhouse:
+    why: "ClickHouse mmap nhiều: max_map_count 262144; THP tắt; nhiều file mở cho các part."
+    sysctl:
+      vm.max_map_count: 262144
+      vm.swappiness: 1
+    thp: never
+    limits:
+      "clickhouse-server": { LimitNOFILE: 262144 }
+  role_edge_l7:
+    why: "Hàng đợi accept và SYN đủ lớn cho tải đột biến; dải cổng nguồn rộng để proxy tới origin; không chậm lại sau khi nhàn rỗi."
+    sysctl:
+      net.core.somaxconn: 65535
+      net.core.netdev_max_backlog: 16384
+      net.ipv4.tcp_max_syn_backlog: 16384
+      net.ipv4.ip_local_port_range: "10240 65535"
+      net.ipv4.tcp_tw_reuse: 1
+      net.ipv4.tcp_fin_timeout: 15
+      net.core.rmem_max: 16777216
+      net.core.wmem_max: 16777216
+      fs.file-max: 2097152
+      net.ipv4.tcp_slow_start_after_idle: 0
+  role_edge_waf:
+    why: "WAF tách CPU và RAM qua slice systemd (profile_edge_waf), không đổi sysctl riêng."
+    sysctl: {}
+  role_openbao:
+    why: "Không core dump: bộ nhớ chứa khoá. Không swap (profile_secret)."
+    sysctl:
+      kernel.core_pattern: "|/bin/false"
+  role_k8s_cp: &k8s
+    why: "kubelet protect-kernel-defaults đòi đúng các giá trị này; inotify đủ cho nhiều pod; conntrack đủ cho kube-proxy."
+    sysctl:
+      net.ipv4.ip_forward: 1
+      net.bridge.bridge-nf-call-iptables: 1
+      net.bridge.bridge-nf-call-ip6tables: 1
+      vm.panic_on_oom: 0
+      vm.overcommit_memory: 1
+      kernel.panic: 10
+      kernel.panic_on_oops: 1
+      fs.inotify.max_user_instances: 8192
+      fs.inotify.max_user_watches: 524288
+      net.netfilter.nf_conntrack_max: 262144
+  role_k8s_app: *k8s

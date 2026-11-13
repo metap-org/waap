@@ -1,3 +1,4 @@
 ---
 # Có đường ra qua egress-1 theo ma trận (N21 cho Z3, N29 cho ci-runner).
 apt_proxy: "{{ '' if lab_bootstrap else 'http://' ~ lab_egress_ip ~ ':3128' }}"
+sysctl_ip_forward: 1   # baseline ghi net.ipv4.ip_forward ở 99-*.conf; phải khớp tuning (K8s cần 1)

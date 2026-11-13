@@ -1,0 +1,1094 @@
+# Checklist chạy lab từng bước
+
+Sinh tự động bởi `labs/infra/tools/steps.py doc` từ `labs/infra/steps.yaml` và bảng tuning ở `labs/ansible/roles/os_tuning/defaults/main.yml`. **Không sửa tay.**
+
+Cách dùng (trên máy lab): `labs/bin/lab step list`, rồi từng bước `show` (đọc), `run` (chạy), `verify` (kiểm). `run` từ chối nếu bước phụ thuộc chưa `verify` đạt.
+
+Giá trị trong cột **Phải là** là giá trị mục tiêu của profile `compact` (ước lượng, chưa đo trên máy thật). Mục **THỦ CÔNG** cần người đọc.
+
+## P0. Máy chủ lab sẵn sàng
+
+### P0.1 Máy chủ lab đủ điều kiện
+
+**Vì sao:** Phát hiện sớm thiếu RAM, đĩa, ảo hoá lồng hay công cụ, trước khi dựng bất cứ thứ gì.
+
+**Phụ thuộc:** không  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab check
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Incus đã cài | `host` | lệnh thành công (rc=0) | `incus --version` |
+| KVM có (ảo hoá lồng bật) | `host` | lệnh thành công (rc=0) | `test -e /dev/kvm` |
+| RAM máy chủ (GB) | `host` | ≥ 50 | `free -g \| awk '/Mem:/{print $2}'` |
+| CPU luồng | `host` | ≥ 8 | `nproc` |
+| Đĩa trống cho Incus (GB) | `host` | ≥ 200 | `df --output=avail -BG /var/lib/incus 2>/dev/null \| tail -1 \| tr -dc 0-9` |
+| OpenTofu | `host` | lệnh thành công (rc=0) | `tofu --version` |
+| Ansible | `host` | lệnh thành công (rc=0) | `ansible-playbook --version` |
+| Ma trận luồng và luật sinh ra khớp (T07) | `host` | lệnh thành công (rc=0) | `python3 labs/infra/tools/gen_nft.py check compact` |
+
+**Hoàn tác:** Không có gì để hoàn tác.
+
+### P0.2 Khoá và bí mật của lab
+
+**Vì sao:** SSH CA, mật khẩu ngẫu nhiên cho database. Nằm ngoài Git (generated/), quyền 0600.
+
+**Phụ thuộc:** P0.1  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab ssh-ca
+$ labs/bin/lab secrets
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Khoá riêng CA SSH quyền 600 | `host` | = 600 | `stat -c %a labs/infra/generated/ssh_user_ca` |
+| secrets.yml quyền 600 | `host` | = 600 | `stat -c %a labs/infra/generated/secrets.yml` |
+| secrets.yml không nằm trong Git | `host` | lệnh thành công (rc=0) | `git check-ignore -q labs/infra/generated/secrets.yml` |
+
+**Hoàn tác:** Xoá labs/infra/generated/ (sinh lại được).
+
+## P1. Mạng ảo và fw-1
+
+### P1.1 Dựng 8 cầu ảo (7 vùng và uplink)
+
+**Vì sao:** Mỗi vùng một cầu riêng, máy chủ không có IP trên cầu, nên không có đường định tuyến giữa các vùng ngoài fw-1.
+
+**Phụ thuộc:** P0.2  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab tf net
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Đủ 8 cầu lab-* | `host` | = 8 | `incus network list -f csv \| grep -c '^lab-'` |
+| Z0 không IP trên máy chủ | `host` | = none | `incus network get lab-z0 ipv4.address` |
+| Z1 không IP trên máy chủ | `host` | = none | `incus network get lab-z1 ipv4.address` |
+| Z2 không IP trên máy chủ | `host` | = none | `incus network get lab-z2 ipv4.address` |
+| Z3 không IP trên máy chủ | `host` | = none | `incus network get lab-z3 ipv4.address` |
+| Z4 không IP trên máy chủ | `host` | = none | `incus network get lab-z4 ipv4.address` |
+| Z5 không IP trên máy chủ | `host` | = none | `incus network get lab-z5 ipv4.address` |
+| Z6 không IP trên máy chủ | `host` | = none | `incus network get lab-z6 ipv4.address` |
+| Uplink có NAT | `host` | = true | `incus network get lab-up ipv4.nat` |
+| Uplink dải riêng | `host` | = 10.10.254.1/24 | `incus network get lab-up ipv4.address` |
+
+**Hoàn tác:** labs/bin/lab destroy (xoá cả lab) hoặc tofu destroy -target=incus_network.zone
+
+### P1.2 Boot fw-1 (router duy nhất giữa các vùng)
+
+**Vì sao:** fw-1 có một card mạng ở mỗi vùng cộng uplink. Nó là router L3 duy nhất; không VM nào khác có hai card.
+
+**Phụ thuộc:** P1.1  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab tf fw
+$ incus exec fw-1 -- cloud-init status --wait
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| fw-1 đang chạy | `host` | = RUNNING | `incus list fw-1 -c s -f csv` |
+| Secure Boot tắt (ảnh images:* không ký; ghi là rủi ro ADR-0045) | `host` | = false | `incus config get fw-1 security.secureboot` |
+| RAM của fw-1 | `host` | = 1GiB | `incus config get fw-1 limits.memory` |
+| vCPU của fw-1 | `host` | = 2 | `incus config get fw-1 limits.cpu` |
+| cloud-init xong | `fw-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| Đủ 8 card mạng (z0 đến z6 và uplink) | `fw-1` | = 8 | `ls /sys/class/net \| grep -cE '^(z[0-6]\|uplink)$'` |
+| IP z0 | `fw-1` | = 10.10.0.1/24 | `ip -4 -o addr show z0 \| awk '{print $4}'` |
+| IP z1 | `fw-1` | = 10.10.10.1/24 | `ip -4 -o addr show z1 \| awk '{print $4}'` |
+| IP z2 | `fw-1` | = 10.10.20.1/24 | `ip -4 -o addr show z2 \| awk '{print $4}'` |
+| IP z3 | `fw-1` | = 10.10.30.1/24 | `ip -4 -o addr show z3 \| awk '{print $4}'` |
+| IP z4 | `fw-1` | = 10.10.40.1/24 | `ip -4 -o addr show z4 \| awk '{print $4}'` |
+| IP z5 | `fw-1` | = 10.10.50.1/24 | `ip -4 -o addr show z5 \| awk '{print $4}'` |
+| IP z6 | `fw-1` | = 10.10.60.1/24 | `ip -4 -o addr show z6 \| awk '{print $4}'` |
+| Định tuyến IP bật | `fw-1` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+| Ra Internet qua uplink | `fw-1` | lệnh thành công (rc=0) | `ping -c1 -W3 1.1.1.1 >/dev/null` |
+
+**Hoàn tác:** incus delete -f fw-1 (tofu dựng lại được)
+
+### P1.3 Luật nftables của fw-1 (chế độ bootstrap)
+
+**Vì sao:** Default-deny, chỉ các luồng trong ma trận 7.6 được chuyển tiếp; bootstrap tạm cho các vùng ra Internet để cài gói (gỡ ở P9.1).
+
+**Phụ thuộc:** P1.2  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab fw bootstrap
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| forward policy drop | `fw-1` | = 1 | `nft list chain inet lab forward \| grep -c 'policy drop'` |
+| input policy drop | `fw-1` | = 1 | `nft list chain inet lab input \| grep -c 'policy drop'` |
+| Số luật chuyển tiếp khớp ma trận ({fw_rules} luật) | `fw-1` | ≥ {fw_rules} | `nft list chain inet lab forward \| grep -c ' accept comment '` |
+| Có luật bootstrap (tạm) | `fw-1` | ≥ 2 | `nft list chain inet lab forward \| grep -c BOOTSTRAP` |
+| NAT ra uplink | `fw-1` | = 1 | `nft list table ip labnat \| grep -c masquerade` |
+| SSH vào fw-1 chỉ từ bastion (10.10.60.11) | `fw-1` | = 1 | `nft list chain inet lab input \| grep -c '10.10.60.11'` |
+
+**Hoàn tác:** labs/bin/lab fw bootstrap để nạp lại; xem luật bằng `incus exec fw-1 -- nft list ruleset`
+
+## P2. Boot VM theo từng vùng
+
+### P2.1 Boot Z6 Vận hành (bastion, ops-1)
+
+**Vì sao:** Boot một vùng một lần, kiểm trước khi sang vùng sau. Vận hành đứng đầu vì bastion là cửa quản trị.
+
+**Phụ thuộc:** P1.3  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab tf vm bastion ops-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| bastion đang chạy | `host` | = RUNNING | `incus list bastion -c s -f csv` |
+| bastion RAM cấp theo profile | `host` | = 512MiB | `incus config get bastion limits.memory` |
+| bastion số vCPU theo profile | `host` | = 1 | `incus config get bastion limits.cpu` |
+| cloud-init xong | `bastion` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z6 | `bastion` | = 10.10.60.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `bastion` | = 10.10.60.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `bastion` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.60.1 >/dev/null` |
+| tên máy đúng | `bastion` | = bastion | `hostname` |
+| ops-1 đang chạy | `host` | = RUNNING | `incus list ops-1 -c s -f csv` |
+| ops-1 RAM cấp theo profile | `host` | = 4GiB | `incus config get ops-1 limits.memory` |
+| ops-1 số vCPU theo profile | `host` | = 2 | `incus config get ops-1 limits.cpu` |
+| cloud-init xong | `ops-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z6 | `ops-1` | = 10.10.60.12/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `ops-1` | = 10.10.60.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `ops-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.60.1 >/dev/null` |
+| tên máy đúng | `ops-1` | = ops-1 | `hostname` |
+
+**Hoàn tác:** incus delete -f <vm>
+
+### P2.2 Boot Z5 Secret (bao-1)
+
+**Vì sao:** Vùng nhạy cảm nhất; chỉ một VM.
+
+**Phụ thuộc:** P2.1  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab tf vm bao-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| bao-1 đang chạy | `host` | = RUNNING | `incus list bao-1 -c s -f csv` |
+| bao-1 RAM cấp theo profile | `host` | = 1GiB | `incus config get bao-1 limits.memory` |
+| bao-1 số vCPU theo profile | `host` | = 1 | `incus config get bao-1 limits.cpu` |
+| cloud-init xong | `bao-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z5 | `bao-1` | = 10.10.50.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `bao-1` | = 10.10.50.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `bao-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.50.1 >/dev/null` |
+| tên máy đúng | `bao-1` | = bao-1 | `hostname` |
+
+**Hoàn tác:** incus delete -f bao-1
+
+### P2.3 Boot Z4 Dữ liệu (data-1, ch-1, kafka-1)
+
+**Vì sao:** Đĩa phụ được tạo cùng VM (xem P6 để gắn).
+
+**Phụ thuộc:** P2.2  ·  **Thời gian dự kiến:** 4 phút
+
+```
+$ labs/bin/lab tf vm data-1 ch-1 kafka-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| data-1 đang chạy | `host` | = RUNNING | `incus list data-1 -c s -f csv` |
+| data-1 RAM cấp theo profile | `host` | = 5GiB | `incus config get data-1 limits.memory` |
+| data-1 số vCPU theo profile | `host` | = 2 | `incus config get data-1 limits.cpu` |
+| cloud-init xong | `data-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z4 | `data-1` | = 10.10.40.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `data-1` | = 10.10.40.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `data-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.40.1 >/dev/null` |
+| tên máy đúng | `data-1` | = data-1 | `hostname` |
+| ch-1 đang chạy | `host` | = RUNNING | `incus list ch-1 -c s -f csv` |
+| ch-1 RAM cấp theo profile | `host` | = 4GiB | `incus config get ch-1 limits.memory` |
+| ch-1 số vCPU theo profile | `host` | = 2 | `incus config get ch-1 limits.cpu` |
+| cloud-init xong | `ch-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z4 | `ch-1` | = 10.10.40.12/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `ch-1` | = 10.10.40.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `ch-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.40.1 >/dev/null` |
+| tên máy đúng | `ch-1` | = ch-1 | `hostname` |
+| kafka-1 đang chạy | `host` | = RUNNING | `incus list kafka-1 -c s -f csv` |
+| kafka-1 RAM cấp theo profile | `host` | = 3GiB | `incus config get kafka-1 limits.memory` |
+| kafka-1 số vCPU theo profile | `host` | = 2 | `incus config get kafka-1 limits.cpu` |
+| cloud-init xong | `kafka-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z4 | `kafka-1` | = 10.10.40.13/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `kafka-1` | = 10.10.40.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `kafka-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.40.1 >/dev/null` |
+| tên máy đúng | `kafka-1` | = kafka-1 | `hostname` |
+| Thấy đĩa phụ data và wal | `data-1` | ≥ 2 | `ls /dev/disk/by-id \| grep -cE 'incus_(data\|wal)'` |
+| Thấy đĩa phụ data | `ch-1` | ≥ 1 | `ls /dev/disk/by-id \| grep -c 'incus_data'` |
+| Thấy đĩa phụ data | `kafka-1` | ≥ 1 | `ls /dev/disk/by-id \| grep -c 'incus_data'` |
+
+**Hoàn tác:** incus delete -f <vm>; incus storage volume delete default <vm>-<đĩa>
+
+### P2.4 Boot Z3 Ứng dụng (k8s-cp-1, k8s-wk-1, k8s-wk-2)
+
+**Vì sao:** Ba node cho K8s; chỉ boot, chưa cài K8s.
+
+**Phụ thuộc:** P2.3  ·  **Thời gian dự kiến:** 5 phút
+
+```
+$ labs/bin/lab tf vm k8s-cp-1 k8s-wk-1 k8s-wk-2
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| k8s-cp-1 đang chạy | `host` | = RUNNING | `incus list k8s-cp-1 -c s -f csv` |
+| k8s-cp-1 RAM cấp theo profile | `host` | = 3GiB | `incus config get k8s-cp-1 limits.memory` |
+| k8s-cp-1 số vCPU theo profile | `host` | = 2 | `incus config get k8s-cp-1 limits.cpu` |
+| cloud-init xong | `k8s-cp-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z3 | `k8s-cp-1` | = 10.10.30.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `k8s-cp-1` | = 10.10.30.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `k8s-cp-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.30.1 >/dev/null` |
+| tên máy đúng | `k8s-cp-1` | = k8s-cp-1 | `hostname` |
+| k8s-wk-1 đang chạy | `host` | = RUNNING | `incus list k8s-wk-1 -c s -f csv` |
+| k8s-wk-1 RAM cấp theo profile | `host` | = 6GiB | `incus config get k8s-wk-1 limits.memory` |
+| k8s-wk-1 số vCPU theo profile | `host` | = 3 | `incus config get k8s-wk-1 limits.cpu` |
+| cloud-init xong | `k8s-wk-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z3 | `k8s-wk-1` | = 10.10.30.21/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `k8s-wk-1` | = 10.10.30.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `k8s-wk-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.30.1 >/dev/null` |
+| tên máy đúng | `k8s-wk-1` | = k8s-wk-1 | `hostname` |
+| k8s-wk-2 đang chạy | `host` | = RUNNING | `incus list k8s-wk-2 -c s -f csv` |
+| k8s-wk-2 RAM cấp theo profile | `host` | = 6GiB | `incus config get k8s-wk-2 limits.memory` |
+| k8s-wk-2 số vCPU theo profile | `host` | = 3 | `incus config get k8s-wk-2 limits.cpu` |
+| cloud-init xong | `k8s-wk-2` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z3 | `k8s-wk-2` | = 10.10.30.22/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `k8s-wk-2` | = 10.10.30.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `k8s-wk-2` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.30.1 >/dev/null` |
+| tên máy đúng | `k8s-wk-2` | = k8s-wk-2 | `hostname` |
+
+**Hoàn tác:** incus delete -f <vm>
+
+### P2.5 Boot Z2 Biên (perimeter-1)
+
+**Vì sao:** Một VM gộp ingress-1, egw-1 và egress-1.
+
+**Phụ thuộc:** P2.4  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab tf vm perimeter-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| perimeter-1 đang chạy | `host` | = RUNNING | `incus list perimeter-1 -c s -f csv` |
+| perimeter-1 RAM cấp theo profile | `host` | = 2GiB | `incus config get perimeter-1 limits.memory` |
+| perimeter-1 số vCPU theo profile | `host` | = 2 | `incus config get perimeter-1 limits.cpu` |
+| cloud-init xong | `perimeter-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z2 | `perimeter-1` | = 10.10.20.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `perimeter-1` | = 10.10.20.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `perimeter-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.20.1 >/dev/null` |
+| tên máy đúng | `perimeter-1` | = perimeter-1 | `hostname` |
+
+**Hoàn tác:** incus delete -f perimeter-1
+
+### P2.6 Boot Z1 Edge DMZ (edge-1, dns-1)
+
+**Vì sao:** Vùng tin thấp nhất trong số các vùng nội bộ.
+
+**Phụ thuộc:** P2.5  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab tf vm edge-1 dns-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| edge-1 đang chạy | `host` | = RUNNING | `incus list edge-1 -c s -f csv` |
+| edge-1 RAM cấp theo profile | `host` | = 3GiB | `incus config get edge-1 limits.memory` |
+| edge-1 số vCPU theo profile | `host` | = 2 | `incus config get edge-1 limits.cpu` |
+| cloud-init xong | `edge-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z1 | `edge-1` | = 10.10.10.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `edge-1` | = 10.10.10.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `edge-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.10.1 >/dev/null` |
+| tên máy đúng | `edge-1` | = edge-1 | `hostname` |
+| dns-1 đang chạy | `host` | = RUNNING | `incus list dns-1 -c s -f csv` |
+| dns-1 RAM cấp theo profile | `host` | = 512MiB | `incus config get dns-1 limits.memory` |
+| dns-1 số vCPU theo profile | `host` | = 1 | `incus config get dns-1 limits.cpu` |
+| cloud-init xong | `dns-1` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z1 | `dns-1` | = 10.10.10.12/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `dns-1` | = 10.10.10.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `dns-1` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.10.1 >/dev/null` |
+| tên máy đúng | `dns-1` | = dns-1 | `hostname` |
+| Thấy đĩa cache | `edge-1` | ≥ 1 | `ls /dev/disk/by-id \| grep -c 'incus_cache'` |
+
+**Hoàn tác:** incus delete -f <vm>
+
+### P2.7 Boot Z0 Internet giả (origin, loadgen, dns-mock)
+
+**Vì sao:** Các VM đóng vai bên ngoài; chưa cài gì lên chúng.
+
+**Phụ thuộc:** P2.6  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab tf vm origin loadgen dns-mock
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| origin đang chạy | `host` | = RUNNING | `incus list origin -c s -f csv` |
+| origin RAM cấp theo profile | `host` | = 512MiB | `incus config get origin limits.memory` |
+| origin số vCPU theo profile | `host` | = 1 | `incus config get origin limits.cpu` |
+| cloud-init xong | `origin` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z0 | `origin` | = 10.10.0.11/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `origin` | = 10.10.0.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `origin` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.0.1 >/dev/null` |
+| tên máy đúng | `origin` | = origin | `hostname` |
+| loadgen đang chạy | `host` | = RUNNING | `incus list loadgen -c s -f csv` |
+| loadgen RAM cấp theo profile | `host` | = 1GiB | `incus config get loadgen limits.memory` |
+| loadgen số vCPU theo profile | `host` | = 2 | `incus config get loadgen limits.cpu` |
+| cloud-init xong | `loadgen` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z0 | `loadgen` | = 10.10.0.12/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `loadgen` | = 10.10.0.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `loadgen` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.0.1 >/dev/null` |
+| tên máy đúng | `loadgen` | = loadgen | `hostname` |
+| dns-mock đang chạy | `host` | = RUNNING | `incus list dns-mock -c s -f csv` |
+| dns-mock RAM cấp theo profile | `host` | = 512MiB | `incus config get dns-mock limits.memory` |
+| dns-mock số vCPU theo profile | `host` | = 1 | `incus config get dns-mock limits.cpu` |
+| cloud-init xong | `dns-mock` | = done | `cloud-init status \| awk '{print $2}'` |
+| IP đúng vùng Z0 | `dns-mock` | = 10.10.0.13/24 | `ip -4 -o addr show lab0 \| awk '{print $4}'` |
+| gateway là fw-1 | `dns-mock` | = 10.10.0.1 | `ip route \| awk '/^default/{print $3}'` |
+| ping được fw-1 | `dns-mock` | lệnh thành công (rc=0) | `ping -c1 -W2 10.10.0.1 >/dev/null` |
+| tên máy đúng | `dns-mock` | = dns-mock | `hostname` |
+
+**Hoàn tác:** incus delete -f <vm>
+
+## P3. Hardening hệ điều hành từng lớp
+
+### P3.1 Gói bắt buộc và gỡ trình biên dịch
+
+**Vì sao:** ADR-0048, "Dịch vụ": chỉ gói cần thiết, không trình biên dịch, không công cụ mạng cũ.
+
+**Phụ thuộc:** P2.7  ·  **Thời gian dự kiến:** 6 phút (16 máy cài song song theo ansible forks)
+
+```
+$ labs/bin/lab provision --tags packages
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| auditd đã cài | `all` | = 1 | `dpkg -s auditd \| grep -c 'Status: install ok installed'` |
+| aide đã cài | `all` | = 1 | `dpkg -s aide \| grep -c 'Status: install ok installed'` |
+| chrony đã cài | `all` | = 1 | `dpkg -s chrony \| grep -c 'Status: install ok installed'` |
+| nftables đã cài | `all` | = 1 | `dpkg -s nftables \| grep -c 'Status: install ok installed'` |
+| Không có gcc | `all` | = 1 | `command -v gcc >/dev/null 2>&1; echo $?` |
+| Không có make | `all` | = 1 | `command -v make >/dev/null 2>&1; echo $?` |
+| Không có telnet | `all` | = 1 | `command -v telnet >/dev/null 2>&1; echo $?` |
+
+**Hoàn tác:** Cài lại gói bằng apt nếu cần; bước idempotent.
+
+### P3.2 Truy cập (SSH, người dùng, sudo)
+
+**Vì sao:** Chỉ SSH cert, không mật khẩu, không root, nhóm ops, sudo có ghi log. Lab vẫn vào bằng incus exec nên không tự khoá.
+
+**Phụ thuộc:** P3.1  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab provision --tags access
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Cấm đăng nhập root | `all` | = no | `sshd -T \| awk '/^permitrootlogin/{print $2}'` |
+| Cấm mật khẩu | `all` | = no | `sshd -T \| awk '/^passwordauthentication/{print $2}'` |
+| Chỉ nhóm ops được SSH | `all` | = ops | `sshd -T \| awk '/^allowgroups/{print $2}'` |
+| Tối đa 3 lần thử | `all` | = 3 | `sshd -T \| awk '/^maxauthtries/{print $2}'` |
+| Hết hạn đăng nhập 30 giây | `all` | = 30 | `sshd -T \| awk '/^logingracetime/{print $2}'` |
+| Ngắt phiên rảnh 300 giây | `all` | = 300 | `sshd -T \| awk '/^clientaliveinterval/{print $2}'` |
+| Không X11 | `all` | = no | `sshd -T \| awk '/^x11forwarding/{print $2}'` |
+| Không chuyển tiếp TCP | `all-except:bastion` | = no | `sshd -T \| awk '/^allowtcpforwarding/{print $2}'` |
+| Bastion cho chuyển tiếp TCP (ProxyJump) | `bastion` | = yes | `sshd -T \| awk '/^allowtcpforwarding/{print $2}'` |
+| Có CA SSH tin cậy | `all` | = 1 | `sshd -T \| grep -c '^trustedusercakeys'` |
+| Mật khẩu root bị khoá | `all` | = L | `passwd -S root \| awk '{print $2}'` |
+| sudoers của ops quyền 440 | `all` | = 440 | `stat -c %a /etc/sudoers.d/90-waap-ops` |
+| sudo ghi log | `all` | = 1 | `grep -c 'logfile="/var/log/sudo.log"' /etc/sudoers.d/90-waap-ops` |
+
+**Hoàn tác:** Xoá /etc/ssh/sshd_config.d/10-waap-hardening.conf rồi systemctl restart ssh (qua incus exec).
+
+### P3.3 Hệ tệp và module kernel
+
+**Vì sao:** /tmp và /dev/shm không thực thi được; chặn module không dùng (USB, FireWire, hệ tệp lạ, giao thức hiếm).
+
+**Phụ thuộc:** P3.2  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags filesystem
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| /tmp noexec,nosuid,nodev | `all` | chứa noexec, nosuid, nodev | `findmnt -no OPTIONS /tmp` |
+| /tmp là tmpfs | `all` | = tmpfs | `findmnt -no FSTYPE /tmp` |
+| /dev/shm noexec,nosuid,nodev | `all` | chứa noexec, nosuid, nodev | `findmnt -no OPTIONS /dev/shm` |
+| Chặn usb-storage | `all` | chứa /bin/false | `modprobe -n -v usb-storage` |
+| Chặn firewire-core | `all` | chứa /bin/false | `modprobe -n -v firewire-core` |
+| Chặn cramfs | `all` | chứa /bin/false | `modprobe -n -v cramfs` |
+| Chặn sctp | `all` | chứa /bin/false | `modprobe -n -v sctp` |
+
+**Hoàn tác:** Sửa /etc/fstab và /etc/modprobe.d/90-waap-blacklist.conf.
+
+### P3.4 Dịch vụ hệ thống
+
+**Vì sao:** Tắt dịch vụ không dùng; bật AppArmor, auditd.
+
+**Phụ thuộc:** P3.3  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags services
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| AppArmor chạy | `all` | = active | `systemctl is-active apparmor` |
+| avahi không chạy | `all` | khớp /^(inactive\|unknown\|failed)/ | `systemctl is-active avahi-daemon; true` |
+| cups không chạy | `all` | khớp /^(inactive\|unknown\|failed)/ | `systemctl is-active cups; true` |
+| rpcbind không chạy | `all` | khớp /^(inactive\|unknown\|failed)/ | `systemctl is-active rpcbind; true` |
+| Không có profile AppArmor ở chế độ complain | `all` | = 0 | `aa-status --complaining` |
+
+**Hoàn tác:** Bật lại bằng systemctl unmask.
+
+### P3.5 Sysctl chuẩn (mạng và kernel)
+
+**Vì sao:** Chống giả mạo IP, tắt redirect, ASLR, che con trỏ kernel; tắt IPv6 ở lab. Chuyển tiếp IP chỉ bật ở fw-1 và node K8s.
+
+**Phụ thuộc:** P3.4  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags kernel
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| rp_filter | `all` | = 1 | `sysctl -n net.ipv4.conf.all.rp_filter` |
+| Không nhận source route | `all` | = 0 | `sysctl -n net.ipv4.conf.all.accept_source_route` |
+| Không nhận redirect | `all` | = 0 | `sysctl -n net.ipv4.conf.all.accept_redirects` |
+| Không gửi redirect | `all` | = 0 | `sysctl -n net.ipv4.conf.all.send_redirects` |
+| Ghi log gói lạ | `all` | = 1 | `sysctl -n net.ipv4.conf.all.log_martians` |
+| SYN cookies | `all` | = 1 | `sysctl -n net.ipv4.tcp_syncookies` |
+| Tắt IPv6 | `all` | = 1 | `sysctl -n net.ipv6.conf.all.disable_ipv6` |
+| ASLR đầy đủ | `all` | = 2 | `sysctl -n kernel.randomize_va_space` |
+| Che con trỏ kernel | `all` | = 2 | `sysctl -n kernel.kptr_restrict` |
+| Hạn chế dmesg | `all` | = 1 | `sysctl -n kernel.dmesg_restrict` |
+| ptrace chỉ cha con | `all` | = 1 | `sysctl -n kernel.yama.ptrace_scope` |
+| bpf không đặc quyền tắt (Ubuntu mặc định 2 | `all` | = 2 | `sysctl -n kernel.unprivileged_bpf_disabled` |
+| Không core dump suid | `all` | = 0 | `sysctl -n fs.suid_dumpable` |
+| Không định tuyến IP | `all-except:firewall,k8s-cp,k8s-app` | = 0 | `sysctl -n net.ipv4.ip_forward` |
+| fw-1 định tuyến IP | `fw-1` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+| Node K8s định tuyến IP | `role:k8s-cp` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+| Node K8s định tuyến IP | `role:k8s-app` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+
+**Hoàn tác:** Xoá /etc/sysctl.d/99-waap-hardening.conf rồi sysctl --system.
+
+### P3.6 auditd
+
+**Vì sao:** Ghi nhận thay đổi danh tính, sudo, SSH, giờ hệ thống, module kernel, mount, xoá tệp.
+
+**Phụ thuộc:** P3.5  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags audit
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| auditd chạy | `all` | = active | `systemctl is-active auditd` |
+| Audit bật | `all` | = 1 | `auditctl -s \| awk '/^enabled/{print $2}'` |
+| Số luật đã nạp | `all` | ≥ 20 | `auditctl -l \| wc -l` |
+| Có luật identity (passwd | `all` | ≥ 4 | `auditctl -l \| grep -c 'k identity'` |
+| Có luật sudoers | `all` | ≥ 2 | `auditctl -l \| grep -c 'k sudoers'` |
+| Có luật sshd | `all` | ≥ 3 | `auditctl -l \| grep -c 'k sshd'` |
+| Có luật đổi giờ | `all` | ≥ 1 | `auditctl -l \| grep -c 'k time-change'` |
+| Có luật nạp module kernel | `all` | ≥ 1 | `auditctl -l \| grep -c 'k modules'` |
+
+**Hoàn tác:** Xoá /etc/audit/rules.d/90-waap.rules rồi augenrules --load.
+
+### P3.7 AIDE (toàn vẹn tệp hệ thống)
+
+**Vì sao:** Cơ sở dữ liệu băm ban đầu; thay đổi ngoài Ansible bị báo.
+
+**Phụ thuộc:** P3.6  ·  **Thời gian dự kiến:** 15 phút (aideinit quét cả hệ tệp)
+
+```
+$ labs/bin/lab provision --tags aide
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Cơ sở dữ liệu AIDE có nội dung | `all-except:firewall` | lệnh thành công (rc=0) | `test -s /var/lib/aide/aide.db` |
+| Kiểm AIDE hằng ngày bật | `all-except:firewall` | = enabled | `systemctl is-enabled dailyaidecheck.timer` |
+| Ngay sau khởi tạo AIDE không báo thay đổi (rc 0) | `all-except:firewall` | lệnh thành công (rc=0) | `aide --check >/dev/null 2>&1` |
+
+**Hoàn tác:** rm /var/lib/aide/aide.db rồi chạy lại bước.
+
+### P3.8 Đồng bộ giờ và vá tự động
+
+**Vì sao:** Giờ chuẩn cho cert 24 giờ và log; vá bảo mật tự động, khởi động lại 03:30.
+
+**Phụ thuộc:** P3.7  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab provision --tags updates
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| chrony chạy | `all` | = active | `systemctl is-active chrony` |
+| Có ít nhất một nguồn giờ | `all` | ≥ 1 | `chronyc sources \| grep -c '^\^'` |
+| Không phục vụ giờ cho ai (cổng 0) | `all` | = 1 | `grep -c '^port 0' /etc/chrony/chrony.conf` |
+| Vá tự động bật | `all` | = 1 | `grep -c 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades` |
+| Chỉ vá bảo mật | `all` | ≥ 1 | `grep -c 'security' /etc/apt/apt.conf.d/52unattended-upgrades-waap` |
+| Giờ khởi động lại | `all` | = 03:30 | `grep -o '03:30' /etc/apt/apt.conf.d/52unattended-upgrades-waap` |
+| Không khởi động lại khi có người đăng nhập | `all` | = 1 | `grep -c 'Automatic-Reboot-WithUsers "false"' /etc/apt/apt.conf.d/52unattended-upgrades-waap` |
+
+**Hoàn tác:** Xoá các tệp apt.conf.d/20auto-upgrades và 52unattended-upgrades-waap.
+
+## P4. Firewall máy chủ
+
+### P4.1 Xem trước luật firewall máy chủ (không áp dụng)
+
+**Vì sao:** Luật input default-deny của từng máy sinh từ ma trận. Đọc trước để chắc không tự chặn đường quản trị.
+
+**Phụ thuộc:** P3.8  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab provision --tags hostfw --check --diff
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Mọi luật máy chủ qua nft -c | `host` | lệnh thành công (rc=0) | `for f in labs/infra/generated/compact/hosts/*.nft; do nft -c -f $f \|\| exit 1; done` |
+| Có luật SSH từ bastion (N25) ở mọi máy | `host` | = 1 | `grep -L 'N25' labs/infra/generated/compact/hosts/*.nft \| wc -l` |
+| Đọc diff: không máy nào mất đường SSH từ bastion; luật chỉ mở cổng có dòng trong ma trận | `host` | THỦ CÔNG (đọc đầu ra của lệnh run) | |
+
+**Hoàn tác:** Bước chỉ xem, không đổi gì.
+
+### P4.2 Áp firewall máy chủ
+
+**Vì sao:** Input default-deny trên từng VM, cộng egress khoá cho vai trò nhạy cảm (kho dữ liệu, OpenBao, WAF) khi seal.
+
+**Phụ thuộc:** P4.1  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab provision --tags hostfw
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| nftables chạy | `all-except:firewall` | = active | `systemctl is-active nftables` |
+| Input policy drop | `all-except:firewall` | = 1 | `nft list chain inet host input \| grep -c 'policy drop'` |
+| Luật nạp từ tệp sinh tự động | `all-except:firewall` | = 1 | `grep -c 'Sinh tự động' /etc/nftables.conf` |
+| Bastion vẫn SSH được data-1 (N25) | `bastion` | lệnh thành công (rc=0) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/22'` |
+
+**Hoàn tác:** incus exec <vm> -- nft flush ruleset (tạm), rồi sửa flows.yaml và chạy lại.
+
+### P4.3 Thăm dò mạng sinh từ ma trận
+
+**Vì sao:** Luồng cho phép phải đến được, luồng cấm phải hết thời gian. Kiểm hai chiều bằng chạy thật (T01 đến T07).
+
+**Phụ thuộc:** P4.2  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab nettest
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Mọi thăm dò đúng kỳ vọng | `host` | lệnh thành công (rc=0) | `labs/bin/lab nettest` |
+| Edge không tới được data-1 5432 (X01) | `edge-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
+| Edge không tới được bao-1 8200 (X01) | `edge-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.50.11/8200'` |
+| Internet giả không tới được data-1 (X02) | `loadgen` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
+| OpenBao không gọi ra được vùng khác (X05) | `bao-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
+
+**Hoàn tác:** Không đổi gì.
+
+## P5. Tối ưu hệ điều hành theo dịch vụ
+
+### P5.1 Tuning cho data-1 (PostgreSQL, RabbitMQ, Redis trên cùng máy)
+
+**Vì sao:** Ba dịch vụ dùng chung kernel nên giá trị được gộp; xung đột ghi ở cuối mục này. Hugepage cấp sẵn cho shared_buffers.
+
+**Phụ thuộc:** P4.3  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags tuning --limit data-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| sysctl net.core.somaxconn | `data-1` | = 1024 | `sysctl -n net.core.somaxconn` |
+| sysctl net.ipv4.tcp_keepalive_time | `data-1` | = 60 | `sysctl -n net.ipv4.tcp_keepalive_time` |
+| sysctl vm.dirty_background_bytes | `data-1` | = 67108864 | `sysctl -n vm.dirty_background_bytes` |
+| sysctl vm.dirty_bytes | `data-1` | = 536870912 | `sysctl -n vm.dirty_bytes` |
+| sysctl vm.nr_hugepages | `data-1` | = 300 | `sysctl -n vm.nr_hugepages` |
+| sysctl vm.overcommit_memory | `data-1` | = 1 | `sysctl -n vm.overcommit_memory` |
+| sysctl vm.swappiness | `data-1` | = 1 | `sysctl -n vm.swappiness` |
+| transparent hugepage | `data-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+| hugepage thực sự cấp được | `data-1` | = 300 | `awk '/HugePages_Total/{print $2}' /proc/meminfo` |
+
+**Vì sao các giá trị này:**
+- `data-1` (role_rabbitmq): Keepalive 60 giây để phát hiện kết nối chết sớm; nhiều kết nối nên cần nhiều file descriptor.
+- `data-1` (role_valkey_central): Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
+- `data-1` (role_postgres): swappiness thấp để không đẩy shared_buffers ra swap; dirty_* giới hạn để checkpoint không dồn cục; hugepages = shared_buffers 512MB / 2MB = 256, dư khoảng 15%.
+
+**Hoàn tác:** Xoá /etc/sysctl.d/95-waap-tuning.conf và waap-thp-off.service rồi sysctl --system.
+
+### P5.2 Tuning cho ch-1 (ClickHouse)
+
+**Vì sao:** max_map_count cho mmap, THP tắt, swappiness thấp.
+
+**Phụ thuộc:** P5.1  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags tuning --limit ch-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| sysctl vm.max_map_count | `ch-1` | = 262144 | `sysctl -n vm.max_map_count` |
+| sysctl vm.swappiness | `ch-1` | = 1 | `sysctl -n vm.swappiness` |
+| transparent hugepage | `ch-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+
+**Vì sao các giá trị này:**
+- `ch-1` (role_clickhouse): ClickHouse mmap nhiều: max_map_count 262144; THP tắt; nhiều file mở cho các part.
+
+**Hoàn tác:** Như P5.1.
+
+### P5.3 Tuning cho edge-1 (mạng, hàng đợi, cổng nguồn)
+
+**Vì sao:** Hàng đợi accept và SYN đủ lớn cho tải đột biến; dải cổng nguồn rộng để proxy tới origin.
+
+**Phụ thuộc:** P5.2  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags tuning --limit edge-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| sysctl fs.file-max | `edge-1` | = 2097152 | `sysctl -n fs.file-max` |
+| sysctl net.core.netdev_max_backlog | `edge-1` | = 16384 | `sysctl -n net.core.netdev_max_backlog` |
+| sysctl net.core.rmem_max | `edge-1` | = 16777216 | `sysctl -n net.core.rmem_max` |
+| sysctl net.core.somaxconn | `edge-1` | = 1024 | `sysctl -n net.core.somaxconn` |
+| sysctl net.core.wmem_max | `edge-1` | = 16777216 | `sysctl -n net.core.wmem_max` |
+| sysctl net.ipv4.ip_local_port_range | `edge-1` | = 10240 65535 | `sysctl -n net.ipv4.ip_local_port_range` |
+| sysctl net.ipv4.tcp_fin_timeout | `edge-1` | = 15 | `sysctl -n net.ipv4.tcp_fin_timeout` |
+| sysctl net.ipv4.tcp_max_syn_backlog | `edge-1` | = 16384 | `sysctl -n net.ipv4.tcp_max_syn_backlog` |
+| sysctl net.ipv4.tcp_slow_start_after_idle | `edge-1` | = 0 | `sysctl -n net.ipv4.tcp_slow_start_after_idle` |
+| sysctl net.ipv4.tcp_tw_reuse | `edge-1` | = 1 | `sysctl -n net.ipv4.tcp_tw_reuse` |
+| sysctl vm.overcommit_memory | `edge-1` | = 1 | `sysctl -n vm.overcommit_memory` |
+| sysctl vm.swappiness | `edge-1` | = 1 | `sysctl -n vm.swappiness` |
+| transparent hugepage | `edge-1` | = [never] | `grep -o '\[[a-z]*\]' /sys/kernel/mm/transparent_hugepage/enabled` |
+
+**Vì sao các giá trị này:**
+- `edge-1` (role_edge_l7): Hàng đợi accept và SYN đủ lớn cho tải đột biến; dải cổng nguồn rộng để proxy tới origin; không chậm lại sau khi nhàn rỗi.
+- `edge-1` (role_edge_waf): WAF tách CPU và RAM qua slice systemd (profile_edge_waf), không đổi sysctl riêng.
+- `edge-1` (role_valkey_edge): Redis cần overcommit=1 để fork bgsave không thất bại; somaxconn >= tcp-backlog; THP làm trễ đuôi.
+
+**Xung đột giá trị khi gộp vai trò (vai trò sau thắng, xem `tuning_precedence`):**
+- `edge-1`: net.core.somaxconn (đã chọn 65535 → 1024 theo vai trò role_valkey_edge)
+
+**Hoàn tác:** Như P5.1.
+
+### P5.4 Tuning cho bao-1 (OpenBao)
+
+**Vì sao:** Không core dump vì bộ nhớ chứa khoá.
+
+**Phụ thuộc:** P5.3  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags tuning --limit bao-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| sysctl kernel.core_pattern | `bao-1` | = \|/bin/false | `sysctl -n kernel.core_pattern` |
+
+**Vì sao các giá trị này:**
+- `bao-1` (role_openbao): Không core dump: bộ nhớ chứa khoá. Không swap (profile_secret).
+
+**Hoàn tác:** Như P5.1.
+
+### P5.5 Tuning cho node K8s (kubelet protect-kernel-defaults)
+
+**Vì sao:** kubelet từ chối chạy nếu sysctl lệch giá trị nó mong đợi; inotify và conntrack đủ cho nhiều pod.
+
+**Phụ thuộc:** P5.4  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab provision --tags tuning --limit k8s-cp-1,k8s-wk-1,k8s-wk-2
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| sysctl fs.inotify.max_user_instances | `k8s-cp-1` | = 8192 | `sysctl -n fs.inotify.max_user_instances` |
+| sysctl fs.inotify.max_user_watches | `k8s-cp-1` | = 524288 | `sysctl -n fs.inotify.max_user_watches` |
+| sysctl kernel.panic | `k8s-cp-1` | = 10 | `sysctl -n kernel.panic` |
+| sysctl kernel.panic_on_oops | `k8s-cp-1` | = 1 | `sysctl -n kernel.panic_on_oops` |
+| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-cp-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables` |
+| sysctl net.bridge.bridge-nf-call-iptables | `k8s-cp-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables` |
+| sysctl net.ipv4.ip_forward | `k8s-cp-1` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+| sysctl net.netfilter.nf_conntrack_max | `k8s-cp-1` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max` |
+| sysctl vm.overcommit_memory | `k8s-cp-1` | = 1 | `sysctl -n vm.overcommit_memory` |
+| sysctl vm.panic_on_oom | `k8s-cp-1` | = 0 | `sysctl -n vm.panic_on_oom` |
+| sysctl fs.inotify.max_user_instances | `k8s-wk-1` | = 8192 | `sysctl -n fs.inotify.max_user_instances` |
+| sysctl fs.inotify.max_user_watches | `k8s-wk-1` | = 524288 | `sysctl -n fs.inotify.max_user_watches` |
+| sysctl kernel.panic | `k8s-wk-1` | = 10 | `sysctl -n kernel.panic` |
+| sysctl kernel.panic_on_oops | `k8s-wk-1` | = 1 | `sysctl -n kernel.panic_on_oops` |
+| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-wk-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables` |
+| sysctl net.bridge.bridge-nf-call-iptables | `k8s-wk-1` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables` |
+| sysctl net.ipv4.ip_forward | `k8s-wk-1` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+| sysctl net.netfilter.nf_conntrack_max | `k8s-wk-1` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max` |
+| sysctl vm.overcommit_memory | `k8s-wk-1` | = 1 | `sysctl -n vm.overcommit_memory` |
+| sysctl vm.panic_on_oom | `k8s-wk-1` | = 0 | `sysctl -n vm.panic_on_oom` |
+| sysctl fs.inotify.max_user_instances | `k8s-wk-2` | = 8192 | `sysctl -n fs.inotify.max_user_instances` |
+| sysctl fs.inotify.max_user_watches | `k8s-wk-2` | = 524288 | `sysctl -n fs.inotify.max_user_watches` |
+| sysctl kernel.panic | `k8s-wk-2` | = 10 | `sysctl -n kernel.panic` |
+| sysctl kernel.panic_on_oops | `k8s-wk-2` | = 1 | `sysctl -n kernel.panic_on_oops` |
+| sysctl net.bridge.bridge-nf-call-ip6tables | `k8s-wk-2` | = 1 | `sysctl -n net.bridge.bridge-nf-call-ip6tables` |
+| sysctl net.bridge.bridge-nf-call-iptables | `k8s-wk-2` | = 1 | `sysctl -n net.bridge.bridge-nf-call-iptables` |
+| sysctl net.ipv4.ip_forward | `k8s-wk-2` | = 1 | `sysctl -n net.ipv4.ip_forward` |
+| sysctl net.netfilter.nf_conntrack_max | `k8s-wk-2` | = 262144 | `sysctl -n net.netfilter.nf_conntrack_max` |
+| sysctl vm.overcommit_memory | `k8s-wk-2` | = 1 | `sysctl -n vm.overcommit_memory` |
+| sysctl vm.panic_on_oom | `k8s-wk-2` | = 0 | `sysctl -n vm.panic_on_oom` |
+
+**Vì sao các giá trị này:**
+- `k8s-cp-1` (role_k8s_cp): kubelet protect-kernel-defaults đòi đúng các giá trị này; inotify đủ cho nhiều pod; conntrack đủ cho kube-proxy.
+- `k8s-wk-1` (role_k8s_app): kubelet protect-kernel-defaults đòi đúng các giá trị này; inotify đủ cho nhiều pod; conntrack đủ cho kube-proxy.
+- `k8s-wk-2` (role_k8s_app): kubelet protect-kernel-defaults đòi đúng các giá trị này; inotify đủ cho nhiều pod; conntrack đủ cho kube-proxy.
+
+**Hoàn tác:** Như P5.1.
+
+### P5.6 Pin CPU và giới hạn RAM cho WAF trên edge-1
+
+**Vì sao:** WAF không được tranh CPU với L7. edge-1 có 2 vCPU nên L7 ở nhân 0, WAF bị khoá ở nhân 1 bằng slice systemd.
+
+**Phụ thuộc:** P5.5  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags profile-edge --limit edge-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| WAF chỉ chạy ở nhân 1 | `edge-1` | = 1 | `systemctl show waap-waf.slice -p AllowedCPUs --value` |
+| WAF tối đa 100% một nhân | `edge-1` | = 1s | `systemctl show waap-waf.slice -p CPUQuotaPerSecUSec --value` |
+| WAF tối đa 1 GiB RAM (byte) | `edge-1` | = 1073741824 | `systemctl show waap-waf.slice -p MemoryMax --value` |
+| L7 tối đa 1 GiB RAM (byte) | `edge-1` | = 1073741824 | `systemctl show waap-edge -p MemoryMax --value` |
+| L7 chỉ có quyền gắn cổng thấp | `edge-1` | = cap_net_bind_service | `systemctl show waap-edge -p CapabilityBoundingSet --value` |
+| WAF không có capability nào | `edge-1` | =  | `systemctl show waap-waf -p CapabilityBoundingSet --value` |
+| L7 chạy bằng user riêng không đăng nhập | `edge-1` | = /usr/sbin/nologin | `getent passwd waap-edge \| cut -d: -f7` |
+| Pin vCPU của VM vào nhân máy chủ (chỉ máy Linux riêng, đường B) | `edge-1` | THỦ CÔNG (incus config get edge-1 limits.cpu; đặt `pin` trong profile rồi tofu apply; ở đường A (Hyper-V) bỏ qua) | |
+
+**Hoàn tác:** Xoá waap-waf.slice và drop-in rồi daemon-reload.
+
+## P6. Đĩa
+
+### P6.1 Gắn đĩa phụ (dữ liệu, WAL, audit, cache)
+
+**Vì sao:** ADR-0048: đĩa riêng cho dữ liệu, WAL, audit, cache; noatime, nodev, nosuid, noexec cho dữ liệu.
+
+**Phụ thuộc:** P5.6  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab provision --tags disks
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| đĩa data gắn ở /var/lib/waap/data, hệ tệp xfs | `data-1` | = xfs | `findmnt -no FSTYPE /var/lib/waap/data` |
+| /var/lib/waap/data tuỳ chọn mount | `data-1` | chứa noatime, nodev, nosuid, noexec | `findmnt -no OPTIONS /var/lib/waap/data` |
+| /var/lib/waap/data dung lượng >= 48 GB (xfs tốn một phần) | `data-1` | ≥ 48 | `df -BG --output=size /var/lib/waap/data \| tail -1 \| tr -dc 0-9` |
+| đĩa wal gắn ở /var/lib/waap/wal, hệ tệp xfs | `data-1` | = xfs | `findmnt -no FSTYPE /var/lib/waap/wal` |
+| /var/lib/waap/wal tuỳ chọn mount | `data-1` | chứa noatime, nodev, nosuid, noexec | `findmnt -no OPTIONS /var/lib/waap/wal` |
+| /var/lib/waap/wal dung lượng >= 8 GB (xfs tốn một phần) | `data-1` | ≥ 8 | `df -BG --output=size /var/lib/waap/wal \| tail -1 \| tr -dc 0-9` |
+| đĩa data gắn ở /var/lib/waap/data, hệ tệp xfs | `ch-1` | = xfs | `findmnt -no FSTYPE /var/lib/waap/data` |
+| /var/lib/waap/data tuỳ chọn mount | `ch-1` | chứa noatime, nodev, nosuid, noexec | `findmnt -no OPTIONS /var/lib/waap/data` |
+| /var/lib/waap/data dung lượng >= 48 GB (xfs tốn một phần) | `ch-1` | ≥ 48 | `df -BG --output=size /var/lib/waap/data \| tail -1 \| tr -dc 0-9` |
+| đĩa data gắn ở /var/lib/waap/data, hệ tệp xfs | `kafka-1` | = xfs | `findmnt -no FSTYPE /var/lib/waap/data` |
+| /var/lib/waap/data tuỳ chọn mount | `kafka-1` | chứa noatime, nodev, nosuid, noexec | `findmnt -no OPTIONS /var/lib/waap/data` |
+| /var/lib/waap/data dung lượng >= 28 GB (xfs tốn một phần) | `kafka-1` | ≥ 28 | `df -BG --output=size /var/lib/waap/data \| tail -1 \| tr -dc 0-9` |
+| đĩa audit gắn ở /var/log/openbao-audit, hệ tệp xfs | `bao-1` | = xfs | `findmnt -no FSTYPE /var/log/openbao-audit` |
+| /var/log/openbao-audit tuỳ chọn mount | `bao-1` | chứa noatime, nodev, nosuid, noexec | `findmnt -no OPTIONS /var/log/openbao-audit` |
+| /var/log/openbao-audit dung lượng >= 0 GB (xfs tốn một phần) | `bao-1` | ≥ 0 | `df -BG --output=size /var/log/openbao-audit \| tail -1 \| tr -dc 0-9` |
+| đĩa cache gắn ở /var/cache/waap-edge, hệ tệp xfs | `edge-1` | = xfs | `findmnt -no FSTYPE /var/cache/waap-edge` |
+| /var/cache/waap-edge tuỳ chọn mount | `edge-1` | chứa noatime, nodev, nosuid | `findmnt -no OPTIONS /var/cache/waap-edge` |
+| /var/cache/waap-edge dung lượng >= 8 GB (xfs tốn một phần) | `edge-1` | ≥ 8 | `df -BG --output=size /var/cache/waap-edge \| tail -1 \| tr -dc 0-9` |
+
+**Hoàn tác:** umount, bỏ dòng trong /etc/fstab. Không mkfs lại khi đã có dữ liệu.
+
+## P7. Hồ sơ hệ điều hành theo vai trò
+
+### P7.1 Hồ sơ data (tài khoản backup, thư mục gốc dữ liệu)
+
+**Vì sao:** Tài khoản backup riêng không đăng nhập được; thư mục gốc chỉ root và nhóm backup.
+
+**Phụ thuộc:** P6.1  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags profile-data
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Tài khoản backup không đăng nhập | `role:postgres` | = /usr/sbin/nologin | `getent passwd waap-backup \| cut -d: -f7` |
+| Thư mục gốc dữ liệu quyền 750 | `role:postgres` | = 750 | `stat -c %a /var/lib/waap` |
+| Thư mục gốc dữ liệu quyền 750 | `role:clickhouse` | = 750 | `stat -c %a /var/lib/waap` |
+
+**Hoàn tác:** Xoá user waap-backup.
+
+### P7.2 Hồ sơ secret (OpenBao: không swap, không core dump, khoá bộ nhớ)
+
+**Vì sao:** Bộ nhớ chứa khoá không được ra đĩa. CAP_IPC_LOCK và LimitMEMLOCK cho mlock.
+
+**Phụ thuộc:** P7.1  ·  **Thời gian dự kiến:** 1 phút
+
+```
+$ labs/bin/lab provision --tags profile-secret
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Không có swap | `bao-1` | = 0 | `swapon --show \| wc -l` |
+| Không có dòng swap hoạt động trong fstab | `bao-1` | = 0 | `grep -vc '^#' /etc/fstab \| head -1; grep -c '^[^#].*swap' /etc/fstab` |
+| Core dump systemd tắt | `bao-1` | = 1 | `grep -c 'Storage=none' /etc/systemd/coredump.conf.d/10-disable.conf` |
+| User openbao không đăng nhập | `bao-1` | = /usr/sbin/nologin | `getent passwd openbao \| cut -d: -f7` |
+| Thư mục audit riêng quyền 750 | `bao-1` | = 750 | `stat -c %a /var/log/openbao-audit` |
+| Thư mục audit thuộc openbao | `bao-1` | = openbao | `stat -c %U /var/log/openbao-audit` |
+| Cho phép mlock | `bao-1` | = infinity | `systemctl show openbao -p LimitMEMLOCK --value` |
+| Chỉ có CAP_IPC_LOCK | `bao-1` | = cap_ipc_lock | `systemctl show openbao -p CapabilityBoundingSet --value` |
+
+**Hoàn tác:** Xoá drop-in openbao.service.d.
+
+### P7.3 Hồ sơ bastion (WireGuard, ghi phiên, không giữ khoá riêng)
+
+**Vì sao:** Cửa quản trị duy nhất; ghi phím gõ vào auditd; MFA TOTP mặc định tắt để không tự khoá.
+
+**Phụ thuộc:** P7.2  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab provision --tags profile-bastion
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Khoá WireGuard sinh tại chỗ | `bastion` | = 600 | `stat -c %a /etc/wireguard/private.key` |
+| Ghi phiên bằng pam_tty_audit | `bastion` | = 1 | `grep -c pam_tty_audit /etc/pam.d/sshd` |
+| Không có khoá riêng của ai trong /home | `bastion` | = 0 | `find /home -name 'id_*' -o -name '*.pem' \| wc -l` |
+| MFA TOTP (mặc định tắt trong lab; bật khi mọi người đã có TOTP) | `bastion` | THỦ CÔNG (đặt bastion_mfa=true trong group_vars/role_bastion.yml khi sẵn sàng) | |
+
+**Hoàn tác:** Gỡ dòng pam_tty_audit khỏi /etc/pam.d/sshd.
+
+## P8. Platform và database
+
+### P8.1 k3s server (control-plane)
+
+**Vì sao:** Platform K8s nhẹ. Cần ghim phiên bản và sha256 (bộ cài từ chối tải nhị phân chưa kiểm). Kubelet khoá chặt, mã hoá secret, tắt traefik và servicelb.
+
+**Phụ thuộc:** P7.3  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab provision --tags k8s --limit k8s-cp-1
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| k3s chạy | `k8s-cp-1` | = active | `systemctl is-active k3s` |
+| Node Ready | `k8s-cp-1` | = 1 | `k3s kubectl get nodes --no-headers \| grep -c ' Ready'` |
+| kubelet protect-kernel-defaults | `k8s-cp-1` | = 1 | `grep -c 'protect-kernel-defaults=true' /etc/rancher/k3s/config.yaml` |
+| Cổng chỉ đọc 10255 đóng | `k8s-cp-1` | = 0 | `ss -ltn \| grep -c ':10255'` |
+| Mã hoá secret bật | `k8s-cp-1` | ≥ 1 | `k3s secrets-encrypt status \| grep -c 'Enabled'` |
+| Không có traefik | `k8s-cp-1` | = 0 | `k3s kubectl -n kube-system get pods --no-headers \| grep -c traefik` |
+| Token cụm quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/k3s/token` |
+| Cấu hình k3s quyền 600 | `k8s-cp-1` | = 600 | `stat -c %a /etc/rancher/k3s/config.yaml` |
+| Không swap | `k8s-cp-1` | = 0 | `swapon --show \| wc -l` |
+| Có audit log của API | `k8s-cp-1` | lệnh thành công (rc=0) | `test -s /var/log/k3s-audit.log` |
+
+**Hoàn tác:** incus exec k8s-cp-1 -- /usr/local/bin/k3s-uninstall.sh (nếu có) hoặc dựng lại VM.
+
+### P8.2 k3s agent (hai worker)
+
+**Vì sao:** Hai worker gia nhập cụm.
+
+**Phụ thuộc:** P8.1  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab provision --tags k8s --limit k8s-wk-1,k8s-wk-2
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Ba node Ready | `k8s-cp-1` | = 3 | `k3s kubectl get nodes --no-headers \| grep -c ' Ready'` |
+| Agent chạy | `k8s-wk-1` | = active | `systemctl is-active k3s-agent` |
+| Agent chạy | `k8s-wk-2` | = active | `systemctl is-active k3s-agent` |
+
+**Hoàn tác:** dựng lại VM worker.
+
+### P8.3 PostgreSQL 16
+
+**Vì sao:** Đĩa dữ liệu và WAL riêng, checksum, scram-sha-256, TLS, chỉ nhận từ vùng ứng dụng (Z3).
+
+**Phụ thuộc:** P8.2  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab services --tags postgres
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Sẵn sàng nhận kết nối | `data-1` | lệnh thành công (rc=0) | `pg_isready -q` |
+| TLS bật | `data-1` | = on | `sudo -u postgres psql -tAc 'show ssl'` |
+| Mã hoá mật khẩu | `data-1` | = scram-sha-256 | `sudo -u postgres psql -tAc 'show password_encryption'` |
+| Thư mục dữ liệu trên đĩa riêng | `data-1` | = /var/lib/waap/data/pg | `sudo -u postgres psql -tAc 'show data_directory'` |
+| WAL trên đĩa riêng | `data-1` | = /var/lib/waap/wal/pg | `readlink -f /var/lib/waap/data/pg/pg_wal` |
+| Checksum dữ liệu bật | `data-1` | = on | `sudo -u postgres psql -tAc 'show data_checksums'` |
+| Chỉ nghe IP lab và localhost | `data-1` | = 127.0.0.1,10.10.40.11 | `sudo -u postgres psql -tAc 'show listen_addresses'` |
+| Số kết nối tối đa | `data-1` | = 200 | `sudo -u postgres psql -tAc 'show max_connections'` |
+| shared_buffers | `data-1` | = 512MB | `sudo -u postgres psql -tAc 'show shared_buffers'` |
+| Dùng hugepage nếu có (try) | `data-1` | = try | `sudo -u postgres psql -tAc 'show huge_pages'` |
+| pg_hba có đúng một dòng hostssl | `data-1` | = 1 | `grep -c '^hostssl' /etc/postgresql/16/main/pg_hba.conf` |
+| pg_hba không có trust | `data-1` | = 0 | `grep -c trust /etc/postgresql/16/main/pg_hba.conf` |
+| Ghi log kết nối | `data-1` | = on | `sudo -u postgres psql -tAc 'show log_connections'` |
+| postgresql@16-main: LimitNOFILE | `data-1` | = 65536 | `systemctl show postgresql@16-main -p LimitNOFILE --value` |
+| rabbitmq-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show rabbitmq-server -p LimitNOFILE --value` |
+| redis-server: LimitNOFILE | `data-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
+| Vùng ứng dụng tới được 5432 (N14) | `k8s-wk-1` | lệnh thành công (rc=0) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
+| Edge không tới được 5432 (X01) | `edge-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5432'` |
+
+**Hoàn tác:** apt purge postgresql-16; xoá /var/lib/waap/data/pg và /var/lib/waap/wal/pg.
+
+### P8.4 RabbitMQ
+
+**Vì sao:** Không tài khoản guest; chỉ nghe IP lab.
+
+**Phụ thuộc:** P8.3  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab services --tags rabbitmq
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| RabbitMQ chạy | `data-1` | = active | `systemctl is-active rabbitmq-server` |
+| Không còn user guest | `data-1` | = 0 | `rabbitmqctl list_users --silent \| grep -c '^guest'` |
+| Chỉ nghe IP lab ở 5672 | `data-1` | = 1 | `ss -ltn \| grep -c '10.10.40.11:5672'` |
+| Không nghe 0.0.0.0 | `data-1` | = 0 | `ss -ltn \| grep -c '0.0.0.0:5672'` |
+| User ứng dụng không là administrator | `data-1` | = 0 | `rabbitmqctl list_users --silent \| grep '^metap' \| grep -c administrator` |
+| Vùng ứng dụng tới được 5672 (I06 tạm) | `k8s-wk-1` | lệnh thành công (rc=0) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.11/5672'` |
+
+**Hoàn tác:** apt purge rabbitmq-server.
+
+### P8.5 Redis (valkey-central trên data-1, valkey-edge trên edge-1)
+
+**Vì sao:** ACL, user default tắt, không loại bỏ khoá (cấu hình, không phải cache), tắt lệnh nguy hiểm.
+
+**Phụ thuộc:** P8.4  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab services --tags redis
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Redis chạy | `data-1` | = active | `systemctl is-active redis-server` |
+| Redis chạy | `edge-1` | = active | `systemctl is-active redis-server` |
+| Không xác thực thì bị từ chối | `data-1` | chứa NOAUTH | `redis-cli -h 10.10.40.11 ping` |
+| User control ghi được | `data-1` | = OK | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} set waf:probe 1` |
+| User edge không ghi được | `data-1` | chứa NOPERM | `redis-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} set waf:probe 2` |
+| User edge đọc được | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user edge --pass {secret:redis_edge_password} get waf:probe` |
+| FLUSHALL bị tắt | `data-1` | chứa unknown | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} flushall` |
+| Không loại bỏ khoá | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info memory \| grep -c 'maxmemory_policy:noeviction'` |
+| AOF bật | `data-1` | = 1 | `redis-cli -h 10.10.40.11 --no-auth-warning --user control --pass {secret:redis_control_password} info persistence \| grep -c 'aof_enabled:1'` |
+| redis-server: LimitNOFILE | `edge-1` | = 65536 | `systemctl show redis-server -p LimitNOFILE --value` |
+
+**Hoàn tác:** apt purge redis-server.
+
+### P8.6 ClickHouse
+
+**Vì sao:** Chỉ cài gói đã ghim sha256 (LAB_CLICKHOUSE_DEBS); chỉ nhận từ vùng ứng dụng; dữ liệu trên đĩa riêng.
+
+**Phụ thuộc:** P8.5  ·  **Thời gian dự kiến:** 4 phút
+
+```
+$ labs/bin/lab services --tags clickhouse
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| ClickHouse chạy | `ch-1` | = active | `systemctl is-active clickhouse-server` |
+| Truy vấn được | `ch-1` | = 1 | `clickhouse-client -q 'select 1'` |
+| Thư mục dữ liệu trên đĩa riêng | `ch-1` | = /var/lib/waap/data/clickhouse/ | `clickhouse-client -q "select value from system.server_settings where name='path'"` |
+| Chỉ nghe IP lab | `ch-1` | = 0 | `ss -ltn \| grep -c '0.0.0.0:9000'` |
+| clickhouse-server: LimitNOFILE | `ch-1` | = 262144 | `systemctl show clickhouse-server -p LimitNOFILE --value` |
+| Vùng ứng dụng tới được 9000 (I02 tạm) | `k8s-wk-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.40.12/9000'` |
+
+**Hoàn tác:** apt purge clickhouse-server clickhouse-client clickhouse-common-static.
+
+### P8.7 egress-1 (squid, đường ra duy nhất có allowlist)
+
+**Vì sao:** Chỉ Z3 và ops ra Internet qua proxy; chặn dải riêng và metadata cloud; chỉ domain trong allowlist.
+
+**Phụ thuộc:** P8.6  ·  **Thời gian dự kiến:** 2 phút
+
+```
+$ labs/bin/lab services --tags egress
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| squid chạy | `perimeter-1` | = active | `systemctl is-active squid` |
+| Nghe 3128 ở IP lab | `perimeter-1` | = 1 | `ss -ltn \| grep -c '10.10.20.11:3128'` |
+| Tới domain trong allowlist (github.com) | `ops-1` | khớp /^(200\|301)$/ | `curl -s -o /dev/null -w '%{http_code}' --max-time 15 -x http://10.10.20.11:3128 https://github.com` |
+| Domain ngoài allowlist bị chặn (CONNECT 403) | `ops-1` | = 403 | `curl -s -o /dev/null -w '%{http_connect}' --max-time 15 -x http://10.10.20.11:3128 https://example.com` |
+| Dải riêng bị chặn qua proxy | `ops-1` | = 403 | `curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x http://10.10.20.11:3128 http://10.10.40.11/` |
+| Metadata cloud bị chặn qua proxy | `ops-1` | = 403 | `curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x http://10.10.20.11:3128 http://169.254.169.254/` |
+
+**Hoàn tác:** apt purge squid.
+
+## P9. Khoá (seal)
+
+### P9.1 Seal (gỡ bootstrap)
+
+**Vì sao:** Gỡ đường ra Internet tạm của mọi vùng; nguồn vá chuyển sang egress-1; SSH chỉ cert; egress khoá cho vai trò nhạy cảm.
+
+**Phụ thuộc:** P8.7  ·  **Thời gian dự kiến:** 8 phút
+
+```
+$ labs/bin/lab seal
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Không còn luật BOOTSTRAP | `fw-1` | = 0 | `nft list chain inet lab forward \| grep -c BOOTSTRAP` |
+| Khoá SSH tĩnh bị tắt | `all` | = none | `sshd -T \| awk '/^authorizedkeysfile/{print $2}'` |
+| apt đi qua egress-1 | `role:k8s-app` | = 1 | `grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy` |
+| apt đi qua egress-1 | `ops-1` | = 1 | `grep -c 'Acquire::http::Proxy' /etc/apt/apt.conf.d/90waap-proxy` |
+| OpenBao không có đường ra (egress khoá) | `bao-1` | = 1 | `nft list chain inet host output \| grep -c 'egress-locked'` |
+| Kho dữ liệu không có đường ra | `data-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'` |
+
+**Hoàn tác:** labs/bin/lab fw bootstrap rồi lab provision -e lab_bootstrap=true (chỉ để gỡ lỗi).
+
+### P9.2 Kiểm mạng và hạ tầng sau khi seal
+
+**Vì sao:** Chạy lại thăm dò mạng và kiểm sống; lần cuối trước khi giao cho các bước triển khai dịch vụ.
+
+**Phụ thuộc:** P9.1  ·  **Thời gian dự kiến:** 5 phút
+
+```
+$ labs/bin/lab nettest
+$ labs/bin/lab smoke
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Thăm dò mạng đúng kỳ vọng | `host` | lệnh thành công (rc=0) | `labs/bin/lab nettest` |
+| Kiểm sống hạ tầng | `host` | lệnh thành công (rc=0) | `labs/bin/lab smoke` |
+
+**Hoàn tác:** Không đổi gì.
+

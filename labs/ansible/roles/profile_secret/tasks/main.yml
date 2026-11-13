@@ -22,10 +22,6 @@
     shell: /usr/sbin/nologin
     create_home: false
 
-- name: Đĩa audit riêng (từ host_vars lab_disks)
-  ansible.builtin.include_role:
-    name: disks
-
 - name: Quyền thư mục audit
   ansible.builtin.file:
     path: "{{ secret_audit_dir }}"

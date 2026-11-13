@@ -1,0 +1,4 @@
+---
+# Lab: đĩa dữ liệu và WAL riêng (host_vars lab_disks của data-1)
+pg_data: /var/lib/waap/data/pg
+pg_wal: /var/lib/waap/wal/pg

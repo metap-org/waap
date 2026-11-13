@@ -2,6 +2,24 @@
 
 Đề xuất của Claude, chờ duyệt. Thiết kế ở [7.6](../../docs/architecture/07-deployment/06-network-zones-and-flows.md), ADR-0047 đến 0050. Kế hoạch ở [../PLAN.md](../PLAN.md).
 
+## Chạy từng bước (đọc phần này trước)
+
+Lab **không** dựng một lần. Có 42 bước nhỏ chia 10 phase, mỗi bước có lệnh riêng, bảng "cấu hình đúng phải là bao nhiêu" và lệnh kiểm tự động: xem [../CHECKLIST.md](../CHECKLIST.md) (sinh tự động, không sửa tay).
+
+```
+labs/bin/lab step list             # tất cả bước và trạng thái
+labs/bin/lab step next             # bước kế tiếp
+labs/bin/lab step show P5.1        # xem lệnh và checklist, không chạy gì
+labs/bin/lab step run P5.1         # chạy (hỏi xác nhận; từ chối nếu bước phụ thuộc chưa kiểm đạt)
+labs/bin/lab step verify P5.1      # chạy từng lệnh kiểm, in PASS/FAIL, thực tế so với mong đợi
+```
+
+- Các phase: P0 máy chủ lab, P1 mạng ảo và `fw-1`, P2 boot VM từng vùng, P3 hardening OS từng lớp, P4 firewall máy chủ, P5 tối ưu OS theo dịch vụ (sysctl, hugepage, THP, giới hạn file, pin CPU), P6 đĩa, P7 hồ sơ OS theo vai trò, P8 platform và database, P9 seal.
+- Giá trị tuning (swappiness, hugepage, `max_map_count`, `LimitNOFILE`, ...) nằm ở **một nơi**: `ansible/roles/os_tuning/defaults/main.yml`, kèm lý do từng nhóm; checklist đọc đúng tệp đó, và test đảm bảo Ansible gộp ra cùng kết quả với checklist cho cả 16 VM.
+- Mục **THỦ CÔNG** trong checklist cần người đọc, rồi `verify --ack-manual`.
+- Trạng thái lưu ở `labs/.state/steps.json` (ngoài Git).
+- Dựng riêng từng phần bằng `lab tf net`, `lab tf fw`, `lab tf vm <tên>...`; nạp lại luật `fw-1` bằng `lab fw bootstrap|sealed`.
+
 ## Đã có
 
 | Phần | Vai trò |

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Điều khiển lab. Chạy trên máy có Incus và OpenTofu (máy ảo Ubuntu trên Hyper-V hoặc Linux native).
 # Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
-#       lab {secrets|services|nettest|smoke}   (P1 lát 2: database, proxy ra; chưa triển khai dịch vụ ứng dụng)
+#       lab step {list|next|show|run|verify} [<id>]   (chạy từng bước nhỏ, xem labs/CHECKLIST.md)
+#       lab {tf|fw|secrets|services|nettest|smoke}   (P1 lát 2: database, proxy ra; chưa triển khai dịch vụ ứng dụng)
 # Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_K3S_VERSION, LAB_K3S_SHA256 (ghim k3s, tự lấy từ trang phát hành)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -120,11 +121,34 @@ cmd_smoke() { # kiểm hạ tầng, không kiểm dịch vụ ứng dụng
   return $fail
 }
 
+cmd_tf() { # tf net | tf fw | tf vm <tên>...   (dựng từng phần, không dựng cả lab)
+  need tofu; [ -n "$SSH_KEY" ] || { echo "đặt LAB_SSH_KEY (khoá công khai)"; exit 1; }
+  local what="${1:-}"; shift || true; local targets=()
+  case "$what" in
+    net) targets=(-target=incus_network.zone -target=incus_network.uplink) ;;
+    fw) targets=(-target=incus_instance.fw) ;;
+    vm) [ $# -gt 0 ] || { echo "lab tf vm <tên>..."; exit 2; }
+        local n; for n in "$@"; do targets+=("-target=incus_instance.vm[\"$n\"]"); done ;;
+    *) echo "lab tf {net|fw|vm <tên>...}"; exit 2 ;;
+  esac
+  [ -f "$GEN/$PROFILE/ruleset.nft" ] || cmd_gen --bootstrap
+  tf init -input=false >/dev/null
+  tf apply -input=false -auto-approve "${targets[@]}"
+}
+
+cmd_fw() { # fw bootstrap | fw sealed: nạp lại luật của fw-1 mà không dựng lại VM
+  case "${1:-}" in bootstrap) cmd_gen --bootstrap ;; sealed) cmd_gen ;; *) echo "lab fw {bootstrap|sealed}"; exit 2 ;; esac
+  incus file push "$GEN/$PROFILE/ruleset.nft" fw-1/etc/nftables.conf
+  incus exec fw-1 -- nft -f /etc/nftables.conf
+}
+
+cmd_step() { python3 "$INFRA/tools/steps.py" --profile "$PROFILE" "$@"; }
+
 cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
 cmd_status() { incus list -c ns4t -f compact; }
 
 case "${1:-}" in
-  check) cmd_check ;; secrets) cmd_secrets ;; services) shift; cmd_services "$@" ;;
+  check) cmd_check ;; tf) shift; cmd_tf "$@" ;; fw) shift; cmd_fw "$@" ;; step) shift; cmd_step "$@" ;; secrets) cmd_secrets ;; services) shift; cmd_services "$@" ;;
   nettest) cmd_nettest ;; smoke) cmd_smoke ;; gen) shift; cmd_gen "$@" ;; ssh-ca) cmd_ssh_ca ;; up) cmd_up ;;
   provision) shift; cmd_provision "$@" ;; audit) shift; cmd_audit "$@" ;; seal) cmd_seal ;;
   down) cmd_down ;; destroy) cmd_destroy ;; status) cmd_status ;;

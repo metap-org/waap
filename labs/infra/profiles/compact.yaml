@@ -4,7 +4,9 @@ profile: compact
 vms:
   - { name: fw-1,        zones: [Z0, Z1, Z2, Z3, Z4, Z5, Z6], host: 1, cpu: 2, mem: 1GiB,  disk: 8GiB,  roles: [firewall] }
   - { name: edge-1,      zones: [Z1], host: 11, cpu: 2, mem: 3GiB,  disk: 20GiB, roles: [edge-l7, edge-waf, valkey-edge],
-    disks: [{ name: cache, size: 10GiB, mount: /var/cache/waap-edge }] }
+    disks: [{ name: cache, size: 10GiB, mount: /var/cache/waap-edge }],
+    # 2 vCPU: L7 ở nhân 0, WAF bị giới hạn ở nhân 1 (slice waap-waf); MemoryMax khớp 3 GiB của VM.
+    vars: { waf_cpus: "1", waf_cpu_quota: "100%", waf_memory_max: 1G, edge_memory_max: 1G } }
   - { name: dns-1,       zones: [Z1], host: 12, cpu: 1, mem: 512MiB, disk: 8GiB,  roles: [dns] }
   - { name: perimeter-1, zones: [Z2], host: 11, cpu: 2, mem: 2GiB,  disk: 12GiB, roles: [ingress-1, egw-1, egress-1] }
   - { name: k8s-cp-1,    zones: [Z3], host: 11, cpu: 2, mem: 3GiB,  disk: 30GiB, roles: [k8s-cp] }

@@ -54,7 +54,7 @@ resource "incus_instance" "fw" {
   image = var.image
 
   config = {
-    "limits.cpu"    = local.fw.cpu
+    "limits.cpu"    = try(local.fw.pin, local.fw.cpu)
     "limits.memory" = local.fw.mem
     "cloud-init.user-data" = templatefile("${path.module}/../cloud-init/fw.yaml.tftpl", {
       ssh_key = var.ssh_public_key
@@ -121,7 +121,7 @@ resource "incus_instance" "vm" {
   depends_on = [incus_instance.fw]
 
   config = {
-    "limits.cpu"    = each.value.cpu
+    "limits.cpu"    = try(each.value.pin, each.value.cpu)   # pin: danh sách nhân máy chủ, ví dụ "2-3"; chỉ dùng trên máy riêng
     "limits.memory" = each.value.mem
     "cloud-init.user-data" = templatefile("${path.module}/../cloud-init/base.yaml.tftpl", {
       hostname = each.key

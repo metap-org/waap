@@ -49,8 +49,11 @@ def inventory(profile, out):
     (Path(out) / "inventory.ini").write_text("\n".join(L) + "\n")
     hv = Path(out) / "host_vars"; hv.mkdir(exist_ok=True)
     for v in prof["vms"]:
+        hvars = dict(v.get("vars") or {})
         if v.get("disks"):
-            (hv / f"{v['name']}.yml").write_text(yaml.safe_dump({"lab_disks": v["disks"]}, sort_keys=False))
+            hvars["lab_disks"] = v["disks"]
+        if hvars:
+            (hv / f"{v['name']}.yml").write_text(yaml.safe_dump(hvars, sort_keys=False))
     print(f"ghi {out}/inventory.ini")
 
 

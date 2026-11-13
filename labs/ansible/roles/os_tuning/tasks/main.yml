@@ -1,0 +1,69 @@
+---
+- name: Gộp giá trị tuning theo các vai trò của máy này
+  ansible.builtin.import_tasks: merge.yml
+
+- name: sysctl theo dịch vụ (đứng trước 99-waap-hardening để luật chung vẫn thắng nếu trùng)
+  ansible.builtin.template:
+    src: sysctl-tuning.conf.j2
+    dest: /etc/sysctl.d/95-waap-tuning.conf
+    mode: "0644"
+    owner: root
+    group: root
+  when: tuning_sysctl | default({}) | length > 0
+  notify: reload sysctl
+  tags: [sysctl]
+
+- name: Nạp module bridge cho node container (cần trước khi áp bridge-nf-call)
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+  when: "'net.bridge.bridge-nf-call-iptables' in (tuning_sysctl | default({}))"
+
+- name: Áp sysctl ngay
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+  when: tuning_sysctl | default({}) | length > 0
+  tags: [sysctl]
+
+- name: Tắt transparent hugepage
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/waap-thp-off.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Disable transparent hugepage
+      After=sysinit.target local-fs.target
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+      [Install]
+      WantedBy=multi-user.target
+  when: tuning_thp | default('') == 'never'
+  notify: reload systemd
+  tags: [thp]
+
+- name: Bật waap-thp-off
+  ansible.builtin.systemd:
+    name: waap-thp-off
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: tuning_thp | default('') == 'never'
+  tags: [thp]
+
+- name: Thư mục drop-in giới hạn tài nguyên của dịch vụ
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item.key }}.service.d"
+    state: directory
+    mode: "0755"
+  loop: "{{ tuning_limits | default({}) | dict2items }}"
+  tags: [limits]
+
+- name: Drop-in giới hạn (LimitNOFILE, ...)
+  ansible.builtin.template:
+    src: limits.conf.j2
+    dest: "/etc/systemd/system/{{ item.key }}.service.d/20-waap-limits.conf"
+    mode: "0644"
+  loop: "{{ tuning_limits | default({}) | dict2items }}"
+  notify: reload systemd
+  tags: [limits]

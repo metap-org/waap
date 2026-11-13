@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+[Service]
+{% for k, v in item.value.items() | sort %}
+{{ k }}={{ v }}
+{% endfor %}

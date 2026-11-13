@@ -1,17 +1,12 @@
 ---
 # ADR-0048 hồ sơ data: đĩa riêng cho dữ liệu, WAL, log; I/O scheduler phù hợp; tài khoản backup riêng.
 # Mã hoá đĩa (LUKS) là biến luks_enabled của role disks, mặc định tắt ở lab (xem defaults của role đó).
-- name: Đĩa dữ liệu
-  ansible.builtin.include_role:
-    name: disks
-
 - name: Tài khoản backup riêng, không đăng nhập được
   ansible.builtin.user:
     name: "{{ data_backup_user }}"
     system: true
     shell: /usr/sbin/nologin
     create_home: false
-
 - name: Thư mục gốc dữ liệu chỉ chủ sở hữu
   ansible.builtin.file:
     path: "{{ data_root }}"
@@ -19,25 +14,3 @@
     mode: "0750"
     owner: root
     group: "{{ data_backup_user }}"
-
-- name: Tắt transparent hugepage (khuyến nghị của Postgres, ClickHouse)
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/waap-thp-off.service
-    mode: "0644"
-    content: |
-      [Unit]
-      Description=Disable transparent hugepage
-      After=sysinit.target local-fs.target
-      [Service]
-      Type=oneshot
-      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
-      [Install]
-      WantedBy=multi-user.target
-  notify: daemon reload
-
-- name: Bật waap-thp-off
-  ansible.builtin.systemd:
-    name: waap-thp-off
-    enabled: true
-    state: started
-    daemon_reload: true

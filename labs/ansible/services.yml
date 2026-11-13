@@ -3,20 +3,30 @@
 # Chạy sau site.yml:  ansible-playbook services.yml -e @../infra/generated/secrets.yml
 - name: PostgreSQL
   hosts: role_postgres
-  roles: [svc_postgres]
+  roles:
+    - role: svc_postgres
+      tags: [postgres]
 
 - name: RabbitMQ
   hosts: role_rabbitmq
-  roles: [svc_rabbitmq]
+  roles:
+    - role: svc_rabbitmq
+      tags: [rabbitmq]
 
 - name: Redis (valkey-central và valkey-edge)
   hosts: role_valkey_central:role_valkey_edge
-  roles: [svc_redis]
+  roles:
+    - role: svc_redis
+      tags: [redis]
 
 - name: ClickHouse
   hosts: role_clickhouse
-  roles: [svc_clickhouse]
+  roles:
+    - role: svc_clickhouse
+      tags: [clickhouse]
 
 - name: egress-1 (proxy ra có allowlist)
   hosts: role_egress_1
-  roles: [svc_perimeter]
+  roles:
+    - role: svc_perimeter
+      tags: [egress]

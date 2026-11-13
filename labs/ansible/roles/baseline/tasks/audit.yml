@@ -20,6 +20,7 @@
     creates: /var/lib/aide/aide.db
   when: baseline_aide_enabled | bool
   changed_when: true
+  tags: [aide]
 
 - name: Kiểm AIDE hằng ngày (cảnh báo khi đổi ngoài Ansible)
   ansible.builtin.systemd:
@@ -28,3 +29,4 @@
     state: started
   when: baseline_aide_enabled | bool
   failed_when: false
+  tags: [aide]

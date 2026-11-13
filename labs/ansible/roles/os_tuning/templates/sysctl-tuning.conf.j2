@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+{% for k, v in tuning_sysctl.items() | sort %}
+{{ k }} = {{ v }}
+{% endfor %}
