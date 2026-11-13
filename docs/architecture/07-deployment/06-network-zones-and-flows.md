@@ -2,7 +2,7 @@
 
 > **Trạng thái: đề xuất của Claude, chờ chủ dự án duyệt (2026-11-13).** Chủ dự án đã chốt lab chạy trên **máy ảo**
 > và yêu cầu **chia vùng mạng hợp lý**; thiết kế dưới đây là câu trả lời cho yêu cầu đó, nằm trong bước 0 của
-> [kế hoạch lab](../../../labs/PLAN.md). Quyết định kèm theo: [ADR-0047](../09-adr/0047-network-zones-and-default-deny.md).
+> [kế hoạch lab](../../../labs/PLAN.md). Quyết định kèm theo: [ADR-0047](../09-adr/0047-network-zones-and-default-deny.md); chuẩn node [ADR-0048](../09-adr/0048-node-baseline-and-hardening-profiles.md), GitOps [ADR-0049](../09-adr/0049-gitops-and-devsecops-per-plane.md), secret [ADR-0050](../09-adr/0050-secret-management-and-rotation.md).
 > Các số (dải IP, số máy) là mặc định để dựng lab, đổi được. Các luồng giữa plane lấy từ
 > [5.5](../05-building-blocks/05-contracts.md), [5.8.6](../05-building-blocks/08-components/06-rollout-distribution-fleet.md),
 > [8.19](../08-cross-cutting/19-node-identity-and-mtls.md), không bịa thêm luồng nào.
@@ -180,7 +180,7 @@ Hai cấu hình, cùng một thiết kế mạng. Cấu hình **thu gọn** gộ
 | Z1 | `edge-l7-1..2`, `edge-waf-1`, `dns-1`, `valkey-edge` | `edge-1` (L7 + WAF, cgroup riêng), `dns-1`, `valkey-edge` gộp vào `edge-1` |
 | Z2 | `ingress-1`, `egw-1`, `egress-1` | Một máy `perimeter-1` chạy ba vai trò, firewall máy chủ tách theo cổng |
 | Z3 | `k8s-cp-1..3`, `k8s-wk-1..3` | 1 control-plane, 2 worker |
-| Z4 | `pg-1..2`, `ch-1`, `kafka-1`, `mq-1`, `s3-1` | `data-1` (Postgres, RabbitMQ, Valkey, MinIO), `ch-1`, `kafka-1` |
+| Z4 | `pg-1..2`, `ch-1`, `kafka-1`, `mq-1`, `s3-1` | `data-1` (Postgres, RabbitMQ, Valkey, SeaweedFS), `ch-1`, `kafka-1` |
 | Z5 | `bao-1..3` | `bao-1` (một node, không HA) |
 | Z6 | `bastion`, `ci-runner`, `registry`, `infra`, `obs` | `bastion`, `ops-1` (CI, registry, infra, obs) |
 | Z0 | `origin`, `loadgen`, `dns-mock` | Như đầy đủ |

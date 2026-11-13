@@ -181,6 +181,9 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045: Cert node ngắn hạn tự gia hạn, re-enroll credential, thu hồi không dùng CRL</a>
 <a class="sub" href="#f-09-adr-0046-management-database-tenancy-and-storage">ADR-0046: Database của Management: tenant là org, bảng chung, PolicyVersion là tài liệu bất biến</a>
 <a class="sub" href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047: Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet</a>
+<a class="sub" href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048: Chuẩn node chung, hồ sơ theo vai trò, hardening kiểm được</a>
+<a class="sub" href="#f-09-adr-0049-gitops-and-devsecops-per-plane">ADR-0049: GitOps và DevSecOps cho từng plane, chuỗi cung ứng có ký và kiểm chính sách</a>
+<a class="sub" href="#f-09-adr-0050-secret-management-and-rotation">ADR-0050: Secret manager duy nhất, cấp secret ngắn hạn, xoay tự động theo loại</a>
 <a class="top" href="#f-10-quality-00-index">10. Quality Requirements</a>
 <a class="top" href="#f-11-risks-00-index">11. Risks and Technical Debt</a>
 <a class="top" href="#f-12-glossary-00-index">12. Glossary</a>
@@ -278,6 +281,9 @@ blockquote { margin: 0 0 14px; padding: 8px 16px; border-left: 3px solid var(--l
 <a class="sub" href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045: Cert node ngắn hạn tự gia hạn, re-enroll credential, thu hồi không dùng CRL</a>
 <a class="sub" href="#f-09-adr-0046-management-database-tenancy-and-storage">ADR-0046: Database của Management: tenant là org, bảng chung, PolicyVersion là tài liệu bất biến</a>
 <a class="sub" href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047: Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet</a>
+<a class="sub" href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048: Chuẩn node chung, hồ sơ theo vai trò, hardening kiểm được</a>
+<a class="sub" href="#f-09-adr-0049-gitops-and-devsecops-per-plane">ADR-0049: GitOps và DevSecOps cho từng plane, chuỗi cung ứng có ký và kiểm chính sách</a>
+<a class="sub" href="#f-09-adr-0050-secret-management-and-rotation">ADR-0050: Secret manager duy nhất, cấp secret ngắn hạn, xoay tự động theo loại</a>
 <a class="top" href="#f-10-quality-00-index">10. Quality Requirements</a>
 <a class="top" href="#f-11-risks-00-index">11. Risks and Technical Debt</a>
 <a class="top" href="#f-12-glossary-00-index">12. Glossary</a>
@@ -8135,7 +8141,7 @@ profile chuẩn cùng danh sách rule tắt, gắn cờ <code>waf_profile_fallba
 <blockquote>
 <p><strong>Trạng thái: đề xuất của Claude, chờ chủ dự án duyệt (2026-11-13).</strong> Chủ dự án đã chốt lab chạy trên <strong>máy ảo</strong>
 và yêu cầu <strong>chia vùng mạng hợp lý</strong>; thiết kế dưới đây là câu trả lời cho yêu cầu đó, nằm trong bước 0 của
-<a href="../../../labs/PLAN.md" target="_blank" rel="noopener">kế hoạch lab</a>. Quyết định kèm theo: <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>.
+<a href="../../../labs/PLAN.md" target="_blank" rel="noopener">kế hoạch lab</a>. Quyết định kèm theo: <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>; chuẩn node <a href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048</a>, GitOps <a href="#f-09-adr-0049-gitops-and-devsecops-per-plane">ADR-0049</a>, secret <a href="#f-09-adr-0050-secret-management-and-rotation">ADR-0050</a>.
 Các số (dải IP, số máy) là mặc định để dựng lab, đổi được. Các luồng giữa plane lấy từ
 <a href="#f-05-building-blocks-05-contracts">5.5</a>, <a href="#f-05-building-blocks-08-components-06-rollout-distribution-fleet">5.8.6</a>,
 <a href="#f-08-cross-cutting-19-node-identity-and-mtls">8.19</a>, không bịa thêm luồng nào.</p>
@@ -8669,7 +8675,7 @@ Cổng là mặc định, có thể đổi.</p>
 <tr>
 <td>Z4</td>
 <td><code>pg-1..2</code>, <code>ch-1</code>, <code>kafka-1</code>, <code>mq-1</code>, <code>s3-1</code></td>
-<td><code>data-1</code> (Postgres, RabbitMQ, Valkey, MinIO), <code>ch-1</code>, <code>kafka-1</code></td>
+<td><code>data-1</code> (Postgres, RabbitMQ, Valkey, SeaweedFS), <code>ch-1</code>, <code>kafka-1</code></td>
 </tr>
 <tr>
 <td>Z5</td>
@@ -13125,6 +13131,21 @@ cân nhắc. Quyết định bị thay thế giữ lại với trạng thái &qu
 <td>Phân vùng mạng theo mức tin, mặc định chặn, một cổng cho edge, một đường ra Internet; lab trên máy ảo</td>
 <td><strong>Đề xuất, chờ chọn</strong></td>
 </tr>
+<tr>
+<td><a href="#f-09-adr-0048-node-baseline-and-hardening-profiles">0048</a></td>
+<td>Chuẩn node chung: Ubuntu 24.04 LTS, role Ansible <code>baseline</code> cộng 7 hồ sơ theo vai trò, hardening CIS kiểm được</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
+<tr>
+<td><a href="#f-09-adr-0049-gitops-and-devsecops-per-plane">0049</a></td>
+<td>GitOps (Argo CD, repo triển khai riêng) và DevSecOps từng plane: quét secret, license, SBOM, quét và ký image, kiểm chính sách; OpenTofu thay Terraform</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
+<tr>
+<td><a href="#f-09-adr-0050-secret-management-and-rotation">0050</a></td>
+<td>OpenBao là secret manager duy nhất, secret động ngắn hạn, bảng xoay theo 12 loại, unseal Shamir ở lab</td>
+<td><strong>Đề xuất, chờ chọn</strong></td>
+</tr>
 </tbody>
 </table>
 <p>Quyết định đang chờ: xem <a href="#f-11-risks-00-index--113-quyết-định-còn-mở">11. Risks and Technical Debt</a>.</p>
@@ -15482,6 +15503,476 @@ giữ làm hướng khi số liệu thật vượt.</li>
 <li>Cần thêm các máy phụ: <code>fw-1</code>, <code>ingress-1</code>, <code>egw-1</code>, <code>egress-1</code>; đã tính trong <a href="#f-07-deployment-06-network-zones-and-flows--5-bố-cục-máy-ảo-theo-vùng">7.6 §5</a>.</li>
 <li><code>egw-1</code> thành điểm nghẽn và điểm lỗi của mọi edge: cần HA ở production; lab có bản thu gọn một máy.</li>
 <li>Đổi số cổng hay thêm luồng thì sửa ma trận trước, rồi luật; không sửa luật trước.</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0048-node-baseline-and-hardening-profiles"><div class="path">09-adr/0048-node-baseline-and-hardening-profiles.md</div><h1 id="f-09-adr-0048-node-baseline-and-hardening-profiles--adr-0048-chuẩn-node-chung-hồ-sơ-theo-vai-trò-hardening-kiểm-được">ADR-0048: Chuẩn node chung, hồ sơ theo vai trò, hardening kiểm được</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0023-kubernetes-for-central-planes-edge-outside">ADR-0023</a>, <a href="#f-09-adr-0024-licensing-policy-for-shipped-components">ADR-0024</a>, <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>, <a href="#f-07-deployment-06-network-zones-and-flows">7.6</a></li>
+</ul>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--bối-cảnh">Bối cảnh</h2>
+<p>Lab và production có nhiều loại máy: node K8s, edge (bare metal hoặc VM), kho dữ liệu, OpenBao, bastion. Chủ dự án yêu cầu các service chạy bare metal hay không đều cần
+bộ cài riêng và chuẩn chung: mạng, hệ điều hành, phần mềm, phân quyền, chia đĩa, hardening đầy đủ. Edge là một binary cộng Vector chạy bằng systemd, nên không phụ thuộc hệ điều hành
+cụ thể (ADR-0023).</p>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>Một hệ điều hành cho mọi node ở lab:</strong> Ubuntu 24.04 LTS. Lý do: có benchmark CIS và nội dung OpenSCAP sẵn, vá bảo mật dài hạn. Artifact edge là binary tĩnh nên không buộc khách dùng cùng bản.</li>
+<li><strong>Một chuẩn nền (<code>baseline</code>) áp cho mọi node</strong>, cộng một <strong>hồ sơ</strong> theo vai trò. Chuẩn nền là một role Ansible duy nhất; hồ sơ là role chồng lên.</li>
+<li><strong>Cấp phát:</strong> image cloud gốc cộng cloud-init (tên máy, CA của SSH, khoá bootstrap) cộng Ansible chạy từ Git. Chưa dùng golden image ở MVP (Packer là BSL, xem ADR-0049).</li>
+<li><strong>Không cấu hình tay trên máy.</strong> Máy lệch chuẩn thì dựng lại, không vá.</li>
+<li><strong>Kiểm được:</strong> mỗi hồ sơ có quét CIS (OpenSCAP) và kiểm trôi (Ansible check mode) chạy định kỳ; kết quả là cổng của giai đoạn P4 (<a href="../../../labs/PLAN.md" target="_blank" rel="noopener">kế hoạch lab</a>).</li>
+</ol>
+<h3 id="f-09-adr-0048-node-baseline-and-hardening-profiles--chuẩn-nền-mọi-node">Chuẩn nền (mọi node)</h3>
+<table>
+<thead>
+<tr>
+<th>Hạng mục</th>
+<th>Quy định</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Truy cập</td>
+<td>SSH chỉ bằng cert ngắn hạn do OpenBao ký, không mật khẩu, không đăng nhập root, chỉ từ <code>bastion</code></td>
+</tr>
+<tr>
+<td>Phân quyền</td>
+<td>Mỗi dịch vụ một user hệ thống không đăng nhập được; <code>sudo</code> chỉ cho nhóm vận hành, có ghi lại; không tài khoản dùng chung</td>
+</tr>
+<tr>
+<td>Phân vùng đĩa</td>
+<td><code>/boot</code>, <code>/</code>, <code>/var</code>, <code>/var/log</code>, <code>/var/log/audit</code>, <code>/tmp</code> (<code>nodev,nosuid,noexec</code>), <code>/home</code> (<code>nodev,nosuid</code>); đĩa dữ liệu riêng theo hồ sơ</td>
+</tr>
+<tr>
+<td>Dịch vụ</td>
+<td>Chỉ gói cần thiết; không trình biên dịch, không công cụ mạng thừa; dịch vụ không dùng bị tắt</td>
+</tr>
+<tr>
+<td>Kernel và mạng</td>
+<td>Bộ <code>sysctl</code> chuẩn (chống giả mạo, chặn chuyển tiếp IP trừ router), tắt IPv6 ở lab, tắt module không dùng, tắt USB và FireWire</td>
+</tr>
+<tr>
+<td>Kiểm soát truy cập bắt buộc</td>
+<td>AppArmor ở chế độ enforce</td>
+</tr>
+<tr>
+<td>Nhật ký và kiểm toán</td>
+<td><code>auditd</code> với bộ luật chuẩn; log hệ điều hành gửi về <code>obs</code> qua Vector; giờ đồng bộ bằng <code>chrony</code> tới <code>infra</code></td>
+</tr>
+<tr>
+<td>Toàn vẹn</td>
+<td>AIDE cho thư mục hệ thống; cảnh báo khi đổi ngoài Ansible</td>
+</tr>
+<tr>
+<td>Cập nhật</td>
+<td>Vá bảo mật tự động, khởi động lại trong khung giờ; node trung tâm vá theo đợt để không mất đồng thời</td>
+</tr>
+<tr>
+<td>Dịch vụ của chúng ta</td>
+<td>Unit systemd: <code>NoNewPrivileges</code>, <code>ProtectSystem=strict</code>, <code>ProtectHome</code>, <code>PrivateTmp</code>, tập capability tối thiểu, <code>MemoryMax</code></td>
+</tr>
+<tr>
+<td>Tường lửa</td>
+<td>nftables mặc định chặn, chỉ mở theo ma trận <a href="#f-07-deployment-06-network-zones-and-flows--4-ma-trận-luồng">7.6 §4</a></td>
+</tr>
+<tr>
+<td>Khởi động</td>
+<td>Secure Boot và TPM khi hạ tầng có; không có thì ghi lại là rủi ro (ADR-0045)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-09-adr-0048-node-baseline-and-hardening-profiles--hồ-sơ-theo-vai-trò">Hồ sơ theo vai trò</h3>
+<table>
+<thead>
+<tr>
+<th>Hồ sơ</th>
+<th>Dùng cho</th>
+<th>Khác biệt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>k8s-node</code></td>
+<td>Control-plane, worker K8s</td>
+<td>Kubelet đã khoá, đọc-only trên port kubelet, tắt anonymous auth; cấu hình kernel cho container</td>
+</tr>
+<tr>
+<td><code>edge-l7</code></td>
+<td>Pool L7 (bare metal hoặc VM)</td>
+<td>Chỉ capability <code>NET_BIND_SERVICE</code>; tinh chỉnh mạng (RSS, IRQ affinity, <code>somaxconn</code>); đĩa NVMe cache gắn <code>noatime</code>; có đường ra tới origin của khách (ngoại lệ duy nhất, ADR-0047)</td>
+</tr>
+<tr>
+<td><code>edge-waf</code></td>
+<td>Pool WAF</td>
+<td>CPU và cgroup riêng; <strong>không có đường ra Internet</strong>; không nhận kết nối từ ngoài vùng</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>Postgres, ClickHouse, Kafka, RabbitMQ</td>
+<td>Đĩa riêng cho dữ liệu, WAL, log; bộ lập lịch I/O phù hợp; mã hoá đĩa (LUKS); tài khoản backup riêng</td>
+</tr>
+<tr>
+<td><code>secret</code></td>
+<td>OpenBao</td>
+<td>Không swap; mã hoá đĩa; tắt core dump; khoá bộ nhớ; đĩa audit riêng; không có đường ra</td>
+</tr>
+<tr>
+<td><code>bastion</code></td>
+<td>Cửa quản trị</td>
+<td>Ghi phiên (session recording); MFA; không lưu khoá riêng của ai; không có quyền đọc dữ liệu khách</td>
+</tr>
+<tr>
+<td><code>ops</code></td>
+<td>CI, registry, giám sát, infra</td>
+<td>Runner CI không giữ secret dài hạn; đường ra qua <code>egress-1</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Nhận xét</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Image gốc cộng Ansible (đề xuất)</strong></td>
+<td>Đơn giản, đủ cho lab, kiểm trôi được; chưa có image dựng sẵn</td>
+</tr>
+<tr>
+<td>Golden image bằng Packer</td>
+<td>Dựng nhanh hơn, nhưng Packer chuyển sang BSL; có thể dùng sau cho nội bộ</td>
+</tr>
+<tr>
+<td>OS bất biến cho node K8s (Talos, Flatcar)</td>
+<td>Hardening mạnh và rẻ; đổi cách vận hành và không dùng cho edge; xem xét lại khi chạy production</td>
+</tr>
+<tr>
+<td>Mỗi vai trò một OS, một chuẩn riêng</td>
+<td>Chi phí duy trì nhân lên; không có chuẩn chung như chủ dự án yêu cầu</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0048-node-baseline-and-hardening-profiles--hệ-quả">Hệ quả</h2>
+<ul>
+<li>Một nơi (role <code>baseline</code>) quyết định chuẩn cho mọi node; sửa ở đó là sửa cho cả fleet, qua pull request.</li>
+<li>Ngưỡng điểm CIS còn mở (L5 trong kế hoạch lab); chưa có số liệu để chọn con số.</li>
+<li>Hardening có thể ảnh hưởng hiệu năng edge; áp từng hạng mục và đo trước sau, không áp đồng loạt.</li>
+<li>Công cụ GPL (Ansible, Lynis) chỉ dùng nội bộ NCC, không phát hành tới khách (ADR-0024).</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0049-gitops-and-devsecops-per-plane"><div class="path">09-adr/0049-gitops-and-devsecops-per-plane.md</div><h1 id="f-09-adr-0049-gitops-and-devsecops-per-plane--adr-0049-gitops-và-devsecops-cho-từng-plane-chuỗi-cung-ứng-có-ký-và-kiểm-chính-sách">ADR-0049: GitOps và DevSecOps cho từng plane, chuỗi cung ứng có ký và kiểm chính sách</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0001-four-planes">ADR-0001</a>, <a href="#f-09-adr-0023-kubernetes-for-central-planes-edge-outside">ADR-0023</a>, <a href="#f-09-adr-0024-licensing-policy-for-shipped-components">ADR-0024</a>, <a href="#f-09-adr-0037-config-apply-classes">ADR-0037</a>, <a href="#f-07-deployment-00-index--74-môi-trường">7.4</a>, <a href="#f-08-cross-cutting-15-config-propagation-and-apply">8.15</a></li>
+</ul>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--bối-cảnh">Bối cảnh</h2>
+<p>Bốn plane có bốn chu kỳ triển khai riêng; một thay đổi ở portal không được làm edge deploy lại. Chủ dự án yêu cầu GitOps và DevSecOps trong từng plane. Hiện tại CI mới
+có build, vet, test, fmt, <code>govulncheck</code>, CodeQL, Semgrep và hai guard <code>depguard</code> (edge và analytics chỉ import <code>metap/pkg/kit/*</code>). Chưa có quét secret, SBOM, quét và ký image,
+kiểm chính sách, hay đường triển khai.</p>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>Git là nguồn sự thật.</strong> Mã nằm ở repo của từng plane; <strong>cấu hình triển khai tách ra một repo riêng</strong> (<code>waap-deploy</code>) với Helm và Kustomize, một thư mục cho mỗi
+môi trường (<code>dev</code>, <code>staging</code>, <code>canary</code>, <code>prod</code>). Thay đổi môi trường là sửa file trong repo này, không phải nhánh riêng cho từng môi trường.</li>
+<li><strong>Argo CD kéo</strong> (Apache-2.0), mẫu app-of-apps, mỗi plane một ứng dụng; tự hoàn lại khi cụm lệch Git (<code>selfHeal</code>) và cảnh báo.</li>
+<li><strong>Thăng cấp bằng pull request</strong> đổi digest image trong thư mục môi trường: staging tự động sau khi pipeline qua; canary và prod cần người duyệt (cùng nguyên tắc 4-eyes của BR-26).</li>
+<li><strong>Edge (ngoài K8s) không đi qua Argo:</strong> pipeline phát hành artifact có ký (binary, Vector) tới registry và relay; việc rollout lên node theo cơ chế canary PoP và gate của chính nền tảng
+(7.4, 8.15 lớp D). Git chỉ ghi <em>phiên bản mong muốn</em> của edge; một job đăng ký phiên bản đó vào fleet registry.</li>
+<li><strong>Mỗi plane một pipeline.</strong> Chặng bắt buộc theo bảng dưới. Không có đường tắt triển khai không qua pipeline.</li>
+<li><strong>Chuỗi cung ứng:</strong> image tham chiếu theo digest; base image tối giản, chạy không root; SBOM cho mọi image; ký bằng cosign với khoá ký nằm trong OpenBao transit (ADR-0050); cụm chỉ nhận image đã ký
+(Kyverno <code>verifyImages</code>).</li>
+<li><strong>Không có secret trong Git.</strong> Quét bằng gitleaks ở CI và pre-commit; bootstrap duy nhất (khoá unseal) giữ ngoại tuyến.</li>
+<li><strong>Công cụ chọn theo license</strong> (ADR-0024): OpenTofu (MPL-2.0) thay Terraform (BSL); Argo CD, Kyverno, cosign, Syft, Trivy (Apache-2.0); gitleaks (MIT).</li>
+</ol>
+<h3 id="f-09-adr-0049-gitops-and-devsecops-per-plane--chặng-pipeline">Chặng pipeline</h3>
+<table>
+<thead>
+<tr>
+<th>Chặng</th>
+<th>Công cụ</th>
+<th>Hiện có</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lint, kiểu, fmt</td>
+<td><code>golangci-lint</code>, <code>gofmt</code></td>
+<td>Một phần</td>
+<td>Thêm lint cho IaC (<code>tflint</code>) và manifest</td>
+</tr>
+<tr>
+<td>Unit test</td>
+<td><code>go test</code></td>
+<td>Có</td>
+<td></td>
+</tr>
+<tr>
+<td>Test tích hợp</td>
+<td><code>go test -tags integration</code> (testkit)</td>
+<td>Một phần</td>
+<td>Chạy trong job riêng có Postgres</td>
+</tr>
+<tr>
+<td>SAST</td>
+<td>Semgrep, CodeQL</td>
+<td>Có</td>
+<td></td>
+</tr>
+<tr>
+<td>SCA</td>
+<td><code>govulncheck</code></td>
+<td>Có</td>
+<td>Chặn lỗ hổng mức cao</td>
+</tr>
+<tr>
+<td>Quét secret</td>
+<td>gitleaks</td>
+<td>Chưa</td>
+<td>Chặn merge</td>
+</tr>
+<tr>
+<td>Kiểm license</td>
+<td><code>go-licenses</code></td>
+<td>Chưa</td>
+<td>Theo ADR-0024; chặn BSL, SSPL, AGPL</td>
+</tr>
+<tr>
+<td>Ranh giới plane</td>
+<td><code>depguard</code></td>
+<td>Có (edge, analytics)</td>
+<td>Giữ nguyên</td>
+</tr>
+<tr>
+<td>Build container</td>
+<td>Dockerfile nhiều tầng, distroless</td>
+<td>Có Dockerfile</td>
+<td>Không root, chỉ đọc hệ thống tệp</td>
+</tr>
+<tr>
+<td>SBOM</td>
+<td>Syft</td>
+<td>Chưa</td>
+<td>Đính kèm image</td>
+</tr>
+<tr>
+<td>Quét image</td>
+<td>Trivy</td>
+<td>Chưa</td>
+<td>Chặn lỗ hổng mức cao</td>
+</tr>
+<tr>
+<td>Ký</td>
+<td>cosign, khoá trong OpenBao</td>
+<td>Chưa</td>
+<td></td>
+</tr>
+<tr>
+<td>Kiểm chính sách</td>
+<td>Kyverno (admission), <code>conftest</code> (trước merge)</td>
+<td>Chưa</td>
+<td>Ví dụ: không chạy root, có giới hạn tài nguyên, NetworkPolicy bắt buộc</td>
+</tr>
+<tr>
+<td>Triển khai</td>
+<td>Argo CD</td>
+<td>Chưa</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Nhận xét</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Argo CD, repo triển khai riêng (đề xuất)</strong></td>
+<td>Một nguồn sự thật cho cụm, tách chu kỳ bốn plane; có giao diện xem trôi</td>
+</tr>
+<tr>
+<td>Flux</td>
+<td>Nhẹ và gần K8s hơn, không có giao diện; chọn lại được, hai công cụ tương đương cho nhu cầu này</td>
+</tr>
+<tr>
+<td>Đẩy từ CI vào cụm</td>
+<td>Đơn giản nhưng CI giữ quyền vào cụm, không tự hoàn lại khi bị sửa tay</td>
+</tr>
+<tr>
+<td>Nhánh riêng cho từng môi trường</td>
+<td>Dễ lệch và khó so sánh; thư mục theo môi trường gọn hơn</td>
+</tr>
+<tr>
+<td>Terraform, Packer</td>
+<td>Bị loại: BSL (ADR-0024 áp cho thành phần phát hành; chọn bản tuân thủ cho đồng nhất)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0049-gitops-and-devsecops-per-plane--hệ-quả">Hệ quả</h2>
+<ul>
+<li>Runner CI ở vùng Vận hành, ra Internet qua <code>egress-1</code> (luồng N29, <a href="#f-07-deployment-06-network-zones-and-flows">7.6</a>); không có đường nào từ Internet vào runner.</li>
+<li>Có hai loại &quot;triển khai&quot;: K8s qua Argo, edge qua fleet registry. Hai đường phải cho ra cùng bản ghi &quot;phiên bản nào đang chạy ở đâu&quot;, nếu không audit sẽ thiếu.</li>
+<li>Repo triển khai riêng thêm một nơi để duy trì, đổi lại bốn plane không kéo nhau.</li>
+<li>Quét và ký làm pipeline dài hơn; chặng nặng (quét image, SBOM) chỉ chạy khi image đổi.</li>
+</ul>
+</section>
+<section class="doc" id="f-09-adr-0050-secret-management-and-rotation"><div class="path">09-adr/0050-secret-management-and-rotation.md</div><h1 id="f-09-adr-0050-secret-management-and-rotation--adr-0050-secret-manager-duy-nhất-cấp-secret-ngắn-hạn-xoay-tự-động-theo-loại">ADR-0050: Secret manager duy nhất, cấp secret ngắn hạn, xoay tự động theo loại</h1>
+<ul>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> (2026-11-13)</li>
+<li>Liên quan: <a href="#f-09-adr-0017-openbao-for-signing-keys-and-node-pki">ADR-0017</a>, <a href="#f-09-adr-0045-short-lived-node-certs-and-reenroll">ADR-0045</a>, <a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>, <a href="#f-09-adr-0048-node-baseline-and-hardening-profiles">ADR-0048</a>, <a href="#f-08-cross-cutting-19-node-identity-and-mtls">8.19</a></li>
+</ul>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--bối-cảnh">Bối cảnh</h2>
+<p>Chủ dự án yêu cầu có secret manager và tự động xoay secret theo nghiệp vụ và hạ tầng. OpenBao đã được chọn cho khoá ký và PKI (ADR-0017). Hiện còn nhiều secret nằm ngoài nó:
+khoá ký JWKS đặt trong thư mục khoá gắn vào container, secret ingest giữa control-plane và analytics-plane, mật khẩu cơ sở dữ liệu tĩnh trong cấu hình compose. Xoay JWKS đã làm được không cần restart,
+nhưng bằng tay.</p>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--quyết-định-đề-xuất">Quyết định (đề xuất)</h2>
+<ol>
+<li><strong>OpenBao là secret manager duy nhất</strong> cho cả bốn plane và hạ tầng. Chạy ở vùng Secret ngoài K8s, ba node Raft, không có đường ra (<a href="#f-09-adr-0047-network-zones-and-default-deny">ADR-0047</a>).</li>
+<li><strong>Ưu tiên secret động, ngắn hạn</strong> hơn secret tĩnh: mật khẩu cơ sở dữ liệu cấp theo yêu cầu với TTL, thu hồi khi hết hạn; cert 24 giờ cho node, 7 ngày cho dịch vụ (ADR-0045).</li>
+<li><strong>Xác thực vào OpenBao theo loại chủ thể:</strong> pod bằng K8s auth; VM bằng cert (TLS auth); CI bằng AppRole với TTL ngắn và secret ID bọc (response wrapping); người bằng OIDC cộng MFA, chỉ cho quản trị.
+<strong>Edge không nói chuyện với OpenBao</strong> (ADR-0045).</li>
+<li><strong>Giao secret không qua biến môi trường dài hạn và không qua Git:</strong> pod nhận qua Secrets Store CSI hoặc agent sidecar của OpenBao ghi vào bộ nhớ (tmpfs), không tạo K8s Secret để khỏi lưu trong etcd; VM dùng OpenBao Agent chạy như dịch vụ.</li>
+<li><strong>Mọi secret có chủ, chu kỳ và cách nạp lại</strong> trong bảng xoay dưới; dịch vụ phải nạp lại không cần khởi động lại.</li>
+<li><strong>Mở khoá (unseal):</strong> lab dùng Shamir 5 phần, cần 3, giữ riêng ngoại tuyến bởi các người khác nhau; root token thu hồi sau bootstrap. Production tự mở khoá bằng transit của một OpenBao thứ hai hoặc KMS.</li>
+<li><strong>Audit bật từ đầu</strong>, gửi về <code>obs</code>; sao lưu snapshot Raft mã hoá lên object storage theo lịch.</li>
+</ol>
+<h3 id="f-09-adr-0050-secret-management-and-rotation--bảng-xoay-theo-loại">Bảng xoay theo loại</h3>
+<table>
+<thead>
+<tr>
+<th>Loại</th>
+<th>Nơi giữ</th>
+<th>Chu kỳ đề xuất</th>
+<th>Cách xoay</th>
+<th>Cách nạp lại</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Khoá ký JWKS</td>
+<td>OpenBao KV; agent ghi thư mục khoá của issuer</td>
+<td>Theo lịch (ví dụ quý) và khi lộ</td>
+<td>Quy trình 3 bước thành job tự động: thêm khoá, đợi mọi verifier làm mới, chuyển <code>signing-kid</code>, đợi token cũ hết hạn, gỡ khoá cũ</td>
+<td>Issuer đọc lại thư mục khoá; verifier lấy lại khi gặp <code>kid</code> lạ (đã có)</td>
+</tr>
+<tr>
+<td>Cert node (edge)</td>
+<td>OpenBao PKI qua node identity service</td>
+<td>24 giờ</td>
+<td>Tự gia hạn ở 2/3 thời hạn</td>
+<td>Agent trên node tải lại (ADR-0045)</td>
+</tr>
+<tr>
+<td>Cert dịch vụ</td>
+<td>OpenBao PKI qua cert-manager</td>
+<td>7 ngày</td>
+<td>Tự gia hạn</td>
+<td>Dịch vụ tải lại cert khi đổi file</td>
+</tr>
+<tr>
+<td>Mật khẩu Postgres</td>
+<td>OpenBao database engine</td>
+<td>Cấp theo yêu cầu, TTL một giờ, tối đa 24 giờ</td>
+<td>Cấp tài khoản tạm, thu hồi khi hết hạn</td>
+<td>Connection pool mở kết nối mới bằng tài khoản mới</td>
+</tr>
+<tr>
+<td>Tài khoản RabbitMQ, Kafka, ClickHouse</td>
+<td>OpenBao (động nếu engine hỗ trợ, nếu không thì tĩnh có xoay)</td>
+<td>Một đến ba mươi ngày</td>
+<td>Xoay theo lịch</td>
+<td>Client đọc lại trước khi hết hạn</td>
+</tr>
+<tr>
+<td>Secret ingest control-plane tới analytics-plane</td>
+<td>OpenBao KV</td>
+<td>Ba mươi ngày</td>
+<td>Hai giá trị song song trong thời gian chuyển</td>
+<td>Hai phía đọc lại</td>
+</tr>
+<tr>
+<td>Khoá ký manifest snapshot</td>
+<td>OpenBao transit</td>
+<td>Theo lịch, phiên bản khoá</td>
+<td>Thêm phiên bản khoá; edge tin nhiều khoá song song</td>
+<td>Edge cập nhật danh sách tin cậy qua bundle</td>
+</tr>
+<tr>
+<td>Cert Origin CA theo zone</td>
+<td>OpenBao PKI</td>
+<td>90 ngày</td>
+<td>Tự gia hạn (ADR-0045)</td>
+<td>Edge nhận qua bundle</td>
+</tr>
+<tr>
+<td>Secret của khách (webhook, kênh thông báo)</td>
+<td><code>SecretStore</code> theo tenant, backend OpenBao</td>
+<td>Do khách chọn</td>
+<td>Qua API, ghi audit</td>
+<td>Đọc lại mỗi lần gửi</td>
+</tr>
+<tr>
+<td>SSH</td>
+<td>OpenBao SSH CA</td>
+<td>Cert vài giờ</td>
+<td>Không có khoá dài hạn</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Secret CI (AppRole)</td>
+<td>OpenBao</td>
+<td>Mỗi lần chạy</td>
+<td>Secret ID dùng một lần</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Khoá unseal, root token</td>
+<td>Ngoại tuyến</td>
+<td>Khi có thay đổi người giữ</td>
+<td>Rekey theo quy trình</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--phương-án-đã-cân-nhắc">Phương án đã cân nhắc</h2>
+<table>
+<thead>
+<tr>
+<th>Phương án</th>
+<th>Nhận xét</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OpenBao cho mọi thứ, secret động (đề xuất)</strong></td>
+<td>Một nơi quản lý và audit; secret ngắn hạn giảm thiệt hại khi lộ; cần OpenBao luôn sẵn sàng</td>
+</tr>
+<tr>
+<td>External Secrets tạo K8s Secret</td>
+<td>Dễ dùng nhưng secret nằm trong etcd; cần mã hoá etcd và kiểm soát RBAC chặt</td>
+</tr>
+<tr>
+<td>SOPS trong Git</td>
+<td>Không cần dịch vụ, nhưng không xoay động, khoá giải mã thành điểm yếu</td>
+</tr>
+<tr>
+<td>KMS của cloud</td>
+<td>Không dùng được on-prem; ADR-0006 yêu cầu plane không phụ thuộc một cloud</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-09-adr-0050-secret-management-and-rotation--hệ-quả">Hệ quả</h2>
+<ul>
+<li>OpenBao ngoài K8s nên cụm có thể khởi động mà không cần OpenBao, nhưng dịch vụ cần secret thì chờ; thứ tự khởi động phải ghi trong runbook: OpenBao, rồi dữ liệu, rồi ứng dụng.</li>
+<li>Vài dịch vụ phải đổi để nạp lại secret động mà không khởi động lại; hiện chưa dịch vụ nào của management-plane làm vậy cho mật khẩu cơ sở dữ liệu. Đây là công việc code, ngoài phạm vi tài liệu.</li>
+<li>Khoá JWKS hiện là tệp khoá thô nên không đi qua transit được; ký trực tiếp bằng transit là hướng sau, đổi mã của issuer.</li>
+<li>Cần diễn tập: lộ khoá thì thu hồi và xoay trong một thao tác; mất đa số người giữ khoá unseal thì khôi phục thế nào.</li>
 </ul>
 </section>
 <section class="doc" id="f-10-quality-00-index"><div class="path">10-quality/00-index.md</div><h1 id="f-10-quality-00-index--10-quality-requirements">10. Quality Requirements</h1>

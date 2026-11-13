@@ -24,11 +24,11 @@ ngoài; mỗi plane một chu kỳ triển khai riêng ([ADR-0001](../docs/archi
 |---|---|---|
 | L1 | Lab chạy trên nền nào? | **Đã chốt (chủ dự án, 2026-11-13): máy ảo.** Còn mở: hypervisor cụ thể (Proxmox, KVM) và `fw-1` dùng nftables hay VyOS |
 | L2 | Tài nguyên tối đa: số máy, CPU, RAM, disk? | Hai cấu hình ở [7.6 §5](../docs/architecture/07-deployment/06-network-zones-and-flows.md#5-bố-cục-máy-ảo-theo-vùng): đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15; chọn theo tài nguyên có |
-| L3 | Hệ điều hành cho node: một họ hay nhiều? | Một họ cho mọi node (Debian 13 hoặc Ubuntu 24.04 LTS); một chuẩn hardening duy nhất |
-| L4 | Công cụ GitOps và IaC? | Argo CD cho K8s; Terraform (hoặc OpenTofu) cho hạ tầng; Ansible cho node ngoài K8s; Packer cho image nền |
+| L3 | Hệ điều hành cho node: một họ hay nhiều? | Ubuntu 24.04 LTS cho mọi node ở lab, một chuẩn hardening duy nhất ([ADR-0048](../docs/architecture/09-adr/0048-node-baseline-and-hardening-profiles.md)) |
+| L4 | Công cụ GitOps và IaC? | Argo CD cho K8s; **OpenTofu** cho hạ tầng (Terraform và Packer là BSL, trái tinh thần ADR-0024); Ansible cho cấu hình node; image cloud gốc cộng cloud-init, chưa dùng golden image ([ADR-0049](../docs/architecture/09-adr/0049-gitops-and-devsecops-per-plane.md)) |
 | L5 | Chuẩn hardening: CIS benchmark mức nào? | CIS Level 1 bắt buộc cho mọi node; Level 2 cho edge và bastion |
 | L6 | Lab có nhận traffic thật từ Internet không (cần domain, IP public)? | Không ở giai đoạn đầu: dùng dns-mock, origin giả và bộ sinh traffic nội bộ; thêm một cổng public riêng ở giai đoạn cuối |
-| L7 | OpenBao (đã chốt ở ADR-0017) chạy ở đâu, mở khoá (unseal) thế nào? | Cụm 3 node Raft trên máy ảo riêng, ngoài K8s; unseal bằng Shamir (lab); tự mở khoá bằng KMS để cho giai đoạn production |
+| L7 | OpenBao (đã chốt ở ADR-0017) chạy ở đâu, mở khoá (unseal) thế nào? | Cụm 3 node Raft trên máy ảo riêng, ngoài K8s; unseal bằng Shamir 5 phần, cần 3 (lab); tự mở khoá bằng transit hoặc KMS ở production ([ADR-0050](../docs/architecture/09-adr/0050-secret-management-and-rotation.md)) |
 | L8 | Lab dùng cho gì ngoài trình diễn: có chạy benchmark, chaos, pentest không? | Có kiểm thử cô lập mạng và chaos nhẹ; benchmark để sau |
 
 ## 2. Thiết kế đề xuất
@@ -49,7 +49,7 @@ Kích thước: S (vài ngày), M (một đến hai tuần), L (nhiều tuần).
 
 Mục tiêu: có thiết kế mạng và triển khai được duyệt **trước khi** dựng, theo đúng ghi chú đầu tiên của chủ dự án.
 
-- Viết thêm vào `7. Deployment View`: mục network topology (vùng mạng, sơ đồ), **ma trận luồng** (nguồn, đích, cổng, giao thức, xác thực, ai khởi tạo), môi trường lab trong 7.4. **Phần mạng đã viết (2026-11-13) ở [7.6](../docs/architecture/07-deployment/06-network-zones-and-flows.md) và [ADR-0047](../docs/architecture/09-adr/0047-network-zones-and-default-deny.md), chờ duyệt.** Còn lại của P0: ADR chuẩn node, GitOps, secret.
+- Viết thêm vào `7. Deployment View`: mục network topology (vùng mạng, sơ đồ), **ma trận luồng** (nguồn, đích, cổng, giao thức, xác thực, ai khởi tạo), môi trường lab trong 7.4. **Phần mạng đã viết (2026-11-13) ở [7.6](../docs/architecture/07-deployment/06-network-zones-and-flows.md) và [ADR-0047](../docs/architecture/09-adr/0047-network-zones-and-default-deny.md), chờ duyệt.** Ba ADR còn lại đã viết: [0048](../docs/architecture/09-adr/0048-node-baseline-and-hardening-profiles.md) (chuẩn node), [0049](../docs/architecture/09-adr/0049-gitops-and-devsecops-per-plane.md) (GitOps), [0050](../docs/architecture/09-adr/0050-secret-management-and-rotation.md) (secret), chờ duyệt.
 - ADR mới: phân vùng mạng; chuẩn node (OS, partition, hardening); GitOps; quản lý secret và lịch xoay.
 - Cập nhật 12 (glossary) nếu có thuật ngữ mới.
 - **Đầu ra:** sơ đồ mạng, ma trận luồng (một bảng, mỗi dòng một luồng được phép), 4 ADR ở trạng thái đề xuất.
@@ -59,8 +59,8 @@ Mục tiêu: có thiết kế mạng và triển khai được duyệt **trướ
 
 Phụ thuộc: P0 (bố cục và quyết định L1 đến L4).
 
-1. Hạ tầng như mã (Terraform): máy ảo, đĩa, mạng ảo, theo [§2.1](#21-bố-cục-lab-đề-xuất).
-2. Image nền (Packer) và provision node (cloud-init, Ansible): chưa hardening đầy đủ ở bước này.
+1. Hạ tầng như mã (OpenTofu): máy ảo, đĩa, mạng ảo, theo [§2.1](#21-bố-cục-lab-đề-xuất).
+2. Image cloud gốc cộng cloud-init và Ansible (role `baseline`): chưa áp đủ hardening ở bước này.
 3. Cụm K8s, ingress, cert-manager; Postgres, RabbitMQ, Kafka, ClickHouse, Valkey.
 4. Triển khai bốn plane bằng artifact hiện có: management-plane, control-plane, analytics-plane, edge-plane; dns-mock thay DNS thật.
 5. `origin` giả và `loadgen`.
