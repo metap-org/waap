@@ -1,0 +1,48 @@
+# Ma trận luồng 7.6 §4 dưới dạng dữ liệu. Nguồn sự thật cho luật fw-1: tools/gen_nft.py sinh nftables từ đây.
+# Đầu mối: "zone:Z3" | "role:edge-l7" | "uplink" (Internet thật qua NAT) | "zones:[Z3,Z4]" | "all-vms-except:[Z0,Z1,Z5]"
+# covers: các ID trong 7.6 mà luật này phủ (mặc định là chính id); L01 là luật chỉ có trong lab nên covers rỗng.
+# enforce: fw (mặc định, fw-1 chặn được vì đi qua router) | host (cùng vùng, đi cầu L2, phải chặn bằng firewall máy chủ ở P2/P4).
+flows:
+  - { id: N01, src: "zone:Z0", dst: "role:ingress-1", proto: tcp, ports: [443] }
+  - { id: N02, src: "zone:Z0", dst: "role:edge-l7",   proto: tcp, ports: [80, 443] }
+  - { id: N02q, covers: [N02], src: "zone:Z0", dst: "role:edge-l7", proto: udp, ports: [443] }
+  - { id: N03, src: "zone:Z0", dst: "role:dns",       proto: udp, ports: [53] }
+  - { id: N03t, covers: [N03], src: "zone:Z0", dst: "role:dns", proto: tcp, ports: [53] }
+  - { id: N04, src: "role:ingress-1", dst: "role:k8s-app", proto: tcp, ports: [443] }
+  - { id: N05, src: "zone:Z1", dst: "role:egw-1", proto: tcp, ports: [443], covers: [N05, N06, N07, N08] }
+  - { id: N09, src: "role:egw-1", dst: "role:k8s-app", proto: tcp, ports: [443] }
+  - { id: N10, src: "role:edge-l7", dst: "role:edge-waf",    proto: tcp, ports: [9443], enforce: host }
+  - { id: N11, src: "role:edge-l7", dst: "role:valkey-edge", proto: tcp, ports: [6379], enforce: host }
+  - { id: N12, src: "role:edge-l7", dst: "zone:Z0", proto: tcp, ports: [80, 443] }
+  - { id: N14, src: "zone:Z3", dst: "role:postgres",       proto: tcp, ports: [5432] }
+  - { id: N15, src: "zone:Z3", dst: "role:rabbitmq",       proto: tcp, ports: [5671] }
+  - { id: N16, src: "zone:Z3", dst: "role:kafka",          proto: tcp, ports: [9093] }
+  - { id: N17, src: "zone:Z3", dst: "role:clickhouse",     proto: tcp, ports: [8443, 9440] }
+  - { id: N18, src: "zone:Z3", dst: "role:valkey-central", proto: tcp, ports: [6379] }
+  - { id: N18o, covers: [N18], src: "zone:Z3", dst: "role:object-storage", proto: tcp, ports: [443] }
+  - { id: N19, src: "zone:Z3", dst: "role:openbao", proto: tcp, ports: [8200] }
+  - { id: N20, src: "role:openbao", dst: "role:openbao", proto: tcp, ports: [8200, 8201], enforce: host }
+  - { id: N21, src: "zone:Z3", dst: "role:egress-1", proto: tcp, ports: [3128] }
+  - { id: N22, src: "role:egress-1", dst: "uplink", proto: tcp, ports: [80, 443, 587] }
+  - { id: N23, src: "role:postgres", dst: "role:postgres", proto: tcp, ports: [5432], enforce: host }
+  - { id: N24, src: "zone:Z0", dst: "role:bastion", proto: udp, ports: [51820] }
+  - { id: N25, src: "role:bastion", dst: "all-vms", proto: tcp, ports: [22] }
+  - { id: N26, src: "role:obs", dst: "all-vms", proto: tcp, ports: [9100, 9090] }
+  # ĐANG MÂU THUẪN TÀI LIỆU: N27 nói "mọi VM" nhưng X01 cấm Z1 -> Z6, X05 cấm OpenBao khởi tạo kết nối ra,
+  # X02 cấm Z0 -> Z6. Tạm loại Z0, Z1, Z5 khỏi N27 cho tới khi chủ dự án chọn cách giải (xem labs/infra/README.md).
+  - { id: N27, src: "all-vms-except:[Z0,Z1,Z5]", dst: "role:infra", proto: udp, ports: [53, 123] }
+  - { id: N28, src: "zone:Z3", dst: "role:registry", proto: tcp, ports: [443] }
+  - { id: N28c, covers: [N28], src: "role:ci-runner", dst: "role:registry", proto: tcp, ports: [443], enforce: host }
+  - { id: N29, src: "role:ci-runner", dst: "role:egress-1", proto: tcp, ports: [3128] }
+  # Chỉ có trong lab: Z0 là "Internet giả" nên cần đường ra Internet thật (NAT qua uplink) cho loadgen, dns-mock.
+  - { id: L01, src: "zone:Z0", dst: "uplink", proto: tcp, ports: [80, 443], covers: [], lab_only: true }
+
+# Cấm tuyệt đối 7.6 §4.7. Sinh luật không được tạo ra bất kỳ luồng nào trùng (cặp máy nguồn, máy đích).
+# X07 (bastion không phải đường đọc dữ liệu khách) là ngữ nghĩa ứng dụng, kiểm ở P2 bằng test, không phải luật mạng.
+forbidden:
+  - { id: X01, src: "zone:Z1", dst: "zones:[Z3,Z4,Z5,Z6]" }
+  - { id: X02, src: "zone:Z0", dst: "zones:[Z3,Z4,Z5,Z6]", except: [N24] }  # N24 (WireGuard vào bastion) là ngoại lệ duy nhất, 7.6 chưa ghi rõ
+  - { id: X03, src: "role:ingress-1", dst: "zones:[Z4,Z5]" }
+  - { id: X04, src: "zones:[Z4,Z5]", dst: "zones:[Z0,Z1]" }
+  - { id: X05, src: "zone:Z5", dst: "zones:[Z0,Z1,Z2,Z3,Z4,Z6]" }
+  - { id: X06, src: "zones:[Z3,Z4,Z5]", dst: "uplink" }

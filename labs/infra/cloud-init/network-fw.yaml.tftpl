@@ -1,0 +1,16 @@
+version: 2
+ethernets:
+%{ for n in nics ~}
+  ${n.ifname}:
+    match: { macaddress: "${n.mac}" }
+    set-name: ${n.ifname}
+    addresses: [ "${n.ip}/24" ]
+%{ endfor ~}
+  uplink:
+    match: { macaddress: "${up_mac}" }
+    set-name: uplink
+    addresses: [ "${up_ip}/24" ]
+    routes:
+      - to: default
+        via: ${up_gw}
+    nameservers: { addresses: [ "${up_gw}" ] }

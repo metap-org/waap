@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Điều khiển lab. Chạy trên máy có Incus và OpenTofu (máy ảo Ubuntu trên Hyper-V hoặc Linux native).
+# Dùng: lab {check|gen|up|seal|down|destroy|status}   Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+INFRA="$ROOT/infra"
+PROFILE="${LAB_PROFILE:-compact}"
+GEN="$INFRA/generated"
+SSH_KEY="${LAB_SSH_KEY:-$(cat "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true)}"
+
+tf() { tofu -chdir="$INFRA/tofu" "$@" -var "profile=$PROFILE" -var "ssh_public_key=$SSH_KEY" -var "generated_dir=$GEN"; }
+# Thứ tự bật: Secret, Data, Internal, Perimeter, Edge (7.6, lab chỉ chạy khi bật).
+UP_ORDER=(fw-1 bao-1 data-1 ch-1 kafka-1 k8s-cp-1 k8s-wk-1 k8s-wk-2 ops-1 bastion perimeter-1 dns-1 edge-1 origin dns-mock loadgen)
+
+need() { command -v "$1" >/dev/null || { echo "thiếu $1"; exit 1; }; }
+
+cmd_check() { python3 "$INFRA/tools/test_gen_nft.py" && python3 "$INFRA/tools/gen_nft.py" check "$PROFILE"; }
+
+cmd_gen() { # gen [--bootstrap]
+  python3 "$INFRA/tools/gen_nft.py" gen "$PROFILE" "$@" -o "$GEN/$PROFILE"
+  nft -c -f "$GEN/$PROFILE/ruleset.nft" 2>/dev/null || echo "(bỏ qua nft -c: không chạy được ở đây)"
+}
+
+cmd_up() {
+  need tofu; need incus; [ -n "$SSH_KEY" ] || { echo "đặt LAB_SSH_KEY (khoá công khai)"; exit 1; }
+  cmd_check
+  if incus info fw-1 >/dev/null 2>&1; then
+    # Lab đã dựng: chỉ bật lại theo thứ tự.
+    for vm in "${UP_ORDER[@]}"; do incus info "$vm" >/dev/null 2>&1 && incus start "$vm" 2>/dev/null || true; done
+    return
+  fi
+  cmd_gen --bootstrap
+  tf init -input=false
+  tf apply -input=false -auto-approve -target=incus_instance.fw   # fw-1 lên trước
+  echo "chờ cloud-init của fw-1..."; incus exec fw-1 -- cloud-init status --wait
+  tf apply -input=false -auto-approve
+  echo "Lab đã dựng ở chế độ BOOTSTRAP (mọi vùng ra Internet để cài gói). Chạy 'lab seal' khi xong."
+}
+
+cmd_seal() { # gỡ đường ra Internet tạm, về đúng ma trận
+  cmd_gen
+  incus file push "$GEN/$PROFILE/ruleset.nft" fw-1/etc/nftables.conf
+  incus exec fw-1 -- nft -f /etc/nftables.conf
+  echo "đã seal: fw-1 chỉ còn luật trong ma trận"
+}
+
+cmd_down() { # snapshot rồi tắt theo thứ tự ngược
+  local snap="down-$(date +%Y%m%d-%H%M%S)"
+  for ((i=${#UP_ORDER[@]}-1; i>=0; i--)); do
+    vm="${UP_ORDER[$i]}"
+    incus info "$vm" >/dev/null 2>&1 || continue
+    incus snapshot create "$vm" "$snap" 2>/dev/null || true
+    incus stop "$vm" 2>/dev/null || true
+  done
+  echo "đã tắt, snapshot $snap"
+}
+
+cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
+cmd_status() { incus list -c ns4t -f compact; }
+
+case "${1:-}" in
+  check) cmd_check ;; gen) shift; cmd_gen "$@" ;; up) cmd_up ;; seal) cmd_seal ;;
+  down) cmd_down ;; destroy) cmd_destroy ;; status) cmd_status ;;
+  *) sed -n '2,4p' "$0"; exit 2 ;;
+esac

@@ -1,0 +1,18 @@
+#cloud-config
+hostname: ${hostname}
+manage_etc_hosts: true
+users:
+  - name: ops
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${ssh_key}
+ssh_pwauth: false
+package_update: true
+packages: [qemu-guest-agent, chrony]
+write_files:
+  - path: /etc/waap-roles
+    content: "${join(" ", roles)}\n"
+runcmd:
+  - systemctl enable --now qemu-guest-agent

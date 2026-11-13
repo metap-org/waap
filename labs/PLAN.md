@@ -22,7 +22,7 @@ ngoài; mỗi plane một chu kỳ triển khai riêng ([ADR-0001](../docs/archi
 
 | # | Câu hỏi | Mặc định đề xuất |
 |---|---|---|
-| L1 | Lab chạy trên nền nào? | **Đã chốt (chủ dự án, 2026-11-13): máy ảo.** Hypervisor đề xuất (chờ duyệt): **Incus**. Máy là Windows nên có hai đường: (A) Ubuntu 24.04 chạy bằng Hyper-V có bật nested virtualization, Incus bên trong (nhanh để bắt đầu, vẫn chia sẻ máy với việc khác); (B) cài Linux native hoặc dual-boot cho lab (nhanh hơn, có card mạng thật cho thử edge). Đề xuất bắt đầu bằng A, mã lab giống hệt nên chuyển sang B không mất công. Còn mở: chọn A hay B, và `fw-1` dùng nftables hay VyOS |
+| L1 | Lab chạy trên nền nào? | **Đã chốt (chủ dự án, 2026-11-13): máy ảo.** Hypervisor đề xuất (chờ duyệt): **Incus**. Máy là Windows nên có hai đường: (A) Ubuntu 24.04 chạy bằng Hyper-V có bật nested virtualization, Incus bên trong (nhanh để bắt đầu, vẫn chia sẻ máy với việc khác); (B) cài Linux native hoặc dual-boot cho lab (nhanh hơn, có card mạng thật cho thử edge). Đề xuất bắt đầu bằng A, mã lab giống hệt nên chuyển sang B không mất công. `fw-1` dùng **nftables** (chủ dự án chốt 2026-11-13). Còn mở: chọn A hay B (mã lab giống nhau) |
 | L2 | Tài nguyên tối đa: số máy, CPU, RAM, disk? | Bốn profile theo RAM (`core`, `min`, `compact`, `full`) ở [7.6 §5](../docs/architecture/07-deployment/06-network-zones-and-flows.md#5-bố-cục-máy-ảo-theo-vùng). Chủ dự án dự kiến máy 64 đến 128 GB RAM trong tương lai; lab viết theo biến `profile` để nâng lên không phải viết lại. **Máy dự tính (chủ dự án, 2026-11-13): Windows, 64 GB RAM, SSD 4 TB, CPU tùy → profile `compact`.** Lab bật mới chạy, không chạy liên tục (đề xuất, chờ duyệt: cần lệnh `lab up`/`lab down` có thứ tự bật tắt, snapshot trước khi tắt, và OpenBao tự unseal sau mỗi lần bật, chỉ cho lab) |
 | L3 | Hệ điều hành cho node: một họ hay nhiều? | Ubuntu 24.04 LTS cho mọi node ở lab, một chuẩn hardening duy nhất ([ADR-0048](../docs/architecture/09-adr/0048-node-baseline-and-hardening-profiles.md)) |
 | L4 | Công cụ GitOps và IaC? | Argo CD cho K8s; **OpenTofu** cho hạ tầng (Terraform và Packer là BSL, trái tinh thần ADR-0024); Ansible cho cấu hình node; image cloud gốc cộng cloud-init, chưa dùng golden image ([ADR-0049](../docs/architecture/09-adr/0049-gitops-and-devsecops-per-plane.md)) |
@@ -56,6 +56,8 @@ Mục tiêu: có thiết kế mạng và triển khai được duyệt **trướ
 - **Cổng qua:** chủ dự án duyệt các ADR và ma trận luồng.
 
 ### P1. Dựng hạ tầng lab 4 plane (bước 1) · L
+
+**Tiến độ (2026-11-13): lát 1 đã viết, chưa chạy trên máy lab.** Có ma trận luồng dạng dữ liệu, bộ sinh luật nftables cho `fw-1` kèm kiểm T07 hai chiều, OpenTofu và cloud-init cho Incus, lệnh `lab`: xem [infra/README.md](infra/README.md). Chưa có: K8s, Postgres, RabbitMQ, Kafka, ClickHouse, Valkey, triển khai bốn plane, `loadgen`, kịch bản đầu cuối.
 
 Phụ thuộc: P0 (bố cục và quyết định L1 đến L4).
 

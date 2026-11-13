@@ -1,0 +1,30 @@
+#cloud-config
+hostname: fw-1
+manage_etc_hosts: true
+users:
+  - name: ops
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${ssh_key}
+ssh_pwauth: false
+package_update: true
+packages: [nftables, qemu-guest-agent]
+write_files:
+  - path: /etc/sysctl.d/90-fw.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.ipv4.conf.all.rp_filter=1
+      net.ipv4.conf.all.accept_redirects=0
+      net.ipv4.conf.all.send_redirects=0
+  - path: /etc/nftables.conf
+    permissions: "0644"
+    content: |
+%{ for line in split("\n", ruleset) ~}
+      ${line}
+%{ endfor ~}
+runcmd:
+  - sysctl --system
+  - systemctl enable --now qemu-guest-agent
+  - systemctl enable --now nftables

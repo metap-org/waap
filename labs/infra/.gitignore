@@ -1,0 +1,3 @@
+/infra/generated/
+.terraform/
+*.tfstate*

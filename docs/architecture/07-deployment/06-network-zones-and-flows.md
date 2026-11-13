@@ -218,6 +218,8 @@ Mỗi dòng ở §4.7 thành một test tự động chạy trong CI của lab (
 
 ## 7. Điểm còn mở
 
+- **Mâu thuẫn nội bộ bộ sinh luật tìm ra (2026-11-13), chờ chủ dự án chọn:** N27 (mọi VM dùng NTP, DNS ở `infra`) đụng X01, X05, X02; N24 (WireGuard Z0 vào `bastion`) đụng X02. Chi tiết và hai hướng giải ở [labs/infra/README.md](../../../labs/infra/README.md).
+
 | Câu | Ghi chú |
 |---|---|
 | Nền ảo hoá và firewall | Chủ dự án chốt "máy ảo"; chưa chốt hypervisor (Proxmox, KVM trần, VMware) hay `fw-1` dùng nftables hay VyOS. Đề xuất: KVM/Proxmox và nftables cho dễ đưa vào mã |
