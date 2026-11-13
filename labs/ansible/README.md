@@ -55,6 +55,7 @@ labs/bin/waap-install postgres --host 10.0.1.5 --harden \
 | `svc_valkey` | **Valkey** (thay Redis) từ binary chính thức ghim sha256, `/opt/valkey/<version>` và symlink `current`; ACL, `noeviction`, AOF; unit có sandbox |
 | `svc_clickhouse` | ClickHouse từ repo apt chính thức (kênh `lts` hoặc `stable`), ba gói cùng version và bị `hold`; user `analytics` có mật khẩu |
 | `svc_registry` | Mirror nội bộ trên `registry`: aptly (mirror có lọc, snapshot, promote, ký lại), kho artifact ghim sha256, apt-cacher-ng, nginx. Script `waap-mirror-{sync,promote,list,artifact}`; timer hằng tuần chỉ đồng bộ |
+| `pkg_push` | Đẩy bản vá vào máy không có đường kéo (Z5), chạy qua `push.yml` hoặc `lab push`: danh sách gói đang cài -> registry chọn gói mới hơn và không hold -> tar kèm sha256 -> máy đích kiểm và `apt-get install ./*.deb` không cần mạng |
 | `svc_perimeter` | Chỉ `egress-1`: squid có allowlist, chặn dải riêng và metadata. `ingress-1` và `egw-1` chưa cấu hình (chờ triển khai dịch vụ) |
 
 ## Cách dùng

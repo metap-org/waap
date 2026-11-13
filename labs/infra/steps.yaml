@@ -742,3 +742,30 @@ steps:
       - {at: data-1, what: apt update chỉ qua mirror, cmd: "apt-get update -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.sources -o Dir::Etc::sourceparts=- 2>&1 | grep -c '{ip:ops-1}'", op: re, value: "^[1-9]"}
       - {at: data-1, what: PostgreSQL còn chạy sau khi chạy lại, cmd: "systemctl is-active postgresql@{pg_version}-main", op: eq, value: active}
     rollback: Không đổi gì nếu phiên bản đã ghim không đổi.
+
+  - id: P9.4
+    title: Vá và cài gói cho Z1 qua egress-1 (M03)
+    why: Z1 không tới được registry (X01) nhưng được tới egress-1 ở Z2, nên vá Ubuntu và tải gói vendor đi qua proxy có allowlist.
+    depends: [P9.2]
+    time: 3 phút
+    run: ["labs/bin/lab nettest"]
+    checks:
+      - {at: edge-1, what: apt đi qua egress-1, cmd: "grep -c '{ip:perimeter-1}:3128' /etc/apt/apt.conf.d/90waap-proxy", op: eq, value: "1"}
+      - {at: edge-1, what: apt update chạy được qua proxy, cmd: "apt-get update -qq", op: rc0}
+      - {at: edge-1, what: Không tới được registry (X01), cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:ops-1}/80'", op: rc_nonzero}
+      - {at: edge-1, what: Không có đường ra trực tiếp, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'", op: rc_nonzero}
+    rollback: "Xoá luồng M03 trong flows.yaml rồi lab fw sealed; Z1 quay về không có đường vá."
+
+  - id: P9.5
+    title: Đẩy bản vá vào Z5 từ registry
+    why: Z5 (secret) không gọi ra bất kỳ vùng nào (X05). Bản vá do registry chuẩn bị, đi qua máy điều khiển và bastion (N25) vào Z5; máy đích kiểm sha256 rồi cài từ file cục bộ.
+    depends: [P9.2]
+    time: 3 phút
+    run: ["labs/bin/lab push"]
+    checks:
+      - {at: bao-1, what: Không tới được registry, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/{ip:ops-1}/80'", op: rc_nonzero}
+      - {at: bao-1, what: Không có đường ra, cmd: "timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'", op: rc_nonzero}
+      - {at: bao-1, what: Thư mục nhận đã dọn sau khi cài, cmd: "ls /var/cache/waap-push/debs 2>/dev/null | wc -l", op: eq, value: "0"}
+      - {at: ops-1, what: Registry có script chuẩn bị gói, cmd: "test -x /usr/local/sbin/waap-mirror-push-prepare", op: rc0}
+      - {at: host, what: Chạy lại không lỗi (không có gì mới thì thoát sớm), cmd: "labs/bin/lab push", op: rc0}
+    rollback: "Cài lại bản cũ bằng dpkg -i từ /var/cache/apt/archives nếu cần; snapshot VM trước khi đẩy."

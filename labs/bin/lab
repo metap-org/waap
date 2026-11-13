@@ -2,6 +2,8 @@
 # Điều khiển lab. Chạy trên máy có Incus và OpenTofu (máy ảo Ubuntu trên Hyper-V hoặc Linux native).
 # Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
 #       lab step {list|next|show|run|verify} [<id>]   (chạy từng bước nhỏ, xem labs/CHECKLIST.md)
+#       lab push [-e push_hosts=<nhóm>]   (đẩy bản vá vào Z5, nơi không có đường kéo)
+#       lab docs   (sinh HTML tài liệu lab ra docs/overview/v1-waap-lab.html)
 #       lab {tf|fw|secrets|services|nettest|smoke}   (P1 lát 2: database, proxy ra; chưa triển khai dịch vụ ứng dụng)
 # Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_VALKEY_VERSION, LAB_VALKEY_SHA256 (ghim binary Valkey từ valkey.io/download), LAB_RKE2_VERSION, LAB_RKE2_SHA256 (ghim RKE2: phiên bản và sha256 của rke2.linux-amd64.tar.gz, tự lấy từ trang phát hành)
 set -euo pipefail
@@ -107,6 +109,15 @@ cmd_services() { # PostgreSQL, RabbitMQ, Redis, ClickHouse, egress-1
   ansible_run services.yml -e "@$GEN/secrets.yml" "$@"
 }
 
+cmd_push() { # đẩy bản vá vào máy không tự kéo được (mặc định Z5, vai trò openbao); thêm -e push_hosts=<nhóm> để đổi
+  cmd_secrets
+  ansible_run push.yml -e "@$GEN/secrets.yml" "$@"
+}
+
+cmd_docs() { # sinh bản HTML của tài liệu lab: docs/overview/v1-waap-lab.html
+  python3 "$ROOT/../docs/overview/tools/render_arch.py" "$ROOT" "$ROOT/../docs/overview/v1-waap-lab.html"
+}
+
 cmd_nettest() { # thăm dò mạng sinh từ ma trận: luồng cho phép phải đến được, luồng cấm phải hết thời gian (T01 đến T07)
   need incus; local fail=0 id exp from to port out rc got
   while read -r id exp from to port; do
@@ -142,7 +153,7 @@ cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
 cmd_status() { incus list -c ns4t -f compact; }
 
 case "${1:-}" in
-  check) cmd_check ;; tf) shift; cmd_tf "$@" ;; fw) shift; cmd_fw "$@" ;; step) shift; cmd_step "$@" ;; secrets) cmd_secrets ;; services) shift; cmd_services "$@" ;;
+  check) cmd_check ;; tf) shift; cmd_tf "$@" ;; fw) shift; cmd_fw "$@" ;; step) shift; cmd_step "$@" ;; secrets) cmd_secrets ;; services) shift; cmd_services "$@" ;; push) shift; cmd_push "$@" ;; docs) cmd_docs ;;
   nettest) cmd_nettest ;; smoke) cmd_smoke ;; gen) shift; cmd_gen "$@" ;; ssh-ca) cmd_ssh_ca ;; up) cmd_up ;;
   provision) shift; cmd_provision "$@" ;; audit) shift; cmd_audit "$@" ;; seal) cmd_seal ;;
   down) cmd_down ;; destroy) cmd_destroy ;; status) cmd_status ;;

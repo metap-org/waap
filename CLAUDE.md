@@ -496,6 +496,7 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
 
 ## Working conventions
 
+- **Merge PR: luôn dùng squash merge** (chủ dự án, 2026-11-13), không dùng merge commit hay rebase merge, để `master` mỗi PR chỉ còn 1 commit. Chỉ merge khi người dùng nói "merge" và CI xanh hết. Một nhánh làm việc đã squash vào `master` thì dựng lại từ `master`; nếu không push ghi đè được thì gộp nhánh cũ bằng `merge -s ours` (PR sẽ hiện nhiều commit nhưng squash gộp lại).
 - Three independent Cargo workspaces, one per plane — never one workspace spanning them, since a
   shared workspace would mean a portal change rebuilds and redeploys the edge. `cargo
   build/test/clippy --workspace` from `management-plane/`, `control-plane/`, or `edge-plane/`

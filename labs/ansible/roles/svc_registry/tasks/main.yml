@@ -111,7 +111,10 @@
     mode: "0755"
     owner: root
     group: root
-  loop: [waap-mirror-sync, waap-mirror-promote, waap-mirror-list, waap-mirror-artifact]
+  loop: [waap-mirror-sync, waap-mirror-promote, waap-mirror-list, waap-mirror-artifact, waap-mirror-push-prepare]
+
+- name: Thư mục trung chuyển cho task đẩy (push.yml)
+  ansible.builtin.file: { path: "{{ mirror_push_dir }}", state: directory, mode: "0750", owner: root, group: root }
 
 - name: Các bản đang publish
   ansible.builtin.command: runuser -u {{ mirror_user }} -- env GNUPGHOME={{ mirror_data }}/.gnupg aptly -config=/etc/aptly.conf publish list -raw

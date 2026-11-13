@@ -18,4 +18,4 @@
         src: "../roles/svc_registry/templates/{{ item }}.sh.j2"
         dest: "{{ outdir }}/{{ item }}.sh"
         mode: "0755"
-      loop: [waap-mirror-sync, waap-mirror-promote, waap-mirror-list, waap-mirror-artifact]
+      loop: [waap-mirror-sync, waap-mirror-promote, waap-mirror-list, waap-mirror-artifact, waap-mirror-push-prepare]

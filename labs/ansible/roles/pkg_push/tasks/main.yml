@@ -1,0 +1,73 @@
+---
+- name: Danh sách gói đang cài trên máy đích
+  ansible.builtin.command: dpkg-query -W -f '${binary:Package} ${Version}\n'
+  register: push_installed
+  changed_when: false
+
+- name: Danh sách gói đang bị hold (không đẩy)
+  ansible.builtin.command: apt-mark showhold
+  register: push_held
+  changed_when: false
+
+- name: Chuyển hai danh sách sang registry
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ mirror_push_dir | default('/srv/mirror/push') }}/{{ inventory_hostname }}.{{ item.ext }}"
+    mode: "0600"
+  loop:
+    - { ext: installed, content: "{{ push_installed.stdout }}\n" }
+    - { ext: held, content: "{{ push_held.stdout }}\n" }
+  delegate_to: "{{ push_registry }}"
+  loop_control: { label: "{{ item.ext }}" }
+
+- name: Registry chuẩn bị gói cần cập nhật
+  ansible.builtin.command: /usr/local/sbin/waap-mirror-push-prepare {{ inventory_hostname }}
+  delegate_to: "{{ push_registry }}"
+  register: push_prepared
+  changed_when: "'Đã chuẩn bị' in push_prepared.stdout"
+
+- name: Dừng nếu không có gì để đẩy
+  ansible.builtin.meta: end_host
+  when: "'Đã chuẩn bị' not in push_prepared.stdout"
+
+- name: Lấy gói về máy điều khiển
+  ansible.builtin.fetch:
+    src: "{{ mirror_push_dir | default('/srv/mirror/push') }}/{{ inventory_hostname }}.{{ item }}"
+    dest: "{{ push_dir }}/{{ inventory_hostname }}/"
+    flat: true
+  loop: [tar, tar.sha256]
+  delegate_to: "{{ push_registry }}"
+
+- name: Thư mục nhận trên máy đích
+  ansible.builtin.file: { path: "{{ push_incoming }}", state: directory, mode: "0700", owner: root, group: root }
+
+- name: Đẩy gói và checksum sang máy đích
+  ansible.builtin.copy:
+    src: "{{ push_dir }}/{{ inventory_hostname }}/{{ item }}"
+    dest: "{{ push_incoming }}/{{ item }}"
+    mode: "0600"
+  loop: ["{{ inventory_hostname }}.tar", "{{ inventory_hostname }}.tar.sha256"]
+
+- name: Kiểm sha256 trước khi giải nén
+  ansible.builtin.command: sha256sum -c {{ inventory_hostname }}.tar.sha256
+  args: { chdir: "{{ push_incoming }}" }
+  changed_when: false
+
+- name: Giải nén vào thư mục sạch
+  ansible.builtin.shell: |
+    set -e
+    rm -rf {{ push_incoming }}/debs && mkdir {{ push_incoming }}/debs
+    tar -C {{ push_incoming }}/debs -xf {{ push_incoming }}/{{ inventory_hostname }}.tar
+  args: { executable: /bin/bash }
+  changed_when: true
+
+- name: Cài từ file cục bộ, không cần mạng  # noqa command-instead-of-module (module apt cài từng deb riêng, vỡ phụ thuộc giữa các gói cùng lô)
+  ansible.builtin.shell: apt-get install -y --no-download --no-install-recommends ./*.deb
+  args: { chdir: "{{ push_incoming }}/debs", executable: /bin/bash }
+  environment: { DEBIAN_FRONTEND: noninteractive }
+  changed_when: true
+
+- name: Ghi nhận lần đẩy gần nhất
+  ansible.builtin.shell: "cp {{ push_incoming }}/debs/MANIFEST /var/lib/waap-last-push && date -u +%FT%TZ >> /var/lib/waap-last-push && rm -rf {{ push_incoming }}/debs {{ push_incoming }}/*.tar*"
+  args: { executable: /bin/bash }
+  changed_when: true

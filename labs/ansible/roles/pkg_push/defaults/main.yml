@@ -1,0 +1,6 @@
+---
+# Đẩy gói cập nhật vào máy không có đường kéo (Z5: X05 cấm mọi hướng ra). Chạy từ máy điều khiển, đi qua bastion (N25) như
+# mọi lần provision; máy đích không tự gọi ra ngoài. Gói lấy từ registry, đã được apt của registry kiểm chữ ký.
+push_registry: "{{ groups['role_registry'][0] }}"
+push_dir: "{{ lab_generated_dir }}/push"
+push_incoming: /var/cache/waap-push

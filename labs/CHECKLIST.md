@@ -1246,3 +1246,42 @@ $ labs/bin/lab services --tags postgres
 
 **Hoàn tác:** Không đổi gì nếu phiên bản đã ghim không đổi.
 
+### P9.4 Vá và cài gói cho Z1 qua egress-1 (M03)
+
+**Vì sao:** Z1 không tới được registry (X01) nhưng được tới egress-1 ở Z2, nên vá Ubuntu và tải gói vendor đi qua proxy có allowlist.
+
+**Phụ thuộc:** P9.2  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab nettest
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| apt đi qua egress-1 | `edge-1` | = 1 | `grep -c '10.10.20.11:3128' /etc/apt/apt.conf.d/90waap-proxy` |
+| apt update chạy được qua proxy | `edge-1` | lệnh thành công (rc=0) | `apt-get update -qq` |
+| Không tới được registry (X01) | `edge-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.60.12/80'` |
+| Không có đường ra trực tiếp | `edge-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'` |
+
+**Hoàn tác:** Xoá luồng M03 trong flows.yaml rồi lab fw sealed; Z1 quay về không có đường vá.
+
+### P9.5 Đẩy bản vá vào Z5 từ registry
+
+**Vì sao:** Z5 (secret) không gọi ra bất kỳ vùng nào (X05). Bản vá do registry chuẩn bị, đi qua máy điều khiển và bastion (N25) vào Z5; máy đích kiểm sha256 rồi cài từ file cục bộ.
+
+**Phụ thuộc:** P9.2  ·  **Thời gian dự kiến:** 3 phút
+
+```
+$ labs/bin/lab push
+```
+
+| Kiểm | Ở đâu | Phải là | Lệnh |
+|---|---|---|---|
+| Không tới được registry | `bao-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/10.10.60.12/80'` |
+| Không có đường ra | `bao-1` | lệnh thất bại (bị chặn) | `timeout 4 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443'` |
+| Thư mục nhận đã dọn sau khi cài | `bao-1` | = 0 | `ls /var/cache/waap-push/debs 2>/dev/null \| wc -l` |
+| Registry có script chuẩn bị gói | `ops-1` | lệnh thành công (rc=0) | `test -x /usr/local/sbin/waap-mirror-push-prepare` |
+| Chạy lại không lỗi (không có gì mới thì thoát sớm) | `host` | lệnh thành công (rc=0) | `labs/bin/lab push` |
+
+**Hoàn tác:** Cài lại bản cũ bằng dpkg -i từ /var/cache/apt/archives nếu cần; snapshot VM trước khi đẩy.
+

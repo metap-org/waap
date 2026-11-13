@@ -37,4 +37,8 @@ Sau `lab seal`, Z4 và Z5 không có đường ra (X04), nên không tới đư�
 
 **Hoàn tác:** `waap-mirror-promote <repo> <snapshot cũ>` (publish switch) rồi pin về bản cũ.
 
-**Mirror chưa phủ Z1 và Z5.** X01 và X05 cấm khởi tạo kết nối tới Z6, nên hai vùng này không kéo được. Cần quyết (đề xuất: mô hình đẩy từ Z6, cùng loại vấn đề với N27); xem `infra/README.md`.
+**Z1 và Z5 không kéo từ registry được** (X01 và X05 cấm khởi tạo kết nối tới Z6), nên mỗi vùng có đường riêng:
+- **Z1 (edge)**: luồng M03 tới `egress-1` ở Z2 (không nằm trong danh sách cấm của X01). `apt` và tải gói vendor đi qua squid có allowlist (`apt_proxy`, `download_proxy`). Vì không qua mirror nên Z1 không có bước promote; chỉ nên dùng cho bản vá Ubuntu và `valkey-edge`. Bước P9.4.
+- **Z5 (secret)**: không có luồng ra nào (X05 cấm mọi vùng). Bản vá **đẩy vào**: `lab push` chạy `push.yml` từ máy điều khiển, đi qua bastion (N25). Registry so danh sách gói đang cài với bản ứng viên của nó, chỉ lấy gói mới hơn và không bị hold, đóng tar kèm sha256; máy đích kiểm sha256 rồi `apt-get install ./*.deb` không cần mạng. Bước P9.5. Gói database đã hold vẫn nâng bằng pin như thường.
+
+Giới hạn đã biết: bản ứng viên lấy từ apt của registry (gồm cả `-updates`, không chỉ `-security`), mỗi lần đẩy là một thao tác chủ động, và OpenBao (P5) chưa có đường cài riêng. Chưa chạy trên máy thật.
