@@ -1,4 +1,0 @@
-lab_disks:
-- name: cache
-  size: 10GiB
-  mount: /var/cache/waap-edge
