@@ -1,0 +1,5 @@
+---
+redis_control_password: "{{ lab_secrets.redis_control_password }}"
+redis_edge_password: "{{ lab_secrets.redis_edge_password }}"
+redis_dir: /var/lib/waap/data/redis
+redis_maxmemory: 256mb

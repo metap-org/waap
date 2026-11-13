@@ -1,0 +1,4 @@
+---
+rabbit_user: metap
+rabbit_password: "{{ lab_secrets.rabbitmq_password }}"
+rabbit_vhost: /

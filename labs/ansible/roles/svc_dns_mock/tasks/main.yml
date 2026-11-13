@@ -1,0 +1,49 @@
+---
+- name: Người dùng dịch vụ
+  ansible.builtin.user:
+    name: "{{ dns_mock_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Thư mục trạng thái
+  ansible.builtin.file:
+    path: "{{ dns_mock_state }}"
+    state: directory
+    owner: "{{ dns_mock_user }}"
+    mode: "0750"
+
+- name: Nhị phân (do `lab build` dựng)
+  ansible.builtin.copy:
+    src: "{{ dns_mock_binary_src }}"
+    dest: /usr/local/bin/dns-mock
+    mode: "0755"
+    owner: root
+    group: root
+  notify: restart dns-mock
+
+- name: Unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/dns-mock.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=dns-mock (DNS và DoH giả cho dev/staging)
+      After=network-online.target
+      [Service]
+      User={{ dns_mock_user }}
+      Environment=DNS_MOCK_STATE_FILE={{ dns_mock_state }}/state.json
+      Environment=DNS_MOCK_ADMIN_TOKEN={{ lab_secrets.dns_mock_admin_token }}
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      ExecStart=/usr/local/bin/dns-mock
+      Restart=on-failure
+      [Install]
+      WantedBy=multi-user.target
+  notify: daemon reload
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: dns-mock
+    enabled: true
+    state: started
+    daemon_reload: true

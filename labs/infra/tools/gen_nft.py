@@ -196,6 +196,30 @@ def render_host(zones, prof, flows, vm_name, bootstrap=False):
     return "\n".join(L) + "\n"
 
 
+def probes(profile):
+    """Danh sách thăm dò mạng sinh từ ma trận: cho phép (mỗi luồng fw, tcp) và bị cấm (mỗi X). Dùng cho `lab nettest`.
+    reach: đến được (kết nối được hoặc bị từ chối RST); blocked: hết thời gian (fw drop)."""
+    zones, prof, flows = load(profile)
+    ips = vm_ips(zones, prof)
+    out = []
+    for f in fw_flows(flows):
+        if f["proto"] != "tcp" or f["dst"] == UPLINK or f.get("lab_only"):
+            continue
+        src = sorted(resolve(f["src"], zones, prof, ips)); dst = sorted(resolve(f["dst"], zones, prof, ips))
+        pair = next(((s, d) for s in src for d in dst if s[1] != d[1]), None)
+        if pair:
+            out.append({"id": f["id"], "expect": "reach", "from": pair[0][0], "to": pair[1][2], "port": f["ports"][0]})
+    for x in flows["forbidden"]:
+        if x["dst"] == UPLINK:
+            continue
+        src = sorted(resolve(x["src"], zones, prof, ips)); dst = sorted(resolve(x["dst"], zones, prof, ips))
+        pair = next(((s, d) for s in src for d in dst if s[1] != d[1]), None)
+        if pair:
+            for port in (22, 443):
+                out.append({"id": x["id"], "expect": "blocked", "from": pair[0][0], "to": pair[1][2], "port": port})
+    return out
+
+
 def check(profile):
     zones, prof, flows = load(profile)
     ips = vm_ips(zones, prof)
@@ -230,7 +254,12 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     g = sub.add_parser("gen"); g.add_argument("profile"); g.add_argument("--bootstrap", action="store_true"); g.add_argument("-o", required=True)
     c = sub.add_parser("check"); c.add_argument("profile")
+    pr = sub.add_parser("probes"); pr.add_argument("profile")
     a = ap.parse_args()
+    if a.cmd == "probes":
+        for p_ in probes(a.profile):
+            print(f'{p_["id"]} {p_["expect"]} {p_["from"]} {p_["to"]} {p_["port"]}')
+        return
     if a.cmd == "check":
         errs = check(a.profile)
         for e in errs:

@@ -34,6 +34,21 @@ flows:
   - { id: N28, src: "zone:Z3", dst: "role:registry", proto: tcp, ports: [443] }
   - { id: N28c, covers: [N28], src: "role:ci-runner", dst: "role:registry", proto: tcp, ports: [443], enforce: host }
   - { id: N29, src: "role:ci-runner", dst: "role:egress-1", proto: tcp, ports: [3128] }
+  # --- ĐƯỜNG TẠM cho code hiện có (interim: true). Không có dòng tương ứng trong 7.6; chờ chủ dự án chốt thiết kế. ---
+  # I01: control-plane ghi bộ luật vào Redis đặt ở Z1 (vai trò valkey-edge). Edge đọc Redis cùng vùng, không phải với tới Z4
+  #      (code hiện tại đọc Redis trực tiếp; nếu để Redis ở Z4 thì cần luồng Z1 -> Z4, trái X01).
+  - { id: I01, src: "zone:Z3", dst: "role:valkey-edge", proto: tcp, ports: [6379], covers: [], interim: true }
+  # I02: analytics-api dùng cổng native không TLS của ClickHouse; 7.6 N17 chỉ mở cổng TLS 8443, 9440.
+  - { id: I02, src: "zone:Z3", dst: "role:clickhouse", proto: tcp, ports: [9000], covers: [], interim: true }
+  # I06: RabbitMQ cổng thường không TLS; 7.6 N15 chỉ mở 5671 (TLS). Client Go của metap chưa chắc nhận CA tuỳ chỉnh qua URL, chưa kiểm.
+  - { id: I06, src: "zone:Z3", dst: "role:rabbitmq", proto: tcp, ports: [5672], covers: [], interim: true }
+  # I07: dns-mock đứng ở Z0 thay DNS bên ngoài; zones-service gọi DoH tới nó. Thật ra đi qua egress-1 (N21), nhưng allowlist của egress chặn dải riêng.
+  - { id: I07, src: "role:k8s-app", dst: "role:dns-mock", proto: tcp, ports: [8053], covers: [], interim: true }
+  # I03, I04: chưa có ingress controller trong K8s (traefik tắt) nên N04 và N09 đi qua NodePort thay vì 443.
+  - { id: I03, src: "role:ingress-1", dst: "role:k8s-app", proto: tcp, ports: [30080], covers: [], interim: true }
+  - { id: I04, src: "role:egw-1", dst: "role:k8s-app", proto: tcp, ports: [30410], covers: [], interim: true }
+  # I05: edge gửi telemetry tới egw-1 (N08) rồi egw-1 chuyển tiếp; cổng 8443 tạm cho relay HTTP của lab.
+  - { id: I05, src: "zone:Z1", dst: "role:egw-1", proto: tcp, ports: [8443], covers: [], interim: true }
   # Chỉ có trong lab: Z0 là "Internet giả" nên cần đường ra Internet thật (NAT qua uplink) cho loadgen, dns-mock.
   - { id: L01, src: "zone:Z0", dst: "uplink", proto: tcp, ports: [80, 443], covers: [], lab_only: true }
 

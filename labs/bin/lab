@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Điều khiển lab. Chạy trên máy có Incus và OpenTofu (máy ảo Ubuntu trên Hyper-V hoặc Linux native).
 # Dùng: lab {check|gen|ssh-ca|up|provision|seal|audit|down|destroy|status}
+#       lab {secrets|build|services|migrate|deploy|nettest|smoke}   (P1 lát 2)
 # Biến: LAB_PROFILE (mặc định compact), LAB_SSH_KEY, LAB_K3S_VERSION, LAB_K3S_SHA256 (ghim k3s, tự lấy từ trang phát hành)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -77,11 +78,113 @@ cmd_down() { # snapshot rồi tắt theo thứ tự ngược
   echo "đã tắt, snapshot $snap"
 }
 
+
+REPO="$(cd "$ROOT/.." && pwd)"
+secret() { python3 -c "import yaml;print(yaml.safe_load(open('$GEN/secrets.yml'))['lab_secrets']['$1'])"; }
+envsub() { # envsub <tệp.tmpl>: điền IP của vai trò và tag
+  set -a; eval "$(python3 "$INFRA/tools/gen_lab.py" env "$PROFILE")"; TAG="${LAB_TAG:-lab}"; set +a
+  envsubst < "$1"
+}
+kc() { incus exec k8s-cp-1 -- k3s kubectl "$@"; }
+
+cmd_secrets() { # mật khẩu và token ngẫu nhiên cho lab; KHÔNG commit. P5 thay bằng OpenBao dynamic secret.
+  mkdir -p "$GEN"; [ -f "$GEN/secrets.yml" ] && { echo "đã có $GEN/secrets.yml"; return; }
+  ( umask 077; python3 - "$GEN/secrets.yml" <<'PY'
+import secrets, sys, yaml
+keys = ["postgres_password", "rabbitmq_password", "redis_control_password", "redis_edge_password", "ingest_token",
+        "analytics_ingest_token", "clearance_secret", "dns_mock_admin_token", "service_password", "control_password"]
+yaml.safe_dump({"lab_secrets": {k: secrets.token_urlsafe(24) for k in keys}}, open(sys.argv[1], "w"))
+PY
+  ); echo "đã sinh $GEN/secrets.yml (0600)"
+}
+
+cmd_build() { # dựng nhị phân ngoài K8s và ảnh container cho ứng dụng trong K8s
+  need go; need docker
+  [ "$(basename "$REPO")" = waap ] || { echo "repo phải nằm ở thư mục tên 'waap' cạnh 'metap' (Dockerfile giả định đường dẫn waap/...)"; exit 1; }
+  local ctx tag="${LAB_TAG:-lab}"; ctx="$(cd "$REPO/.." && pwd)"
+  [ -d "$ctx/metap" ] || { echo "thiếu $ctx/metap"; exit 1; }
+  mkdir -p "$GEN/bin" "$GEN/images"
+  export CGO_ENABLED=0
+  ( cd "$REPO/edge-plane" && go build -trimpath -o "$GEN/bin/waap-edge" ./cmd/waf-edge )
+  ( cd "$REPO/devtools/dns-mock" && go build -trimpath -o "$GEN/bin/dns-mock" . )
+  ( cd "$ctx/metap" && go build -trimpath -o "$GEN/bin/db-migrate" ./cmd/db-migrate && go build -trimpath -o "$GEN/bin/dev-tools" ./cmd/dev-tools )
+  local svc
+  for svc in zones-service scanning-service alerting-service waf-graphql-gateway; do
+    docker build -q -f waap/management-plane/Dockerfile --build-arg SERVICE="$svc" -t "waap/$svc:$tag" "$ctx"
+  done
+  docker build -q -f waap/analytics-plane/Dockerfile -t "waap/analytics-api:$tag" "$ctx"
+  docker build -q -f waap/control-plane/Dockerfile -t "waap/waf-config-distributor:$tag" "$ctx"
+  docker build -q -f waap/management-plane/web/Dockerfile -t "waap/web:$tag" "$ctx"
+  docker save -o "$GEN/images/waap-$tag.tar" "waap/zones-service:$tag" "waap/scanning-service:$tag" "waap/alerting-service:$tag" \
+    "waap/waf-graphql-gateway:$tag" "waap/analytics-api:$tag" "waap/waf-config-distributor:$tag" "waap/web:$tag"
+  [ -d "$GEN/jwks" ] || "$GEN/bin/dev-tools" gen-jwks-key "$GEN/jwks"
+  echo "đã dựng: $GEN/bin, $GEN/images, $GEN/jwks"
+}
+
+cmd_services() { # PostgreSQL, RabbitMQ, Redis, ClickHouse, biên, origin, loadgen, dns-mock, edge
+  cmd_secrets
+  ansible_run services.yml -e "@$GEN/secrets.yml" -e "clickhouse_debs=${LAB_CLICKHOUSE_DEBS:-[]}" "$@"
+}
+
+cmd_migrate() { # chạy db-migrate ngay trên data-1 qua socket cục bộ (không mở thêm đường mạng)
+  need incus; local pw; pw="$(secret postgres_password)"
+  incus file push "$GEN/bin/db-migrate" data-1/usr/local/bin/db-migrate --mode 0755
+  incus exec data-1 -- env "DATABASE_URL=postgres://metap:${pw}@/metap?host=/var/run/postgresql" /usr/local/bin/db-migrate
+}
+
+cmd_deploy() { # nạp ảnh vào mọi node k3s, tạo Secret, áp manifest
+  need incus; need envsubst; local tag="${LAB_TAG:-lab}" n
+  for n in k8s-cp-1 k8s-wk-1 k8s-wk-2; do
+    incus info "$n" >/dev/null 2>&1 || continue
+    incus file push "$GEN/images/waap-$tag.tar" "$n/tmp/waap-images.tar"
+    incus exec "$n" -- k3s ctr images import /tmp/waap-images.tar
+  done
+  eval "$(python3 "$INFRA/tools/gen_lab.py" env "$PROFILE")"
+  local S='import yaml,sys;print(yaml.safe_load(open(sys.argv[1]))["lab_secrets"][sys.argv[2]])'
+  sv() { python3 -c "$S" "$GEN/secrets.yml" "$1"; }
+  kc create namespace waap --dry-run=client -o yaml | kc apply -f -
+  kc -n waap create secret generic waap-secrets \
+    --from-literal=database-url="postgres://metap:$(sv postgres_password)@${POSTGRES_IP}:5432/metap?sslmode=require" \
+    --from-literal=amqp-url="amqp://metap:$(sv rabbitmq_password)@${RABBIT_IP}:5672/%2f" \
+    --from-literal=redis-edge-write-url="redis://control:$(sv redis_control_password)@${VALKEY_EDGE_IP}:6379" \
+    --from-literal=ingest-token="$(sv ingest_token)" --from-literal=analytics-ingest-token="$(sv analytics_ingest_token)" \
+    --from-literal=service-email="waf-service@lab.local" --from-literal=service-password="$(sv service_password)" \
+    --from-literal=control-email="control-plane@lab.local" --from-literal=control-password="$(sv control_password)" \
+    --dry-run=client -o yaml | kc apply -f -
+  kc -n waap create secret generic waap-jwks --from-file="$GEN/jwks" --dry-run=client -o yaml | kc apply -f -
+  envsub "$ROOT/k8s/waap.yaml.tmpl" | kc apply -f -
+  kc -n waap rollout status deploy --timeout=300s
+}
+
+cmd_nettest() { # thăm dò mạng sinh từ ma trận: luồng cho phép phải đến được, luồng cấm phải hết thời gian (T01 đến T07)
+  need incus; local fail=0 id exp from to port out rc got
+  while read -r id exp from to port; do
+    out="$(incus exec "$from" -- timeout 4 bash -c "exec 3<>/dev/tcp/$to/$port" 2>&1)"; rc=$?
+    if [ $rc -eq 0 ] || echo "$out" | grep -qi "refused"; then got=reach; else got=blocked; fi
+    if [ "$got" = "$exp" ]; then echo "ok   $id $from -> $to:$port ($exp)"; else echo "LỖI $id $from -> $to:$port mong $exp, thấy $got"; fail=1; fi
+  done < <(python3 "$INFRA/tools/gen_nft.py" probes "$PROFILE")
+  return $fail
+}
+
+cmd_smoke() {
+  need incus; local fail=0
+  chk() { if eval "$2" >/dev/null 2>&1; then echo "ok   $1"; else echo "LỖI $1"; fail=1; fi; }
+  chk "k3s: mọi pod waap Ready" "kc -n waap wait --for=condition=Ready pod --all --timeout=60s"
+  chk "postgres sẵn sàng" "incus exec data-1 -- pg_isready -q"
+  chk "rabbitmq chạy" "incus exec data-1 -- systemctl is-active --quiet rabbitmq-server"
+  chk "redis (valkey-edge) chạy" "incus exec edge-1 -- systemctl is-active --quiet redis-server"
+  chk "clickhouse chạy" "incus exec ch-1 -- systemctl is-active --quiet clickhouse-server"
+  chk "waap-edge chạy" "incus exec edge-1 -- systemctl is-active --quiet waap-edge"
+  chk "egress-1 chặn đích ngoài allowlist" "! incus exec ops-1 -- env https_proxy=http://10.10.20.11:3128 curl -sf --max-time 8 https://example.com"
+  return $fail
+}
+
 cmd_destroy() { need tofu; tf destroy -input=false -auto-approve; }
 cmd_status() { incus list -c ns4t -f compact; }
 
 case "${1:-}" in
-  check) cmd_check ;; gen) shift; cmd_gen "$@" ;; ssh-ca) cmd_ssh_ca ;; up) cmd_up ;;
+  check) cmd_check ;; secrets) cmd_secrets ;; build) cmd_build ;; services) shift; cmd_services "$@" ;;
+  migrate) cmd_migrate ;; deploy) cmd_deploy ;; nettest) cmd_nettest ;; smoke) cmd_smoke ;; gen) shift; cmd_gen "$@" ;; ssh-ca) cmd_ssh_ca ;; up) cmd_up ;;
   provision) shift; cmd_provision "$@" ;; audit) shift; cmd_audit "$@" ;; seal) cmd_seal ;;
   down) cmd_down ;; destroy) cmd_destroy ;; status) cmd_status ;;
   *) sed -n '2,4p' "$0"; exit 2 ;;

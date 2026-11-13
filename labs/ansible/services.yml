@@ -1,0 +1,38 @@
+---
+# Dịch vụ nền và ứng dụng ngoài K8s (P1 lát 2). Chạy sau site.yml:
+#   ansible-playbook services.yml -e @../infra/generated/secrets.yml
+- name: PostgreSQL
+  hosts: role_postgres
+  roles: [svc_postgres]
+
+- name: RabbitMQ
+  hosts: role_rabbitmq
+  roles: [svc_rabbitmq]
+
+- name: Redis (valkey-central và valkey-edge)
+  hosts: role_valkey_central:role_valkey_edge
+  roles: [svc_redis]
+
+- name: ClickHouse
+  hosts: role_clickhouse
+  roles: [svc_clickhouse]
+
+- name: Biên (ingress-1, egw-1, egress-1)
+  hosts: role_ingress_1:role_egw_1:role_egress_1
+  roles: [svc_perimeter]
+
+- name: Origin giả
+  hosts: role_origin
+  roles: [svc_origin]
+
+- name: Máy tải
+  hosts: role_loadgen
+  roles: [svc_loadgen]
+
+- name: dns-mock
+  hosts: role_dns_mock
+  roles: [svc_dns_mock]
+
+- name: Edge (ngoài K8s theo ADR-0023)
+  hosts: role_edge_l7
+  roles: [svc_edge_app]

@@ -1,0 +1,11 @@
+---
+- name: Công cụ tải
+  ansible.builtin.apt:
+    name: [curl, apache2-utils]
+    state: present
+
+- name: Kịch bản tải (bình thường và giống tấn công)
+  ansible.builtin.template:
+    src: waap-loadgen.sh.j2
+    dest: /usr/local/bin/waap-loadgen
+    mode: "0755"

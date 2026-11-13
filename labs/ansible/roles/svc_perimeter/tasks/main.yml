@@ -1,0 +1,42 @@
+---
+- name: Gói (nginx cho ingress và egw, squid cho egress)
+  ansible.builtin.apt:
+    name: [nginx, squid, ssl-cert]
+    state: present
+
+- name: Bỏ site mặc định
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: ingress-1, cổng vào portal (TLS tự ký của lab, chuyển tới NodePort portal)
+  ansible.builtin.template:
+    src: ingress.conf.j2
+    dest: /etc/nginx/conf.d/10-ingress.conf
+    mode: "0644"
+  when: inventory_hostname in groups['role_ingress_1']
+  notify: restart nginx
+
+- name: egw-1, relay telemetry của edge tới control-plane (chỉ chuyển tiếp, không giữ dữ liệu)
+  ansible.builtin.template:
+    src: egw.conf.j2
+    dest: /etc/nginx/conf.d/20-egw.conf
+    mode: "0644"
+  when: inventory_hostname in groups['role_egw_1']
+  notify: restart nginx
+
+- name: egress-1, proxy ra Internet có allowlist
+  ansible.builtin.template:
+    src: squid.conf.j2
+    dest: /etc/squid/squid.conf
+    mode: "0644"
+  when: inventory_hostname in groups['role_egress_1']
+  notify: restart squid
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [nginx, squid]

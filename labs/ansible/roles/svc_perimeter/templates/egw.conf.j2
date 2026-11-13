@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+# Tạm (I05, I04): HTTP trơn từ edge, relay tới NodePort ingest của control-plane. Stream Distribution và mTLS cert node (N05 đến N08) chưa có.
+upstream control_ingest {
+{% for n in perimeter_backend_nodes %}
+  server {{ n }}:{{ perimeter_ingest_nodeport }};
+{% endfor %}
+}
+server {
+  listen {{ lab_ip }}:{{ perimeter_egw_port }};
+  server_tokens off;
+  client_max_body_size 2m;
+  location = /ingest/events {
+    limit_except POST { deny all; }
+    proxy_pass http://control_ingest;
+  }
+  location / { return 404; }
+}

@@ -1,0 +1,46 @@
+---
+- name: Chỉ cài bản đã ghim
+  ansible.builtin.assert:
+    that:
+      - clickhouse_debs | length >= 2
+      - clickhouse_debs | map(attribute='sha256') | map('length') | unique == [64]
+    fail_msg: "Ghim clickhouse_debs (url, sha256 từng gói) trước khi cài. Không tải gói chưa kiểm."
+    quiet: true
+
+- name: Tải gói đã ghim
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "/var/cache/{{ item.url | basename }}"
+    checksum: "sha256:{{ item.sha256 }}"
+    mode: "0644"
+  loop: "{{ clickhouse_debs }}"
+
+- name: Cài gói
+  ansible.builtin.apt:
+    deb: "/var/cache/{{ item.url | basename }}"
+  loop: "{{ clickhouse_debs }}"
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: Thư mục dữ liệu
+  ansible.builtin.file:
+    path: "{{ clickhouse_data }}"
+    state: directory
+    owner: clickhouse
+    group: clickhouse
+    mode: "0750"
+
+- name: Cấu hình (nghe IP lab, dữ liệu trên đĩa riêng, default không mật khẩu chỉ từ Z3)
+  ansible.builtin.template:
+    src: waap.xml.j2
+    dest: /etc/clickhouse-server/config.d/90-waap.xml
+    mode: "0640"
+    owner: clickhouse
+    group: clickhouse
+  notify: restart clickhouse
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: clickhouse-server
+    enabled: true
+    state: started

@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+local   all   postgres                 peer
+local   all   all                      scram-sha-256
+{% for c in pg_allowed_cidrs %}
+hostssl {{ pg_db }}   {{ pg_user }}   {{ c }}   scram-sha-256
+{% endfor %}
+{# Sao chép N23: dòng replication thêm khi có node dự phòng #}

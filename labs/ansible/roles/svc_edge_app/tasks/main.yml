@@ -1,0 +1,41 @@
+---
+- name: Thư mục binary
+  ansible.builtin.file:
+    path: /opt/waap/bin
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Nhị phân waap-edge (do `lab build` dựng, tĩnh)
+  ansible.builtin.copy:
+    src: "{{ edge_binary_src }}"
+    dest: "{{ edge_binary }}"
+    mode: "0755"
+    owner: root
+    group: root
+  notify: restart waap-edge
+
+- name: Cấu hình môi trường (chỉ đọc bởi dịch vụ)
+  ansible.builtin.template:
+    src: edge.env.j2
+    dest: /etc/waap-edge.env
+    mode: "0640"
+    owner: root
+    group: "{{ edge_user }}"
+  no_log: true
+  notify: restart waap-edge
+
+- name: Drop-in nạp môi trường
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/waap-edge.service.d/20-env.conf
+    mode: "0644"
+    content: "[Service]\nEnvironmentFile=/etc/waap-edge.env\n"
+  notify: restart waap-edge
+
+- name: Bật và chạy waap-edge
+  ansible.builtin.systemd:
+    name: waap-edge
+    enabled: true
+    state: started
+    daemon_reload: true

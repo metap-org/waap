@@ -1,0 +1,37 @@
+---
+- name: Gói RabbitMQ
+  ansible.builtin.apt:
+    name: rabbitmq-server
+    state: present
+
+- name: Nghe trên IP lab, không guest
+  ansible.builtin.copy:
+    dest: /etc/rabbitmq/rabbitmq.conf
+    mode: "0644"
+    content: |
+      listeners.tcp.1 = {{ lab_ip }}:5672
+      loopback_users = none
+      default_user_tags.administrator = false
+  notify: restart rabbitmq
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: rabbitmq-server
+    enabled: true
+    state: started
+
+- name: Tài khoản ứng dụng
+  community.rabbitmq.rabbitmq_user:
+    user: "{{ rabbit_user }}"
+    password: "{{ rabbit_password }}"
+    vhost: "{{ rabbit_vhost }}"
+    configure_priv: ".*"
+    read_priv: ".*"
+    write_priv: ".*"
+    state: present
+  no_log: true
+
+- name: Xoá tài khoản guest
+  community.rabbitmq.rabbitmq_user:
+    user: guest
+    state: absent

@@ -1,0 +1,7 @@
+---
+# ClickHouse không có trong apt của Ubuntu. Ghim các gói .deb và checksum từ trang phát hành (tự kiểm), như k3s.
+# Mỗi phần tử: {url, sha256}. Thứ tự cài: common-static, server, client.
+clickhouse_debs: []
+clickhouse_data: /var/lib/waap/data/clickhouse
+clickhouse_listen: "{{ lab_ip }}"
+clickhouse_ttl_days: 30

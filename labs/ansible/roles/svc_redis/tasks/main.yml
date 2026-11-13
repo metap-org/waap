@@ -1,0 +1,29 @@
+---
+# Ubuntu 24.04 có redis 7.0 (BSD). Valkey/Redis mới hơn cần nguồn ghim riêng (ADR-0024 loại Redis 7.4+ giấy phép).
+- name: Gói Redis
+  ansible.builtin.apt:
+    name: redis-server
+    state: present
+
+- name: Thư mục dữ liệu
+  ansible.builtin.file:
+    path: "{{ redis_dir }}"
+    state: directory
+    owner: redis
+    group: redis
+    mode: "0750"
+
+- name: Cấu hình Redis với ACL, control ghi và edge chỉ đọc
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    mode: "0640"
+    owner: redis
+    group: redis
+  notify: restart redis
+
+- name: Chạy
+  ansible.builtin.systemd:
+    name: redis-server
+    enabled: true
+    state: started

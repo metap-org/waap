@@ -1,0 +1,12 @@
+<!-- {{ ansible_managed }} -->
+<clickhouse>
+  <listen_host>{{ clickhouse_listen }}</listen_host>
+  <path>{{ clickhouse_data }}/</path>
+  <tmp_path>{{ clickhouse_data }}/tmp/</tmp_path>
+  <user_files_path>{{ clickhouse_data }}/user_files/</user_files_path>
+  <users>
+    <default>
+      <networks replace="replace"><ip>10.10.30.0/24</ip><ip>127.0.0.1</ip></networks>
+    </default>
+  </users>
+</clickhouse>

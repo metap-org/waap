@@ -1,0 +1,12 @@
+---
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  listen: restart nginx
+
+- name: Restart squid
+  ansible.builtin.systemd:
+    name: squid
+    state: restarted
+  listen: restart squid

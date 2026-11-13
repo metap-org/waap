@@ -40,6 +40,18 @@ class GenTests(unittest.TestCase):
         finally:
             g.load = orig
 
+    def test_probes_cover_allowed_and_forbidden(self):
+        pr = g.probes("compact")
+        self.assertTrue(any(p["id"] == "N14" and p["expect"] == "reach" for p in pr))
+        self.assertTrue(any(p["id"] == "X01" and p["expect"] == "blocked" and p["port"] == 22 for p in pr))
+        # Không thăm dò nào đòi "reach" mà nguồn và đích cùng vùng (fw-1 không thấy).
+        self.assertTrue(all(p["from"] != "fw-1" for p in pr))
+
+    def test_interim_flows_have_no_doc_ids(self):
+        for f in self.flows["flows"]:
+            if f.get("interim"):
+                self.assertEqual(f.get("covers"), [], f["id"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-/infra/generated/
+/generated/
 .terraform/
 *.tfstate*
 __pycache__/

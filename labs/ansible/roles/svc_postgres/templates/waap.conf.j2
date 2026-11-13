@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+listen_addresses = '127.0.0.1,{{ lab_ip }}'
+ssl = on
+ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'
+ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'
+password_encryption = scram-sha-256
+log_connections = on
+log_disconnections = on
+log_line_prefix = '%m [%p] %q%u@%d '
+shared_buffers = 512MB
+max_connections = 200

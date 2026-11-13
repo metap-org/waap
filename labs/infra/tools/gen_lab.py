@@ -54,6 +54,19 @@ def inventory(profile, out):
     print(f"ghi {out}/inventory.ini")
 
 
+def env_vars(profile):
+    """IP của các vai trò cần cho manifest K8s và lệnh deploy, dạng KEY=VAL (dùng với envsubst)."""
+    zones, prof, _ = g.load(profile)
+    ips = g.vm_ips(zones, prof)
+    want = {"POSTGRES_IP": "postgres", "RABBIT_IP": "rabbitmq", "VALKEY_EDGE_IP": "valkey-edge", "CLICKHOUSE_IP": "clickhouse",
+            "DNS_MOCK_IP": "dns-mock", "INGRESS_IP": "ingress-1", "EGW_IP": "egw-1", "K8S_CP_IP": "k8s-cp", "EDGE_IP": "edge-l7", "ORIGIN_IP": "origin"}
+    out = []
+    for k, role in want.items():
+        v = next((x for x in prof["vms"] if role in x["roles"]), None)
+        out.append(f"{k}={ips[v['name']][v['zones'][0]] if v else ''}")
+    return "\n".join(out)
+
+
 def diagram(profile):
     zones, prof, flows = g.load(profile)
     ips = g.vm_ips(zones, prof)
@@ -94,9 +107,12 @@ def diagram(profile):
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("inventory"); i.add_argument("profile"); i.add_argument("-o", required=True)
+    e = sub.add_parser("env"); e.add_argument("profile")
     d = sub.add_parser("diagram"); d.add_argument("profile"); d.add_argument("--inject")
     a = ap.parse_args()
-    if a.cmd == "inventory":
+    if a.cmd == "env":
+        print(env_vars(a.profile))
+    elif a.cmd == "inventory":
         inventory(a.profile, a.o)
     else:
         text = diagram(a.profile)

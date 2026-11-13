@@ -1,0 +1,5 @@
+---
+edge_binary_src: "{{ lab_generated_dir }}/bin/waap-edge"
+edge_listen: "0.0.0.0:8080"
+edge_redis_url: "redis://edge:{{ lab_secrets.redis_edge_password }}@127.0.0.1:6379"
+edge_ingest_url: "http://{{ hostvars[groups['role_egw_1'][0]].lab_ip }}:8443/ingest/events"

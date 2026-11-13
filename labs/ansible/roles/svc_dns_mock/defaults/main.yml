@@ -1,0 +1,4 @@
+---
+dns_mock_binary_src: "{{ lab_generated_dir }}/bin/dns-mock"
+dns_mock_user: dnsmock
+dns_mock_state: /var/lib/dns-mock
