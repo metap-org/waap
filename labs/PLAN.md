@@ -1,7 +1,8 @@
 # Kế hoạch lab WAAP: dựng 4 plane, mạng cô lập, GitOps, hardening, secret
 
 > **Trạng thái: đề xuất của Claude, chờ chủ dự án duyệt (2026-11-13).** Chưa có quyết định nào ở đây, trừ những
-> điều đã nằm sẵn trong các ADR và được dẫn nguồn. Kế hoạch bám 6 bước trong [README.md](README.md). Phần
+> điều đã nằm sẵn trong các ADR và được dẫn nguồn. **Cập nhật 2026-11-13:** chủ dự án chốt lab chạy trên máy ảo và yêu cầu chia vùng mạng hợp lý; thiết kế mạng
+> (P0) đã viết ở [7.6](../docs/architecture/07-deployment/06-network-zones-and-flows.md) và [ADR-0047](../docs/architecture/09-adr/0047-network-zones-and-default-deny.md), chờ duyệt. Kế hoạch bám 6 bước trong [README.md](README.md). Phần
 > [§1](#1-câu-hỏi-cần-chốt-trước-khi-chạy) liệt kê những gì cần chủ dự án chốt; mỗi câu có mặc định đề xuất để chốt nhanh.
 
 ## 0. Hiện trạng (đã kiểm trong repo)
@@ -21,8 +22,8 @@ ngoài; mỗi plane một chu kỳ triển khai riêng ([ADR-0001](../docs/archi
 
 | # | Câu hỏi | Mặc định đề xuất |
 |---|---|---|
-| L1 | Lab chạy trên nền nào: máy ảo tự có (Proxmox, KVM), cloud, hay máy vật lý? | Máy ảo trên hypervisor tự có, vì cần thử cả bước "bare metal" của edge và phải kiểm soát mạng ở mức L2 |
-| L2 | Tài nguyên tối đa: số máy, CPU, RAM, disk? | Khoảng 14 máy ảo ([§2.1](#21-bố-cục-lab-đề-xuất)), tổng khoảng 56 vCPU, 160 GB RAM, 2 TB disk |
+| L1 | Lab chạy trên nền nào? | **Đã chốt (chủ dự án, 2026-11-13): máy ảo.** Còn mở: hypervisor cụ thể (Proxmox, KVM) và `fw-1` dùng nftables hay VyOS |
+| L2 | Tài nguyên tối đa: số máy, CPU, RAM, disk? | Hai cấu hình ở [7.6 §5](../docs/architecture/07-deployment/06-network-zones-and-flows.md#5-bố-cục-máy-ảo-theo-vùng): đầy đủ khoảng 30 máy nhỏ, thu gọn khoảng 15; chọn theo tài nguyên có |
 | L3 | Hệ điều hành cho node: một họ hay nhiều? | Một họ cho mọi node (Debian 13 hoặc Ubuntu 24.04 LTS); một chuẩn hardening duy nhất |
 | L4 | Công cụ GitOps và IaC? | Argo CD cho K8s; Terraform (hoặc OpenTofu) cho hạ tầng; Ansible cho node ngoài K8s; Packer cho image nền |
 | L5 | Chuẩn hardening: CIS benchmark mức nào? | CIS Level 1 bắt buộc cho mọi node; Level 2 cho edge và bastion |
@@ -34,31 +35,11 @@ ngoài; mỗi plane một chu kỳ triển khai riêng ([ADR-0001](../docs/archi
 
 ### 2.1 Bố cục lab đề xuất
 
-Dựa trên 7.2 và 7.4 (staging đủ bốn plane). Tên máy chỉ là nhãn.
-
-| Nhóm | Máy | Vai trò | Ghi chú |
-|---|---|---|---|
-| **Cụm K8s trung tâm** (ADR-0023) | `k8s-cp-1..3`, `k8s-wk-1..3` | Management, Control, Analytics (stateless) | 3 control-plane node, 3 worker; có thể dùng RKE2 hoặc k3s |
-| **Dữ liệu** | `pg-1..2`, `ch-1`, `kafka-1` | Postgres chính và dự phòng, ClickHouse, Kafka | Ngoài K8s cho dễ cô lập disk và mạng; RabbitMQ, Valkey chạy trên worker ở lab nhỏ |
-| **Secret** | `bao-1..3` | OpenBao Raft | Mạng riêng, chỉ nhận từ vùng secret |
-| **Edge** | `edge-l7-1..2`, `edge-waf-1`, `dns-1` | PoP giả: pool L7, pool WAF, DNS điều hướng | Bare metal giả lập: đặt trên VM có NIC riêng và cgroup |
-| **Vận hành** | `bastion`, `ci-runner` | Cửa vào quản trị, runner CI | Không có đường vào thẳng từ ngoài |
-| **Giả lập** | `origin`, `loadgen` | Origin của khách, bộ sinh traffic và tấn công | Nằm ngoài mọi plane |
+Đã chuyển sang [7.6 §5](../docs/architecture/07-deployment/06-network-zones-and-flows.md#5-bố-cục-máy-ảo-theo-vùng) để chỉ có một nơi giữ danh sách máy: hai cấu hình, đầy đủ (khoảng 30 máy nhỏ) và thu gọn (khoảng 15), cùng một thiết kế mạng.
 
 ### 2.2 Vùng mạng (trust zone) đề xuất
 
-| Vùng | Chứa | Ai vào được |
-|---|---|---|
-| **Internet (giả lập)** | `loadgen`, `origin`, người dùng cuối | — |
-| **DMZ edge** | `edge-l7`, `edge-waf`, `dns` | Từ Internet vào 80/443/53; **không** có đường vào các vùng khác |
-| **Ứng dụng công khai** | Ingress của Management (portal, public API) | Từ Internet vào 443 |
-| **Ứng dụng nội bộ** | Control, Management, Analytics (pod) | Chỉ từ ingress, DMZ edge qua cổng đã khai, bastion |
-| **Dữ liệu** | Postgres, ClickHouse, Kafka, RabbitMQ, Valkey | Chỉ từ ứng dụng nội bộ, theo từng cặp |
-| **Secret** | OpenBao | Chỉ từ ứng dụng nội bộ và node ngoài K8s qua mTLS; bastion cho quản trị |
-| **Vận hành** | `bastion`, `ci-runner`, GitOps controller | Quản trị viên qua VPN/WireGuard + MFA |
-
-Nguyên tắc: **mặc định chặn tất cả** (default deny), mở từng luồng bằng một dòng trong ma trận ([§3, P0](#3-các-giai-đoạn)).
-Edge chỉ gọi **ra** Control (snapshot, enroll) và ingest; edge không có route tới Management, Postgres hay OpenBao.
+Đã chuyển sang [7.6 §2](../docs/architecture/07-deployment/06-network-zones-and-flows.md#2-vùng-tin-cậy): tám vùng (Internet giả lập, Edge DMZ, Biên, Ứng dụng nội bộ, Dữ liệu, Secret, Vận hành, hypervisor), một bộ định tuyến L3 duy nhất, mặc định chặn tất cả. Ma trận luồng ở [7.6 §4](../docs/architecture/07-deployment/06-network-zones-and-flows.md#4-ma-trận-luồng); các test mạng ở [7.6 §6](../docs/architecture/07-deployment/06-network-zones-and-flows.md#6-kiểm-thử-mạng). Quyết định ở [ADR-0047](../docs/architecture/09-adr/0047-network-zones-and-default-deny.md).
 
 ## 3. Các giai đoạn
 
@@ -68,7 +49,7 @@ Kích thước: S (vài ngày), M (một đến hai tuần), L (nhiều tuần).
 
 Mục tiêu: có thiết kế mạng và triển khai được duyệt **trước khi** dựng, theo đúng ghi chú đầu tiên của chủ dự án.
 
-- Viết thêm vào `7. Deployment View`: mục network topology (vùng mạng, sơ đồ), **ma trận luồng** (nguồn, đích, cổng, giao thức, xác thực, ai khởi tạo), môi trường lab trong 7.4.
+- Viết thêm vào `7. Deployment View`: mục network topology (vùng mạng, sơ đồ), **ma trận luồng** (nguồn, đích, cổng, giao thức, xác thực, ai khởi tạo), môi trường lab trong 7.4. **Phần mạng đã viết (2026-11-13) ở [7.6](../docs/architecture/07-deployment/06-network-zones-and-flows.md) và [ADR-0047](../docs/architecture/09-adr/0047-network-zones-and-default-deny.md), chờ duyệt.** Còn lại của P0: ADR chuẩn node, GitOps, secret.
 - ADR mới: phân vùng mạng; chuẩn node (OS, partition, hardening); GitOps; quản lý secret và lịch xoay.
 - Cập nhật 12 (glossary) nếu có thuật ngữ mới.
 - **Đầu ra:** sơ đồ mạng, ma trận luồng (một bảng, mỗi dòng một luồng được phép), 4 ADR ở trạng thái đề xuất.
