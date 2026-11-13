@@ -199,6 +199,8 @@ Hai cấu hình, cùng một thiết kế mạng. Cấu hình **thu gọn** gộ
 
 Chủ dự án dự kiến nâng máy lên 64 đến 128 GB RAM: bắt đầu bằng profile nhỏ, chuyển lên `compact` rồi `full` khi có máy. Với máy 64 đến 128 GB nên dùng **một máy Linux riêng** làm máy chủ lab (Incus chạy trực tiếp, không lồng trong máy ảo khác): lab chạy nhanh hơn, và có card mạng thật để thử tinh chỉnh edge (RSS, IRQ affinity) mà máy ảo lồng không thử được. CPU từ 16 nhân, NVMe từ 1 TB.
 
+Máy dự tính hiện nay là Windows 64 GB, SSD 4 TB, lab bật mới chạy: dùng profile `compact`. Đề xuất bắt đầu bằng một máy ảo Ubuntu 24.04 trên Hyper-V (bật nested virtualization) chạy Incus; nếu sau này thử edge cần card mạng thật thì chuyển sang Linux native, mã lab không đổi. Vì lab không chạy liên tục nên cần lệnh bật và tắt theo thứ tự (Secret, Data, Internal, Perimeter, Edge), snapshot trước khi tắt, và OpenBao tự unseal sau khi bật (chỉ trong lab, khóa unseal để trong tệp của lab; production giữ Shamir 5/3 theo ADR-0050). Đề xuất của Claude, chờ duyệt.
+
 ## 6. Kiểm thử mạng
 
 Mỗi dòng ở §4.7 thành một test tự động chạy trong CI của lab (cả hai chiều: bị chặn ở firewall vùng **và** ở firewall máy chủ):
