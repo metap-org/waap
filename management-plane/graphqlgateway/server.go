@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"io"
 	"net/http"
 
@@ -103,11 +104,7 @@ type graphqlRequestBody struct {
 	Variables     map[string]interface{} `json:"variables"`
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
+var writeJSON = httpx.WriteJSON
 
 func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

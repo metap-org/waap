@@ -21,6 +21,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"log/slog"
 	"net/http"
 	"os"
@@ -240,11 +241,11 @@ func main() {
 	if corsOrigins != "" {
 		origins = strings.Split(corsOrigins, ",")
 	}
-	handler := runtime.CORS(runtime.CORSOptions{
+	handler := httpx.Recover(runtime.CORS(runtime.CORSOptions{
 		Origins: origins,
 		Methods: []string{"GET", "POST", "OPTIONS"},
 		Headers: []string{"Authorization", "Content-Type", "X-CSRF-Token"},
-	})(server.Router())
+	})(server.Router()))
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	slog.Info("waf-graphql-gateway listening", "addr", addr, "entities", len(owners))

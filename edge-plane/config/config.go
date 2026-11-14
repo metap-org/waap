@@ -1,8 +1,7 @@
 // Package config is edge node configuration, read once at boot from the environment.
 //
-// Hand-rolled rather than reusing any shared helper: edge-plane deliberately does not depend on
-// metap (or on control-plane/go) at all. Ten lines of os.Getenv is a much smaller cost than any
-// dependency that would drag in.
+// Reads through metap's stdlib-only pkg/kit/env, the one thing edge-plane may import from metap
+// (depguard-enforced); it depends on nothing else from metap or control-plane.
 package config
 
 import (
@@ -42,6 +41,10 @@ type Config struct {
 	// means a restart invalidates outstanding clearances (a re-challenge, not an outage); set it
 	// explicitly to share clearances across a fleet.
 	ClearanceSecret string
+	// MaxRequestBodyBytes: largest request body the edge will buffer and forward; a larger one
+	// is answered 413 without reaching the origin. The proxy holds the whole body in memory, so
+	// this bounds memory per in-flight request.
+	MaxRequestBodyBytes int64
 }
 
 func Load() Config {
@@ -59,6 +62,7 @@ func Load() Config {
 		ClearanceCookie:        env.String("CLEARANCE_COOKIE", "waf_clearance"),
 		ClearanceTTL:           env.Seconds("CLEARANCE_TTL_SECONDS", 1_800*time.Second),
 		ClearanceSecret:        env.String("CLEARANCE_SECRET", randomSecret()),
+		MaxRequestBodyBytes:    int64(env.Int("MAX_REQUEST_BODY_BYTES", 10<<20)),
 	}
 }
 

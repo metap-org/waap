@@ -178,8 +178,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 		return
 	}
 	var body findingsBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid request body.", nil)
+	if !httpserver.DecodeJSONBody(w, r, &body) {
 		return
 	}
 	succeeded := true

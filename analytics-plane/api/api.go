@@ -8,10 +8,8 @@
 package api
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -19,6 +17,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/metap-org/metap/pkg/kit/httpx"
 
 	"github.com/metap-org/waap/analytics-plane/auth"
 	"github.com/metap-org/waap/analytics-plane/events"
@@ -55,18 +55,14 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("GET /v1/security-events/{id}", s.get)
 	authed.HandleFunc("POST /v1/security-events/aggregate", s.aggregate)
 	mux.Handle("/v1/", auth.Middleware(s.Verifier, writeError)(authed))
-	return mux
+	return httpx.Recover(mux)
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, code, msg string) {
-	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": msg}})
-}
+// The one JSON/error shape lives in kit/httpx; these keep the call sites short.
+var (
+	writeJSON  = httpx.WriteJSON
+	writeError = httpx.WriteError
+)
 
 // fail maps a store/planner error to a response; anything unexpected is logged, not echoed.
 func fail(w http.ResponseWriter, err error) {
@@ -96,8 +92,7 @@ type rejection struct {
 }
 
 func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
-	if s.IngestToken != "" &&
-		subtle.ConstantTimeCompare([]byte(r.Header.Get(IngestHeader)), []byte(s.IngestToken)) != 1 {
+	if s.IngestToken != "" && !httpx.SecretEqual(r.Header.Get(IngestHeader), s.IngestToken) {
 		writeError(w, http.StatusForbidden, "forbidden", "missing or wrong ingest token")
 		return
 	}
@@ -105,7 +100,11 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Events []events.Incoming `json:"events"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxBodyBytes)).Decode(&body); err != nil {
+	if err := httpx.DecodeJSON(w, r, &body, maxBodyBytes); err != nil {
+		if errors.Is(err, httpx.ErrBodyTooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "ingest body is too large")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "malformed_body", "body must be {\"events\": [...]}")
 		return
 	}
@@ -206,9 +205,14 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 func (s *Server) aggregate(w http.ResponseWriter, r *http.Request) {
 	id, _ := auth.FromContext(r.Context())
 	var q events.AggregateQuery
-	dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&q); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "aggregate spec is too large")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_query", "malformed aggregate spec: "+strings.TrimPrefix(err.Error(), "json: "))
 		return
 	}

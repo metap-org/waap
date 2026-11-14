@@ -215,8 +215,8 @@ func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.A
 		return
 	}
 	var body verifyDNSBody
-	if r.ContentLength != 0 {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+	if r.ContentLength != 0 && !httpserver.DecodeJSONBody(w, r, &body) {
+		return
 	}
 
 	got, err := state.Crud.Get(r.Context(), "waf.domains", domainID, rc)

@@ -147,3 +147,27 @@ func TestIngestAndQuery(t *testing.T) {
 	rec, _ = do(t, h, "GET", "/health", "", "")
 	require.Equal(t, http.StatusOK, rec.Code)
 }
+
+func TestOversizedBodiesAreRefusedWith413(t *testing.T) {
+	h := (&Server{Store: &fakeStore{}, Verifier: fakeVerifier{}}).Handler()
+
+	rec, _ := do(t, h, "POST", "/v1/security-events/ingest", "good", `{"events":[{"zoneId":"`+strings.Repeat("z", maxBodyBytes)+`"}]}`)
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	require.Contains(t, rec.Body.String(), `"code":"payload_too_large"`)
+
+	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "good", `{"groupBy":["`+strings.Repeat("x", 64<<10)+`"]}`)
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}
+
+func TestAPanicingStoreIsAJSON500NotADroppedConnection(t *testing.T) {
+	h := (&Server{Store: &panicStore{}, Verifier: fakeVerifier{}}).Handler()
+	rec, _ := do(t, h, "GET", "/v1/security-events", "good", "")
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Contains(t, rec.Body.String(), `"code":"internal_error"`)
+}
+
+type panicStore struct{ fakeStore }
+
+func (*panicStore) List(context.Context, uuid.UUID, events.ListQuery) (store.Page, error) {
+	panic("boom")
+}

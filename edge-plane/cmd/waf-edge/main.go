@@ -31,6 +31,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -107,7 +108,10 @@ func main() {
 
 	ctx, stop := shutdown.Context(bg)
 	defer stop()
-	server := &http.Server{Addr: cfg.ListenAddr, Handler: http.HandlerFunc(e.handle)}
+	// Recover so a panic in rule evaluation is a logged 500 rather than a dropped connection.
+	// ReadTimeout is explicit because the body is buffered up to MaxRequestBodyBytes and the
+	// shared default (60s) is tuned for API bodies, not uploads through a proxy.
+	server := &http.Server{Addr: cfg.ListenAddr, Handler: httpx.Recover(http.HandlerFunc(e.handle)), ReadTimeout: 2 * time.Minute}
 	slog.Info("waf-edge starting", "listen_addr", cfg.ListenAddr, "zones", ruleCache.ZoneCount())
 	// Returns immediately if the listener fails (e.g. port in use) instead of idling until a
 	// signal arrives, as the hand-rolled loop this replaced did.
@@ -225,7 +229,12 @@ func (e *edge) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e *edge) passThrough(w http.ResponseWriter, r *http.Request, zone *ruleset.CompiledZone, clientIP, host string) {
-	if err := proxy.Forward(e.client, w, r, zone.OriginAddress, clientIP, host); err != nil {
+	if err := proxy.Forward(e.client, w, r, zone.OriginAddress, clientIP, host, e.config.MaxRequestBodyBytes); err != nil {
+		var perr *proxy.Error
+		if errors.As(err, &perr) && perr.Kind == proxy.ErrBodyTooLarge {
+			pages.PayloadTooLarge(w, pages.RayID())
+			return
+		}
 		slog.Warn("origin request failed", "hostname", zone.Hostname, "origin", zone.OriginAddress, "error", err)
 		pages.OriginUnreachable(w, pages.RayID())
 	}

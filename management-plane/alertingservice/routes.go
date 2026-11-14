@@ -192,8 +192,8 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 	}
 
 	var body correlateBody
-	if r.ContentLength != 0 {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+	if r.ContentLength != 0 && !httpserver.DecodeJSONBody(w, r, &body) {
+		return
 	}
 	windowMinutes := int64(defaultWindowMinutes)
 	if body.WindowMinutes != nil {

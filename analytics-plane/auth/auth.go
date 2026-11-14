@@ -17,12 +17,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"github.com/metap-org/metap/pkg/kit/httpx"
 )
 
 const (
@@ -169,8 +170,8 @@ func Middleware(v Verifier, onError func(w http.ResponseWriter, status int, code
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
-			token, ok := strings.CutPrefix(header, "Bearer ")
-			if !ok || token == "" {
+			token, ok := httpx.BearerToken(header)
+			if !ok {
 				onError(w, http.StatusUnauthorized, "unauthorized", "missing or malformed Authorization header")
 				return
 			}

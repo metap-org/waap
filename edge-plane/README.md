@@ -26,6 +26,7 @@ It reads Redis keys that `../control-plane` writes, and nothing else. It never c
 `../management-plane`.
 
 - The snapshot lives in memory; **a request never touches Redis**.
+- Request bodies are buffered up to `MAX_REQUEST_BODY_BYTES` (default 10 MiB); a larger body is answered `413` without reaching the origin. The server applies read-header/read/idle timeouts and recovers a handler panic as a logged 500.
 - A refresh ticker (`REFRESH_INTERVAL_SECONDS`, default 10s — this value *is* the 10-30s
   config-propagation SLA in the architecture doc) checks each zone's `configVersion` and
   re-fetches only what changed.

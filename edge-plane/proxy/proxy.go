@@ -48,6 +48,9 @@ func BuildClient() *http.Client {
 				// time rather than indefinitely; the caller turns a failure into a 502 page.
 				Timeout: 5 * time.Second,
 			}).DialContext,
+			// An origin that accepts the connection and then never answers would otherwise pin
+			// this request (and its buffered body) forever; the caller turns it into a 502.
+			ResponseHeaderTimeout: 30 * time.Second,
 		},
 		// This proxy follows the origin's response verbatim, redirects included — a client
 		// asked the ORIGIN for a resource, and the origin deciding to redirect is the origin's
@@ -82,6 +85,9 @@ const (
 	ErrBadOrigin ErrKind = iota
 	ErrBadRequestBody
 	ErrUnreachable
+	// ErrBodyTooLarge: the request body exceeds the configured limit. It is buffered in memory
+	// (see Forward), so an unbounded body is an unbounded allocation per request.
+	ErrBodyTooLarge
 )
 
 type Error struct{ Kind ErrKind }
@@ -92,6 +98,8 @@ func (e *Error) Error() string {
 		return "bad origin address"
 	case ErrBadRequestBody:
 		return "bad request body"
+	case ErrBodyTooLarge:
+		return "request body too large"
 	default:
 		return "origin unreachable"
 	}
@@ -99,7 +107,7 @@ func (e *Error) Error() string {
 
 // Forward proxies request to originAddress, rewriting headers per this package's own doc
 // comment, and writes the origin's response (or an error) to w.
-func Forward(client *http.Client, w http.ResponseWriter, r *http.Request, originAddress, clientIP, host string) error {
+func Forward(client *http.Client, w http.ResponseWriter, r *http.Request, originAddress, clientIP, host string, maxBody int64) error {
 	pathAndQuery := r.URL.Path
 	if r.URL.RawQuery != "" {
 		pathAndQuery += "?" + r.URL.RawQuery
@@ -114,8 +122,12 @@ func Forward(client *http.Client, w http.ResponseWriter, r *http.Request, origin
 
 	// Buffered, not streamed: this proxy's job is evaluating rules rather than moving large
 	// uploads. A real edge would stream; this one is honest about not doing so.
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
 	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			return &Error{Kind: ErrBodyTooLarge}
+		}
 		return &Error{Kind: ErrBadRequestBody}
 	}
 
