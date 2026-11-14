@@ -63,7 +63,7 @@ token). **Bắt buộc đặt trên staging dùng chung.** Cổng truy vấn DNS
 - `DNS_MOCK_STATE_FILE`: mỗi thay đổi được ghi ra file này, và được nạp lại khi khởi động.
 - `DNS_MOCK_SEED_FILE`: chỉ nạp khi chưa có state file. Cùng định dạng `{"records":[...],"faults":[...]}`.
 
-Compose của management-plane giữ state trong volume `dns-mock`, seed bằng `seed.dev.json`
+Compose của m-deploy giữ state trong volume `dns-mock`, seed bằng `seed.dev.json`
 (`*.edge.waf.local → 127.0.0.1`, khớp `EDGE_CNAME_TARGET`).
 
 ## Xác minh một zone trên portal (dev)

@@ -1,0 +1,22 @@
+# Architecture guard only: `golangci-lint run ./...` from a-api.
+version: "2"
+linters:
+  default: none
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # a-api (the analytics plane) is not built on metap (ADR-0009): from the
+        # metap module it may import only pkg/kit/* — standard-library-only utilities with no
+        # metadata/CRUD/permission/DB knowledge. Anything else from metap means the work
+        # belongs in the m-* services instead.
+        metap-kit-only:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: github.com/metap-org/metap
+              desc: "a-api may import only github.com/metap-org/metap/pkg/kit/* from metap"
+          allow:
+            - github.com/metap-org/metap/pkg/kit
