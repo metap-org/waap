@@ -29,13 +29,13 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/permission"
-	"github.com/metap-org/metap/pkg/runtime"
+	"github.com/metap-org/metap/pkg/kit/env"
 )
 
 // scannerURL: where a scan request is handed off. Unset (the default) means "no scanner
 // deployed" — the job still queues, which is the honest state: something asked for a scan and
 // nothing is going to run it yet.
-func scannerURL() (string, bool) { return runtime.Optional("SCANNER_URL") }
+func scannerURL() (string, bool) { return env.Lookup("SCANNER_URL") }
 
 func httpClient() *http.Client { return &http.Client{Timeout: 15 * time.Second} }
 

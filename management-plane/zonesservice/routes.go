@@ -28,23 +28,23 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/query"
-	"github.com/metap-org/metap/pkg/runtime"
+	"github.com/metap-org/metap/pkg/kit/env"
 )
 
 func scanningURL() string {
-	v, _ := runtime.Optional("SCANNING_URL")
+	v, _ := env.Lookup("SCANNING_URL")
 	return orDefault(v, "http://localhost:3010")
 }
 func alertingURL() string {
-	v, _ := runtime.Optional("ALERTING_URL")
+	v, _ := env.Lookup("ALERTING_URL")
 	return orDefault(v, "http://localhost:3020")
 }
 func dohURL() string {
-	v, _ := runtime.Optional("DOH_RESOLVER_URL")
+	v, _ := env.Lookup("DOH_RESOLVER_URL")
 	return orDefault(v, "https://dns.google/resolve")
 }
 func edgeCNAMETarget() string {
-	v, _ := runtime.Optional("EDGE_CNAME_TARGET")
+	v, _ := env.Lookup("EDGE_CNAME_TARGET")
 	return orDefault(v, "edge.waf.local")
 }
 

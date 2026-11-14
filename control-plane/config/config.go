@@ -3,11 +3,9 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
-	"github.com/metap-org/metap/pkg/runtime"
+	"github.com/metap-org/metap/pkg/kit/env"
 )
 
 type Config struct {
@@ -51,53 +49,32 @@ type Config struct {
 	IngestToken *string
 }
 
-func envOrString(name, def string) string {
-	if v, ok := os.LookupEnv(name); ok {
-		return v
-	}
-	return def
-}
-
-func envOrUint(name string, def int) int {
-	if v, ok := os.LookupEnv(name); ok {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			return n
-		}
-	}
-	return def
-}
-
 func Load() (Config, error) {
-	serviceEmail, err := runtime.RequireEnv("CONTROL_SERVICE_EMAIL")
+	serviceEmail, err := env.Require("CONTROL_SERVICE_EMAIL")
 	if err != nil {
 		return Config{}, err
 	}
-	servicePassword, err := runtime.RequireEnv("CONTROL_SERVICE_PASSWORD")
+	servicePassword, err := env.Require("CONTROL_SERVICE_PASSWORD")
 	if err != nil {
 		return Config{}, err
 	}
-	var ingestToken *string
-	if v, ok := runtime.Optional("INGEST_TOKEN"); ok {
-		ingestToken = &v
-	}
-	resyncSeconds := envOrUint("RESYNC_INTERVAL_SECONDS", 60)
 
 	return Config{
-		ZonesURL:               envOrString("ZONES_URL", "http://localhost:4000"),
-		AnalyticsURL:           envOrString("ANALYTICS_URL", "http://localhost:3030"),
-		AnalyticsIngestToken:   envOrString("ANALYTICS_INGEST_TOKEN", ""),
-		LoginURL:               envOrString("CONTROL_LOGIN_URL", "http://localhost:3000/auth/login"),
+		ZonesURL:               env.String("ZONES_URL", "http://localhost:4000"),
+		AnalyticsURL:           env.String("ANALYTICS_URL", "http://localhost:3030"),
+		AnalyticsIngestToken:   env.String("ANALYTICS_INGEST_TOKEN", ""),
+		LoginURL:               env.String("CONTROL_LOGIN_URL", "http://localhost:3000/auth/login"),
 		ServiceEmail:           serviceEmail,
 		ServicePassword:        servicePassword,
-		RedisURL:               envOrString("REDIS_URL", "redis://localhost:6379"),
-		AmqpURL:                envOrString("AMQP_URL", "amqp://guest:guest@localhost:5672/%2f"),
-		Queue:                  envOrString("CONFIG_DISTRIBUTOR_QUEUE", "waf.config-distributor"),
-		ResyncInterval:         time.Duration(resyncSeconds) * time.Second,
-		Port:                   envOrUint("PORT", 4100),
-		Host:                   envOrString("HOST", "0.0.0.0"),
-		IngestMaxBatch:         envOrUint("INGEST_MAX_BATCH", 200),
-		IngestMaxRequestEvents: envOrUint("INGEST_MAX_REQUEST_EVENTS", 1000),
-		IngestToken:            ingestToken,
+		RedisURL:               env.String("REDIS_URL", "redis://localhost:6379"),
+		AmqpURL:                env.String("AMQP_URL", "amqp://guest:guest@localhost:5672/%2f"),
+		Queue:                  env.String("CONFIG_DISTRIBUTOR_QUEUE", "waf.config-distributor"),
+		ResyncInterval:         env.Seconds("RESYNC_INTERVAL_SECONDS", time.Minute),
+		Port:                   env.Int("PORT", 4100),
+		Host:                   env.String("HOST", "0.0.0.0"),
+		IngestMaxBatch:         env.Int("INGEST_MAX_BATCH", 200),
+		IngestMaxRequestEvents: env.Int("INGEST_MAX_REQUEST_EVENTS", 1000),
+		IngestToken:            env.Ptr("INGEST_TOKEN"),
 	}, nil
 }
 

@@ -36,7 +36,7 @@ import (
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
-	"github.com/metap-org/metap/pkg/runtime"
+	"github.com/metap-org/metap/pkg/kit/env"
 
 	"github.com/metap-org/waap/management-plane/analytics"
 )
@@ -56,7 +56,7 @@ func httpClient() *http.Client { return &http.Client{Timeout: 10 * time.Second} 
 
 // analyticsClient: where security events are read from (the Analytics plane's query API).
 func analyticsClient() *analytics.Client {
-	v, _ := runtime.Optional("ANALYTICS_URL")
+	v, _ := env.Lookup("ANALYTICS_URL")
 	if v == "" {
 		v = "http://localhost:3030"
 	}
