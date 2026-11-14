@@ -1,0 +1,42 @@
+// Package bootstrap declares the WAAP roles and what each may do, applied to a tenant by
+// cmd/waf-bootstrap. It is a service directory of its own (m-bootstrap) because a role's grants
+// span entities owned by several services; the one-shot binary blank-imports them all so the
+// wildcards expand against the whole product.
+//
+// Tenant Admin is the built-in "admin" role (bypasses every policy); Platform Admin is not a
+// per-tenant role (dev-tools bootstrap-platform-admin). Neither is declared here. Field-level
+// permission stays at metap's allow-by-default.
+package bootstrap
+
+import "github.com/metap-org/metap/pkg/bootstrap"
+
+const (
+	RoleSecurityAnalyst = "security_analyst"
+	RoleDeveloper       = "developer"
+	RoleViewer          = "viewer"
+)
+
+func init() { bootstrap.Submit(Personas) }
+
+// Personas is docs/management's persona table as grants.
+func Personas() bootstrap.Bootstrap {
+	return bootstrap.Bootstrap{
+		Roles: []string{RoleSecurityAnalyst, RoleDeveloper, RoleViewer},
+		Grants: []bootstrap.Grant{
+			// Security Analyst / SOC: sees everything, edits rules and policies, handles
+			// incidents and alerts, cannot delete a Zone or touch its domain.
+			{Role: RoleSecurityAnalyst, Entities: []string{"waf.*"}, Actions: []string{"read"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{"waf.firewall_rules", "waf.ddos_policies", "waf.ip_access_lists"},
+				Actions: []string{"create", "update", "delete"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{"waf.incidents", "waf.scan_findings"}, Actions: []string{"update", "transition"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{"waf.alert_policies"}, Actions: []string{"create", "update"}},
+
+			// Developer: owns remediation of scan findings, no DDoS policy or firewall rule access.
+			{Role: RoleDeveloper, Entities: []string{"waf.scan_findings"}, Actions: []string{"read", "update", "transition"}},
+			{Role: RoleDeveloper, Entities: []string{"waf.scan_jobs"}, Actions: []string{"read"}},
+
+			// Viewer: read-only incidents and alert history.
+			{Role: RoleViewer, Entities: []string{"waf.incidents", "waf.alert_notifications"}, Actions: []string{"read"}},
+		},
+	}
+}
