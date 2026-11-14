@@ -159,8 +159,8 @@ func TestRunScanJobWithNoScannerConfiguredJustQueues(t *testing.T) {
 	jobData := crud.JsonObject{"zoneId": jsonMarshal(t, "zone-"+uuid.New().String()), "scanType": jsonMarshal(t, "quickScan")}
 	jobResult, err := state.Crud.Create(ctx, "waf.scan_jobs", jobData, rc, nil)
 	require.NoError(t, err, "create job: %v / %+v", err, jobResult)
-	require.True(t, jobResult.IsOk, "create job: %v / %+v", err, jobResult)
-	jobID := jobResult.Data.ID
+	require.NoError(t, err)
+	jobID := jobResult.ID
 
 	r := chi.NewRouter()
 	scanningservice.MountRoutes(r, state)
@@ -206,14 +206,14 @@ func TestSubmitFindingsCompletesTheJobAndCreatesFindings(t *testing.T) {
 	jobData := crud.JsonObject{"zoneId": jsonMarshal(t, "zone-"+uuid.New().String()), "scanType": jsonMarshal(t, "fullScan")}
 	jobResult, err := state.Crud.Create(ctx, "waf.scan_jobs", jobData, rc, nil)
 	require.NoError(t, err, "create job: %v / %+v", err, jobResult)
-	require.True(t, jobResult.IsOk, "create job: %v / %+v", err, jobResult)
-	jobID := jobResult.Data.ID
+	require.NoError(t, err)
+	jobID := jobResult.ID
 
 	// Walk the job to "queued" first via a real transition, matching what run-scan-job would
 	// have done before a scanner calls back.
-	queuedResult, err := state.Crud.Transition(ctx, "waf.scan_jobs", jobID, "run", jobResult.Data.Version, nil, rc, nil)
+	queuedResult, err := state.Crud.Transition(ctx, "waf.scan_jobs", jobID, "run", jobResult.Version, nil, rc, nil)
 	require.NoError(t, err, "transition to queued: %v / %+v", err, queuedResult)
-	require.True(t, queuedResult.IsOk, "transition to queued: %v / %+v", err, queuedResult)
+	require.NoError(t, err)
 
 	r := chi.NewRouter()
 	scanningservice.MountRoutes(r, state)
@@ -251,6 +251,6 @@ func TestSubmitFindingsCompletesTheJobAndCreatesFindings(t *testing.T) {
 	findings, err := state.Crud.List(ctx, "waf.scan_findings",
 		query.ListInput{Limit: 10, Filters: [][2]string{{"scanJobId", jobID.String()}}}, rc)
 	require.NoError(t, err, "list findings")
-	require.True(t, findings.IsOk, "expected 2 findings for this job, got %+v", findings)
+	require.NoError(t, err)
 	require.Len(t, findings.Data, 2, "expected 2 findings for this job, got %+v", findings)
 }

@@ -232,10 +232,6 @@ func objectArg(args map[string]interface{}, name string) (crud.JsonObject, bool,
 	return obj, true, err
 }
 
-func resultError(status uint16, code string, message *string, fieldErrors map[string][]string) error {
-	return newServiceError(status, code, message, fieldErrors)
-}
-
 // schemaBuilder holds what every resolver needs: which backend owns each entity, and the object
 // type built for each entity (a reference field's type is the target entity's object, so types
 // are created first and their fields filled lazily via FieldsThunk).
@@ -277,15 +273,19 @@ func (b *schemaBuilder) loadReference(ctx context.Context, entity string, id uui
 	}
 	result, err := backend.Get(ctx, entity, id, requestContextFrom(ctx))
 	if err != nil {
-		return nil, err
-	}
-	var h *recordHandle
-	if result.IsOk {
-		capabilities := result.Data.Capabilities
-		h, err = newRecordHandle(result.Data.Record, &capabilities)
-		if err != nil {
+		// A reference the caller cannot read (denied or gone) resolves to null; anything else
+		// is a real failure.
+		if _, business := crud.AsServiceError(err); !business {
 			return nil, err
 		}
+		result = crud.GetResult{}
+		err = nil
+	}
+	var h *recordHandle
+	capabilities := result.Capabilities
+	h, err = newRecordHandle(result.Record, &capabilities)
+	if err != nil {
+		return nil, err
 	}
 	if cache != nil {
 		cache.mu.Lock()
@@ -444,13 +444,10 @@ func (b *schemaBuilder) getField(entity string, recordType *graphql.Object) *gra
 			}
 			result, err := backend.Get(p.Context, entity, id, requestContextFrom(p.Context))
 			if err != nil {
-				return nil, err
+				return nil, gqlError(err)
 			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			}
-			capabilities := result.Data.Capabilities
-			return newRecordHandle(result.Data.Record, &capabilities)
+			capabilities := result.Capabilities
+			return newRecordHandle(result.Record, &capabilities)
 		},
 	}
 }
@@ -507,10 +504,7 @@ func (b *schemaBuilder) listField(entity string, connection *graphql.Object) *gr
 			}
 			result, err := backend.List(p.Context, entity, input, requestContextFrom(p.Context))
 			if err != nil {
-				return nil, err
-			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
+				return nil, gqlError(err)
 			}
 			conn := &connectionHandle{records: make([]*recordHandle, 0, len(result.Data))}
 			for _, dto := range result.Data {
@@ -520,7 +514,7 @@ func (b *schemaBuilder) listField(entity string, connection *graphql.Object) *gr
 				}
 				conn.records = append(conn.records, h)
 			}
-			if result.Page != nil && result.Page.NextCursor != nil {
+			if result.Page.NextCursor != nil {
 				conn.nextCursor = *result.Page.NextCursor
 				conn.hasMore = true
 			}
@@ -552,13 +546,10 @@ func (b *schemaBuilder) aggregateField() *graphql.Field {
 			}
 			result, err := backend.Aggregate(p.Context, entity, spec, requestContextFrom(p.Context))
 			if err != nil {
-				return nil, err
+				return nil, gqlError(err)
 			}
-			if !result.IsOk {
-				return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			}
-			rows := make([]interface{}, 0, len(result.Data))
-			for _, r := range result.Data {
+			rows := make([]interface{}, 0, len(result))
+			for _, r := range result {
 				var row interface{} // nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
 				if err := json.Unmarshal(r, &row); err != nil {
 					return nil, err
@@ -570,14 +561,11 @@ func (b *schemaBuilder) aggregateField() *graphql.Field {
 	}
 }
 
-func recordResult(result crud.ServiceResult[crud.RecordDto], err error) (interface{}, error) {
+func recordResult(result crud.RecordDto, err error) (interface{}, error) {
 	if err != nil {
-		return nil, err
+		return nil, gqlError(err)
 	}
-	if !result.IsOk {
-		return nil, resultError(result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-	}
-	return newRecordHandle(result.Data, nil)
+	return newRecordHandle(result, nil)
 }
 
 func (b *schemaBuilder) addMutations(fields graphql.Fields, entity string, recordType *graphql.Object, hasWorkflow bool) {

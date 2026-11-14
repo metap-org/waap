@@ -39,14 +39,6 @@ func scannerURL() (string, bool) { return runtime.Optional("SCANNER_URL") }
 
 func httpClient() *http.Client { return &http.Client{Timeout: 15 * time.Second} }
 
-func writeCrudError(w http.ResponseWriter, status uint16, errorCode string, message *string, fieldErrors map[string][]string) {
-	msg := ""
-	if message != nil {
-		msg = *message
-	}
-	httpserver.WriteServiceError(w, int(status), errorCode, msg, fieldErrors)
-}
-
 // doTransition applies one workflow transition, mapping a service-level failure into a plain
 // error. Transition names come from entities.ScanJobEntity's workflow (run/start/complete/fail)
 // — this module never writes status directly, so guards, audit rows and outbox events all still
@@ -54,29 +46,18 @@ func writeCrudError(w http.ResponseWriter, status uint16, errorCode string, mess
 func doTransition(ctx context.Context, state *httpserver.AppState, job crud.RecordDto, action string, rc *permission.RequestContext) (crud.RecordDto, error) {
 	result, err := state.Crud.Transition(ctx, "waf.scan_jobs", job.ID, action, job.Version, nil, rc, nil)
 	if err != nil {
-		return crud.RecordDto{}, err
+		return crud.RecordDto{}, fmt.Errorf("transition %s: %w", action, err)
 	}
-	if !result.IsOk {
-		msg := ""
-		if result.Message != nil {
-			msg = " (" + *result.Message + ")"
-		}
-		return crud.RecordDto{}, fmt.Errorf("transition %s: %s%s", action, result.ErrorCode, msg)
-	}
-	return result.Data, nil
+	return result, nil
 }
 
 func loadJob(ctx context.Context, w http.ResponseWriter, state *httpserver.AppState, id uuid.UUID, rc *permission.RequestContext) (crud.RecordDto, bool) {
 	result, err := state.Crud.Get(ctx, "waf.scan_jobs", id, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return crud.RecordDto{}, false
 	}
-	if !result.IsOk {
-		writeCrudError(w, result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-		return crud.RecordDto{}, false
-	}
-	return result.Data.Record, true
+	return result.Record, true
 }
 
 // RunScanJob is POST /api/waf.scan_jobs/{id}/run — the portal's "Run scan now" button.
@@ -204,14 +185,10 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 		}
 		result, err := state.Crud.Create(r.Context(), "waf.scan_findings", data, rc, nil)
 		if err != nil {
-			httpserver.WriteInternalError(w, err)
+			httpserver.WriteCrudError(w, err)
 			return
 		}
-		if !result.IsOk {
-			writeCrudError(w, result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			return
-		}
-		created = append(created, result.Data.ID)
+		created = append(created, result.ID)
 	}
 
 	// The job may still be "queued" if the scanner was quick — walk it through start first so
@@ -239,15 +216,11 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	patch := crud.JsonObject{"lastRunAt": jsonStr(now)}
 	jobAfter, err := state.Crud.Update(r.Context(), "waf.scan_jobs", finished.ID, finished.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
-	}
-	if !jobAfter.IsOk {
-		writeCrudError(w, jobAfter.Status, jobAfter.ErrorCode, jobAfter.Message, jobAfter.FieldErrors)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
 	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
-		"jobId": finished.ID, "job": jobAfter.Data, "createdFindings": created,
+		"jobId": finished.ID, "job": jobAfter, "createdFindings": created,
 	}})
 }
 

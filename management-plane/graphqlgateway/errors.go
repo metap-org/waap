@@ -1,6 +1,10 @@
 package graphqlgateway
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/metap-org/metap/pkg/crud"
+)
 
 // serviceError carries a CrudService-shaped failure (status/code/message/fieldErrors) through
 // graphql-go's error path as a GraphQL extensions object — the same extensions.code/status/
@@ -33,4 +37,18 @@ func (e *serviceError) Extensions() map[string]interface{} {
 		ext["fieldErrors"] = e.fieldErrors
 	}
 	return ext
+}
+
+// gqlError turns what a backend returned into the error a GraphQL resolver hands back: a
+// *crud.ServiceError becomes a serviceError whose extensions carry code/status/fieldErrors, any
+// other error passes through unchanged (graphql-go reports it as a plain message).
+func gqlError(err error) error {
+	if se, ok := crud.AsServiceError(err); ok {
+		var msg *string
+		if se.Message != "" {
+			msg = &se.Message
+		}
+		return newServiceError(se.Status, se.Code, msg, se.FieldErrors)
+	}
+	return err
 }

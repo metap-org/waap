@@ -29,7 +29,7 @@ type fakeBackend struct {
 	aggregateResult []json.RawMessage
 }
 
-func (f *fakeBackend) List(_ context.Context, entity string, input query.ListInput, _ *permission.RequestContext) (crud.ServiceResult[[]crud.RecordDto], error) {
+func (f *fakeBackend) List(_ context.Context, entity string, input query.ListInput, _ *permission.RequestContext) (crud.ListResult, error) {
 	f.lastList = input
 	var out []crud.RecordDto
 	for _, r := range f.records {
@@ -38,47 +38,46 @@ func (f *fakeBackend) List(_ context.Context, entity string, input query.ListInp
 		}
 	}
 	next := "cursor-2"
-	return crud.ResultOkWithPage(out, crud.PageInfo{Limit: input.Limit, NextCursor: &next}), nil
+	return crud.ListResult{Data: out, Page: crud.PageInfo{Limit: input.Limit, NextCursor: &next}}, nil
 }
 
-func (f *fakeBackend) Get(_ context.Context, _ string, id uuid.UUID, _ *permission.RequestContext) (crud.ServiceResult[crud.GetResult], error) {
+func (f *fakeBackend) Get(_ context.Context, _ string, id uuid.UUID, _ *permission.RequestContext) (crud.GetResult, error) {
 	f.getCalls++
 	r, ok := f.records[id]
 	if !ok {
-		msg := "not found"
-		return crud.ResultErrWithMessage[crud.GetResult](404, "not_found", msg), nil
+		return crud.GetResult{}, crud.NewServiceErrorMsg(404, "not_found", "not found")
 	}
-	return crud.ResultOk(crud.GetResult{Record: r, Capabilities: crud.RecordCapabilities{CanUpdate: true, WritableFields: []string{"enabled"}}}), nil
+	return crud.GetResult{Record: r, Capabilities: crud.RecordCapabilities{CanUpdate: true, WritableFields: []string{"enabled"}}}, nil
 }
 
-func (f *fakeBackend) GetMany(context.Context, string, []uuid.UUID, *permission.RequestContext) (crud.ServiceResult[[]crud.GetManyResult], error) {
-	return crud.ResultOk([]crud.GetManyResult{}), nil
+func (f *fakeBackend) GetMany(context.Context, string, []uuid.UUID, *permission.RequestContext) ([]crud.GetManyResult, error) {
+	return []crud.GetManyResult{}, nil
 }
 
-func (f *fakeBackend) Create(_ context.Context, entity string, data crud.JsonObject, _ *permission.RequestContext, _ *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (f *fakeBackend) Create(_ context.Context, entity string, data crud.JsonObject, _ *permission.RequestContext, _ *string) (crud.RecordDto, error) {
 	r := crud.RecordDto{ID: uuid.New(), Entity: entity, Data: data, Version: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	f.records[r.ID] = r
-	return crud.ResultOk(r), nil
+	return r, nil
 }
 
-func (f *fakeBackend) Update(_ context.Context, _ string, id uuid.UUID, v int32, _ crud.JsonObject, _ *permission.RequestContext, _ *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (f *fakeBackend) Update(_ context.Context, _ string, id uuid.UUID, v int32, _ crud.JsonObject, _ *permission.RequestContext, _ *string) (crud.RecordDto, error) {
 	f.lastVersion = v
-	return crud.ResultOk(f.records[id]), nil
+	return f.records[id], nil
 }
 
-func (f *fakeBackend) Transition(_ context.Context, _ string, id uuid.UUID, _ string, v int32, _ crud.JsonObject, _ *permission.RequestContext, _ *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (f *fakeBackend) Transition(_ context.Context, _ string, id uuid.UUID, _ string, v int32, _ crud.JsonObject, _ *permission.RequestContext, _ *string) (crud.RecordDto, error) {
 	f.lastVersion = v
-	return crud.ResultOk(f.records[id]), nil
+	return f.records[id], nil
 }
 
-func (f *fakeBackend) Delete(_ context.Context, _ string, id uuid.UUID, v int32, _ *permission.RequestContext, _ *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (f *fakeBackend) Delete(_ context.Context, _ string, id uuid.UUID, v int32, _ *permission.RequestContext, _ *string) (crud.RecordDto, error) {
 	f.lastVersion = v
-	return crud.ResultOk(f.records[id]), nil
+	return f.records[id], nil
 }
 
-func (f *fakeBackend) Aggregate(_ context.Context, _ string, spec query.AggregateSpec, _ *permission.RequestContext) (crud.ServiceResult[[]json.RawMessage], error) {
+func (f *fakeBackend) Aggregate(_ context.Context, _ string, spec query.AggregateSpec, _ *permission.RequestContext) ([]json.RawMessage, error) {
 	f.lastAggregate = spec
-	return crud.ResultOk(f.aggregateResult), nil
+	return f.aggregateResult, nil
 }
 
 func raw(v interface{}) json.RawMessage {

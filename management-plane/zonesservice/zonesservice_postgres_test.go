@@ -146,15 +146,15 @@ func TestGuardedZonesBackendCreateZoneAutoResolvesDomainID(t *testing.T) {
 	}
 	result, err := backend.Create(ctx, "waf.zones", data, rc, nil)
 	require.NoError(t, err, "Create")
-	require.True(t, result.IsOk, "Create failed: status=%d code=%s msg=%v fieldErrors=%v", result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-	domainIDRaw, ok := result.Data.Data["domainId"]
-	require.True(t, ok, "expected domainId to be auto-filled, got %+v", result.Data.Data)
-	require.NotEqual(t, 0, len(domainIDRaw), "expected domainId to be auto-filled, got %+v", result.Data.Data)
+	require.NoError(t, err)
+	domainIDRaw, ok := result.Data["domainId"]
+	require.True(t, ok, "expected domainId to be auto-filled, got %+v", result.Data)
+	require.NotEqual(t, 0, len(domainIDRaw), "expected domainId to be auto-filled, got %+v", result.Data)
 
 	// A new Domain row with this apex must now exist.
 	domains, err := state.Crud.List(ctx, "waf.domains", query.ListInput{Limit: 10, Filters: [][2]string{{"apexDomain", apex}}}, rc)
 	require.NoError(t, err, "List domains")
-	require.True(t, domains.IsOk, "expected exactly 1 domain for %s, got %+v", apex, domains)
+	require.NoError(t, err)
 	require.Len(t, domains.Data, 1, "expected exactly 1 domain for %s, got %+v", apex, domains)
 
 	// Creating a second zone under the same apex must reuse the same domain, not create a
@@ -165,10 +165,10 @@ func TestGuardedZonesBackendCreateZoneAutoResolvesDomainID(t *testing.T) {
 	}
 	result2, err := backend.Create(ctx, "waf.zones", data2, rc, nil)
 	require.NoError(t, err, "Create second zone: %v / %+v", err, result2)
-	require.True(t, result2.IsOk, "Create second zone: %v / %+v", err, result2)
+	require.NoError(t, err)
 	domains2, err := state.Crud.List(ctx, "waf.domains", query.ListInput{Limit: 10, Filters: [][2]string{{"apexDomain", apex}}}, rc)
 	require.NoError(t, err, "expected the second zone to reuse the same domain, got %+v /", domains2)
-	require.True(t, domains2.IsOk, "expected the second zone to reuse the same domain, got %+v / %v", domains2, err)
+	require.NoError(t, err)
 	require.Len(t, domains2.Data, 1, "expected the second zone to reuse the same domain, got %+v / %v", domains2, err)
 }
 
@@ -188,11 +188,11 @@ func TestGuardedZonesBackendRejectsInvalidMatchCondition(t *testing.T) {
 		"matchCondition": jsonMarshal(t, map[string]any{"field": "bogus", "op": "eq", "value": "x"}),
 		"ruleType":       jsonMarshal(t, "waf"), "action": jsonMarshal(t, "block"),
 	}
-	result, err := backend.Create(context.Background(), "waf.firewall_rules", data, rc, nil)
-	require.NoError(t, err, "Create")
-	require.False(t, result.IsOk, "expected invalid matchCondition to be rejected")
-	require.EqualValues(t, 422, result.Status, "expected a 422 with a matchCondition field error, got status=%d fieldErrors=%v", result.Status, result.FieldErrors)
-	require.NotNil(t, result.FieldErrors["matchCondition"], "expected a 422 with a matchCondition field error, got status=%d fieldErrors=%v", result.Status, result.FieldErrors)
+	_, err := backend.Create(context.Background(), "waf.firewall_rules", data, rc, nil)
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "expected a ServiceError, got %v", err)
+	require.EqualValues(t, 422, se.Status, "expected a 422 with a matchCondition field error, got status=%d fieldErrors=%v", se.Status, se.FieldErrors)
+	require.NotNil(t, se.FieldErrors["matchCondition"], "expected a 422 with a matchCondition field error, got status=%d fieldErrors=%v", se.Status, se.FieldErrors)
 }
 
 func TestGuardedZonesBackendRejectsInvalidIPAccessListValue(t *testing.T) {
@@ -207,11 +207,11 @@ func TestGuardedZonesBackendRejectsInvalidIPAccessListValue(t *testing.T) {
 	rc := adminContext(tenantID, userID)
 
 	data := crud.JsonObject{"type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, "not-an-ip")}
-	result, err := backend.Create(context.Background(), "waf.ip_access_lists", data, rc, nil)
-	require.NoError(t, err, "Create")
-	require.False(t, result.IsOk, "expected invalid IP/CIDR to be rejected")
-	require.EqualValues(t, 422, result.Status, "expected a 422 with a value field error, got status=%d fieldErrors=%v", result.Status, result.FieldErrors)
-	require.NotNil(t, result.FieldErrors["value"], "expected a 422 with a value field error, got status=%d fieldErrors=%v", result.Status, result.FieldErrors)
+	_, err := backend.Create(context.Background(), "waf.ip_access_lists", data, rc, nil)
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "expected a ServiceError, got %v", err)
+	require.EqualValues(t, 422, se.Status, "expected a 422 with a value field error, got status=%d fieldErrors=%v", se.Status, se.FieldErrors)
+	require.NotNil(t, se.FieldErrors["value"], "expected a 422 with a value field error, got status=%d fieldErrors=%v", se.Status, se.FieldErrors)
 }
 
 func mustCreateDomain(t *testing.T, state *httpserver.AppState, rc *permission.RequestContext, apex string) string {
@@ -221,8 +221,8 @@ func mustCreateDomain(t *testing.T, state *httpserver.AppState, rc *permission.R
 	}
 	result, err := state.Crud.Create(context.Background(), "waf.domains", data, rc, nil)
 	require.NoError(t, err, "create domain: %v / %+v", err, result)
-	require.True(t, result.IsOk, "create domain: %v / %+v", err, result)
-	return result.Data.ID.String()
+	require.NoError(t, err)
+	return result.ID.String()
 }
 
 // TestSyncConfigStateOverRealHTTP exercises the full chi routing + handler + CrudService stack
@@ -249,8 +249,8 @@ func TestSyncConfigStateOverRealHTTP(t *testing.T) {
 	}
 	zoneResult, err := state.Crud.Create(ctx, "waf.zones", zoneData, rc, nil)
 	require.NoError(t, err, "create zone: %v / %+v", err, zoneResult)
-	require.True(t, zoneResult.IsOk, "create zone: %v / %+v", err, zoneResult)
-	zoneID := zoneResult.Data.ID
+	require.NoError(t, err)
+	zoneID := zoneResult.ID
 
 	// hasConfig starts false; no ddos_policies/firewall_rules exist yet for this zone.
 	r := chi.NewRouter()

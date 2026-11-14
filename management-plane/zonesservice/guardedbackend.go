@@ -65,14 +65,6 @@ func cloneJsonObject(data crud.JsonObject) crud.JsonObject {
 	return out
 }
 
-// errResultAs converts a ServiceResult[From]'s error half onto a different type parameter — the
-// Go equivalent of the Rust ServiceResult::Err{...} struct-literal propagation used when a
-// helper reads a different entity's result than the one it ultimately returns. Callers must
-// only pass a result with IsOk == false.
-func errResultAs[From, To any](r crud.ServiceResult[From]) crud.ServiceResult[To] {
-	return crud.ServiceResult[To]{Status: r.Status, ErrorCode: r.ErrorCode, Message: r.Message, FieldErrors: r.FieldErrors}
-}
-
 // crossServiceLink is one sibling service's gRPC connection, built lazily and cached — see this
 // file's own doc comment for why Go's cache-on-success semantics differ from the Rust original's.
 type crossServiceLink struct {
@@ -122,18 +114,14 @@ var _ crud.RecordBackend = (*GuardedZonesBackend)(nil)
 
 // resolveDomainID ports zoneDomainGuard's logic verbatim — looks up (or lazily creates) the
 // Domain row for hostname's apex and returns its id to inject into the create payload.
-func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, *crud.ServiceResult[crud.RecordDto], error) {
+func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, error) {
 	apex := ApexDomain(hostname)
 	existing, err := b.inner.List(ctx, "waf.domains", query.ListInput{Limit: 1, Filters: [][2]string{{"apexDomain", apex}}}, rc)
 	if err != nil {
-		return uuid.Nil, nil, err
-	}
-	if !existing.IsOk {
-		result := errResultAs[[]crud.RecordDto, crud.RecordDto](existing)
-		return uuid.Nil, &result, nil
+		return uuid.Nil, err
 	}
 	if len(existing.Data) > 0 {
-		return existing.Data[0].ID, nil, nil
+		return existing.Data[0].ID, nil
 	}
 
 	newDomain := crud.JsonObject{
@@ -144,47 +132,41 @@ func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname stri
 	}
 	created, err := b.inner.Create(ctx, "waf.domains", newDomain, rc, nil)
 	if err != nil {
-		return uuid.Nil, nil, err
+		return uuid.Nil, err
 	}
-	if !created.IsOk {
-		return uuid.Nil, &created, nil
-	}
-	return created.Data.ID, nil, nil
+	return created.ID, nil
 }
 
 // validateFirewallRule ports firewallRuleMatchConditionGuard's validation verbatim.
-func validateFirewallRule(data crud.JsonObject) *crud.ServiceResult[crud.RecordDto] {
+func validateFirewallRule(data crud.JsonObject) error {
 	condition, ok := data["matchCondition"]
 	if ok && !IsValidMatchCondition(condition) {
-		result := crud.ResultErrWithFieldErrors[crud.RecordDto](422, "validation_failed",
+		return crud.NewServiceErrorFields(422, "validation_failed",
 			map[string][]string{"matchCondition": {"not a recognized rule expression"}})
-		return &result
 	}
 	return nil
 }
 
 // validateIPAccessList ports ipAccessListValueGuard's validation verbatim.
-func validateIPAccessList(data crud.JsonObject) *crud.ServiceResult[crud.RecordDto] {
+func validateIPAccessList(data crud.JsonObject) error {
 	value, ok := jsonAsString(data["value"])
 	if ok && !IsValidIPOrCIDR(value) {
-		result := crud.ResultErrWithFieldErrors[crud.RecordDto](422, "validation_failed",
+		return crud.NewServiceErrorFields(422, "validation_failed",
 			map[string][]string{"value": {"not a valid IP address or CIDR"}})
-		return &result
 	}
 	return nil
 }
 
 // zoneReferencedBy ports zoneDeleteGuard's cross-service check — see this file's own doc
 // comment for the identity-forwarding mechanism. Returns the blocking entity name, or "" when
-// clear to delete; result is non-nil only on an error the caller should return as-is.
-func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.UUID, rc *permission.RequestContext) (string, *crud.ServiceResult[crud.RecordDto], error) {
+// clear to delete; a non-nil error is one the caller should return as-is.
+func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.UUID, rc *permission.RequestContext) (string, error) {
 	// The sibling services run the check as the caller, with the caller's own token (set on
 	// rc by metap's HTTP/gRPC auth). No token means we cannot ask on the caller's behalf, and an
 	// unchecked delete could orphan scan jobs/incidents — refuse rather than guess.
 	if rc.ForwardedBearerToken == "" {
-		result := crud.ResultErrWithMessage[crud.RecordDto](503, "reference_check_unavailable",
+		return "", crud.NewServiceErrorMsg(503, "reference_check_unavailable",
 			"Could not verify cross-service references (no caller token to forward); refusing to delete.")
-		return "", &result, nil
 	}
 	forwardedRC := *rc
 
@@ -201,38 +183,33 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 	for _, check := range checks {
 		backend := check.link.get()
 		if backend == nil {
-			result := crud.ResultErrWithMessage[crud.RecordDto](503, "reference_check_unavailable",
+			return "", crud.NewServiceErrorMsg(503, "reference_check_unavailable",
 				fmt.Sprintf("Could not verify cross-service references (%s unreachable); refusing to delete.", check.entity))
-			return "", &result, nil
 		}
 		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: 1, Filters: [][2]string{{"zoneId", zoneID.String()}}}, &forwardedRC)
 		if err != nil {
-			return "", nil, err
-		}
-		if !result.IsOk {
-			errResult := errResultAs[[]crud.RecordDto, crud.RecordDto](result)
-			return "", &errResult, nil
+			return "", err
 		}
 		if len(result.Data) > 0 {
-			return check.entity, nil, nil
+			return check.entity, nil
 		}
 	}
-	return "", nil, nil
+	return "", nil
 }
 
-func (b *GuardedZonesBackend) List(ctx context.Context, entity string, input query.ListInput, rc *permission.RequestContext) (crud.ServiceResult[[]crud.RecordDto], error) {
+func (b *GuardedZonesBackend) List(ctx context.Context, entity string, input query.ListInput, rc *permission.RequestContext) (crud.ListResult, error) {
 	return b.inner.List(ctx, entity, input, rc)
 }
 
-func (b *GuardedZonesBackend) Get(ctx context.Context, entity string, id uuid.UUID, rc *permission.RequestContext) (crud.ServiceResult[crud.GetResult], error) {
+func (b *GuardedZonesBackend) Get(ctx context.Context, entity string, id uuid.UUID, rc *permission.RequestContext) (crud.GetResult, error) {
 	return b.inner.Get(ctx, entity, id, rc)
 }
 
-func (b *GuardedZonesBackend) GetMany(ctx context.Context, entity string, ids []uuid.UUID, rc *permission.RequestContext) (crud.ServiceResult[[]crud.GetManyResult], error) {
+func (b *GuardedZonesBackend) GetMany(ctx context.Context, entity string, ids []uuid.UUID, rc *permission.RequestContext) ([]crud.GetManyResult, error) {
 	return b.inner.GetMany(ctx, entity, ids, rc)
 }
 
-func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	switch entity {
 	case "waf.zones":
 		hostname, ok := jsonAsString(data["hostname"])
@@ -241,24 +218,21 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 			// validation error rather than this wrapper inventing a different one.
 			return b.inner.Create(ctx, entity, data, rc, reason)
 		}
-		domainID, errResult, err := b.resolveDomainID(ctx, hostname, rc)
+		domainID, err := b.resolveDomainID(ctx, hostname, rc)
 		if err != nil {
-			return crud.ServiceResult[crud.RecordDto]{}, err
-		}
-		if errResult != nil {
-			return *errResult, nil
+			return crud.RecordDto{}, err
 		}
 		withDomain := cloneJsonObject(data)
 		withDomain["domainId"] = jsonString(domainID.String())
 		return b.inner.Create(ctx, entity, withDomain, rc, reason)
 	case "waf.firewall_rules":
 		if err := validateFirewallRule(data); err != nil {
-			return *err, nil
+			return crud.RecordDto{}, err
 		}
 		return b.inner.Create(ctx, entity, data, rc, reason)
 	case "waf.ip_access_lists":
 		if err := validateIPAccessList(data); err != nil {
-			return *err, nil
+			return crud.RecordDto{}, err
 		}
 		return b.inner.Create(ctx, entity, data, rc, reason)
 	default:
@@ -266,43 +240,40 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 	}
 }
 
-func (b *GuardedZonesBackend) Update(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (b *GuardedZonesBackend) Update(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	// domainId is create-only (matching the old zoneDomainGuard, which only ever intercepted
 	// create) — a Zone's domain never changes once it's assigned.
 	switch entity {
 	case "waf.firewall_rules":
 		if err := validateFirewallRule(data); err != nil {
-			return *err, nil
+			return crud.RecordDto{}, err
 		}
 	case "waf.ip_access_lists":
 		if err := validateIPAccessList(data); err != nil {
-			return *err, nil
+			return crud.RecordDto{}, err
 		}
 	}
 	return b.inner.Update(ctx, entity, id, expectedVersion, data, rc, reason)
 }
 
-func (b *GuardedZonesBackend) Transition(ctx context.Context, entity string, id uuid.UUID, action string, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (b *GuardedZonesBackend) Transition(ctx context.Context, entity string, id uuid.UUID, action string, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	return b.inner.Transition(ctx, entity, id, action, expectedVersion, data, rc, reason)
 }
 
-func (b *GuardedZonesBackend) Delete(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, rc *permission.RequestContext, reason *string) (crud.ServiceResult[crud.RecordDto], error) {
+func (b *GuardedZonesBackend) Delete(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	if entity == "waf.zones" {
-		blockingEntity, errResult, err := b.zoneReferencedBy(ctx, id, rc)
+		blockingEntity, err := b.zoneReferencedBy(ctx, id, rc)
 		if err != nil {
-			return crud.ServiceResult[crud.RecordDto]{}, err
-		}
-		if errResult != nil {
-			return *errResult, nil
+			return crud.RecordDto{}, err
 		}
 		if blockingEntity != "" {
-			return crud.ResultErrWithMessage[crud.RecordDto](409, "record_referenced",
-				fmt.Sprintf("This zone is still referenced by %q and cannot be deleted.", blockingEntity)), nil
+			return crud.RecordDto{}, crud.NewServiceErrorMsg(409, "record_referenced",
+				fmt.Sprintf("This zone is still referenced by %q and cannot be deleted.", blockingEntity))
 		}
 	}
 	return b.inner.Delete(ctx, entity, id, expectedVersion, rc, reason)
 }
 
-func (b *GuardedZonesBackend) Aggregate(ctx context.Context, entity string, spec query.AggregateSpec, rc *permission.RequestContext) (crud.ServiceResult[[]json.RawMessage], error) {
+func (b *GuardedZonesBackend) Aggregate(ctx context.Context, entity string, spec query.AggregateSpec, rc *permission.RequestContext) ([]json.RawMessage, error) {
 	return b.inner.Aggregate(ctx, entity, spec, rc)
 }
