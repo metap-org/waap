@@ -19,14 +19,14 @@ Mỗi bảng entity có sẵn các cột:
 |---|---|
 | `id` uuid, `tenant_id` uuid | Khoá chính; tenant của bản ghi |
 | `code`, `status` | Mã hiển thị; trạng thái workflow (nếu entity có workflow) |
-| `data` jsonb | Mọi field khai báo trong metadata, mặc định nằm ở đây |
+| một cột có kiểu cho mỗi field | Mỗi field khai báo trong metadata là một cột riêng (`text`, `double precision`, `numeric(18,4)`, `boolean`, `date`, `timestamptz`, `uuid`; kind `json` là cột `jsonb`). **Không còn cột `data`** (roadmap 106, 2026-11-14) |
 | `version` integer | Optimistic locking: update và delete kiểm `WHERE version = $n` |
 | `deleted` boolean | Xoá mềm |
 | `created_at`, `updated_at`, `created_by`, `updated_by` | Dấu vết |
 
 | Quy tắc | Hệ quả cho thiết kế |
 |---|---|
-| Field `indexed`/`sortable`/`unique`/`searchable` được nâng thành cột sinh ra từ `data` có index; field `reference` có `refEntity` thành cột thật có FK `ON DELETE RESTRICT` | Chỉ nâng field thật sự dùng để lọc, sắp xếp, nối; còn lại để trong `data` |
+| Mọi field là cột thật; `indexed`/`sortable`/`unique`/`searchable` thêm index trực tiếp trên cột; field `reference` có `refEntity` có FK `ON DELETE RESTRICT` | Không còn bản sao giữa `data` và cột, nên không còn trigger đồng bộ. Chỉ đặt index cho field thật sự dùng để lọc, sắp xếp, nối |
 | `unique` là partial unique index `WHERE deleted = false`; composite unique theo nhiều field | Xoá mềm rồi tạo lại cùng giá trị được |
 | Ghi entity và ghi outbox trong cùng transaction; audit ghi sau commit (`metap-audit`) | Sự kiện sang Control/Analytics không bao giờ mất |
 | Reference chỉ trỏ được tới entity cùng schema | Tham chiếu sang `metadata.users` (user của metap) là uuid thường, không FK |
@@ -135,7 +135,7 @@ erDiagram
     }
 ```
 
-Cột nêu dưới đây là field được nâng thành cột (lọc, sắp xếp, nối, unique). Field khác nằm trong `data`.
+Bảng dưới liệt kê các field đáng chú ý (lọc, sắp xếp, nối, unique); mọi field khác của entity cũng là cột riêng. Chỗ nào ghi "trong `data`" thì đọc là "trong cột `jsonb` của field đó" (từ 2026-11-14 không còn cột `data`).
 "Unique" ghi phạm vi: **tenant** (mặc định của `uniqueScope`), **zone** (composite với `zone_id`, cũng
 theo tenant) hay **toàn cục** (qua `waap_global`).
 

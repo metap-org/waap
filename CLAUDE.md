@@ -496,6 +496,14 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
 
 ## Working conventions
 
+- **Entity values are native typed columns, no `data jsonb` (2026-11-14, `../metap-docs/docs/roadmap/106-native-entity-columns-no-data-jsonb.md`).**
+  All 9 management-plane entities plus `waf.security_events` compile under it unchanged (checked). An existing
+  table that still has the `data` column is **refused at service boot** (`reconciler.ErrLegacyDataColumn`) until it is
+  migrated, so move every table before deploying the new `metap`: snapshot the DB, then per entity
+  `dev-tools migrate-to-native-columns <tenantId> <entity.json> <table> --all-tenants` (these tables are shared by
+  tenants, `Schema` strategy; `<tenantId>` is only the progress-ledger key, use the platform sentinel), check the report,
+  then re-run with `--drop-data`. Read-back differences to expect in tests/portal: `datetime` as `+00:00` not `Z`, `money`
+  with 4 decimals. Not yet run against the real dev DB (no copy available in the session that built this).
 - **Merge PR: luôn dùng squash merge** (chủ dự án, 2026-11-13), không dùng merge commit hay rebase merge, để `master` mỗi PR chỉ còn 1 commit. Chỉ merge khi người dùng nói "merge" và CI xanh hết. Một nhánh làm việc đã squash vào `master` thì dựng lại từ `master`; nếu không push ghi đè được thì gộp nhánh cũ bằng `merge -s ours` (PR sẽ hiện nhiều commit nhưng squash gộp lại).
 - Three independent Cargo workspaces, one per plane — never one workspace spanning them, since a
   shared workspace would mean a portal change rebuilds and redeploys the edge. `cargo
