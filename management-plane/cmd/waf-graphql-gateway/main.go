@@ -36,7 +36,6 @@ import (
 	"github.com/metap-org/metap/pkg/jwks"
 	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/metadata"
-	"github.com/metap-org/metap/pkg/runtime"
 
 	_ "github.com/metap-org/waap/management-plane/alertingservice/entities"
 	_ "github.com/metap-org/waap/management-plane/scanningservice/entities"
@@ -143,7 +142,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	httpClient := runtime.DefaultHTTPClient()
+	httpClient := httpx.DefaultClient()
 
 	var upstreams []upstreamConfig
 	for n := 1; ; n++ {
@@ -157,7 +156,7 @@ func main() {
 	backendByName := make(map[string]*grpcapi.GrpcBackend, len(upstreams))
 	for _, u := range upstreams {
 		byName[u.name] = u
-		token, err := runtime.StartServiceTokenSource(ctx, httpClient, u.loginURL, u.serviceEmail, u.servicePassword)
+		token, err := httpx.StartServiceTokenSource(ctx, httpClient, u.loginURL, u.serviceEmail, u.servicePassword)
 		if err != nil {
 			slog.Error("logging into upstream", "upstream", u.name, "error", err)
 			os.Exit(1)
@@ -244,7 +243,7 @@ func main() {
 	if corsOrigins != "" {
 		origins = strings.Split(corsOrigins, ",")
 	}
-	handler := httpx.Recover(runtime.CORS(runtime.CORSOptions{
+	handler := httpx.Recover(httpx.CORS(httpx.CORSOptions{
 		Origins: origins,
 		Methods: []string{"GET", "POST", "OPTIONS"},
 		Headers: []string{"Authorization", "Content-Type", "X-CSRF-Token"},
@@ -252,7 +251,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	slog.Info("waf-graphql-gateway listening", "addr", addr, "entities", len(owners))
-	if err := runtime.Serve(addr, handler); err != nil && err != http.ErrServerClosed {
+	if err := httpx.Serve(addr, handler); err != nil && err != http.ErrServerClosed {
 		slog.Error("waf-graphql-gateway exited with an error", "error", err)
 		os.Exit(1)
 	}
