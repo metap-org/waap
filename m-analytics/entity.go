@@ -11,10 +11,14 @@
 // Every call forwards the caller's own token; Analytics re-verifies it and scopes by its tenant.
 package analytics
 
-import "github.com/metap-org/metap/pkg/metadata"
+import (
+	"github.com/metap-org/metap/pkg/metadata"
+
+	"github.com/metap-org/waap/model"
+)
 
 // SecurityEvents is the read-model entity name.
-const SecurityEvents = "waf.security_events"
+const SecurityEvents = model.SecurityEvents
 
 // SecurityEventEntity: same fields and list view the Postgres-backed entity had, so the portal
 // and the GraphQL schema see no change. zoneId/triggeredById stay plain strings (no reference
@@ -28,7 +32,7 @@ func SecurityEventEntity() metadata.EntityDefinition {
 		// reconciles this entity, so no such Postgres table exists — the data is in ClickHouse.
 		TableName: "analytics.security_events",
 		Fields: []metadata.EntityField{
-			metadata.NewField("zoneId", "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
 			metadata.EnumField("triggeredBy", "Triggered By", "ddosPolicy", "firewallRule").Require().Index(),
 			metadata.NewField("triggeredById", "Triggered By Id", metadata.KindString).Require(),
 			name,
@@ -40,8 +44,8 @@ func SecurityEventEntity() metadata.EntityDefinition {
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",
 			Label:       "Default",
-			Fields:      []string{"zoneId", "triggeredByName", "action", "sourceIp", "requestPath", "occurredAt"},
-			Filters:     []string{"zoneId", "triggeredBy", "action", "sourceIp"},
+			Fields:      []string{model.FieldZoneID, "triggeredByName", "action", "sourceIp", "requestPath", "occurredAt"},
+			Filters:     []string{model.FieldZoneID, "triggeredBy", "action", "sourceIp"},
 			DefaultSort: metadata.Ptr("-occurredAt"),
 			MaxLimit:    50,
 		}},

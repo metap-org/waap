@@ -39,6 +39,7 @@ import (
 	"github.com/metap-org/metap/pkg/query"
 
 	"github.com/metap-org/waap/m-analytics"
+	"github.com/metap-org/waap/model"
 )
 
 // Default correlation window/threshold — the settled v1 rule. Overridable per request only so an
@@ -179,7 +180,7 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 
 	filters := map[string]string{}
 	if body.ZoneID != nil {
-		filters["zoneId"] = *body.ZoneID
+		filters[model.FieldZoneID] = *body.ZoneID
 	}
 	cutoff := time.Now().UTC().Add(-time.Duration(windowMinutes) * time.Minute)
 	events, err := recentEvents(ctx, rc, filters, cutoff)
@@ -195,7 +196,7 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 		if occurredAtOrFallback(event).Before(cutoff) {
 			continue
 		}
-		zoneID := strField(event, "zoneId")
+		zoneID := strField(event, model.FieldZoneID)
 		sourceIP := strField(event, "sourceIp")
 		if zoneID == "" || sourceIP == "" {
 			continue
@@ -209,8 +210,8 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 		if count < threshold {
 			continue
 		}
-		existing, err := listRecords(ctx, state, "waf.incidents",
-			[][2]string{{"zoneId", key.zoneID}, {"status", "open"}}, 50, rc)
+		existing, err := listRecords(ctx, state, model.Incidents,
+			[][2]string{{model.FieldZoneID, key.zoneID}, {"status", "open"}}, 50, rc)
 		if err != nil {
 			return nil, err
 		}
@@ -227,12 +228,12 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 		}
 
 		data := crud.JsonObject{
-			"zoneId":     jsonStr(key.zoneID),
-			"title":      jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
-			"severity":   jsonStr(severityFor(count)),
-			"eventCount": json.RawMessage(fmt.Sprintf("%d", count)),
+			model.FieldZoneID: jsonStr(key.zoneID),
+			"title":           jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
+			"severity":        jsonStr(severityFor(count)),
+			"eventCount":      json.RawMessage(fmt.Sprintf("%d", count)),
 		}
-		result, err := state.Crud.Create(ctx, "waf.incidents", data, rc, nil)
+		result, err := state.Crud.Create(ctx, model.Incidents, data, rc, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -306,7 +307,7 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 		"deliveryStatus": jsonStr(status),
 		"triggeredAt":    jsonStr(time.Now().UTC().Format(time.RFC3339)),
 	}
-	result, err := state.Crud.Create(ctx, "waf.alert_notifications", data, rc, nil)
+	result, err := state.Crud.Create(ctx, model.AlertNotifications, data, rc, nil)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("alert_notifications: %w", err)
 	}
@@ -316,7 +317,7 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 // evaluateAlerts is POST /internal/alerts/evaluate — every enabled AlertPolicy, evaluated against
 // the recent event stream, counted PER ZONE (never summed across zones).
 func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext) (map[string]any, error) {
-	policies, err := listRecords(ctx, state, "waf.alert_policies", [][2]string{{"enabled", "true"}}, 50, rc)
+	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{"enabled", "true"}}, 50, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +347,7 @@ func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permiss
 			if occurredAtOrFallback(event).Before(cutoff) {
 				continue
 			}
-			perZone[strField(event, "zoneId")]++
+			perZone[strField(event, model.FieldZoneID)]++
 		}
 
 		channels := policy.Data["channels"]
@@ -355,10 +356,10 @@ func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permiss
 				continue
 			}
 			payload := map[string]any{
-				"policy":        strField(policy, "name"),
-				"zoneId":        zoneID,
-				"eventCount":    count,
-				"windowMinutes": windowMinutes,
+				"policy":          strField(policy, "name"),
+				model.FieldZoneID: zoneID,
+				"eventCount":      count,
+				"windowMinutes":   windowMinutes,
 			}
 			delivered, detail := deliver(channels, payload)
 			notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
@@ -366,12 +367,12 @@ func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permiss
 				return nil, err
 			}
 			fired = append(fired, map[string]any{
-				"notificationId": notificationID,
-				"policyId":       policy.ID,
-				"zoneId":         zoneID,
-				"eventCount":     count,
-				"delivered":      delivered,
-				"detail":         detail,
+				"notificationId":  notificationID,
+				"policyId":        policy.ID,
+				model.FieldZoneID: zoneID,
+				"eventCount":      count,
+				"delivered":       delivered,
+				"detail":          detail,
 			})
 		}
 	}
@@ -383,7 +384,7 @@ func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permiss
 // the real delivery path and writes a real AlertNotification, because a test that takes a
 // different path than production proves nothing about production.
 func testAlertPolicy(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, policyID uuid.UUID) (map[string]any, error) {
-	getResult, err := state.Crud.Get(ctx, "waf.alert_policies", policyID, rc)
+	getResult, err := state.Crud.Get(ctx, model.AlertPolicies, policyID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +442,7 @@ func writeResult(w http.ResponseWriter) func(map[string]any, error) {
 
 // RegisterActions registers the gRPC handlers for the actions declared on this service's entities.
 func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
-	if err := reg.Register("waf.incidents", "correlate", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+	if err := reg.Register(model.Incidents, model.ActionCorrelate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		raw, err := json.Marshal(c.Input)
 		if err != nil {
 			return nil, err
@@ -454,12 +455,12 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 	}); err != nil {
 		return err
 	}
-	if err := reg.Register("waf.alert_policies", "evaluate", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+	if err := reg.Register(model.AlertPolicies, model.ActionEvaluate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		return crud.ToObject(evaluateAlerts(ctx, state, c.RC))
 	}); err != nil {
 		return err
 	}
-	return reg.Register("waf.alert_policies", "test", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+	return reg.Register(model.AlertPolicies, model.ActionTest, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		return crud.ToObject(testAlertPolicy(ctx, state, c.RC, c.ID))
 	})
 }

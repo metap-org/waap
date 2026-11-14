@@ -7,6 +7,7 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func DomainEntity() metadata.EntityDefinition {
@@ -18,9 +19,9 @@ func DomainEntity() metadata.EntityDefinition {
 	apexDomain.Searchable = metadata.Ptr(true)
 
 	return metadata.EntityDefinition{
-		Name:      "waf.domains",
+		Name:      model.Domains,
 		Label:     "Domain",
-		TableName: reconciler.QualifiedTableNameIn("waf.domains", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.Domains, "waf"),
 		Fields: []metadata.EntityField{
 			apexDomain,
 			// Auto-generated server-side (guardedbackend.resolveDomainID) when a zone's hostname
@@ -36,7 +37,7 @@ func DomainEntity() metadata.EntityDefinition {
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: "verifyDns", Label: "Verify domain ownership", Description: "Checks the _waf-verify TXT record and cascades onto the domain's zones.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionVerifyDNS, Label: "Verify domain ownership", Description: "Checks the _waf-verify TXT record and cascades onto the domain's zones.", Scope: metadata.ActionScopeRecord},
 		},
 	}
 }

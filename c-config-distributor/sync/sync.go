@@ -19,6 +19,7 @@ import (
 	"github.com/metap-org/waap/c-config-distributor/ports"
 
 	"github.com/metap-org/waap/c-config-distributor/compile"
+	"github.com/metap-org/waap/model"
 )
 
 // Zone recompiles and republishes one zone by id, or unpublishes it if it has gone away or is no
@@ -100,13 +101,13 @@ func ZoneIDFromEvent(entity string, payload json.RawMessage) (string, bool) {
 		return "", false
 	}
 	switch entity {
-	case "waf.zones":
+	case model.Zones:
 		if envelope.RecordID != nil {
 			return *envelope.RecordID, true
 		}
 		return "", false
-	case "waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists":
-		raw, ok := envelope.Data["zoneId"]
+	case model.DdosPolicies, model.FirewallRules, model.IPAccessLists:
+		raw, ok := envelope.Data[model.FieldZoneID]
 		if !ok {
 			return "", false
 		}

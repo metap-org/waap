@@ -22,6 +22,7 @@ import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func ZoneEntity() metadata.EntityDefinition {
@@ -38,9 +39,9 @@ func ZoneEntity() metadata.EntityDefinition {
 	)
 
 	return metadata.EntityDefinition{
-		Name:      "waf.zones",
+		Name:      model.Zones,
 		Label:     "Zone",
-		TableName: reconciler.QualifiedTableNameIn("waf.zones", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.Zones, "waf"),
 		Fields: []metadata.EntityField{
 			hostname,
 			metadata.NewField("originAddress", "Origin Address", metadata.KindString).Require(),
@@ -48,7 +49,7 @@ func ZoneEntity() metadata.EntityDefinition {
 			metadata.EnumField("protectionMode", "Protection Mode", "monitor", "enforce").Require().Index(),
 			metadata.NewField("configVersion", "Config Version", metadata.KindNumber).Sort(),
 			metadata.NewField("hasConfig", "Has Config", metadata.KindBoolean),
-			metadata.RefField("domainId", "Domain", "waf.domains", "apexDomain").Require().Index(),
+			metadata.RefField("domainId", "Domain", model.Domains, "apexDomain").Require().Index(),
 			metadata.EnumField("verificationStatus", "Verification Status", "unverified", "verified").Index(),
 			metadata.EnumField("dnsRoutingStatus", "DNS Routing Status", "notRouted", "routed", "unknown"),
 			metadata.NewField("lastDnsCheckAt", "Last DNS Check At", metadata.KindDatetime).Sort(),
@@ -75,9 +76,9 @@ func ZoneEntity() metadata.EntityDefinition {
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: "verifyDns", Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord},
-			{Name: "testOrigin", Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
-			{Name: "syncConfigState", Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionVerifyDNS, Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionSyncConfigState, Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
 		},
 	}
 }
@@ -86,13 +87,13 @@ func ZoneRelatedViews() []metadata.RelatedView {
 	limit5 := uint32(5)
 	limit10 := uint32(10)
 	return []metadata.RelatedView{
-		{Name: "ddosPolicy", Label: "DDoS Policy", Entity: "waf.ddos_policies", FilterField: "zoneId",
+		{Name: "ddosPolicy", Label: "DDoS Policy", Entity: model.DdosPolicies, FilterField: model.FieldZoneID,
 			Fields: []string{"sensitivity", "action", "enabled"}, Limit: &limit5},
-		{Name: "firewallRules", Label: "Firewall Rules", Entity: "waf.firewall_rules", FilterField: "zoneId",
+		{Name: "firewallRules", Label: "Firewall Rules", Entity: model.FirewallRules, FilterField: model.FieldZoneID,
 			Fields: []string{"name", "ruleType", "action"}, Limit: &limit10},
-		{Name: "scanJobs", Label: "Recent Scan Jobs", Entity: "waf.scan_jobs", FilterField: "zoneId",
+		{Name: "scanJobs", Label: "Recent Scan Jobs", Entity: model.ScanJobs, FilterField: model.FieldZoneID,
 			Fields: []string{"scanType", "status"}, Limit: &limit5},
-		{Name: "incidents", Label: "Recent Incidents", Entity: "waf.incidents", FilterField: "zoneId",
+		{Name: "incidents", Label: "Recent Incidents", Entity: model.Incidents, FilterField: model.FieldZoneID,
 			Fields: []string{"title", "severity", "status"}, Limit: &limit5},
 	}
 }
@@ -111,6 +112,6 @@ func ZoneFieldDisplayHints() []metadata.FieldDisplayHint {
 
 func init() {
 	metadata.SubmitEntity(ZoneEntity)
-	metadata.SubmitRelatedViews("waf.zones", ZoneRelatedViews)
-	metadata.SubmitFieldDisplayHints("waf.zones", ZoneFieldDisplayHints)
+	metadata.SubmitRelatedViews(model.Zones, ZoneRelatedViews)
+	metadata.SubmitFieldDisplayHints(model.Zones, ZoneFieldDisplayHints)
 }

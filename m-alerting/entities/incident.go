@@ -16,15 +16,16 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func IncidentEntity() metadata.EntityDefinition {
 	return metadata.EntityDefinition{
-		Name:      "waf.incidents",
+		Name:      model.Incidents,
 		Label:     "Incident",
-		TableName: reconciler.QualifiedTableNameIn("waf.incidents", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.Incidents, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.NewField("zoneId", "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
 			metadata.NewField("title", "Title", metadata.KindString).Require().Sort(),
 			metadata.EnumField("severity", "Severity", "low", "medium", "high", "critical").Require().Index(),
 			metadata.EnumField("status", "Status", "open", "acknowledged", "mitigating", "resolved").Index(),
@@ -34,8 +35,8 @@ func IncidentEntity() metadata.EntityDefinition {
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",
 			Label:       "Default",
-			Fields:      []string{"title", "zoneId", "severity", "status", "assignedTo"},
-			Filters:     []string{"zoneId", "severity", "status", "assignedTo"},
+			Fields:      []string{"title", model.FieldZoneID, "severity", "status", "assignedTo"},
+			Filters:     []string{model.FieldZoneID, "severity", "status", "assignedTo"},
 			DefaultSort: metadata.Ptr("-createdAt"),
 			MaxLimit:    50,
 		}},
@@ -51,7 +52,7 @@ func IncidentEntity() metadata.EntityDefinition {
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: "correlate", Label: "Correlate incidents", Description: "Opens incidents for recent events grouped by zone and source IP.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionCorrelate, Label: "Correlate incidents", Description: "Opens incidents for recent events grouped by zone and source IP.", Scope: metadata.ActionScopeEntity},
 		},
 	}
 }
@@ -67,4 +68,4 @@ func incidentFieldDisplayHints() []metadata.FieldDisplayHint {
 	}
 }
 
-func init() { metadata.SubmitFieldDisplayHints("waf.incidents", incidentFieldDisplayHints) }
+func init() { metadata.SubmitFieldDisplayHints(model.Incidents, incidentFieldDisplayHints) }

@@ -31,6 +31,7 @@ import (
 	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/waap/model"
 )
 
 func scanningURL() string {
@@ -122,7 +123,7 @@ func trimOneLayer(s string, c byte) string {
 // this zone's own hostname actually pointed at edge-plane yet? Never gates activation, purely
 // informational.
 func verifyDNS(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
-	got, err := state.Crud.Get(ctx, "waf.zones", zoneID, rc)
+	got, err := state.Crud.Get(ctx, model.Zones, zoneID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +153,7 @@ func verifyDNS(ctx context.Context, state *httpserver.AppState, rc *permission.R
 		"dnsRoutingStatus": jsonString(status),
 		"lastDnsCheckAt":   jsonString(time.Now().UTC().Format(time.RFC3339)),
 	}
-	updated, err := state.Crud.Update(ctx, "waf.zones", zoneID, record.Version, patch, rc, nil)
+	updated, err := state.Crud.Update(ctx, model.Zones, zoneID, record.Version, patch, rc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ type verifyDNSBody struct {
 // — writing each zone's own verificationStatus mirror field directly.
 func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, domainID uuid.UUID, body verifyDNSBody) (map[string]any, error) {
 
-	got, err := state.Crud.Get(ctx, "waf.domains", domainID, rc)
+	got, err := state.Crud.Get(ctx, model.Domains, domainID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +220,7 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 	}
 
 	patch := crud.JsonObject{"verificationStatus": jsonString("verified")}
-	updatedDomain, err := state.Crud.Update(ctx, "waf.domains", domainID, domain.Version, patch, rc, nil)
+	updatedDomain, err := state.Crud.Update(ctx, model.Domains, domainID, domain.Version, patch, rc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -227,11 +228,11 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 	// Cascade onto every zone under this domain — best-effort per zone (one failing zone must
 	// not stop the others, and must not undo the domain's own now-verified status).
 	listInput := query.ListInput{Limit: 100, Filters: [][2]string{{"domainId", domainID.String()}}}
-	zones, err := state.Crud.List(ctx, "waf.zones", listInput, rc)
+	zones, err := state.Crud.List(ctx, model.Zones, listInput, rc)
 	if err == nil {
 		for _, zone := range zones.Data {
 			zonePatch := crud.JsonObject{"verificationStatus": jsonString("verified")}
-			if _, err := state.Crud.Update(ctx, "waf.zones", zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
+			if _, err := state.Crud.Update(ctx, model.Zones, zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
 				slog.Error("domain verified but cascading verificationStatus onto this zone failed",
 					"zone_id", zone.ID, "domain_id", domainID, "error", err)
 			}
@@ -247,7 +248,7 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 // TestOrigin is POST /api/waf.zones/{id}/test-origin — "can we actually reach the origin the
 // customer gave us", a one-shot connectivity check. Not stored on the zone.
 func testOrigin(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
-	got, err := state.Crud.Get(ctx, "waf.zones", zoneID, rc)
+	got, err := state.Crud.Get(ctx, model.Zones, zoneID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +282,7 @@ func testOrigin(ctx context.Context, state *httpserver.AppState, rc *permission.
 func syncConfigState(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
 
 	anyForZone := func(entity string) (bool, error) {
-		input := query.ListInput{Limit: 1, Filters: [][2]string{{"zoneId", zoneID.String()}}}
+		input := query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}
 		result, err := state.Crud.List(ctx, entity, input, rc)
 		if err != nil {
 			return false, err
@@ -291,17 +292,17 @@ func syncConfigState(ctx context.Context, state *httpserver.AppState, rc *permis
 
 	// A caller who cannot list rules cannot be told a zone has none either — surfacing "false"
 	// here would silently flip hasConfig off on a permission error.
-	hasDdos, err := anyForZone("waf.ddos_policies")
+	hasDdos, err := anyForZone(model.DdosPolicies)
 	if err != nil {
 		return nil, err
 	}
-	hasFirewall, err := anyForZone("waf.firewall_rules")
+	hasFirewall, err := anyForZone(model.FirewallRules)
 	if err != nil {
 		return nil, err
 	}
 	hasConfig := hasDdos || hasFirewall
 
-	got, err := state.Crud.Get(ctx, "waf.zones", zoneID, rc)
+	got, err := state.Crud.Get(ctx, model.Zones, zoneID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +316,7 @@ func syncConfigState(ctx context.Context, state *httpserver.AppState, rc *permis
 	}
 
 	patch := crud.JsonObject{"hasConfig": jsonBool(hasConfig)}
-	_, err = state.Crud.Update(ctx, "waf.zones", zoneID, zone.Version, patch, rc, nil)
+	_, err = state.Crud.Update(ctx, model.Zones, zoneID, zone.Version, patch, rc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -400,16 +401,16 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 		entity, name string
 		run          crud.ActionHandler
 	}{
-		{"waf.zones", "verifyDns", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		{model.Zones, model.ActionVerifyDNS, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(verifyDNS(ctx, state, c.RC, c.ID))
 		}},
-		{"waf.zones", "testOrigin", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		{model.Zones, model.ActionTestOrigin, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(testOrigin(ctx, state, c.RC, c.ID))
 		}},
-		{"waf.zones", "syncConfigState", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		{model.Zones, model.ActionSyncConfigState, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(syncConfigState(ctx, state, c.RC, c.ID))
 		}},
-		{"waf.domains", "verifyDns", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		{model.Domains, model.ActionVerifyDNS, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			var body verifyDNSBody
 			if raw, ok := c.Input["expectedToken"]; ok {
 				if tok, ok := jsonAsString(raw); ok {

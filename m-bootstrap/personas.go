@@ -8,7 +8,11 @@
 // permission stays at metap's allow-by-default.
 package bootstrap
 
-import "github.com/metap-org/metap/pkg/bootstrap"
+import (
+	"github.com/metap-org/metap/pkg/bootstrap"
+
+	"github.com/metap-org/waap/model"
+)
 
 const (
 	RoleSecurityAnalyst = "security_analyst"
@@ -26,17 +30,17 @@ func Personas() bootstrap.Bootstrap {
 			// Security Analyst / SOC: sees everything, edits rules and policies, handles
 			// incidents and alerts, cannot delete a Zone or touch its domain.
 			{Role: RoleSecurityAnalyst, Entities: []string{"waf.*"}, Actions: []string{"read"}},
-			{Role: RoleSecurityAnalyst, Entities: []string{"waf.firewall_rules", "waf.ddos_policies", "waf.ip_access_lists"},
+			{Role: RoleSecurityAnalyst, Entities: []string{model.FirewallRules, model.DdosPolicies, model.IPAccessLists},
 				Actions: []string{"create", "update", "delete"}},
-			{Role: RoleSecurityAnalyst, Entities: []string{"waf.incidents", "waf.scan_findings"}, Actions: []string{"update", "transition"}},
-			{Role: RoleSecurityAnalyst, Entities: []string{"waf.alert_policies"}, Actions: []string{"create", "update"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{model.Incidents, model.ScanFindings}, Actions: []string{"update", "transition"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{model.AlertPolicies}, Actions: []string{"create", "update"}},
 
 			// Developer: owns remediation of scan findings, no DDoS policy or firewall rule access.
-			{Role: RoleDeveloper, Entities: []string{"waf.scan_findings"}, Actions: []string{"read", "update", "transition"}},
-			{Role: RoleDeveloper, Entities: []string{"waf.scan_jobs"}, Actions: []string{"read"}},
+			{Role: RoleDeveloper, Entities: []string{model.ScanFindings}, Actions: []string{"read", "update", "transition"}},
+			{Role: RoleDeveloper, Entities: []string{model.ScanJobs}, Actions: []string{"read"}},
 
 			// Viewer: read-only incidents and alert history.
-			{Role: RoleViewer, Entities: []string{"waf.incidents", "waf.alert_notifications"}, Actions: []string{"read"}},
+			{Role: RoleViewer, Entities: []string{model.Incidents, model.AlertNotifications}, Actions: []string{"read"}},
 		},
 	}
 }

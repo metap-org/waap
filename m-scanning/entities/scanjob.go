@@ -18,15 +18,16 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func ScanJobEntity() metadata.EntityDefinition {
 	return metadata.EntityDefinition{
-		Name:      "waf.scan_jobs",
+		Name:      model.ScanJobs,
 		Label:     "Scan Job",
-		TableName: reconciler.QualifiedTableNameIn("waf.scan_jobs", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.ScanJobs, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.NewField("zoneId", "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
 			metadata.EnumField("scanType", "Scan Type", "quickScan", "fullScan", "apiScan").Require().Index(),
 			metadata.NewField("schedule", "Schedule (cron)", metadata.KindString),
 			metadata.EnumField("status", "Status", "idle", "queued", "running", "completed", "failed").Index(),
@@ -34,8 +35,8 @@ func ScanJobEntity() metadata.EntityDefinition {
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:      []string{"zoneId", "scanType", "schedule", "status", "lastRunAt"},
-			Filters:     []string{"zoneId", "status"},
+			Fields:      []string{model.FieldZoneID, "scanType", "schedule", "status", "lastRunAt"},
+			Filters:     []string{model.FieldZoneID, "status"},
 			DefaultSort: metadata.Ptr("-createdAt"),
 			MaxLimit:    50,
 		}},
@@ -52,7 +53,7 @@ func ScanJobEntity() metadata.EntityDefinition {
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: "run", Label: "Run scan now", Description: "Queues the job and hands it to the scanner.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionRun, Label: "Run scan now", Description: "Queues the job and hands it to the scanner.", Scope: metadata.ActionScopeRecord},
 		},
 	}
 }

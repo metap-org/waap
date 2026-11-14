@@ -36,6 +36,7 @@ import (
 
 	"github.com/metap-org/metap/pkg/kit/httpx"
 	"github.com/metap-org/waap/c-config-distributor/ports"
+	"github.com/metap-org/waap/model"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -162,7 +163,7 @@ func RunWriter(ctx context.Context, dp ports.EventSink, queue <-chan EdgeEvent, 
 		payloads := make([]map[string]any, 0, len(batch))
 		for _, event := range batch {
 			payloads = append(payloads, map[string]any{
-				"zoneId": event.ZoneID, "triggeredBy": event.TriggeredBy, "triggeredById": event.TriggeredByID,
+				model.FieldZoneID: event.ZoneID, "triggeredBy": event.TriggeredBy, "triggeredById": event.TriggeredByID,
 				"triggeredByName": event.TriggeredByName, "action": event.Action, "sourceIp": event.SourceIP,
 				"requestPath": event.RequestPath, "occurredAt": event.OccurredAt,
 			})

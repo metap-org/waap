@@ -17,6 +17,7 @@ import (
 
 	"github.com/metap-org/metap/pkg/crud"
 	gw "github.com/metap-org/metap/pkg/graphqlgateway"
+	"github.com/metap-org/waap/model"
 )
 
 // RestURLs are the upstreams' REST base URLs (e.g. http://localhost:3000). Only the platform
@@ -39,13 +40,13 @@ type legacyMutation struct {
 }
 
 var legacyMutations = []legacyMutation{
-	{"verifyZoneDns", "zoneId", "waf.zones", "verifyDns", func(i Invokers) crud.ActionInvoker { return i.Zones }},
-	{"verifyDomainDns", "domainId", "waf.domains", "verifyDns", func(i Invokers) crud.ActionInvoker { return i.Zones }},
-	{"testZoneOrigin", "zoneId", "waf.zones", "testOrigin", func(i Invokers) crud.ActionInvoker { return i.Zones }},
-	{"syncZoneConfigState", "zoneId", "waf.zones", "syncConfigState", func(i Invokers) crud.ActionInvoker { return i.Zones }},
-	{"runScanJob", "jobId", "waf.scan_jobs", "run", func(i Invokers) crud.ActionInvoker { return i.Scanning }},
-	{"testAlertPolicy", "policyId", "waf.alert_policies", "test", func(i Invokers) crud.ActionInvoker { return i.Alerting }},
-	{"evaluateAlerts", "", "waf.alert_policies", "evaluate", func(i Invokers) crud.ActionInvoker { return i.Alerting }},
+	{"verifyZoneDns", model.FieldZoneID, model.Zones, model.ActionVerifyDNS, func(i Invokers) crud.ActionInvoker { return i.Zones }},
+	{"verifyDomainDns", model.FieldDomainID, model.Domains, model.ActionVerifyDNS, func(i Invokers) crud.ActionInvoker { return i.Zones }},
+	{"testZoneOrigin", model.FieldZoneID, model.Zones, model.ActionTestOrigin, func(i Invokers) crud.ActionInvoker { return i.Zones }},
+	{"syncZoneConfigState", model.FieldZoneID, model.Zones, model.ActionSyncConfigState, func(i Invokers) crud.ActionInvoker { return i.Zones }},
+	{"runScanJob", "jobId", model.ScanJobs, "run", func(i Invokers) crud.ActionInvoker { return i.Scanning }},
+	{"testAlertPolicy", "policyId", model.AlertPolicies, "test", func(i Invokers) crud.ActionInvoker { return i.Alerting }},
+	{"evaluateAlerts", "", model.AlertPolicies, model.ActionEvaluate, func(i Invokers) crud.ActionInvoker { return i.Alerting }},
 }
 
 // AddCustomFields adds the portal-compatible mutations; pass it to graphqlgateway.WithExtensions.
@@ -79,15 +80,15 @@ func AddCustomFields(inv Invokers) func(query, mutation graphql.Fields) {
 
 		mutation["correlateIncidents"] = &graphql.Field{
 			Type: gw.JSONScalar,
-			Args: graphql.FieldConfigArgument{"zoneId": &graphql.ArgumentConfig{Type: graphql.String}},
+			Args: graphql.FieldConfigArgument{model.FieldZoneID: &graphql.ArgumentConfig{Type: graphql.String}},
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				call := crud.ActionCall{Entity: "waf.incidents", Name: "correlate", RC: gw.RequestContextFrom(p.Context), Input: crud.JsonObject{}}
-				if zoneID, ok := p.Args["zoneId"].(string); ok && zoneID != "" {
+				call := crud.ActionCall{Entity: model.Incidents, Name: model.ActionCorrelate, RC: gw.RequestContextFrom(p.Context), Input: crud.JsonObject{}}
+				if zoneID, ok := p.Args[model.FieldZoneID].(string); ok && zoneID != "" {
 					raw, err := json.Marshal(zoneID)
 					if err != nil {
 						return nil, err
 					}
-					call.Input["zoneId"] = raw
+					call.Input[model.FieldZoneID] = raw
 				}
 				return gw.InvokeAction(p.Context, inv.Alerting, call)
 			},

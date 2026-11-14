@@ -30,6 +30,7 @@ import (
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/waap/model"
 )
 
 // scannerURL: where a scan request is handed off. Unset (the default) means "no scanner
@@ -44,7 +45,7 @@ func httpClient() *http.Client { return &http.Client{Timeout: 15 * time.Second} 
 // — this module never writes status directly, so guards, audit rows and outbox events all still
 // happen.
 func doTransition(ctx context.Context, state *httpserver.AppState, job crud.RecordDto, action string, rc *permission.RequestContext) (crud.RecordDto, error) {
-	result, err := state.Crud.Transition(ctx, "waf.scan_jobs", job.ID, action, job.Version, nil, rc, nil)
+	result, err := state.Crud.Transition(ctx, model.ScanJobs, job.ID, action, job.Version, nil, rc, nil)
 	if err != nil {
 		return crud.RecordDto{}, fmt.Errorf("transition %s: %w", action, err)
 	}
@@ -52,7 +53,7 @@ func doTransition(ctx context.Context, state *httpserver.AppState, job crud.Reco
 }
 
 func loadJob(ctx context.Context, w http.ResponseWriter, state *httpserver.AppState, id uuid.UUID, rc *permission.RequestContext) (crud.RecordDto, bool) {
-	result, err := state.Crud.Get(ctx, "waf.scan_jobs", id, rc)
+	result, err := state.Crud.Get(ctx, model.ScanJobs, id, rc)
 	if err != nil {
 		httpserver.WriteCrudError(w, err)
 		return crud.RecordDto{}, false
@@ -63,7 +64,7 @@ func loadJob(ctx context.Context, w http.ResponseWriter, state *httpserver.AppSt
 // runScanJob is the "Run scan now" button — both POST /api/waf.scan_jobs/{id}/run and the gRPC
 // action waf.scan_jobs.run call it.
 func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, jobID uuid.UUID) (map[string]any, error) {
-	got, err := state.Crud.Get(ctx, "waf.scan_jobs", jobID, rc)
+	got, err := state.Crud.Get(ctx, model.ScanJobs, jobID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.
 	// Fire-and-forget by design: the scanner reports back through the findings callback below,
 	// so this request doesn't wait out a scan that can take minutes.
 	payload := map[string]any{
-		"scanJobId": queued.ID, "zoneId": queued.Data["zoneId"], "scanType": queued.Data["scanType"],
+		"scanJobId": queued.ID, model.FieldZoneID: queued.Data[model.FieldZoneID], "scanType": queued.Data["scanType"],
 		"callbackPath": fmt.Sprintf("/internal/scan-jobs/%s/findings", queued.ID),
 	}
 	body, _ := json.Marshal(payload)
@@ -121,7 +122,7 @@ func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.
 
 // RegisterActions registers the gRPC handlers for the actions declared on this service's entities.
 func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
-	return reg.Register("waf.scan_jobs", "run", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+	return reg.Register(model.ScanJobs, model.ActionRun, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		return crud.ToObject(runScanJob(ctx, state, c.RC, c.ID))
 	})
 }
@@ -176,7 +177,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 		if finding.Description != nil {
 			data["description"] = jsonStr(*finding.Description)
 		}
-		result, err := state.Crud.Create(r.Context(), "waf.scan_findings", data, rc, nil)
+		result, err := state.Crud.Create(r.Context(), model.ScanFindings, data, rc, nil)
 		if err != nil {
 			httpserver.WriteCrudError(w, err)
 			return
@@ -207,7 +208,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	// lastRunAt isn't part of any transition's SetFields, so it's written here — the one field
 	// this flow owns that the workflow itself doesn't.
 	patch := crud.JsonObject{"lastRunAt": jsonStr(now)}
-	jobAfter, err := state.Crud.Update(r.Context(), "waf.scan_jobs", finished.ID, finished.Version, patch, rc, nil)
+	jobAfter, err := state.Crud.Update(r.Context(), model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
 	if err != nil {
 		httpserver.WriteCrudError(w, err)
 		return
