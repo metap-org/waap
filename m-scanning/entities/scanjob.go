@@ -51,6 +51,9 @@ func ScanJobEntity() metadata.EntityDefinition {
 			},
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: "run", Label: "Run scan now", Description: "Queues the job and hands it to the scanner.", Scope: metadata.ActionScopeRecord},
+		},
 	}
 }
 

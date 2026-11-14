@@ -50,6 +50,9 @@ func IncidentEntity() metadata.EntityDefinition {
 			},
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: "correlate", Label: "Correlate incidents", Description: "Opens incidents for recent events grouped by zone and source IP.", Scope: metadata.ActionScopeEntity},
+		},
 	}
 }
 

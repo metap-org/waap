@@ -224,7 +224,9 @@ func main() {
 	}
 
 	schema, err := gw.BuildSchema(registry, owners,
-		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(rest)))
+		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(wafgateway.Invokers{
+			Zones: zonesBackend, Scanning: scanningBackend, Alerting: alertingBackend,
+		})))
 	if err != nil {
 		slog.Error("building GraphQL schema", "error", err)
 		os.Exit(1)

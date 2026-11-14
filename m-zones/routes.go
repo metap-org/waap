@@ -16,6 +16,7 @@
 package zonesservice
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 )
 
@@ -119,27 +121,16 @@ func trimOneLayer(s string, c byte) string {
 // VerifyDNS is POST /api/waf.zones/{id}/verify-dns — the informational DNS routing check: is
 // this zone's own hostname actually pointed at edge-plane yet? Never gates activation, purely
 // informational.
-func VerifyDNS(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-	zoneID, err := uuid.Parse(chi.URLParam(r, "id"))
+func verifyDNS(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
+	got, err := state.Crud.Get(ctx, "waf.zones", zoneID, rc)
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid zone id.", nil)
-		return
-	}
-	got, err := state.Crud.Get(r.Context(), "waf.zones", zoneID, rc)
-	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	record := got.Record
 
 	hostname, _ := jsonAsString(record.Data["hostname"])
 	if hostname == "" {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Zone has no hostname.", nil)
-		return
+		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Zone has no hostname.")
 	}
 
 	client := httpClient()
@@ -161,15 +152,14 @@ func VerifyDNS(w http.ResponseWriter, r *http.Request, state *httpserver.AppStat
 		"dnsRoutingStatus": jsonString(status),
 		"lastDnsCheckAt":   jsonString(time.Now().UTC().Format(time.RFC3339)),
 	}
-	updated, err := state.Crud.Update(r.Context(), "waf.zones", zoneID, record.Version, patch, rc, nil)
+	updated, err := state.Crud.Update(ctx, "waf.zones", zoneID, record.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+	return map[string]any{
 		"zone": updated, "dnsRouted": routed,
 		"checked": map[string]any{"cname": cname, "expectedTarget": target},
-	}})
+	}, nil
 }
 
 func hasSuffix(s, suffix string) bool {
@@ -188,32 +178,17 @@ type verifyDNSBody struct {
 // On a real match of the domain's own verificationToken in a _waf-verify.<apexDomain> TXT
 // record, this both marks the Domain itself verified and cascades that onto every Zone under it
 // — writing each zone's own verificationStatus mirror field directly.
-func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-	domainID, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid domain id.", nil)
-		return
-	}
-	var body verifyDNSBody
-	if r.ContentLength != 0 && !httpserver.DecodeJSONBody(w, r, &body) {
-		return
-	}
+func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, domainID uuid.UUID, body verifyDNSBody) (map[string]any, error) {
 
-	got, err := state.Crud.Get(r.Context(), "waf.domains", domainID, rc)
+	got, err := state.Crud.Get(ctx, "waf.domains", domainID, rc)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	domain := got.Record
 
 	apexDomain, _ := jsonAsString(domain.Data["apexDomain"])
 	if apexDomain == "" {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Domain has no apexDomain.", nil)
-		return
+		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Domain has no apexDomain.")
 	}
 	expectedToken := ""
 	if body.ExpectedToken != nil {
@@ -237,61 +212,48 @@ func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	}
 
 	if !ownershipOK {
-		httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+		return map[string]any{
 			"domain": domain, "ownershipVerified": false,
 			"checked": map[string]any{"txt": txt, "expectedToken": expectedToken},
-		}})
-		return
+		}, nil
 	}
 
 	patch := crud.JsonObject{"verificationStatus": jsonString("verified")}
-	updatedDomain, err := state.Crud.Update(r.Context(), "waf.domains", domainID, domain.Version, patch, rc, nil)
+	updatedDomain, err := state.Crud.Update(ctx, "waf.domains", domainID, domain.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 
 	// Cascade onto every zone under this domain — best-effort per zone (one failing zone must
 	// not stop the others, and must not undo the domain's own now-verified status).
 	listInput := query.ListInput{Limit: 100, Filters: [][2]string{{"domainId", domainID.String()}}}
-	zones, err := state.Crud.List(r.Context(), "waf.zones", listInput, rc)
+	zones, err := state.Crud.List(ctx, "waf.zones", listInput, rc)
 	if err == nil {
 		for _, zone := range zones.Data {
 			zonePatch := crud.JsonObject{"verificationStatus": jsonString("verified")}
-			if _, err := state.Crud.Update(r.Context(), "waf.zones", zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
+			if _, err := state.Crud.Update(ctx, "waf.zones", zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
 				slog.Error("domain verified but cascading verificationStatus onto this zone failed",
 					"zone_id", zone.ID, "domain_id", domainID, "error", err)
 			}
 		}
 	}
 
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+	return map[string]any{
 		"domain": updatedDomain, "ownershipVerified": true,
 		"checked": map[string]any{"txt": txt, "expectedToken": expectedToken},
-	}})
+	}, nil
 }
 
 // TestOrigin is POST /api/waf.zones/{id}/test-origin — "can we actually reach the origin the
 // customer gave us", a one-shot connectivity check. Not stored on the zone.
-func TestOrigin(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-	zoneID, err := uuid.Parse(chi.URLParam(r, "id"))
+func testOrigin(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
+	got, err := state.Crud.Get(ctx, "waf.zones", zoneID, rc)
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid zone id.", nil)
-		return
-	}
-	got, err := state.Crud.Get(r.Context(), "waf.zones", zoneID, rc)
-	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	origin, _ := jsonAsString(got.Record.Data["originAddress"])
 	if origin == "" {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Zone has no origin address.", nil)
-		return
+		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Zone has no origin address.")
 	}
 	// A customer types "1.2.3.4" or "origin.example.com" as often as a full URL.
 	targetURL := origin
@@ -310,26 +272,17 @@ func TestOrigin(w http.ResponseWriter, r *http.Request, state *httpserver.AppSta
 		defer resp.Body.Close()
 		payload = map[string]any{"reachable": true, "status": resp.StatusCode, "latencyMs": elapsedMs, "url": targetURL}
 	}
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": payload})
+	return payload, nil
 }
 
 // SyncConfigState is POST /api/waf.zones/{id}/sync-config-state — recomputes hasConfig from the
 // zone's actual DdosPolicy/FirewallRule records and writes it back. Idempotent, so calling it at
 // any time (or twice) is harmless.
-func SyncConfigState(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-	zoneID, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid zone id.", nil)
-		return
-	}
+func syncConfigState(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
 
 	anyForZone := func(entity string) (bool, error) {
 		input := query.ListInput{Limit: 1, Filters: [][2]string{{"zoneId", zoneID.String()}}}
-		result, err := state.Crud.List(r.Context(), entity, input, rc)
+		result, err := state.Crud.List(ctx, entity, input, rc)
 		if err != nil {
 			return false, err
 		}
@@ -340,20 +293,17 @@ func SyncConfigState(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	// here would silently flip hasConfig off on a permission error.
 	hasDdos, err := anyForZone("waf.ddos_policies")
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	hasFirewall, err := anyForZone("waf.firewall_rules")
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	hasConfig := hasDdos || hasFirewall
 
-	got, err := state.Crud.Get(r.Context(), "waf.zones", zoneID, rc)
+	got, err := state.Crud.Get(ctx, "waf.zones", zoneID, rc)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	zone := got.Record
 
@@ -361,17 +311,15 @@ func SyncConfigState(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	if currentHasConfig == hasConfig {
 		// Already correct — skip the write so this doesn't bump version/updatedAt on every call
 		// and turn an idempotent sync into a source of version conflicts for the portal.
-		httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"hasConfig": hasConfig, "changed": false}})
-		return
+		return map[string]any{"hasConfig": hasConfig, "changed": false}, nil
 	}
 
 	patch := crud.JsonObject{"hasConfig": jsonBool(hasConfig)}
-	_, err = state.Crud.Update(r.Context(), "waf.zones", zoneID, zone.Version, patch, rc, nil)
+	_, err = state.Crud.Update(ctx, "waf.zones", zoneID, zone.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"hasConfig": hasConfig, "changed": true}})
+	return map[string]any{"hasConfig": hasConfig, "changed": true}, nil
 }
 
 // DeepHealth is GET /internal/health/deep — liveness of this service plus the two siblings it
@@ -409,14 +357,71 @@ func jsonBool(b bool) json.RawMessage {
 	return out
 }
 
-// MountRoutes registers this service's custom (non-generic-CRUD) endpoints onto r.
+// MountRoutes registers this service's custom (non-generic-CRUD) endpoints onto r. REST stays
+// available next to the gRPC actions (RegisterActions) for any caller that wants it.
 func MountRoutes(r chi.Router, state *httpserver.AppState) {
-	wrap := func(h func(http.ResponseWriter, *http.Request, *httpserver.AppState)) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) { h(w, r, state) }
-	}
-	r.Post("/api/waf.zones/{id}/verify-dns", wrap(VerifyDNS))
-	r.Post("/api/waf.domains/{id}/verify-dns", wrap(VerifyDomainDNS))
-	r.Post("/api/waf.zones/{id}/test-origin", wrap(TestOrigin))
-	r.Post("/api/waf.zones/{id}/sync-config-state", wrap(SyncConfigState))
+	r.Post("/api/waf.zones/{id}/verify-dns", httpserver.RecordActionRoute(state, "zone", func(ctx context.Context, rc *permission.RequestContext, id uuid.UUID) (map[string]any, error) {
+		return verifyDNS(ctx, state, rc, id)
+	}))
+	r.Post("/api/waf.domains/{id}/verify-dns", func(w http.ResponseWriter, req *http.Request) {
+		rc, ok := httpserver.RequireAuth(w, req, state)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(req, "id"))
+		if err != nil {
+			httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid domain id.", nil)
+			return
+		}
+		var body verifyDNSBody
+		if req.ContentLength != 0 && !httpserver.DecodeJSONBody(w, req, &body) {
+			return
+		}
+		out, err := verifyDomainDNS(req.Context(), state, rc, id, body)
+		if err != nil {
+			httpserver.WriteCrudError(w, err)
+			return
+		}
+		httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": out})
+	})
+	r.Post("/api/waf.zones/{id}/test-origin", httpserver.RecordActionRoute(state, "zone", func(ctx context.Context, rc *permission.RequestContext, id uuid.UUID) (map[string]any, error) {
+		return testOrigin(ctx, state, rc, id)
+	}))
+	r.Post("/api/waf.zones/{id}/sync-config-state", httpserver.RecordActionRoute(state, "zone", func(ctx context.Context, rc *permission.RequestContext, id uuid.UUID) (map[string]any, error) {
+		return syncConfigState(ctx, state, rc, id)
+	}))
 	r.Get("/internal/health/deep", DeepHealth)
+}
+
+// RegisterActions registers the gRPC handlers for the actions declared on this service's
+// entities (see entities: Actions). Same cores as the REST routes above.
+func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+	for _, a := range []struct {
+		entity, name string
+		run          crud.ActionHandler
+	}{
+		{"waf.zones", "verifyDns", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(verifyDNS(ctx, state, c.RC, c.ID))
+		}},
+		{"waf.zones", "testOrigin", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(testOrigin(ctx, state, c.RC, c.ID))
+		}},
+		{"waf.zones", "syncConfigState", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(syncConfigState(ctx, state, c.RC, c.ID))
+		}},
+		{"waf.domains", "verifyDns", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			var body verifyDNSBody
+			if raw, ok := c.Input["expectedToken"]; ok {
+				if tok, ok := jsonAsString(raw); ok {
+					body.ExpectedToken = &tok
+				}
+			}
+			return crud.ToObject(verifyDomainDNS(ctx, state, c.RC, c.ID, body))
+		}},
+	} {
+		if err := reg.Register(a.entity, a.name, a.run); err != nil {
+			return err
+		}
+	}
+	return nil
 }

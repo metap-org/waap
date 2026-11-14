@@ -143,6 +143,15 @@ route. That is the option `04-architecture-boundary.md` already leaned toward, a
 the project owner, so it is flagged in `../metap-docs/docs/roadmap/72-control-edge-planes.md` and
 in that PR, and is cheap to reverse (the edge knows exactly one ingest URL).
 
+**Custom (non-CRUD) endpoints are gRPC actions first (2026-11-14, `../metap-docs/docs/roadmap/109-grpc-first-actions.md`).**
+`verifyDns`/`testOrigin`/`syncConfigState` (waf.zones), `verifyDns` (waf.domains), `run` (waf.scan_jobs), `test`/`evaluate`
+(waf.alert_policies) and `correlate` (waf.incidents) are declared in each entity's `Actions` and registered by the service's
+`RegisterActions`; each handler is a core function that the old REST route (kept, same behavior) also calls. `waf-graphql-gateway`
+reaches them over gRPC (`wafgateway.Invokers`), no longer through each service's REST URL; the portal's older mutation names
+(`verifyZoneDns`, `runScanJob`, ...) are thin wrappers, and the generic `<action><TypeName>` mutations exist beside them.
+`UPSTREAM_N_REST_URL` is now needed only for the platform admin fields. `POST /internal/scan-jobs/{id}/findings` (scanner
+callback) and `/ingest/events` (edge to control) stay REST.
+
 ## Domain model (business-level, not yet `EntityDefinition` code)
 
 `docs/management/02-domain-model.md` has full field-level detail. Summary of the entity graph:

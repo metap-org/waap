@@ -24,5 +24,6 @@ func main() {
 		Name:     "scanning-service",
 		GRPCPort: 3011,
 		Routes:   scanningservice.MountRoutes,
+		Actions:  scanningservice.RegisterActions,
 	})
 }

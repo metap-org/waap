@@ -35,6 +35,9 @@ func DomainEntity() metadata.EntityDefinition {
 			MaxLimit: 100,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: "verifyDns", Label: "Verify domain ownership", Description: "Checks the _waf-verify TXT record and cascades onto the domain's zones.", Scope: metadata.ActionScopeRecord},
+		},
 	}
 }
 

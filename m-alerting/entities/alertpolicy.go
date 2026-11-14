@@ -29,6 +29,10 @@ func AlertPolicyEntity() metadata.EntityDefinition {
 			MaxLimit:    50,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: "test", Label: "Send test alert", Description: "Runs the real delivery path and records a notification.", Scope: metadata.ActionScopeRecord},
+			{Name: "evaluate", Label: "Evaluate alert policies", Description: "Evaluates every enabled policy against recent events.", Scope: metadata.ActionScopeEntity},
+		},
 	}
 }
 

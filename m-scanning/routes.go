@@ -60,21 +60,14 @@ func loadJob(ctx context.Context, w http.ResponseWriter, state *httpserver.AppSt
 	return result.Record, true
 }
 
-// RunScanJob is POST /api/waf.scan_jobs/{id}/run — the portal's "Run scan now" button.
-func RunScanJob(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+// runScanJob is the "Run scan now" button — both POST /api/waf.scan_jobs/{id}/run and the gRPC
+// action waf.scan_jobs.run call it.
+func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, jobID uuid.UUID) (map[string]any, error) {
+	got, err := state.Crud.Get(ctx, "waf.scan_jobs", jobID, rc)
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid job id.", nil)
-		return
+		return nil, err
 	}
-	job, ok := loadJob(r.Context(), w, state, jobID, rc)
-	if !ok {
-		return
-	}
+	job := got.Record
 
 	// run is valid from idle/completed/failed — a job already queued or running has nothing to
 	// do, and saying so beats a workflow error the UI would have to translate.
@@ -83,23 +76,20 @@ func RunScanJob(w http.ResponseWriter, r *http.Request, state *httpserver.AppSta
 		status = *job.Status
 	}
 	if status == "queued" || status == "running" {
-		httpserver.WriteServiceError(w, http.StatusConflict, "scan_already_in_progress", "This scan job is already "+status+".", nil)
-		return
+		return nil, crud.NewServiceErrorMsg(http.StatusConflict, "scan_already_in_progress", "This scan job is already "+status+".")
 	}
 
-	queued, err := doTransition(r.Context(), state, job, "run", rc)
+	queued, err := doTransition(ctx, state, job, "run", rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
+		return nil, err
 	}
 
 	scanner, hasScanner := scannerURL()
 	if !hasScanner {
-		httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+		return map[string]any{
 			"job": queued, "dispatched": false,
 			"detail": "Queued. No scanner backend is configured (SCANNER_URL unset), so nothing will pick this up yet.",
-		}})
-		return
+		}, nil
 	}
 
 	// Fire-and-forget by design: the scanner reports back through the findings callback below,
@@ -111,26 +101,29 @@ func RunScanJob(w http.ResponseWriter, r *http.Request, state *httpserver.AppSta
 	body, _ := json.Marshal(payload)
 	resp, err := httpClient().Post(scanner+"/scans", "application/json", bytes.NewReader(body))
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadGateway, "scanner_unavailable", "Could not reach the scanner: "+err.Error(), nil)
-		return
+		return nil, crud.NewServiceErrorMsg(http.StatusBadGateway, "scanner_unavailable", "Could not reach the scanner: "+err.Error())
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"job": queued, "dispatched": true, "detail": "Handed to scanner."}})
-		return
+		return map[string]any{"job": queued, "dispatched": true, "detail": "Handed to scanner."}, nil
 	}
 	detail := fmt.Sprintf("Scanner rejected the request (%d)", resp.StatusCode)
-	running, err := doTransition(r.Context(), state, queued, "start", rc)
+	running, err := doTransition(ctx, state, queued, "start", rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
+		return nil, err
 	}
-	failed, err := doTransition(r.Context(), state, running, "fail", rc)
+	failed, err := doTransition(ctx, state, running, "fail", rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
+		return nil, err
 	}
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"job": failed, "dispatched": false, "detail": detail}})
+	return map[string]any{"job": failed, "dispatched": false, "detail": detail}, nil
+}
+
+// RegisterActions registers the gRPC handlers for the actions declared on this service's entities.
+func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+	return reg.Register("waf.scan_jobs", "run", func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		return crud.ToObject(runScanJob(ctx, state, c.RC, c.ID))
+	})
 }
 
 type findingInput struct {
@@ -234,6 +227,8 @@ func MountRoutes(r chi.Router, state *httpserver.AppState) {
 	wrap := func(h func(http.ResponseWriter, *http.Request, *httpserver.AppState)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { h(w, r, state) }
 	}
-	r.Post("/api/waf.scan_jobs/{id}/run", wrap(RunScanJob))
+	r.Post("/api/waf.scan_jobs/{id}/run", httpserver.RecordActionRoute(state, "job", func(ctx context.Context, rc *permission.RequestContext, id uuid.UUID) (map[string]any, error) {
+		return runScanJob(ctx, state, rc, id)
+	}))
 	r.Post("/internal/scan-jobs/{id}/findings", wrap(SubmitFindings))
 }

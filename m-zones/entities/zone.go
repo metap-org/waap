@@ -74,6 +74,11 @@ func ZoneEntity() metadata.EntityDefinition {
 			},
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: "verifyDns", Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord},
+			{Name: "testOrigin", Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
+			{Name: "syncConfigState", Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
+		},
 	}
 }
 
