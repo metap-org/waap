@@ -15,7 +15,7 @@ Rust original's own hard rule) reached full build/test/vet-clean parity and was 
 against real Postgres/Redis/HTTP. `edge-plane/go`'s one disclosed behavioral divergence: Go's
 `net.IP` has no explicit V4/V6 discriminant independent of bit pattern, so an IPv4-mapped IPv6
 client address matches a plain IPv4 CIDR rule there, where the Rust original's own test pinned
-the opposite as a documented gap. `management-plane/go`'s `graphqlgateway` package is a **bespoke**
+the opposite as a documented gap. `management-plane`'s gateway (generic part now `metap`'s `pkg/graphqlgateway`, since 2026-11-14; the WAF-only mutations stay in `management-plane/wafgateway`) is a **bespoke**
 forwarding gateway (`github.com/graphql-go/graphql`, no codegen) rather than a port of
 `metap-graphql`'s generic dynamic-schema-from-metadata engine — that engine was never built in
 `metap-go` at all (see `../metap/CLAUDE.md`), so a direct port wasn't possible; confirmed with

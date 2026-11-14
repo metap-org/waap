@@ -4,7 +4,7 @@
 // GraphQL layer at all — metap-graphql/metap-graphql-http/metap-graphql-gateway were never
 // ported). The schema is generated from the 3 WAF services' own entity definitions (imported
 // below for their init() SubmitEntity side effect) in the Rust metap-graphql wire shape the
-// portal and control-plane expect (graphqlgateway.BuildSchema), forwarding to each upstream's gRPC RecordBackend
+// portal and control-plane expect (graphqlgateway.BuildSchema from metap, wafgateway for the WAF mutations), forwarding to each upstream's gRPC RecordBackend
 // (grpcapi.GrpcBackend, the same client the 3 Go WAF services already use for their own
 // cross-service calls); the 8 custom business-action mutations forward to each service's REST
 // endpoint instead, since those have no gRPC equivalent.
@@ -31,6 +31,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/metap-org/metap/pkg/crud"
+	gw "github.com/metap-org/metap/pkg/graphqlgateway"
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/jwks"
 	"github.com/metap-org/metap/pkg/kit/env"
@@ -42,7 +43,7 @@ import (
 	_ "github.com/metap-org/waap/management-plane/zonesservice/entities"
 
 	"github.com/metap-org/waap/management-plane/analytics"
-	"github.com/metap-org/waap/management-plane/graphqlgateway"
+	"github.com/metap-org/waap/management-plane/wafgateway"
 )
 
 type upstreamConfig struct {
@@ -217,24 +218,25 @@ func main() {
 	}
 	owners[analytics.SecurityEvents] = &analytics.Backend{Client: analytics.NewClient(analyticsURL)}
 
-	rest := graphqlgateway.RestURLs{
+	rest := wafgateway.RestURLs{
 		Zones:    byName["zones"].restURL,
 		Scanning: byName["scanning"].restURL,
 		Alerting: byName["alerting"].restURL,
 	}
 
-	schema, err := graphqlgateway.BuildSchema(registry, owners, rest)
+	schema, err := gw.BuildSchema(registry, owners,
+		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(rest)))
 	if err != nil {
 		slog.Error("building GraphQL schema", "error", err)
 		os.Exit(1)
 	}
 
-	defaults := graphqlgateway.DefaultLimits()
-	limits := graphqlgateway.Limits{
+	defaults := gw.DefaultLimits()
+	limits := gw.Limits{
 		MaxDepth:      env.Int("GRAPHQL_MAX_DEPTH", defaults.MaxDepth),
 		MaxComplexity: env.Int("GRAPHQL_MAX_COMPLEXITY", defaults.MaxComplexity),
 	}
-	server := graphqlgateway.NewServer(schema, verifier, limits)
+	server := gw.NewServer(schema, verifier, limits)
 	server.ServeMetadataFor(registry, analytics.SecurityEvents)
 
 	corsOrigins, _ := env.Lookup("CORS_ORIGINS")
