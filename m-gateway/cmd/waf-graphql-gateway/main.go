@@ -43,6 +43,7 @@ import (
 
 	"github.com/metap-org/waap/m-analytics"
 	"github.com/metap-org/waap/m-gateway"
+	"github.com/metap-org/waap/model"
 )
 
 type upstreamConfig struct {
@@ -189,16 +190,16 @@ func main() {
 	// Which upstream owns each entity. The entity shapes themselves come from the metadata
 	// registry, so a field added to an entity shows up here without touching this file.
 	owners := map[string]crud.RecordBackend{
-		"waf.domains":             zonesBackend,
-		"waf.zones":               zonesBackend,
-		"waf.ddos_policies":       zonesBackend,
-		"waf.firewall_rules":      zonesBackend,
-		"waf.ip_access_lists":     zonesBackend,
-		"waf.scan_jobs":           scanningBackend,
-		"waf.scan_findings":       scanningBackend,
-		"waf.alert_policies":      alertingBackend,
-		"waf.alert_notifications": alertingBackend,
-		"waf.incidents":           alertingBackend,
+		model.Domains:            zonesBackend,
+		model.Zones:              zonesBackend,
+		model.DdosPolicies:       zonesBackend,
+		model.FirewallRules:      zonesBackend,
+		model.IPAccessLists:      zonesBackend,
+		model.ScanJobs:           scanningBackend,
+		model.ScanFindings:       scanningBackend,
+		model.AlertPolicies:      alertingBackend,
+		model.AlertNotifications: alertingBackend,
+		model.Incidents:          alertingBackend,
 	}
 	registry := metadata.NewMetadataRegistry()
 	if err := registry.RegisterAllSubmitted(); err != nil {
@@ -224,7 +225,9 @@ func main() {
 	}
 
 	schema, err := gw.BuildSchema(registry, owners,
-		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(rest)))
+		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(wafgateway.Invokers{
+			Zones: zonesBackend, Scanning: scanningBackend, Alerting: alertingBackend,
+		})))
 	if err != nil {
 		slog.Error("building GraphQL schema", "error", err)
 		os.Exit(1)

@@ -22,16 +22,17 @@ import (
 	"github.com/metap-org/metap/pkg/infra/eventbus"
 
 	"github.com/metap-org/waap/c-config-distributor/sync"
+	"github.com/metap-org/waap/model"
 )
 
 // watched lists entities whose changes can alter what the edge should do. waf.scan_*,
 // waf.incidents, waf.alert_* all flow through the same exchange and are deliberately ignored
 // here — none of them affects request handling.
 var watched = map[string]bool{
-	"waf.zones":           true,
-	"waf.ddos_policies":   true,
-	"waf.firewall_rules":  true,
-	"waf.ip_access_lists": true,
+	model.Zones:         true,
+	model.DdosPolicies:  true,
+	model.FirewallRules: true,
+	model.IPAccessLists: true,
 }
 
 func Run(ctx context.Context, amqpURL, queue string, dp ports.ConfigSource, distributor ports.RuleSink) error {

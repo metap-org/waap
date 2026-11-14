@@ -104,6 +104,7 @@ carries the plane prefix (`m-`, `c-`, `e-`, `a-`):
 | Directory | Role | Status |
 |---|---|---|
 | `m-zones/` `m-scanning/` `m-alerting/` `m-gateway/` `m-analytics/` `m-web/` `m-deploy/` | Business portal (source of truth): Zone, DDoS policy, firewall rule, vulnerability scan, incident, alert — built on `metap`, full CRUD/workflow/permission UI | 3 services (`zones`/`scanning`/`alerting`) + `waf-graphql-gateway` (own binary, `management-plane/graphql-gateway/`, not just config — 7 custom mutations, wraps `metap`'s generic gateway library via `build_with_extensions`) + Customer Portal frontend (10-module IA, zone-centric). Custom non-CRUD endpoints live in each service's `src/routes.rs`. **Both compose files must build/run `waf-graphql-gateway`, not `metap/crates/metap-graphql-gateway`'s generic binary** — found live, 2026-09-04: they'd been pointed at the generic one, silently dropping every custom field (`docs/roadmap/76-waf-portal-live-bugfixes.md`) |
+| `m-bootstrap/` | One-shot first-run bootstrap (2026-11-14, `../metap-docs/docs/roadmap/108-*.md`): the role personas (`security_analyst`, `developer`, `viewer`; Tenant Admin is the built-in `admin`, Platform Admin is `dev-tools bootstrap-platform-admin`) as `bootstrap.Submit` grants, plus `cmd/waf-bootstrap`, which blank-imports every service's entities and runs `app.BootstrapMain`. Additive and re-runnable; initial users go in a `BOOTSTRAP_FILE` JSON overlay with passwords from env vars named by `secretRef` (production aborts if one is missing). Env: `BOOTSTRAP_TENANT_IDS` (ids or `all`) | Done |
 | `c-config-distributor/` | Headless worker: pulls config changes from `management-plane` (RabbitMQ outbox subscribe), compiles them into an edge-ready rule-set, writes to Redis/DragonflyDB. No UI, not CRUD | `waf-config-distributor` — 3 jobs in one process: subscribe (fast path), periodic full resync (**the convergence guarantee**), telemetry ingest. The Redis contract is `waf-config-distributor/src/ruleset.rs` |
 | `a-api/` | Telemetry: security events (later access logs, usage) — ingest, storage, query. **Not** built on `metap` (ADR-0009): only `pkg/kit/*`, depguard-enforced like `edge-plane` | `analytics-api` (2026-11-08, first cut): batch ingest from `control-plane` (`POST /v1/security-events/ingest`, ingest secret + platform token, tenant from the token), ClickHouse MergeTree with TTL retention (30 days), structured query API (allowlisted equality filters, keyset cursor, metap-shaped aggregate). Verifies platform tokens itself against zones-service's JWKS. Management reads it two ways, both with the caller's own token: the gateway serves `waf.security_events` as a read-only read model (`management-plane/analytics`, no mutations, metadata served by the gateway itself), and alerting-service's correlate/evaluate sweeps read a time window. Not yet: Kafka/Vector/enricher/archiver/detection/exporter, zone/role-level read filtering |
 | `e-edge/` | High-performance, low-latency mitigation engine: evaluates rules against real traffic, blocks/challenges/logs. Deliberately **not** built on `metap`/metadata-driven approach | `waf-edge` — hyper 1.x (now Go `net/http`), **no `metap` platform dependency** — only `metap`'s stdlib-only `pkg/kit/*` since 2026-11-07, depguard-enforced. `ArcSwap` rule snapshot (a request never touches Redis), DDoS budget → priority-ordered rules → block/challenge/log → proxy to origin |
@@ -141,6 +142,19 @@ route. That is the option `04-architecture-boundary.md` already leaned toward, a
 "edge never talks to `management-plane` directly" rule intact. It was decided in-session rather than by
 the project owner, so it is flagged in `../metap-docs/docs/roadmap/72-control-edge-planes.md` and
 in that PR, and is cheap to reverse (the edge knows exactly one ingest URL).
+
+**Custom (non-CRUD) endpoints are gRPC actions first (2026-11-14, `../metap-docs/docs/roadmap/109-grpc-first-actions.md`).**
+`verifyDns`/`testOrigin`/`syncConfigState` (waf.zones), `verifyDns` (waf.domains), `run` (waf.scan_jobs), `test`/`evaluate`
+(waf.alert_policies) and `correlate` (waf.incidents) are declared in each entity's `Actions` and registered by the service's
+`RegisterActions`; each handler is a core function that the old REST route (kept, same behavior) also calls. `waf-graphql-gateway`
+reaches them over gRPC (`wafgateway.Invokers`), no longer through each service's REST URL; the portal's older mutation names
+(`verifyZoneDns`, `runScanJob`, ...) are thin wrappers, and the generic `<action><TypeName>` mutations exist beside them.
+`UPSTREAM_N_REST_URL` is now needed only for the platform admin fields. `POST /internal/scan-jobs/{id}/findings` (scanner
+callback) and `/ingest/events` (edge to control) stay REST.
+
+**Shared names live in `model/` (2026-11-14, `../metap-docs/docs/roadmap/110-magic-literals-audit.md`):** entity names
+(`model.Zones`, ...), `model.FieldZoneID`/`FieldDomainID` and the action names (`model.ActionVerifyDNS`, ...). Never retype
+`"waf.zones"` or `"zoneId"`; careful with struct tags (`json:"zoneId"` stays a tag).
 
 ## Domain model (business-level, not yet `EntityDefinition` code)
 

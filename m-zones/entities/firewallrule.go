@@ -12,17 +12,18 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func FirewallRuleEntity() metadata.EntityDefinition {
 	// zoneId is nullable since the tenant-wide ("global") scope feature: zoneId == nil means this
 	// rule applies to every zone in the tenant, not just one.
-	zoneID := metadata.RefField("zoneId", "Zone", "waf.zones", "hostname").Index()
+	zoneID := metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Index()
 
 	return metadata.EntityDefinition{
-		Name:      "waf.firewall_rules",
+		Name:      model.FirewallRules,
 		Label:     "Firewall Rule",
-		TableName: reconciler.QualifiedTableNameIn("waf.firewall_rules", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.FirewallRules, "waf"),
 		Fields: []metadata.EntityField{
 			zoneID,
 			metadata.NewField("name", "Name", metadata.KindString).Require().Sort(),
@@ -39,8 +40,8 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:      []string{"zoneId", "name", "priority", "ruleType", "action", "enabled"},
-			Filters:     []string{"zoneId", "ruleType", "enabled"},
+			Fields:      []string{model.FieldZoneID, "name", "priority", "ruleType", "action", "enabled"},
+			Filters:     []string{model.FieldZoneID, "ruleType", "enabled"},
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    100,
 		}},

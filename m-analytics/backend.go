@@ -13,6 +13,7 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/waap/model"
 )
 
 // Backend serves the read model as a crud.RecordBackend. Writes are refused: events arrive only
@@ -37,13 +38,13 @@ func token(rc *permission.RequestContext) string {
 func ToRecord(e Event) crud.RecordDto {
 	str := func(s string) json.RawMessage { raw, _ := json.Marshal(s); return raw }
 	data := crud.JsonObject{
-		"zoneId":        str(e.ZoneID),
-		"triggeredBy":   str(e.TriggeredBy),
-		"triggeredById": str(e.TriggeredByID),
-		"action":        str(e.Action),
-		"sourceIp":      str(e.SourceIP),
-		"requestPath":   str(e.RequestPath),
-		"occurredAt":    str(e.OccurredAt.UTC().Format("2006-01-02T15:04:05.000Z07:00")),
+		model.FieldZoneID: str(e.ZoneID),
+		"triggeredBy":     str(e.TriggeredBy),
+		"triggeredById":   str(e.TriggeredByID),
+		"action":          str(e.Action),
+		"sourceIp":        str(e.SourceIP),
+		"requestPath":     str(e.RequestPath),
+		"occurredAt":      str(e.OccurredAt.UTC().Format("2006-01-02T15:04:05.000Z07:00")),
 	}
 	if e.TriggeredByName != "" {
 		data["triggeredByName"] = str(e.TriggeredByName)

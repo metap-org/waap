@@ -8,15 +8,16 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func ScanFindingEntity() metadata.EntityDefinition {
 	return metadata.EntityDefinition{
-		Name:      "waf.scan_findings",
+		Name:      model.ScanFindings,
 		Label:     "Scan Finding",
-		TableName: reconciler.QualifiedTableNameIn("waf.scan_findings", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.ScanFindings, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.RefField("scanJobId", "Scan Job", "waf.scan_jobs", "scanType").Require().Index(),
+			metadata.RefField("scanJobId", "Scan Job", model.ScanJobs, "scanType").Require().Index(),
 			metadata.EnumField("severity", "Severity", "info", "low", "medium", "high", "critical").Require().Index(),
 			metadata.NewField("category", "Category", metadata.KindString).Require().Index().Sort(),
 			metadata.NewField("endpoint", "Endpoint", metadata.KindString).Require(),

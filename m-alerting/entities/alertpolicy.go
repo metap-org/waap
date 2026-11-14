@@ -6,13 +6,14 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func AlertPolicyEntity() metadata.EntityDefinition {
 	return metadata.EntityDefinition{
-		Name:      "waf.alert_policies",
+		Name:      model.AlertPolicies,
 		Label:     "Alert Policy",
-		TableName: reconciler.QualifiedTableNameIn("waf.alert_policies", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.AlertPolicies, "waf"),
 		Fields: []metadata.EntityField{
 			metadata.NewField("name", "Name", metadata.KindString).Require().Sort(),
 			metadata.NewField("thresholdCount", "Threshold Count", metadata.KindNumber).Require(),
@@ -29,6 +30,10 @@ func AlertPolicyEntity() metadata.EntityDefinition {
 			MaxLimit:    50,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: model.ActionTest, Label: "Send test alert", Description: "Runs the real delivery path and records a notification.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionEvaluate, Label: "Evaluate alert policies", Description: "Evaluates every enabled policy against recent events.", Scope: metadata.ActionScopeEntity},
+		},
 	}
 }
 

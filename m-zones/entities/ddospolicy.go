@@ -8,15 +8,16 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func DdosPolicyEntity() metadata.EntityDefinition {
 	return metadata.EntityDefinition{
-		Name:      "waf.ddos_policies",
+		Name:      model.DdosPolicies,
 		Label:     "DDoS Policy",
-		TableName: reconciler.QualifiedTableNameIn("waf.ddos_policies", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.DdosPolicies, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.RefField("zoneId", "Zone", "waf.zones", "hostname").Require().Index(),
+			metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Require().Index(),
 			metadata.EnumField("sensitivity", "Sensitivity", "low", "medium", "high", "aggressive").Require(),
 			metadata.NewField("requestRateThreshold", "Request Rate Threshold", metadata.KindNumber).Require().Sort(),
 			metadata.NewField("burstWindow", "Burst Window (s)", metadata.KindNumber).Require(),
@@ -30,8 +31,8 @@ func DdosPolicyEntity() metadata.EntityDefinition {
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:      []string{"zoneId", "sensitivity", "action", "pathPrefix", "httpMethod", "priority", "enabled"},
-			Filters:     []string{"zoneId", "enabled"},
+			Fields:      []string{model.FieldZoneID, "sensitivity", "action", "pathPrefix", "httpMethod", "priority", "enabled"},
+			Filters:     []string{model.FieldZoneID, "enabled"},
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    50,
 		}},

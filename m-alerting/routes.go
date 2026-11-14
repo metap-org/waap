@@ -39,6 +39,7 @@ import (
 	"github.com/metap-org/metap/pkg/query"
 
 	"github.com/metap-org/waap/m-analytics"
+	"github.com/metap-org/waap/model"
 )
 
 // Default correlation window/threshold — the settled v1 rule. Overridable per request only so an
@@ -63,21 +64,18 @@ func analyticsClient() *analytics.Client {
 	return analytics.NewClient(v)
 }
 
-// recentEvents reads events since cutoff (newest first, at most eventScanLimit). A failure is
-// written to w and reported as ok=false: an Analytics error keeps its own status (401 stays 401,
-// 503 stays 503) instead of turning into a generic 500.
-func recentEvents(w http.ResponseWriter, r *http.Request, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, bool) {
-	events, err := analyticsClient().Window(r.Context(), rc.ForwardedBearerToken, filters, cutoff, eventScanLimit)
+// recentEvents reads events since cutoff (newest first, at most eventScanLimit). An Analytics
+// error keeps its own status (401 stays 401, 503 stays 503) instead of turning into a generic 500.
+func recentEvents(ctx context.Context, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, error) {
+	events, err := analyticsClient().Window(ctx, rc.ForwardedBearerToken, filters, cutoff, eventScanLimit)
 	if err != nil {
 		var apiErr *analytics.APIError
 		if errors.As(err, &apiErr) {
-			httpserver.WriteServiceError(w, apiErr.Status, apiErr.Code, apiErr.Message, nil)
-		} else {
-			httpserver.WriteInternalError(w, err)
+			return nil, crud.NewServiceErrorMsg(uint16(apiErr.Status), apiErr.Code, apiErr.Message)
 		}
-		return nil, false
+		return nil, err
 	}
-	return events, true
+	return events, nil
 }
 
 func jsonStr(s string) json.RawMessage {
@@ -170,16 +168,7 @@ type zoneIPKey struct {
 // doesn't copy them), so the title carries the key. Crude but stable, and it keeps a re-run
 // idempotent — which matters because this is scheduled, so it WILL run again over the same
 // events.
-func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-
-	var body correlateBody
-	if r.ContentLength != 0 && !httpserver.DecodeJSONBody(w, r, &body) {
-		return
-	}
+func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, body correlateBody) (map[string]any, error) {
 	windowMinutes := int64(defaultWindowMinutes)
 	if body.WindowMinutes != nil {
 		windowMinutes = *body.WindowMinutes
@@ -191,12 +180,12 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 
 	filters := map[string]string{}
 	if body.ZoneID != nil {
-		filters["zoneId"] = *body.ZoneID
+		filters[model.FieldZoneID] = *body.ZoneID
 	}
 	cutoff := time.Now().UTC().Add(-time.Duration(windowMinutes) * time.Minute)
-	events, ok := recentEvents(w, r, rc, filters, cutoff)
-	if !ok {
-		return
+	events, err := recentEvents(ctx, rc, filters, cutoff)
+	if err != nil {
+		return nil, err
 	}
 
 	// Grouped in memory rather than by SQL: the window is small and bounded by eventScanLimit,
@@ -207,7 +196,7 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 		if occurredAtOrFallback(event).Before(cutoff) {
 			continue
 		}
-		zoneID := strField(event, "zoneId")
+		zoneID := strField(event, model.FieldZoneID)
 		sourceIP := strField(event, "sourceIp")
 		if zoneID == "" || sourceIP == "" {
 			continue
@@ -221,11 +210,10 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 		if count < threshold {
 			continue
 		}
-		existing, err := listRecords(r.Context(), state, "waf.incidents",
-			[][2]string{{"zoneId", key.zoneID}, {"status", "open"}}, 50, rc)
+		existing, err := listRecords(ctx, state, model.Incidents,
+			[][2]string{{model.FieldZoneID, key.zoneID}, {"status", "open"}}, 50, rc)
 		if err != nil {
-			httpserver.WriteInternalError(w, err)
-			return
+			return nil, err
 		}
 		alreadyOpen := false
 		for _, incident := range existing {
@@ -240,26 +228,25 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 		}
 
 		data := crud.JsonObject{
-			"zoneId":     jsonStr(key.zoneID),
-			"title":      jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
-			"severity":   jsonStr(severityFor(count)),
-			"eventCount": json.RawMessage(fmt.Sprintf("%d", count)),
+			model.FieldZoneID: jsonStr(key.zoneID),
+			"title":           jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
+			"severity":        jsonStr(severityFor(count)),
+			"eventCount":      json.RawMessage(fmt.Sprintf("%d", count)),
 		}
-		result, err := state.Crud.Create(r.Context(), "waf.incidents", data, rc, nil)
+		result, err := state.Crud.Create(ctx, model.Incidents, data, rc, nil)
 		if err != nil {
-			httpserver.WriteCrudError(w, err)
-			return
+			return nil, err
 		}
 		created = append(created, result.ID)
 	}
 
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+	return map[string]any{
 		"scannedEvents":    len(events),
 		"createdIncidents": created,
 		"skippedExisting":  skipped,
 		"windowMinutes":    windowMinutes,
 		"threshold":        threshold,
-	}})
+	}, nil
 }
 
 func channelsObject(raw json.RawMessage) map[string]json.RawMessage {
@@ -320,7 +307,7 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 		"deliveryStatus": jsonStr(status),
 		"triggeredAt":    jsonStr(time.Now().UTC().Format(time.RFC3339)),
 	}
-	result, err := state.Crud.Create(ctx, "waf.alert_notifications", data, rc, nil)
+	result, err := state.Crud.Create(ctx, model.AlertNotifications, data, rc, nil)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("alert_notifications: %w", err)
 	}
@@ -329,16 +316,10 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 
 // evaluateAlerts is POST /internal/alerts/evaluate — every enabled AlertPolicy, evaluated against
 // the recent event stream, counted PER ZONE (never summed across zones).
-func evaluateAlerts(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-
-	policies, err := listRecords(r.Context(), state, "waf.alert_policies", [][2]string{{"enabled", "true"}}, 50, rc)
+func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext) (map[string]any, error) {
+	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{"enabled", "true"}}, 50, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
+		return nil, err
 	}
 	// One read covering the widest policy window; each policy then counts only its own window.
 	widest := int64(defaultWindowMinutes)
@@ -347,9 +328,9 @@ func evaluateAlerts(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 			widest = m
 		}
 	}
-	events, ok := recentEvents(w, r, rc, nil, time.Now().UTC().Add(-time.Duration(widest)*time.Minute))
-	if !ok {
-		return
+	events, err := recentEvents(ctx, rc, nil, time.Now().UTC().Add(-time.Duration(widest)*time.Minute))
+	if err != nil {
+		return nil, err
 	}
 
 	fired := make([]map[string]any, 0)
@@ -366,7 +347,7 @@ func evaluateAlerts(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 			if occurredAtOrFallback(event).Before(cutoff) {
 				continue
 			}
-			perZone[strField(event, "zoneId")]++
+			perZone[strField(event, model.FieldZoneID)]++
 		}
 
 		channels := policy.Data["channels"]
@@ -375,50 +356,37 @@ func evaluateAlerts(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 				continue
 			}
 			payload := map[string]any{
-				"policy":        strField(policy, "name"),
-				"zoneId":        zoneID,
-				"eventCount":    count,
-				"windowMinutes": windowMinutes,
+				"policy":          strField(policy, "name"),
+				model.FieldZoneID: zoneID,
+				"eventCount":      count,
+				"windowMinutes":   windowMinutes,
 			}
 			delivered, detail := deliver(channels, payload)
-			notificationID, err := recordNotification(r.Context(), state, rc, policy, channelName(channels), delivered)
+			notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
 			if err != nil {
-				httpserver.WriteInternalError(w, err)
-				return
+				return nil, err
 			}
 			fired = append(fired, map[string]any{
-				"notificationId": notificationID,
-				"policyId":       policy.ID,
-				"zoneId":         zoneID,
-				"eventCount":     count,
-				"delivered":      delivered,
-				"detail":         detail,
+				"notificationId":  notificationID,
+				"policyId":        policy.ID,
+				model.FieldZoneID: zoneID,
+				"eventCount":      count,
+				"delivered":       delivered,
+				"detail":          detail,
 			})
 		}
 	}
 
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
-		"policiesEvaluated": len(policies), "fired": fired,
-	}})
+	return map[string]any{"policiesEvaluated": len(policies), "fired": fired}, nil
 }
 
 // testAlertPolicy is POST /api/waf.alert_policies/{id}/test — the "Send test alert" button. Runs
 // the real delivery path and writes a real AlertNotification, because a test that takes a
 // different path than production proves nothing about production.
-func testAlertPolicy(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
-	policyID, err := uuid.Parse(chi.URLParam(r, "id"))
+func testAlertPolicy(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, policyID uuid.UUID) (map[string]any, error) {
+	getResult, err := state.Crud.Get(ctx, model.AlertPolicies, policyID, rc)
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid policy id.", nil)
-		return
-	}
-	getResult, err := state.Crud.Get(r.Context(), "waf.alert_policies", policyID, rc)
-	if err != nil {
-		httpserver.WriteCrudError(w, err)
-		return
+		return nil, err
 	}
 	policy := getResult.Record
 
@@ -429,22 +397,70 @@ func testAlertPolicy(w http.ResponseWriter, r *http.Request, state *httpserver.A
 		"message": "Test alert from the WAF portal",
 	}
 	delivered, detail := deliver(channels, payload)
-	notificationID, err := recordNotification(r.Context(), state, rc, policy, channelName(channels), delivered)
+	notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
+		return nil, err
 	}
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
-		"notificationId": notificationID, "delivered": delivered, "detail": detail,
-	}})
+	return map[string]any{"notificationId": notificationID, "delivered": delivered, "detail": detail}, nil
 }
 
-// MountRoutes registers this service's custom (non-generic-CRUD) endpoints onto r.
+// MountRoutes registers this service's custom (non-generic-CRUD) endpoints onto r. REST stays
+// available next to the gRPC actions (RegisterActions).
 func MountRoutes(r chi.Router, state *httpserver.AppState) {
-	wrap := func(h func(http.ResponseWriter, *http.Request, *httpserver.AppState)) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) { h(w, r, state) }
+	r.Post("/internal/incidents/correlate", func(w http.ResponseWriter, req *http.Request) {
+		rc, ok := httpserver.RequireAuth(w, req, state)
+		if !ok {
+			return
+		}
+		var body correlateBody
+		if req.ContentLength != 0 && !httpserver.DecodeJSONBody(w, req, &body) {
+			return
+		}
+		writeResult(w)(correlateIncidents(req.Context(), state, rc, body))
+	})
+	r.Post("/internal/alerts/evaluate", func(w http.ResponseWriter, req *http.Request) {
+		rc, ok := httpserver.RequireAuth(w, req, state)
+		if !ok {
+			return
+		}
+		writeResult(w)(evaluateAlerts(req.Context(), state, rc))
+	})
+	r.Post("/api/waf.alert_policies/{id}/test", httpserver.RecordActionRoute(state, "policy", func(ctx context.Context, rc *permission.RequestContext, id uuid.UUID) (map[string]any, error) {
+		return testAlertPolicy(ctx, state, rc, id)
+	}))
+}
+
+func writeResult(w http.ResponseWriter) func(map[string]any, error) {
+	return func(out map[string]any, err error) {
+		if err != nil {
+			httpserver.WriteCrudError(w, err)
+			return
+		}
+		httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": out})
 	}
-	r.Post("/internal/incidents/correlate", wrap(correlateIncidents))
-	r.Post("/internal/alerts/evaluate", wrap(evaluateAlerts))
-	r.Post("/api/waf.alert_policies/{id}/test", wrap(testAlertPolicy))
+}
+
+// RegisterActions registers the gRPC handlers for the actions declared on this service's entities.
+func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+	if err := reg.Register(model.Incidents, model.ActionCorrelate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		raw, err := json.Marshal(c.Input)
+		if err != nil {
+			return nil, err
+		}
+		var body correlateBody
+		if err := json.Unmarshal(raw, &body); err != nil {
+			return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Invalid correlate input.")
+		}
+		return crud.ToObject(correlateIncidents(ctx, state, c.RC, body))
+	}); err != nil {
+		return err
+	}
+	if err := reg.Register(model.AlertPolicies, model.ActionEvaluate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		return crud.ToObject(evaluateAlerts(ctx, state, c.RC))
+	}); err != nil {
+		return err
+	}
+	return reg.Register(model.AlertPolicies, model.ActionTest, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+		return crud.ToObject(testAlertPolicy(ctx, state, c.RC, c.ID))
+	})
 }

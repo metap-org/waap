@@ -39,6 +39,7 @@ import (
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/waap/model"
 )
 
 func jsonString(s string) json.RawMessage {
@@ -116,7 +117,7 @@ var _ crud.RecordBackend = (*GuardedZonesBackend)(nil)
 // Domain row for hostname's apex and returns its id to inject into the create payload.
 func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, error) {
 	apex := ApexDomain(hostname)
-	existing, err := b.inner.List(ctx, "waf.domains", query.ListInput{Limit: 1, Filters: [][2]string{{"apexDomain", apex}}}, rc)
+	existing, err := b.inner.List(ctx, model.Domains, query.ListInput{Limit: 1, Filters: [][2]string{{"apexDomain", apex}}}, rc)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -130,7 +131,7 @@ func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname stri
 		"verificationMethod": jsonString("dnsTxt"),
 		"verificationStatus": jsonString("unverified"),
 	}
-	created, err := b.inner.Create(ctx, "waf.domains", newDomain, rc, nil)
+	created, err := b.inner.Create(ctx, model.Domains, newDomain, rc, nil)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -174,8 +175,8 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 		link   *crossServiceLink
 		entity string
 	}{
-		{b.scanning, "waf.scan_jobs"},
-		{b.alerting, "waf.incidents"},
+		{b.scanning, model.ScanJobs},
+		{b.alerting, model.Incidents},
 		// waf.security_events is deliberately not here: it is an append-only log in the
 		// Analytics plane, and a deleted zone's history ageing out by TTL is correct, not an
 		// orphan to block on.
@@ -186,7 +187,7 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 			return "", crud.NewServiceErrorMsg(503, "reference_check_unavailable",
 				fmt.Sprintf("Could not verify cross-service references (%s unreachable); refusing to delete.", check.entity))
 		}
-		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: 1, Filters: [][2]string{{"zoneId", zoneID.String()}}}, &forwardedRC)
+		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, &forwardedRC)
 		if err != nil {
 			return "", err
 		}
@@ -211,7 +212,7 @@ func (b *GuardedZonesBackend) GetMany(ctx context.Context, entity string, ids []
 
 func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	switch entity {
-	case "waf.zones":
+	case model.Zones:
 		hostname, ok := jsonAsString(data["hostname"])
 		if !ok {
 			// No hostname at all — let the real create reject it with its own "required field"
@@ -225,12 +226,12 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 		withDomain := cloneJsonObject(data)
 		withDomain["domainId"] = jsonString(domainID.String())
 		return b.inner.Create(ctx, entity, withDomain, rc, reason)
-	case "waf.firewall_rules":
+	case model.FirewallRules:
 		if err := validateFirewallRule(data); err != nil {
 			return crud.RecordDto{}, err
 		}
 		return b.inner.Create(ctx, entity, data, rc, reason)
-	case "waf.ip_access_lists":
+	case model.IPAccessLists:
 		if err := validateIPAccessList(data); err != nil {
 			return crud.RecordDto{}, err
 		}
@@ -244,11 +245,11 @@ func (b *GuardedZonesBackend) Update(ctx context.Context, entity string, id uuid
 	// domainId is create-only (matching the old zoneDomainGuard, which only ever intercepted
 	// create) — a Zone's domain never changes once it's assigned.
 	switch entity {
-	case "waf.firewall_rules":
+	case model.FirewallRules:
 		if err := validateFirewallRule(data); err != nil {
 			return crud.RecordDto{}, err
 		}
-	case "waf.ip_access_lists":
+	case model.IPAccessLists:
 		if err := validateIPAccessList(data); err != nil {
 			return crud.RecordDto{}, err
 		}
@@ -261,7 +262,7 @@ func (b *GuardedZonesBackend) Transition(ctx context.Context, entity string, id 
 }
 
 func (b *GuardedZonesBackend) Delete(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
-	if entity == "waf.zones" {
+	if entity == model.Zones {
 		blockingEntity, err := b.zoneReferencedBy(ctx, id, rc)
 		if err != nil {
 			return crud.RecordDto{}, err

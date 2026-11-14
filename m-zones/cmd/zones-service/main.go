@@ -39,6 +39,7 @@ func main() {
 				env.String("ALERTING_GRPC_ADDR", "localhost:3021"),
 			), nil
 		},
-		Routes: zonesservice.MountRoutes,
+		Routes:  zonesservice.MountRoutes,
+		Actions: zonesservice.RegisterActions,
 	})
 }

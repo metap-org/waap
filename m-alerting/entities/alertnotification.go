@@ -6,15 +6,16 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func AlertNotificationEntity() metadata.EntityDefinition {
 	return metadata.EntityDefinition{
-		Name:      "waf.alert_notifications",
+		Name:      model.AlertNotifications,
 		Label:     "Alert Notification",
-		TableName: reconciler.QualifiedTableNameIn("waf.alert_notifications", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.AlertNotifications, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.RefField("alertPolicyId", "Alert Policy", "waf.alert_policies", "name").Require().Index(),
+			metadata.RefField("alertPolicyId", "Alert Policy", model.AlertPolicies, "name").Require().Index(),
 			metadata.NewField("triggeredAt", "Triggered At", metadata.KindDatetime).Require().Index().Sort(),
 			metadata.EnumField("channel", "Channel", "email", "webhook").Require(),
 			metadata.EnumField("deliveryStatus", "Delivery Status", "sent", "failed").Require().Index(),

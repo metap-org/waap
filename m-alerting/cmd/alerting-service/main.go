@@ -26,5 +26,6 @@ func main() {
 		Name:     "alerting-service",
 		GRPCPort: 3021,
 		Routes:   alertingservice.MountRoutes,
+		Actions:  alertingservice.RegisterActions,
 	})
 }

@@ -6,18 +6,19 @@ package entities
 import (
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/waap/model"
 )
 
 func IPAccessListEntity() metadata.EntityDefinition {
 	// zoneId is nullable for the same tenant-wide ("global") reason as FirewallRule.zoneId —
 	// nil applies to every zone in the tenant.
-	zoneID := metadata.RefField("zoneId", "Zone", "waf.zones", "hostname").Index()
+	zoneID := metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Index()
 	typ := metadata.EnumField("type", "Type", "whitelist", "blacklist").Require().Index()
 
 	return metadata.EntityDefinition{
-		Name:      "waf.ip_access_lists",
+		Name:      model.IPAccessLists,
 		Label:     "IP Access List",
-		TableName: reconciler.QualifiedTableNameIn("waf.ip_access_lists", "waf"),
+		TableName: reconciler.QualifiedTableNameIn(model.IPAccessLists, "waf"),
 		Fields: []metadata.EntityField{
 			zoneID,
 			typ,
@@ -29,8 +30,8 @@ func IPAccessListEntity() metadata.EntityDefinition {
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:   []string{"zoneId", "type", "value", "enabled"},
-			Filters:  []string{"zoneId", "type", "enabled"},
+			Fields:   []string{model.FieldZoneID, "type", "value", "enabled"},
+			Filters:  []string{model.FieldZoneID, "type", "enabled"},
 			MaxLimit: 100,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},

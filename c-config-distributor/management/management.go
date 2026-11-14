@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/waap/model"
 	"net/http"
 	"strings"
 )
@@ -244,25 +245,25 @@ func (d *Client) AllZones(ctx context.Context) ([]Record, error) {
 // DdosPoliciesFor returns every DDoS policy on this zone — a zone can carry more than one,
 // scoped by path/method.
 func (d *Client) DdosPoliciesFor(ctx context.Context, zoneID string) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafDdosPoliciesList", ddosFields, map[string]any{"zoneId": zoneID}, 50)
+	return d.list(ctx, d.zonesURL, "wafDdosPoliciesList", ddosFields, map[string]any{model.FieldZoneID: zoneID}, 50)
 }
 
 func (d *Client) RulesFor(ctx context.Context, zoneID string) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafFirewallRulesList", ruleFields, map[string]any{"zoneId": zoneID}, 50)
+	return d.list(ctx, d.zonesURL, "wafFirewallRulesList", ruleFields, map[string]any{model.FieldZoneID: zoneID}, 50)
 }
 
 // TenantWideRulesFor returns tenant-wide ("global") FirewallRules — zoneId unset applies to
 // every zone. zoneId: "" (empty value) is metap-query's own "field is unset" convention.
 func (d *Client) TenantWideRulesFor(ctx context.Context) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafFirewallRulesList", ruleFields, map[string]any{"zoneId": ""}, 50)
+	return d.list(ctx, d.zonesURL, "wafFirewallRulesList", ruleFields, map[string]any{model.FieldZoneID: ""}, 50)
 }
 
 func (d *Client) IPAccessListsFor(ctx context.Context, zoneID string) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafIpAccessListsList", ipAccessListFields, map[string]any{"zoneId": zoneID}, 100)
+	return d.list(ctx, d.zonesURL, "wafIpAccessListsList", ipAccessListFields, map[string]any{model.FieldZoneID: zoneID}, 100)
 }
 
 // TenantWideIPAccessListsFor returns tenant-wide ("global") IpAccessList entries — same
 // zoneId: "" (empty) convention as TenantWideRulesFor.
 func (d *Client) TenantWideIPAccessListsFor(ctx context.Context) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafIpAccessListsList", ipAccessListFields, map[string]any{"zoneId": ""}, 100)
+	return d.list(ctx, d.zonesURL, "wafIpAccessListsList", ipAccessListFields, map[string]any{model.FieldZoneID: ""}, 100)
 }
