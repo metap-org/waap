@@ -158,6 +158,20 @@ Cả bốn luồng N05 đến N08 dùng chung cổng 443 và tách theo SNI ho�
 | N27 | Mọi VM | `infra` (Z6) | 123/UDP, 53/UDP | — | Đồng bộ giờ, DNS nội bộ |
 | N28 | Z3, `ci-runner` | `registry` (Z6) | 443/TCP | mTLS | Kéo và đẩy image |
 | N29 | `ci-runner`, GitOps controller | `egress-1` (Z2) | 3128/TCP | mTLS | Kéo mã từ Git, đẩy artifact ra ngoài khi cần |
+| M01 | Mọi VM trừ Z0, Z1, Z5 | `registry` (Z6) | 80/TCP, 3142/TCP | Chữ ký apt của mirror (khoá riêng, client ghim fingerprint); sha256 cho artifact | Kéo gói đã được promote và bản vá Ubuntu qua bộ nhớ đệm. Cổng 80 là HTTP thuần vì apt và sha256 đã kiểm toàn vẹn; TLS thêm ở P2 và P5 |
+| M02 | `registry` | `egress-1` (Z2) | 3128/TCP | Allowlist domain ở squid | Mirror kéo từ repo vendor và Ubuntu |
+| M03 | Z1 (mọi edge) | `egress-1` (Z2) | 3128/TCP | Allowlist domain ở squid | Z1 vá Ubuntu và tải gói vendor, không qua mirror vì X01 chặn tới Z6 |
+
+### 4.6.1 Đường vá và cài gói theo vùng
+
+Database chạy trên VM, cài từ repo của vendor (không dùng gói Ubuntu) để nâng bản dễ. Z4 và Z5 không có đường ra Internet (X04), nên gói đi qua mirror ở `registry`:
+
+| Vùng | Đường | Ghi chú |
+|---|---|---|
+| Z2, Z3, Z4, Z6 | M01 tới `registry` | Bản mới chỉ tới client sau khi người vận hành **promote** snapshot; hoàn tác bằng promote snapshot cũ |
+| Z1 | M03 tới `egress-1` | Không có promote; chỉ nên dùng cho bản vá Ubuntu và `valkey-edge` |
+| Z5 | **Đẩy vào**, không có luồng mới | X05 cấm Z5 gọi ra mọi nơi. Máy điều khiển lấy gói đã chuẩn bị ở `registry` rồi đẩy vào Z5 qua `bastion` (N25); máy đích kiểm sha256 rồi cài từ file cục bộ, không cần mạng |
+| Z0 | Không áp dụng | Internet giả của lab |
 
 ### 4.7 Cấm tuyệt đối (kiểm bằng test)
 
@@ -361,6 +375,7 @@ Mỗi dòng ở §4.7 thành một test tự động chạy trong CI của lab (
 
 ## 7. Điểm còn mở
 
+- **M01 đến M03 và cơ chế đẩy vào Z5 (2026-11-13) mới được ghi vào đây, chờ chủ dự án duyệt.** M03 làm lệch lý do của X01 ("Edge chỉ đi ra cổng `egw-1`"): thêm đường Z1 tới `egress-1`. Nếu không chấp nhận, Z1 cũng phải dùng cơ chế đẩy như Z5. Bản ứng viên khi đẩy lấy từ apt của `registry` (gồm cả kênh cập nhật, không chỉ bảo mật).
 - **Mâu thuẫn nội bộ bộ sinh luật tìm ra (2026-11-13), chờ chủ dự án chọn:** N27 (mọi VM dùng NTP, DNS ở `infra`) đụng X01, X05, X02; N24 (WireGuard Z0 vào `bastion`) đụng X02. Chi tiết và hai hướng giải ở [labs/infra/README.md](../../../labs/infra/README.md).
 
 | Câu | Ghi chú |

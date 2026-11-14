@@ -256,7 +256,7 @@ def check(profile):
                 errs.append(f'{f["id"]} mở cổng {sorted(bad)} bị {x["id"]} cấm')
     # 2. T07 hai chiều với 7.6: mọi dòng ma trận có luật, mọi luật có dòng ma trận.
     md = DOC.read_text(encoding="utf-8")
-    doc_ids = set(re.findall(r"^\| (N\d\d) \|", md, re.M))
+    doc_ids = set(re.findall(r"^\| ([NM]\d\d) \|", md, re.M))
     covered = {c for f in flows["flows"] for c in f.get("covers", [f["id"]])}
     for i in sorted(doc_ids - covered):
         errs.append(f"{i} có trong 7.6 nhưng không có luật")

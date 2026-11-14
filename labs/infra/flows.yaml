@@ -40,14 +40,14 @@ flows:
   - { id: L02a, src: "role:k8s-app", dst: "role:k8s-cp", proto: tcp, ports: [6443, 9345], enforce: host, covers: [] }
   - { id: L02b, src: "zone:Z3", dst: "zone:Z3", proto: tcp, ports: [10250, 9099], enforce: host, covers: [] }
   - { id: L02c, src: "zone:Z3", dst: "zone:Z3", proto: udp, ports: [8472], enforce: host, covers: [] }
-  # --- Mirror nội bộ ở registry (ĐỀ XUẤT bổ sung 7.6, chờ duyệt) ---
+  # --- Mirror nội bộ ở registry (đã ghi vào 7.6 §4.6, chờ chủ dự án duyệt) ---
   # M01: client (trừ Z1, Z5) đọc mirror apt và kho artifact (tcp/80) và bộ nhớ đệm Ubuntu (tcp/3142). Loại Z0, Z1, Z5 vì X01 và X05 cấm khởi tạo kết nối tới Z6:
   #      Z1 và Z5 cần cơ chế đẩy từ vùng vận hành (cùng loại vấn đề với N27), chưa quyết.
-  - { id: M01, src: "all-vms-except:[Z0,Z1,Z5]", dst: "role:registry", proto: tcp, ports: [80, 3142], covers: [] }
+  - { id: M01, src: "all-vms-except:[Z0,Z1,Z5]", dst: "role:registry", proto: tcp, ports: [80, 3142] }
   # M02: registry kéo từ vendor và Ubuntu qua egress-1 (allowlist). Cùng ý với N29 nhưng cho vai trò registry (full tách khỏi ci-runner).
   # M03: Z1 tới egress-1 (ở Z2, không nằm trong danh sách cấm của X01) để vá Ubuntu và tải gói vendor qua allowlist. Z5 không có luồng tương đương: X05 cấm mọi vùng.
-  - { id: M03, src: "zone:Z1", dst: "role:egress-1", proto: tcp, ports: [3128], covers: [] }
-  - { id: M02, src: "role:registry", dst: "role:egress-1", proto: tcp, ports: [3128], covers: [] }
+  - { id: M03, src: "zone:Z1", dst: "role:egress-1", proto: tcp, ports: [3128] }
+  - { id: M02, src: "role:registry", dst: "role:egress-1", proto: tcp, ports: [3128] }
   # --- Chỉ profile full ---
   # etcd HA: giữa các server với nhau (không bao giờ cho worker). Chỉ có tác dụng khi có từ 2 server.
   - { id: L02d, src: "role:k8s-cp", dst: "role:k8s-cp", proto: tcp, ports: [2379, 2380], enforce: host, covers: [], profiles: [full] }

@@ -5532,14 +5532,13 @@ lab seal &amp;&amp; lab nettest          # gỡ bootstrap rồi chạy lại
 <li>Chưa có ingress controller trong K8s (N04, N09 nói cổng 443).</li>
 <li>Kafka (ADR-0018) và OpenBao (P5) không dịch vụ nào dùng ở code hiện tại.</li>
 </ol>
-<h2 id="f-infra-readme--luồng-mirror-đề-xuất-bổ-sung-76-chờ-duyệt">Luồng mirror (đề xuất bổ sung 7.6, chờ duyệt)</h2>
+<h2 id="f-infra-readme--luồng-mirror-đã-ghi-vào-76-46-chờ-chủ-dự-án-duyệt">Luồng mirror (đã ghi vào 7.6 §4.6, chờ chủ dự án duyệt)</h2>
 <ul>
 <li><strong>M01</strong> mọi VM trừ Z0, Z1, Z5 tới <code>registry</code> tcp 80 (mirror apt và artifact) và 3142 (apt-cacher-ng).</li>
 <li><strong>M02</strong> <code>registry</code> tới <code>egress-1</code> tcp 3128 để kéo từ vendor.</li>
-<li>Cả hai <code>covers: []</code> vì không có trong 7.6; cần thêm vào 7.6 nếu được duyệt.</li>
-<li><strong>M03</strong> <code>zone:Z1</code> tới <code>egress-1</code> tcp 3128 (cũng <code>covers: []</code>, đề xuất). Egress-1 nằm ở Z2, không có trong danh sách cấm của X01. Squid được mở thêm nguồn <code>10.10.10.0/24</code>.</li>
+<li><strong>M03</strong> <code>zone:Z1</code> tới <code>egress-1</code> tcp 3128. Egress-1 nằm ở Z2, không có trong danh sách cấm của X01. Squid được mở thêm nguồn <code>10.10.10.0/24</code>.</li>
 <li><strong>Z5 không có luồng đi ra</strong> (X05 cấm mọi vùng). Bản vá được <strong>đẩy vào</strong> bằng <code>lab push</code> (<code>ansible/push.yml</code>, role <code>pkg_push</code>) qua bastion (N25), không thêm luồng nào; một test khẳng định không luồng nào có nguồn là Z5.</li>
-<li>Chờ duyệt: ghi M01 đến M03 và cơ chế đẩy vào 7.6.</li>
+<li>M01 đến M03 và cơ chế đẩy vào Z5 đã ghi ở 7.6 §4.6 và §4.6.1; điểm cần duyệt (M03 lệch lý do của X01) ở 7.6 §7.</li>
 </ul>
 </section>
 <section class="doc" id="f-ansible-readme"><div class="path">ansible/README.md</div><h1 id="f-ansible-readme--bộ-cài-và-hardening-p4-lát-1">Bộ cài và hardening (P4, lát 1)</h1>

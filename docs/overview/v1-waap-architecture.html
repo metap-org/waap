@@ -8589,6 +8589,63 @@ Cổng là mặc định, có thể đổi.</p>
 <td>mTLS</td>
 <td>Kéo mã từ Git, đẩy artifact ra ngoài khi cần</td>
 </tr>
+<tr>
+<td>M01</td>
+<td>Mọi VM trừ Z0, Z1, Z5</td>
+<td><code>registry</code> (Z6)</td>
+<td>80/TCP, 3142/TCP</td>
+<td>Chữ ký apt của mirror (khoá riêng, client ghim fingerprint); sha256 cho artifact</td>
+<td>Kéo gói đã được promote và bản vá Ubuntu qua bộ nhớ đệm. Cổng 80 là HTTP thuần vì apt và sha256 đã kiểm toàn vẹn; TLS thêm ở P2 và P5</td>
+</tr>
+<tr>
+<td>M02</td>
+<td><code>registry</code></td>
+<td><code>egress-1</code> (Z2)</td>
+<td>3128/TCP</td>
+<td>Allowlist domain ở squid</td>
+<td>Mirror kéo từ repo vendor và Ubuntu</td>
+</tr>
+<tr>
+<td>M03</td>
+<td>Z1 (mọi edge)</td>
+<td><code>egress-1</code> (Z2)</td>
+<td>3128/TCP</td>
+<td>Allowlist domain ở squid</td>
+<td>Z1 vá Ubuntu và tải gói vendor, không qua mirror vì X01 chặn tới Z6</td>
+</tr>
+</tbody>
+</table>
+<h3 id="f-07-deployment-06-network-zones-and-flows--461-đường-vá-và-cài-gói-theo-vùng">4.6.1 Đường vá và cài gói theo vùng</h3>
+<p>Database chạy trên VM, cài từ repo của vendor (không dùng gói Ubuntu) để nâng bản dễ. Z4 và Z5 không có đường ra Internet (X04), nên gói đi qua mirror ở <code>registry</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Vùng</th>
+<th>Đường</th>
+<th>Ghi chú</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Z2, Z3, Z4, Z6</td>
+<td>M01 tới <code>registry</code></td>
+<td>Bản mới chỉ tới client sau khi người vận hành <strong>promote</strong> snapshot; hoàn tác bằng promote snapshot cũ</td>
+</tr>
+<tr>
+<td>Z1</td>
+<td>M03 tới <code>egress-1</code></td>
+<td>Không có promote; chỉ nên dùng cho bản vá Ubuntu và <code>valkey-edge</code></td>
+</tr>
+<tr>
+<td>Z5</td>
+<td><strong>Đẩy vào</strong>, không có luồng mới</td>
+<td>X05 cấm Z5 gọi ra mọi nơi. Máy điều khiển lấy gói đã chuẩn bị ở <code>registry</code> rồi đẩy vào Z5 qua <code>bastion</code> (N25); máy đích kiểm sha256 rồi cài từ file cục bộ, không cần mạng</td>
+</tr>
+<tr>
+<td>Z0</td>
+<td>Không áp dụng</td>
+<td>Internet giả của lab</td>
+</tr>
 </tbody>
 </table>
 <h3 id="f-07-deployment-06-network-zones-and-flows--47-cấm-tuyệt-đối-kiểm-bằng-test">4.7 Cấm tuyệt đối (kiểm bằng test)</h3>
@@ -9022,6 +9079,7 @@ Cổng là mặc định, có thể đổi.</p>
 </table>
 <h2 id="f-07-deployment-06-network-zones-and-flows--7-điểm-còn-mở">7. Điểm còn mở</h2>
 <ul>
+<li><strong>M01 đến M03 và cơ chế đẩy vào Z5 (2026-11-13) mới được ghi vào đây, chờ chủ dự án duyệt.</strong> M03 làm lệch lý do của X01 (&quot;Edge chỉ đi ra cổng <code>egw-1</code>&quot;): thêm đường Z1 tới <code>egress-1</code>. Nếu không chấp nhận, Z1 cũng phải dùng cơ chế đẩy như Z5. Bản ứng viên khi đẩy lấy từ apt của <code>registry</code> (gồm cả kênh cập nhật, không chỉ bảo mật).</li>
 <li><strong>Mâu thuẫn nội bộ bộ sinh luật tìm ra (2026-11-13), chờ chủ dự án chọn:</strong> N27 (mọi VM dùng NTP, DNS ở <code>infra</code>) đụng X01, X05, X02; N24 (WireGuard Z0 vào <code>bastion</code>) đụng X02. Chi tiết và hai hướng giải ở <a href="../../../labs/infra/README.md" target="_blank" rel="noopener">labs/infra/README.md</a>.</li>
 </ul>
 <table>
