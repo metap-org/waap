@@ -6,7 +6,7 @@
 // exactly what a portal user with its service account's role sees, and management-plane stays free to
 // change how it stores things.
 //
-// Authentication is runtime.ServiceTokenSource — a real user this process logs in as, refreshed
+// Authentication is httpx.ServiceTokenSource — a real user this process logs in as, refreshed
 // in the background. metap already learned the alternative the hard way: a hand-minted static
 // JWT expired inside a running deployment and crashed the caller at boot.
 //
@@ -22,10 +22,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"net/http"
 	"strings"
-
-	"github.com/metap-org/metap/pkg/runtime"
 )
 
 // Record is a record as reshaped from the GraphQL response — the fixed envelope's id/status plus
@@ -107,10 +106,10 @@ var (
 type Client struct {
 	http     *http.Client
 	zonesURL string
-	token    *runtime.ServiceTokenSource
+	token    *httpx.ServiceTokenSource
 }
 
-func New(httpClient *http.Client, zonesURL string, token *runtime.ServiceTokenSource) *Client {
+func New(httpClient *http.Client, zonesURL string, token *httpx.ServiceTokenSource) *Client {
 	return &Client{http: httpClient, zonesURL: zonesURL, token: token}
 }
 
