@@ -1,6 +1,6 @@
 // waf-bootstrap applies the WAAP personas (and an optional BOOTSTRAP_FILE overlay with initial
 // users) to every active tenant, or to BOOTSTRAP_TENANT_IDS. One-shot and safe to re-run: it only
-// adds what is missing. Passwords come from the environment variable each user's passwordRef
+// adds what is missing. Passwords come from the environment variable each user's secretRef
 // names; with NODE_ENV=production a missing one aborts before anything is written.
 package main
 
