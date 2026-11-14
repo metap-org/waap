@@ -58,7 +58,7 @@ theo chính sách tài liệu ([2.4](../02-constraints/00-index.md#24-convention
 |---|---|
 | **WAAP** | Web Application & API Protection: WAF, DDoS L7, bot, API security gộp thành một sản phẩm |
 | **Plane** | Một phần hệ thống có chu kỳ deploy và yêu cầu riêng; có 4 plane ([ADR-0001](../09-adr/0001-four-planes.md)) |
-| **Management plane** | Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Thư mục `management-plane/` của repo demo (trước 2026-11-08 tên là `data-plane/`) |
+| **Management plane** | Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Các thư mục `m-*` của repo demo (từ 2026-11-14; trước đó thư mục `management-plane/`, trước 2026-11-08 tên là `data-plane/`) |
 | **Control plane** | Plane biến ý định thành config edge chạy được và phân phối nó |
 | **Edge plane** | Đường đi của traffic thật; theo nghĩa chuẩn ngành là *data plane* |
 | **Analytics plane** | Plane nhận, lưu, truy vấn, phân tích log; detection, cảnh báo, export, metering |

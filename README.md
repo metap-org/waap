@@ -2,18 +2,26 @@
 
 Sản phẩm demo **WAAP** (Web Application & API Protection, kiểu Cloudflare) — build portal nhanh
 trên nền `metap` (`../metap`), phần thực thi bảo vệ thật tách riêng. Repo chia theo 4 plane của
-[ADR-0001](docs/architecture/09-adr/0001-four-planes.md) (thư mục `management-plane/` trước 2026-11-08
-tên là `data-plane/`):
+[ADR-0001](docs/architecture/09-adr/0001-four-planes.md). Từ 2026-11-14 plane không còn là thư mục:
+mỗi service là một thư mục phẳng ở gốc repo, tên mang tiền tố plane — `m-` management, `c-` control,
+`e-` edge, `a-` analytics (thư mục `management-plane/` trước 2026-11-08 tên là `data-plane/`):
 
-| Thư mục | Vai trò | Trạng thái |
+| Thư mục | Plane | Vai trò |
 |---|---|---|
-| [`management-plane/`](management-plane/) | Nơi giữ dữ liệu/config nguồn — portal nghiệp vụ (Zone, DDoS policy, firewall rule, vulnerability scan, incident, alert), build trên `metap` | Backend: cả 9 entity pillar 1-4 chạy được, test qua API thật. Frontend (`web/`, `@metap/platform-ui`): generic list/form/detail/workflow UI chạy được, test qua browser thật — còn thiếu portal IA riêng theo `docs/07` + logic custom (DNS verify, dashboard, correlation, alert gửi thật) |
-| `control-plane/` | Lấy config từ `management-plane`, tính toán (compile) thành rule-set, đẩy (distribute) xuống `edge-plane` — worker nền, không UI | Chưa bắt đầu |
-| `edge-plane/` | Thực thi mitigation thật tại biên (nhận traffic, evaluate rule, chặn/challenge) — hệ thống riêng, hiệu năng cao | Chưa bắt đầu |
-| [`analytics-plane/`](analytics-plane/) | Log và số liệu traffic: nhận security event từ control-plane, lưu ClickHouse, query API cho portal và alerting — không dùng `metap` | Bản đầu (2026-11-08): `analytics-api`, xem README của nó |
-| [`devtools/`](devtools/) | Không phải plane: thứ giả lập thế giới bên ngoài cho dev/staging (`dns-mock`) | Dùng được |
+| `m-zones/`, `m-scanning/`, `m-alerting/` | Management | 3 service backend portal (Zone/DDoS/firewall/IP list, scan, alert/incident) — build trên `metap` |
+| `m-gateway/` | Management | GraphQL gateway của portal (engine generic ở `metap/pkg/graphqlgateway`, ở đây chỉ còn mutation riêng của WAF) |
+| `m-analytics/` | Management | Read model security event, dùng chung bởi `m-gateway` và `m-alerting` (dữ liệu nằm ở `a-api`) |
+| `m-web/` | Management | Customer Portal (`@metap/platform-ui`) |
+| `m-deploy/` | Management | Dockerfile, docker-compose, `.env.example`, key JWKS cho các `m-*` service |
+| `c-config-distributor/` | Control | Lấy config từ management, compile thành rule-set, đẩy xuống Redis cho edge; nhận telemetry từ edge — worker nền, không UI |
+| `e-edge/` | Edge | Thực thi mitigation thật tại biên (evaluate rule, chặn/challenge) — module Go riêng, chỉ import `metap/pkg/kit` |
+| `a-api/` | Analytics | Nhận security event từ control, lưu ClickHouse, query API cho portal và alerting — module Go riêng, chỉ import `metap/pkg/kit` |
+| [`devtools/`](devtools/) | — | Không phải plane: thứ giả lập thế giới bên ngoài cho dev/staging (`dns-mock`) |
 
-Xem `management-plane/docs/04-architecture-boundary.md` cho luồng dữ liệu giữa các plane (config
+Các service `m-*` và `c-*` chung một Go module ở gốc repo (`go build ./...`, `go test ./...` từ gốc);
+`e-edge` và `a-api` là module riêng.
+
+Xem `docs/management/04-architecture-boundary.md` cho luồng dữ liệu giữa các plane (config
 đi xuống, telemetry đi lên) và lý do tách theo hướng này.
 
-Bắt đầu đọc từ `management-plane/docs/01-product-vision.md`.
+Bắt đầu đọc từ `docs/management/01-product-vision.md`.

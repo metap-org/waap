@@ -26,6 +26,23 @@ than deleted, not a path/command that still works in this repo — read it as "t
 Rust version used to do/be called," the same way `../metap/CLAUDE.md` treats its own
 `crates/`→`go/` references after its Rust removal.
 
+**Update 2026-11-14: the plane folders were flattened into one directory per service, named by plane
+prefix** — `m-` management, `c-` control, `e-` edge, `a-` analytics (ADR-0001's four planes stay the
+architecture; they are no longer directories). Read every older `<plane>/...` path in this file, in
+READMEs and in docs through this map: `management-plane/zonesservice|scanningservice|alertingservice|
+wafgateway|analytics|web` → `m-zones` / `m-scanning` / `m-alerting` / `m-gateway` / `m-analytics` /
+`m-web`; `management-plane/docs` → `docs/management`; `management-plane/{Dockerfile,docker-compose*.yml,
+README.md,.env.example,keys}` → `m-deploy/`; `management-plane/cmd/<bin>` → `<service>/cmd/<bin>`
+(zones-service in `m-zones`, scanning-service in `m-scanning`, alerting-service in `m-alerting`,
+waf-graphql-gateway in `m-gateway`); `control-plane/*` → `c-config-distributor/*` (still one process);
+`edge-plane` → `e-edge`; `analytics-plane` → `a-api`. **Go modules:** the m-* and c-* services share ONE
+module at the repo root (`github.com/metap-org/waap`, `replace github.com/metap-org/metap => ../metap`,
+`go build ./...`/`go test ./...` from the root); `e-edge` and `a-api` stay their own modules
+(`.../waap/e-edge`, `.../waap/a-api`, kit-only depguard guard) — that separate module is the reason the
+guard can work. The Docker build for the m-* services takes the package dir:
+`--build-arg SERVICE=m-zones/cmd/zones-service`. A new service is a new `<prefix>-<name>/` directory,
+never a sub-folder of a plane.
+
 **Update 2026-11-07:** "zero `metap-go` dependency" for `edge-plane/go` above is history too —
 it now imports `metap`'s `pkg/kit/*` and nothing else from `metap` (depguard-enforced, see
 Working conventions). `metap`'s Go module moved to that repo's root as
@@ -59,9 +76,9 @@ build`, and `management-plane`'s own 3 e2e tests now pass against a real Postgre
 FirewallRule created through the portal's own GraphQL path was compiled, published to Redis, and
 enforced by a real `waf-edge` process against a real HTTP request end to end, telemetry included.
 The product/architecture
-spec lives in `management-plane/docs/` and remains the source of truth
+spec lives in `docs/management/` and remains the source of truth
 for anything not yet built. Read
-`management-plane/docs/01-product-vision.md` through `04-architecture-boundary.md` in order before
+`docs/management/01-product-vision.md` through `04-architecture-boundary.md` in order before
 proposing or writing any code — they contain the settled decisions (scope, domain model, personas,
 plane boundaries) that later work must stay consistent with. Docs are written in Vietnamese.
 
@@ -79,16 +96,17 @@ reinvent.
 
 ## Repo structure: 4 planes, 4 deploy cycles
 
-The repo is deliberately split into four top-level plane directories (ADR-0001: Management,
-Control, Edge, Analytics), each a separate codebase/deploy cycle with a hard boundary — do not
-blur these when implementing:
+The repo is split by the four planes of ADR-0001 (Management, Control, Edge, Analytics), each a
+separate codebase/deploy cycle with a hard boundary — do not blur these when implementing. Since
+2026-11-14 the planes are not directories: every service is a flat top-level directory whose name
+carries the plane prefix (`m-`, `c-`, `e-`, `a-`):
 
 | Directory | Role | Status |
 |---|---|---|
-| `management-plane/` | Business portal (source of truth): Zone, DDoS policy, firewall rule, vulnerability scan, incident, alert — built on `metap`, full CRUD/workflow/permission UI | 3 services (`zones`/`scanning`/`alerting`) + `waf-graphql-gateway` (own binary, `management-plane/graphql-gateway/`, not just config — 7 custom mutations, wraps `metap`'s generic gateway library via `build_with_extensions`) + Customer Portal frontend (10-module IA, zone-centric). Custom non-CRUD endpoints live in each service's `src/routes.rs`. **Both compose files must build/run `waf-graphql-gateway`, not `metap/crates/metap-graphql-gateway`'s generic binary** — found live, 2026-09-04: they'd been pointed at the generic one, silently dropping every custom field (`docs/roadmap/76-waf-portal-live-bugfixes.md`) |
-| `control-plane/` | Headless worker: pulls config changes from `management-plane` (RabbitMQ outbox subscribe), compiles them into an edge-ready rule-set, writes to Redis/DragonflyDB. No UI, not CRUD | `waf-config-distributor` — 3 jobs in one process: subscribe (fast path), periodic full resync (**the convergence guarantee**), telemetry ingest. The Redis contract is `waf-config-distributor/src/ruleset.rs` |
-| `analytics-plane/` | Telemetry: security events (later access logs, usage) — ingest, storage, query. **Not** built on `metap` (ADR-0009): only `pkg/kit/*`, depguard-enforced like `edge-plane` | `analytics-api` (2026-11-08, first cut): batch ingest from `control-plane` (`POST /v1/security-events/ingest`, ingest secret + platform token, tenant from the token), ClickHouse MergeTree with TTL retention (30 days), structured query API (allowlisted equality filters, keyset cursor, metap-shaped aggregate). Verifies platform tokens itself against zones-service's JWKS. Management reads it two ways, both with the caller's own token: the gateway serves `waf.security_events` as a read-only read model (`management-plane/analytics`, no mutations, metadata served by the gateway itself), and alerting-service's correlate/evaluate sweeps read a time window. Not yet: Kafka/Vector/enricher/archiver/detection/exporter, zone/role-level read filtering |
-| `edge-plane/` | High-performance, low-latency mitigation engine: evaluates rules against real traffic, blocks/challenges/logs. Deliberately **not** built on `metap`/metadata-driven approach | `waf-edge` — hyper 1.x (now Go `net/http`), **no `metap` platform dependency** — only `metap`'s stdlib-only `pkg/kit/*` since 2026-11-07, depguard-enforced. `ArcSwap` rule snapshot (a request never touches Redis), DDoS budget → priority-ordered rules → block/challenge/log → proxy to origin |
+| `m-zones/` `m-scanning/` `m-alerting/` `m-gateway/` `m-analytics/` `m-web/` `m-deploy/` | Business portal (source of truth): Zone, DDoS policy, firewall rule, vulnerability scan, incident, alert — built on `metap`, full CRUD/workflow/permission UI | 3 services (`zones`/`scanning`/`alerting`) + `waf-graphql-gateway` (own binary, `management-plane/graphql-gateway/`, not just config — 7 custom mutations, wraps `metap`'s generic gateway library via `build_with_extensions`) + Customer Portal frontend (10-module IA, zone-centric). Custom non-CRUD endpoints live in each service's `src/routes.rs`. **Both compose files must build/run `waf-graphql-gateway`, not `metap/crates/metap-graphql-gateway`'s generic binary** — found live, 2026-09-04: they'd been pointed at the generic one, silently dropping every custom field (`docs/roadmap/76-waf-portal-live-bugfixes.md`) |
+| `c-config-distributor/` | Headless worker: pulls config changes from `management-plane` (RabbitMQ outbox subscribe), compiles them into an edge-ready rule-set, writes to Redis/DragonflyDB. No UI, not CRUD | `waf-config-distributor` — 3 jobs in one process: subscribe (fast path), periodic full resync (**the convergence guarantee**), telemetry ingest. The Redis contract is `waf-config-distributor/src/ruleset.rs` |
+| `a-api/` | Telemetry: security events (later access logs, usage) — ingest, storage, query. **Not** built on `metap` (ADR-0009): only `pkg/kit/*`, depguard-enforced like `edge-plane` | `analytics-api` (2026-11-08, first cut): batch ingest from `control-plane` (`POST /v1/security-events/ingest`, ingest secret + platform token, tenant from the token), ClickHouse MergeTree with TTL retention (30 days), structured query API (allowlisted equality filters, keyset cursor, metap-shaped aggregate). Verifies platform tokens itself against zones-service's JWKS. Management reads it two ways, both with the caller's own token: the gateway serves `waf.security_events` as a read-only read model (`management-plane/analytics`, no mutations, metadata served by the gateway itself), and alerting-service's correlate/evaluate sweeps read a time window. Not yet: Kafka/Vector/enricher/archiver/detection/exporter, zone/role-level read filtering |
+| `e-edge/` | High-performance, low-latency mitigation engine: evaluates rules against real traffic, blocks/challenges/logs. Deliberately **not** built on `metap`/metadata-driven approach | `waf-edge` — hyper 1.x (now Go `net/http`), **no `metap` platform dependency** — only `metap`'s stdlib-only `pkg/kit/*` since 2026-11-07, depguard-enforced. `ArcSwap` rule snapshot (a request never touches Redis), DDoS budget → priority-ordered rules → block/challenge/log → proxy to origin |
 
 **`devtools/` is not a plane** (2026-11-08): dev/staging stand-ins for the outside world, each its
 own Go module with no `metap` dependency and never deployed to production. `devtools/dns-mock`
@@ -126,7 +144,7 @@ in that PR, and is cheap to reverse (the edge knows exactly one ingest URL).
 
 ## Domain model (business-level, not yet `EntityDefinition` code)
 
-`management-plane/docs/02-domain-model.md` has full field-level detail. Summary of the entity graph:
+`docs/management/02-domain-model.md` has full field-level detail. Summary of the entity graph:
 
 ```
 Tenant (reused from metap control.tenants)
@@ -449,7 +467,7 @@ staleness, not re-decided here:**
 - `FirewallRule.matchCondition` is its own JSON grammar, not `metap-permission`'s
   `PolicyCondition` — `zonesservice/entities/firewallrule.go`'s own doc comment states why (no
   `uri.*`/`header.*`/`body.*` namespace there, missing `Contains`/`Regex`/`CidrMatch`), and
-  `management-plane/docs/02-domain-model.md`'s 2026-08-30 "Chốt" section recorded the same decision.
+  `docs/management/02-domain-model.md`'s 2026-08-30 "Chốt" section recorded the same decision.
 - `Incident` correlation is a static v1 rule (same `zoneId` + same `sourceIp` inside a 15-minute
   window, threshold events or more), not per-tenant configurable — see
   `alertingservice/routes.go`'s own doc comment and the same domain-model section.
@@ -508,11 +526,11 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
 - **HTTP baseline (2026-11-14, audit P0):** every listener uses `metap`'s `pkg/kit/httpx` — `Serve`/`ServeContext` (server timeouts), `DecodeJSON`/`DecodeJSONBody` (bounded body, 413), `WriteJSON`/`WriteError` (the one `{"error":{code,message}}` shape), `Recover`, `SecretEqual` (constant-time shared secret), `BearerToken` — never a local `writeJSON`, a hand-rolled `ConstantTimeCompare`, or `json.NewDecoder(r.Body)` on its own. The edge buffers request bodies up to `MAX_REQUEST_BODY_BYTES` (default 10 MiB, 413 beyond) and gives the origin 30s to send headers. `devtools/` is left alone (separate modules, no `metap` dependency).
 - Three independent Cargo workspaces, one per plane — never one workspace spanning them, since a
   shared workspace would mean a portal change rebuilds and redeploys the edge. `cargo
-  build/test/clippy --workspace` from `management-plane/`, `control-plane/`, or `edge-plane/`
-  separately; `pnpm dev`/`tsc -b`/`oxlint` from `management-plane/web`.
-- `edge-plane/` may import **only `github.com/metap-org/metap/pkg/kit/*`** from `metap` —
+  build/test/clippy --workspace` from the repo root (m-* and c-* services), `e-edge/` or `a-api/`
+  separately; `pnpm dev`/`tsc -b`/`oxlint` from `m-web`.
+- `e-edge/` and `a-api/` may import **only `github.com/metap-org/metap/pkg/kit/*`** from `metap` —
   standard-library-only utilities (`kit/env`, `kit/shutdown`, `kit/httpx`) with no
-  metadata/CRUD/permission/DB knowledge, enforced by depguard (`edge-plane/.golangci.yml`, run
+  metadata/CRUD/permission/DB knowledge, enforced by depguard (`e-edge/.golangci.yml`, `a-api/.golangci.yml`, run
   in CI). This replaced the earlier "never gain a `metap` dependency" rule on 2026-11-07 (project
   owner's call: non-management-plane Go code was re-writing env/shutdown/serve helpers from
   scratch). The rule's purpose is unchanged — the edge is not metadata-driven, and a portal
@@ -520,16 +538,16 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   If something there needs any *other* `metap` package, that is still the signal the work
   belongs in `control-plane` instead. Missing a general-purpose helper? Add it to `metap`'s
   `pkg/kit` (stdlib-only, that repo's own depguard rule) rather than re-implementing it here.
-- **control-plane seams** (`control-plane/ports`): `ConfigSource` (management-plane reads),
+- **control-plane seams** (`c-config-distributor/ports`): `ConfigSource` (management-plane reads),
   `EventSink` (telemetry writes), `RuleSink` (Redis rule-sets) — `sync`/`resync`/`subscribe`/
   `ingest` take these, and `ports/portsmock` (mockery) makes the pipeline unit-testable without a
   live management-plane or Redis. **The control-plane → edge-plane Redis format is pinned by golden
-  files in `contracts/ruleset/`** (producer test in `control-plane/ruleset`, consumer test in
-  `edge-plane/ruleset`); see that directory's README before changing either `ruleset`
+  files in `contracts/ruleset/`** (producer test in `c-config-distributor/ruleset`, consumer test in
+  `e-edge/ruleset`); see that directory's README before changing either `ruleset`
   package.
 - **Integration tests** (anything needing real Postgres) carry `//go:build integration` and use
   `metap`'s `pkg/testkit` (a fresh migrated database per test; fails, never skips, when Postgres
-  is unreachable): `go test -tags integration ./...` from `management-plane`, with
+  is unreachable): `go test -tags integration ./...` from the repo root, with
   `docker compose up -d postgres` running in `../metap` (testkit defaults to its
   `localhost:5433`; override with `METAP_TEST_DATABASE_URL`). Plain `go test ./...` is unit-only.
 - **Phases 70/71 (2026-09-03) and 72 (2026-09-04) landed unverified on purpose, then got a
@@ -566,7 +584,7 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   what this live-Postgres pass found) is in the "Xác minh" / "Đã verify" sections of
   `../metap-docs/docs/roadmap/70-aggregate-api.md`, `71-waf-admin-portal.md`, and
   `72-control-edge-planes.md`.
-- Docs are the spec. If an implementation choice isn't settled in `management-plane/docs/`, don't invent
+- Docs are the spec. If an implementation choice isn't settled in `docs/management/`, don't invent
   one silently — it's likely one of the explicitly-flagged open questions above.
 - **Current state (2026-11-08): single JWKS issuer.** `zones-service` is the only service holding a
   signing key (`JWKS_KEYS_DIR` → `metap`'s `jwks.LoadKeyDir`: `<kid>.key` files + `signing-kid`);
@@ -582,9 +600,9 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   refetch on an unknown kid and on a timer) — verified end to end on the compose stack: publish,
   promote, retire, with an old-key token rejected by all 3 services after retirement. RSA
   (`AUTH_JWT_PUBLIC_KEY_PATH`) is only a cutover fallback for kid-less tokens; the compose files no
-  longer set it. Keys live in `management-plane/keys/` (gitignored, and excluded from the image build
-  by `management-plane/Dockerfile.dockerignore`) and are mounted at runtime. Recipe and rotation steps:
-  `management-plane/README.md` "Token: một issuer duy nhất".
+  longer set it. Keys live in `m-deploy/keys/` (gitignored, and excluded from the image build
+  by `m-deploy/Dockerfile.dockerignore`) and are mounted at runtime. Recipe and rotation steps:
+  `m-deploy/README.md` "Token: một issuer duy nhất".
 - **(History) Auth moved from a shared static RSA keypair to `metap-jwks` (Ed25519, 2026-09-04).** The 3
   `management-plane` services + `graphql-gateway` used to share 1 `dev-jwt-private.pem` file (copied
   into every container) for both mint and verify. They now default to a `metap-jwks` trust root
@@ -597,7 +615,7 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   single-issuer topology**: all 3 services still hold the same private key locally (mint
   themselves), matching the old RSA topology's blast radius — only rotation got safer (`JwksKeyStore`'s
   3-step add/promote/retire), not the "1 process holds the only private key" property JWKS
-  otherwise enables. See `management-plane/README.md`'s GraphQL gateway section for the auth-flow
+  otherwise enables. See `m-deploy/README.md`'s GraphQL gateway section for the auth-flow
   detail and the 3 services' own `.env.example` for the exact env vars
   (`JWKS_PRIVATE_KEY_PATH`/`JWKS_KID_PATH`/`JWKS_URL`). RSA (`AUTH_JWT_PUBLIC_KEY_PATH`/
   `AUTH_JWT_PRIVATE_KEY_PATH`, `dev-tools gen-keys`) still works as an explicit fallback if the

@@ -1,11 +1,10 @@
 name: CodeQL
 
-# Covers all 3 Go modules (management-plane, control-plane, edge-plane) in one CodeQL
-# database — CodeQL's Go extractor just needs every build command to run between `init` and
-# `analyze`, it doesn't need one module per job. management-plane and control-plane each
-# `replace github.com/metap-org/metap => ../../../metap`, so both need a sibling
-# checkout of metap-org/metap at that same relative path; edge-plane too since 2026-11-07
-# (it imports only metap's pkg/kit/*).
+# Covers every Go module (the root module with the m-* and c-* services, e-edge, a-api) in one
+# CodeQL database — CodeQL's Go extractor just needs every build command to run between `init`
+# and `analyze`, it doesn't need one module per job. The root module `replace`s
+# github.com/metap-org/metap => ../metap, so it needs a sibling checkout of metap-org/metap at
+# that same relative path; e-edge and a-api import only metap's pkg/kit/*.
 on:
   push:
     branches: [main, master]
@@ -46,25 +45,25 @@ jobs:
           path: metap
       - uses: actions/setup-go@v5
         with:
-          go-version-file: waap/management-plane/go.mod
-          cache-dependency-path: waap/management-plane/go.sum
+          go-version-file: waap/go.mod
+          cache-dependency-path: waap/go.sum
       - uses: github/codeql-action/init@v3
         with:
           languages: go
           config-file: ./waap/.github/codeql/codeql-config.yml
           # The actual git checkout isn't at github.workspace's root here (two sibling repos
-          # checked out side by side, waap/ and metap/, so management-plane's and
-          # control-plane's `replace` into ../../../metap resolves correctly) — without
+          # checked out side by side, waap/ and metap/, so the root module's
+          # `replace` into ../metap resolves correctly) — without
           # this, codeql-action/analyze can fall back to treating the workspace root as the git
           # repo, find no .git there, and fail with "configuration error" (seen live on a sibling
           # repo's identically-shaped workflow — metap-org/metap-lowcode PR #8 — even though this
           # exact job happened to pass once before this was added).
           checkout_path: ${{ github.workspace }}/waap
-      - working-directory: waap/management-plane
+      - working-directory: waap
         run: go build ./...
-      - working-directory: waap/control-plane
+      - working-directory: waap/e-edge
         run: go build ./...
-      - working-directory: waap/edge-plane
+      - working-directory: waap/a-api
         run: go build ./...
       - uses: github/codeql-action/analyze@v3
         with:

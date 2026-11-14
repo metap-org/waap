@@ -1,6 +1,6 @@
 # Contract: rule-set trong Redis (control-plane → edge-plane)
 
-`control-plane/ruleset` (producer) và `edge-plane/ruleset` (consumer) khai báo **hai bản
+`c-config-distributor/ruleset` (producer) và `e-edge/ruleset` (consumer) khai báo **hai bản
 copy độc lập** của cùng một định dạng JSON + tên key Redis — cố ý, vì hai plane là hai Go module
 riêng, deploy riêng, và `edge-plane` không được import code của `control-plane`.
 
@@ -15,8 +15,8 @@ Hai test dùng chung các file này:
 
 | Phía | Test | Kiểm tra |
 |---|---|---|
-| producer | `control-plane/ruleset/contract_test.go` | output `json.Marshal` của control-plane **bằng đúng** golden |
-| consumer | `edge-plane/ruleset/contract_test.go` | edge parse được golden (`DisallowUnknownFields`) và đọc ra đúng giá trị |
+| producer | `c-config-distributor/ruleset/contract_test.go` | output `json.Marshal` của control-plane **bằng đúng** golden |
+| consumer | `e-edge/ruleset/contract_test.go` | edge parse được golden (`DisallowUnknownFields`) và đọc ra đúng giá trị |
 
 Đổi định dạng (thêm field/op/action…): sửa producer, chạy
 `go test ./ruleset/ -run Contract -update` trong `control-plane` để ghi lại golden, rồi sửa
