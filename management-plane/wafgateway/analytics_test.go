@@ -1,6 +1,7 @@
-package graphqlgateway
+package wafgateway
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,8 +10,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/graphql-go/graphql"
+
 	"github.com/metap-org/metap/pkg/crud"
+	gw "github.com/metap-org/metap/pkg/graphqlgateway"
 	"github.com/metap-org/metap/pkg/metadata"
+	"github.com/metap-org/metap/pkg/permission"
 
 	"github.com/metap-org/waap/management-plane/analytics"
 )
@@ -50,7 +55,7 @@ func analyticsSchema(t *testing.T, base string) (*metadata.MetadataRegistry, map
 func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	srv, reqs, bodies := fakeAnalyticsAPI(t)
 	registry, backends := analyticsSchema(t, srv.URL)
-	schema, err := BuildSchema(registry, backends, RestURLs{})
+	schema, err := gw.BuildSchema(registry, backends)
 	require.NoError(t, err)
 
 	// The portal's ZoneEventsTab/IncidentDetailPage list call, as platform-ui shapes it.
@@ -94,4 +99,9 @@ func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	res = exec(schema, `{ wafSecurityEvents(id: "7b0f8a52-58b8-4d1e-9d55-3f3e1b0f0a01") { id } }`, nil)
 	require.NotEmpty(t, res.Errors)
 	require.Equal(t, "invalid_query", res.Errors[0].Extensions["code"])
+}
+
+func exec(schema graphql.Schema, q string, vars map[string]interface{}) *graphql.Result {
+	ctx := gw.WithRequestContext(context.Background(), &permission.RequestContext{ForwardedBearerToken: "caller-token"})
+	return graphql.Do(graphql.Params{Schema: schema, RequestString: q, VariableValues: vars, Context: ctx})
 }

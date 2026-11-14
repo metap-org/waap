@@ -107,3 +107,11 @@ func OriginUnreachable(w http.ResponseWriter, ray string) {
 			"reached.", ray)
 	writeHTML(w, http.StatusBadGateway, html)
 }
+
+// PayloadTooLarge renders the response for a request body over the edge's limit. Distinct from
+// Blocked and OriginUnreachable: the request never reached a rule or the origin.
+func PayloadTooLarge(w http.ResponseWriter, ray string) {
+	html := page("Request too large", "The request body is too large",
+		"The request body exceeds the size this site accepts.", ray)
+	writeHTML(w, http.StatusRequestEntityTooLarge, html)
+}

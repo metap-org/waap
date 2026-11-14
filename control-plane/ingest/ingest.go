@@ -29,11 +29,12 @@ package ingest
 
 import (
 	"context"
-	"crypto/subtle"
-	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"github.com/metap-org/waap/control-plane/ports"
 
 	"github.com/go-chi/chi/v5"
@@ -63,35 +64,30 @@ type State struct {
 	IngestToken      *string
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
+// maxIngestBodyBytes bounds one ingest request. MaxRequestEvents is only checked after the body
+// has been decoded, so without this an oversized body is fully read into memory first.
+const maxIngestBodyBytes int64 = 16 << 20
 
 func ingestHandler(state *State) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if state.IngestToken != nil {
-			presented := r.Header.Get("x-waf-ingest-token")
-			// Length-independent comparison isn't worth reaching for here (this is a coarse
-			// deployment boundary, not a per-user credential), but an absent token must never
-			// pass.
-			// Constant-time: a plain != leaks how many leading bytes matched via timing.
-			if presented == "" || subtle.ConstantTimeCompare([]byte(presented), []byte(*state.IngestToken)) != 1 {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid ingest token"})
-				return
-			}
+		// SecretEqual compares in constant time and never matches an empty token.
+		if state.IngestToken != nil && !httpx.SecretEqual(r.Header.Get("x-waf-ingest-token"), *state.IngestToken) {
+			httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid ingest token")
+			return
 		}
 
 		var body ingestBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "malformed body"})
+		if err := httpx.DecodeJSON(w, r, &body, maxIngestBodyBytes); err != nil {
+			if errors.Is(err, httpx.ErrBodyTooLarge) {
+				httpx.WriteError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "ingest body is too large")
+				return
+			}
+			httpx.WriteError(w, http.StatusBadRequest, "invalid_request_body", "malformed body")
 			return
 		}
 		if len(body.Events) > state.MaxRequestEvents {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{
-				"error": "too many events in one request", "max": state.MaxRequestEvents,
-			})
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "too_many_events",
+				"at most "+strconv.Itoa(state.MaxRequestEvents)+" events per request")
 			return
 		}
 
@@ -111,7 +107,7 @@ func ingestHandler(state *State) http.HandlerFunc {
 			slog.Warn("ingest buffer full, dropped events", "dropped", dropped)
 		}
 
-		writeJSON(w, http.StatusAccepted, map[string]any{"data": map[string]any{"accepted": accepted, "dropped": dropped}})
+		httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"data": map[string]any{"accepted": accepted, "dropped": dropped}})
 	}
 }
 
@@ -122,12 +118,13 @@ func healthHandler(state *State) http.HandlerFunc {
 		if !redisOK {
 			status = http.StatusServiceUnavailable
 		}
-		writeJSON(w, status, map[string]any{"data": map[string]any{"self": "ok", "redis": redisOK}})
+		httpx.WriteJSON(w, status, map[string]any{"data": map[string]any{"self": "ok", "redis": redisOK}})
 	}
 }
 
 func Router(state *State) http.Handler {
 	r := chi.NewRouter()
+	r.Use(httpx.Recover)
 	r.Get("/health", healthHandler(state))
 	r.Post("/ingest/events", ingestHandler(state))
 	return r

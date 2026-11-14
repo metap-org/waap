@@ -34,9 +34,9 @@ import (
 
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
-	"github.com/metap-org/metap/pkg/runtime"
 
 	"github.com/metap-org/waap/management-plane/analytics"
 )
@@ -56,7 +56,7 @@ func httpClient() *http.Client { return &http.Client{Timeout: 10 * time.Second} 
 
 // analyticsClient: where security events are read from (the Analytics plane's query API).
 func analyticsClient() *analytics.Client {
-	v, _ := runtime.Optional("ANALYTICS_URL")
+	v, _ := env.Lookup("ANALYTICS_URL")
 	if v == "" {
 		v = "http://localhost:3030"
 	}
@@ -112,14 +112,6 @@ func strField(record crud.RecordDto, field string) string {
 	return s
 }
 
-func writeCrudError(w http.ResponseWriter, status uint16, errorCode string, message *string, fieldErrors map[string][]string) {
-	msg := ""
-	if message != nil {
-		msg = *message
-	}
-	httpserver.WriteServiceError(w, int(status), errorCode, msg, fieldErrors)
-}
-
 // listRecords lists up to limit records with plain equality filters, unwrapping the service
 // result into a plain error — every caller here treats a permission/validation failure as "abort
 // the sweep", not as an empty set, because silently proceeding on an empty read would create
@@ -127,14 +119,7 @@ func writeCrudError(w http.ResponseWriter, status uint16, errorCode string, mess
 func listRecords(ctx context.Context, state *httpserver.AppState, entity string, filters [][2]string, limit int64, rc *permission.RequestContext) ([]crud.RecordDto, error) {
 	result, err := state.Crud.List(ctx, entity, query.ListInput{Limit: limit, Filters: filters}, rc)
 	if err != nil {
-		return nil, err
-	}
-	if !result.IsOk {
-		msg := ""
-		if result.Message != nil {
-			msg = " (" + *result.Message + ")"
-		}
-		return nil, fmt.Errorf("%s: %s%s", entity, result.ErrorCode, msg)
+		return nil, fmt.Errorf("%s: %w", entity, err)
 	}
 	return result.Data, nil
 }
@@ -192,8 +177,8 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 	}
 
 	var body correlateBody
-	if r.ContentLength != 0 {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+	if r.ContentLength != 0 && !httpserver.DecodeJSONBody(w, r, &body) {
+		return
 	}
 	windowMinutes := int64(defaultWindowMinutes)
 	if body.WindowMinutes != nil {
@@ -262,14 +247,10 @@ func correlateIncidents(w http.ResponseWriter, r *http.Request, state *httpserve
 		}
 		result, err := state.Crud.Create(r.Context(), "waf.incidents", data, rc, nil)
 		if err != nil {
-			httpserver.WriteInternalError(w, err)
+			httpserver.WriteCrudError(w, err)
 			return
 		}
-		if !result.IsOk {
-			writeCrudError(w, result.Status, result.ErrorCode, result.Message, result.FieldErrors)
-			return
-		}
-		created = append(created, result.Data.ID)
+		created = append(created, result.ID)
 	}
 
 	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
@@ -341,12 +322,9 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 	}
 	result, err := state.Crud.Create(ctx, "waf.alert_notifications", data, rc, nil)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, fmt.Errorf("alert_notifications: %w", err)
 	}
-	if !result.IsOk {
-		return uuid.Nil, fmt.Errorf("alert_notifications: %s", result.ErrorCode)
-	}
-	return result.Data.ID, nil
+	return result.ID, nil
 }
 
 // evaluateAlerts is POST /internal/alerts/evaluate — every enabled AlertPolicy, evaluated against
@@ -439,14 +417,10 @@ func testAlertPolicy(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	}
 	getResult, err := state.Crud.Get(r.Context(), "waf.alert_policies", policyID, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
-	if !getResult.IsOk {
-		writeCrudError(w, getResult.Status, getResult.ErrorCode, getResult.Message, getResult.FieldErrors)
-		return
-	}
-	policy := getResult.Data.Record
+	policy := getResult.Record
 
 	channels := policy.Data["channels"]
 	payload := map[string]any{

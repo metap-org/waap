@@ -14,8 +14,8 @@ package subscribe
 import (
 	"context"
 	"encoding/json"
+	"github.com/metap-org/metap/pkg/events"
 	"log/slog"
-	"strings"
 
 	"github.com/metap-org/waap/control-plane/ports"
 
@@ -35,7 +35,7 @@ var watched = map[string]bool{
 }
 
 func Run(ctx context.Context, amqpURL, queue string, dp ports.ConfigSource, distributor ports.RuleSink) error {
-	return eventbus.RunResilientConsumer(ctx, queue, "waf.*.record.*", nil,
+	return eventbus.RunResilientConsumer(ctx, queue, events.RecordPattern("waf.*", ""), nil,
 		func() (eventbus.EventBus, error) { return eventbus.ConnectRabbitEventBus(amqpURL) },
 		func(ctx context.Context, event *eventbus.ConsumedEvent) {
 			handle(ctx, dp, distributor, event)
@@ -49,10 +49,10 @@ func Run(ctx context.Context, amqpURL, queue string, dp ports.ConfigSource, dist
 // compile that is already running, which is what the Rust original's plain "await a shutdown
 // future" shape (as opposed to a cancellation token threaded into the call itself) achieves.
 func handle(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSink, event *eventbus.ConsumedEvent) {
-	// <entity>.record.<action> — the entity name is everything before ".record.".
-	entity, _, found := strings.Cut(event.RoutingKey, ".record.")
-	if !found || !watched[entity] {
-		_ = event.Ack()
+	topic := events.ParseTopic(event.RoutingKey)
+	entity := topic.Entity
+	if topic.Kind != events.KindRecord || !watched[entity] {
+		event.AckLogged()
 		return
 	}
 
@@ -67,7 +67,7 @@ func handle(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSi
 		// resolved to a zone from the event alone. Ack it and let the periodic resync pick the
 		// change up — better than requeueing forever on a message that will never carry more.
 		slog.Debug("event carries no resolvable zone, leaving it to the next resync", "routing_key", event.RoutingKey)
-		_ = event.Ack()
+		event.AckLogged()
 		return
 	}
 
@@ -82,8 +82,8 @@ func handle(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSi
 		// clears on its own. The periodic resync is the backstop if it doesn't, so this never
 		// needs to be the only thing that can recover.
 		slog.Warn("failed to sync zone, requeueing", "error", err, "zone_id", zoneID)
-		_ = event.Nack(true)
+		event.NackLogged(true)
 		return
 	}
-	_ = event.Ack()
+	event.AckLogged()
 }

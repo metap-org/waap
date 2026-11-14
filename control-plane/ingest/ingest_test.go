@@ -90,3 +90,19 @@ func TestRunWriterSendsOneBatchPerDrain(t *testing.T) {
 	<-done
 	close(shutdown)
 }
+
+func TestIngestRefusesABodyOverTheByteLimitBeforeReadingItAll(t *testing.T) {
+	h := Router(newState(t, 10, nil))
+	big := `{"events":[{"zoneId":"` + strings.Repeat("z", int(maxIngestBodyBytes)) + `"}]}`
+	rec := post(t, h, "", big)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"code":"payload_too_large"`)
+}
+
+func TestIngestErrorsUseTheStandardEnvelope(t *testing.T) {
+	h := Router(newState(t, 10, nil))
+	rec := post(t, h, "", `{"events":[{},{},{},{}]}`)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	assert.JSONEq(t, `{"error":{"code":"too_many_events","message":"at most 3 events per request"}}`, rec.Body.String())
+	assert.Equal(t, http.StatusBadRequest, post(t, h, "", `{`).Code)
+}

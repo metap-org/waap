@@ -24,19 +24,19 @@ func IncidentEntity() metadata.EntityDefinition {
 		Label:     "Incident",
 		TableName: reconciler.QualifiedTableNameIn("waf.incidents", "waf"),
 		Fields: []metadata.EntityField{
-			field("zoneId", "Zone", metadata.KindString, true, true, false),
-			field("title", "Title", metadata.KindString, true, false, true),
-			enumField("severity", "Severity", []string{"low", "medium", "high", "critical"}, true, true),
-			enumField("status", "Status", []string{"open", "acknowledged", "mitigating", "resolved"}, false, true),
-			field("eventCount", "Event Count", metadata.KindNumber, false, false, true),
-			field("assignedTo", "Assigned To", metadata.KindString, false, true, false),
+			metadata.NewField("zoneId", "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField("title", "Title", metadata.KindString).Require().Sort(),
+			metadata.EnumField("severity", "Severity", "low", "medium", "high", "critical").Require().Index(),
+			metadata.EnumField("status", "Status", "open", "acknowledged", "mitigating", "resolved").Index(),
+			metadata.NewField("eventCount", "Event Count", metadata.KindNumber).Sort(),
+			metadata.NewField("assignedTo", "Assigned To", metadata.KindString).Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",
 			Label:       "Default",
 			Fields:      []string{"title", "zoneId", "severity", "status", "assignedTo"},
 			Filters:     []string{"zoneId", "severity", "status", "assignedTo"},
-			DefaultSort: strPtr("-createdAt"),
+			DefaultSort: metadata.Ptr("-createdAt"),
 			MaxLimit:    50,
 		}},
 		Workflow: &metadata.EntityWorkflow{
@@ -44,9 +44,9 @@ func IncidentEntity() metadata.EntityDefinition {
 			InitialState:   "open",
 			TerminalStates: []string{"resolved"},
 			Transitions: []metadata.WorkflowTransition{
-				transitionNoGuard("acknowledge", "open", "acknowledged", "Acknowledge"),
-				transitionNoGuard("startMitigating", "acknowledged", "mitigating", "Start Mitigating"),
-				transitionNoGuard("resolve", "mitigating", "resolved", "Resolve"),
+				metadata.Transition("acknowledge", "open", "acknowledged", "Acknowledge"),
+				metadata.Transition("startMitigating", "acknowledged", "mitigating", "Start Mitigating"),
+				metadata.Transition("resolve", "mitigating", "resolved", "Resolve"),
 			},
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
@@ -60,7 +60,7 @@ func init() { metadata.SubmitEntity(IncidentEntity) }
 // email via GET /users instead of showing the raw id.
 func incidentFieldDisplayHints() []metadata.FieldDisplayHint {
 	return []metadata.FieldDisplayHint{
-		{Field: "assignedTo", ResolveVia: strPtr("users")},
+		{Field: "assignedTo", ResolveVia: metadata.Ptr("users")},
 	}
 }
 

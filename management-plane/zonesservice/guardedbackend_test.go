@@ -49,14 +49,13 @@ func TestCreateZoneReusesTheExistingDomainForItsApex(t *testing.T) {
 
 	inner.EXPECT().List(mock.Anything, "waf.domains", mock.MatchedBy(func(in query.ListInput) bool {
 		return len(in.Filters) == 1 && in.Filters[0] == [2]string{"apexDomain", "example.com"}
-	}), rc).Return(crud.ResultOk([]crud.RecordDto{{ID: domainID}}), nil)
+	}), rc).Return(crud.ListResult{Data: []crud.RecordDto{{ID: domainID}}}, nil)
 	inner.EXPECT().Create(mock.Anything, "waf.zones", mock.MatchedBy(func(data crud.JsonObject) bool {
 		return string(data["domainId"]) == `"`+domainID.String()+`"`
-	}), rc, (*string)(nil)).Return(crud.ResultOk(crud.RecordDto{ID: uuid.New()}), nil)
+	}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
 
-	res, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "shop.example.com"}), rc, nil)
+	_, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "shop.example.com"}), rc, nil)
 	require.NoError(t, err)
-	assert.True(t, res.IsOk)
 }
 
 func TestCreateZoneCreatesAnUnverifiedDomainWhenNoneExists(t *testing.T) {
@@ -64,29 +63,29 @@ func TestCreateZoneCreatesAnUnverifiedDomainWhenNoneExists(t *testing.T) {
 	rc := testRC()
 	newDomainID := uuid.New()
 
-	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ResultOk([]crud.RecordDto{}), nil)
+	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ListResult{Data: []crud.RecordDto{}}, nil)
 	inner.EXPECT().Create(mock.Anything, "waf.domains", mock.MatchedBy(func(data crud.JsonObject) bool {
 		return string(data["apexDomain"]) == `"example.com"` && string(data["verificationStatus"]) == `"unverified"`
-	}), rc, (*string)(nil)).Return(crud.ResultOk(crud.RecordDto{ID: newDomainID}), nil)
+	}), rc, (*string)(nil)).Return(crud.RecordDto{ID: newDomainID}, nil)
 	inner.EXPECT().Create(mock.Anything, "waf.zones", mock.MatchedBy(func(data crud.JsonObject) bool {
 		return string(data["domainId"]) == `"`+newDomainID.String()+`"`
-	}), rc, (*string)(nil)).Return(crud.ResultOk(crud.RecordDto{ID: uuid.New()}), nil)
+	}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
 
-	res, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "example.com"}), rc, nil)
+	_, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "example.com"}), rc, nil)
 	require.NoError(t, err)
-	assert.True(t, res.IsOk)
 }
 
 func TestCreateZoneSurfacesADomainLookupFailureAsIs(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
 	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).
-		Return(crud.ResultErr[[]crud.RecordDto](403, "forbidden"), nil)
+		Return(crud.ListResult{}, crud.NewServiceError(403, "forbidden"))
 
-	res, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "example.com"}), rc, nil)
-	require.NoError(t, err)
-	assert.EqualValues(t, 403, res.Status)
-	assert.Equal(t, "forbidden", res.ErrorCode)
+	_, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "example.com"}), rc, nil)
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.EqualValues(t, 403, se.Status)
+	assert.Equal(t, "forbidden", se.Code)
 }
 
 func TestCreateZoneWithoutHostnameIsLeftToTheRealValidation(t *testing.T) {
@@ -94,30 +93,32 @@ func TestCreateZoneWithoutHostnameIsLeftToTheRealValidation(t *testing.T) {
 	rc := testRC()
 	data := obj(t, map[string]any{"name": "no hostname"})
 	inner.EXPECT().Create(mock.Anything, "waf.zones", data, rc, (*string)(nil)).
-		Return(crud.ResultErrWithFieldErrors[crud.RecordDto](400, "validation_failed", map[string][]string{"hostname": {"required"}}), nil)
+		Return(crud.RecordDto{}, crud.NewServiceErrorFields(400, "validation_failed", map[string][]string{"hostname": {"required"}}))
 
-	res, err := g.Create(context.Background(), "waf.zones", data, rc, nil)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"required"}, res.FieldErrors["hostname"])
+	_, err := g.Create(context.Background(), "waf.zones", data, rc, nil)
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.Equal(t, []string{"required"}, se.FieldErrors["hostname"])
 }
 
 func TestInvalidFirewallMatchConditionIsRejectedBeforeReachingCrud(t *testing.T) {
 	g, _ := newGuarded(t) // no expectations: inner must not be called
 	data := obj(t, map[string]any{"matchCondition": map[string]any{"nonsense": true}})
 
-	for name, call := range map[string]func() (crud.ServiceResult[crud.RecordDto], error){
-		"create": func() (crud.ServiceResult[crud.RecordDto], error) {
+	for name, call := range map[string]func() (crud.RecordDto, error){
+		"create": func() (crud.RecordDto, error) {
 			return g.Create(context.Background(), "waf.firewall_rules", data, testRC(), nil)
 		},
-		"update": func() (crud.ServiceResult[crud.RecordDto], error) {
+		"update": func() (crud.RecordDto, error) {
 			return g.Update(context.Background(), "waf.firewall_rules", uuid.New(), 1, data, testRC(), nil)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			res, err := call()
-			require.NoError(t, err)
-			assert.EqualValues(t, 422, res.Status)
-			assert.Contains(t, res.FieldErrors, "matchCondition")
+			_, err := call()
+			se, ok := crud.AsServiceError(err)
+			require.True(t, ok, "got %v", err)
+			assert.EqualValues(t, 422, se.Status)
+			assert.Contains(t, se.FieldErrors, "matchCondition")
 		})
 	}
 }
@@ -126,14 +127,16 @@ func TestInvalidIPAccessListValueIsRejectedBeforeReachingCrud(t *testing.T) {
 	g, _ := newGuarded(t)
 	data := obj(t, map[string]any{"value": "999.1.1.1/40"})
 
-	res, err := g.Create(context.Background(), "waf.ip_access_lists", data, testRC(), nil)
-	require.NoError(t, err)
-	assert.EqualValues(t, 422, res.Status)
-	assert.Equal(t, []string{"not a valid IP address or CIDR"}, res.FieldErrors["value"])
+	_, err := g.Create(context.Background(), "waf.ip_access_lists", data, testRC(), nil)
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.EqualValues(t, 422, se.Status)
+	assert.Equal(t, []string{"not a valid IP address or CIDR"}, se.FieldErrors["value"])
 
-	res, err = g.Update(context.Background(), "waf.ip_access_lists", uuid.New(), 1, data, testRC(), nil)
-	require.NoError(t, err)
-	assert.EqualValues(t, 422, res.Status)
+	_, err = g.Update(context.Background(), "waf.ip_access_lists", uuid.New(), 1, data, testRC(), nil)
+	se, ok = crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.EqualValues(t, 422, se.Status)
 }
 
 func TestValidIPAccessListValuePassesThroughUnchanged(t *testing.T) {
@@ -141,11 +144,10 @@ func TestValidIPAccessListValuePassesThroughUnchanged(t *testing.T) {
 	rc := testRC()
 	data := obj(t, map[string]any{"value": "10.0.0.0/8"})
 	inner.EXPECT().Create(mock.Anything, "waf.ip_access_lists", data, rc, (*string)(nil)).
-		Return(crud.ResultOk(crud.RecordDto{ID: uuid.New()}), nil)
+		Return(crud.RecordDto{ID: uuid.New()}, nil)
 
-	res, err := g.Create(context.Background(), "waf.ip_access_lists", data, rc, nil)
+	_, err := g.Create(context.Background(), "waf.ip_access_lists", data, rc, nil)
 	require.NoError(t, err)
-	assert.True(t, res.IsOk)
 }
 
 func TestUnguardedEntitiesPassStraightThrough(t *testing.T) {
@@ -154,9 +156,9 @@ func TestUnguardedEntitiesPassStraightThrough(t *testing.T) {
 	data := obj(t, map[string]any{"threshold": 100})
 	id := uuid.New()
 	inner.EXPECT().Create(mock.Anything, "waf.ddos_policies", data, rc, (*string)(nil)).
-		Return(crud.ResultOk(crud.RecordDto{ID: id}), nil)
+		Return(crud.RecordDto{ID: id}, nil)
 	inner.EXPECT().Update(mock.Anything, "waf.zones", id, int32(3), data, rc, (*string)(nil)).
-		Return(crud.ResultOk(crud.RecordDto{ID: id}), nil)
+		Return(crud.RecordDto{ID: id}, nil)
 
 	_, err := g.Create(context.Background(), "waf.ddos_policies", data, rc, nil)
 	require.NoError(t, err)
@@ -170,8 +172,9 @@ func TestDeleteZoneWithoutACallerTokenIsRefusedNotUnchecked(t *testing.T) {
 	g, _ := newGuarded(t) // inner.Delete must not be reached
 	rc := testRC()        // ForwardedBearerToken empty
 
-	res, err := g.Delete(context.Background(), "waf.zones", uuid.New(), 1, rc, nil)
-	require.NoError(t, err)
-	assert.EqualValues(t, 503, res.Status)
-	assert.Equal(t, "reference_check_unavailable", res.ErrorCode)
+	_, err := g.Delete(context.Background(), "waf.zones", uuid.New(), 1, rc, nil)
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.EqualValues(t, 503, se.Status)
+	assert.Equal(t, "reference_check_unavailable", se.Code)
 }

@@ -4,7 +4,7 @@
 // GraphQL layer at all — metap-graphql/metap-graphql-http/metap-graphql-gateway were never
 // ported). The schema is generated from the 3 WAF services' own entity definitions (imported
 // below for their init() SubmitEntity side effect) in the Rust metap-graphql wire shape the
-// portal and control-plane expect (graphqlgateway.BuildSchema), forwarding to each upstream's gRPC RecordBackend
+// portal and control-plane expect (graphqlgateway.BuildSchema from metap, wafgateway for the WAF mutations), forwarding to each upstream's gRPC RecordBackend
 // (grpcapi.GrpcBackend, the same client the 3 Go WAF services already use for their own
 // cross-service calls); the 8 custom business-action mutations forward to each service's REST
 // endpoint instead, since those have no gRPC equivalent.
@@ -21,6 +21,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"log/slog"
 	"net/http"
 	"os"
@@ -30,8 +31,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/metap-org/metap/pkg/crud"
+	gw "github.com/metap-org/metap/pkg/graphqlgateway"
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/jwks"
+	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/runtime"
 
@@ -40,7 +43,7 @@ import (
 	_ "github.com/metap-org/waap/management-plane/zonesservice/entities"
 
 	"github.com/metap-org/waap/management-plane/analytics"
-	"github.com/metap-org/waap/management-plane/graphqlgateway"
+	"github.com/metap-org/waap/management-plane/wafgateway"
 )
 
 type upstreamConfig struct {
@@ -53,18 +56,18 @@ type upstreamConfig struct {
 }
 
 func loadUpstream(n int) (upstreamConfig, bool) {
-	name, ok := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_NAME", n))
+	name, ok := env.Lookup(fmt.Sprintf("UPSTREAM_%d_NAME", n))
 	if !ok {
 		return upstreamConfig{}, false
 	}
-	grpcAddr, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_GRPC_ADDR", n))
-	loginURL, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_LOGIN_URL", n))
-	email, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_SERVICE_EMAIL", n))
-	password, _ := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_SERVICE_PASSWORD", n))
+	grpcAddr, _ := env.Lookup(fmt.Sprintf("UPSTREAM_%d_GRPC_ADDR", n))
+	loginURL, _ := env.Lookup(fmt.Sprintf("UPSTREAM_%d_LOGIN_URL", n))
+	email, _ := env.Lookup(fmt.Sprintf("UPSTREAM_%d_SERVICE_EMAIL", n))
+	password, _ := env.Lookup(fmt.Sprintf("UPSTREAM_%d_SERVICE_PASSWORD", n))
 	// UPSTREAM_N_REST_URL: the upstream's own REST base for custom mutations. Defaults to the
 	// login URL's host, which is only right while every upstream issues its own tokens — with a
 	// single JWKS issuer every LOGIN_URL points at the issuer, so set REST_URL explicitly.
-	restURL, ok := runtime.Optional(fmt.Sprintf("UPSTREAM_%d_REST_URL", n))
+	restURL, ok := env.Lookup(fmt.Sprintf("UPSTREAM_%d_REST_URL", n))
 	if !ok {
 		restURL = restBaseFromLoginURL(loginURL)
 	}
@@ -91,22 +94,22 @@ func restBaseFromLoginURL(loginURL string) string {
 // AUTH_JWT_PUBLIC_KEY_PATH additionally (or, without JWKS_URL, only) verifies legacy RS256 ones.
 func buildVerifier(ctx context.Context) (*jwks.TokenVerifier, error) {
 	var publicKey *rsa.PublicKey
-	if path, ok := runtime.Optional("AUTH_JWT_PUBLIC_KEY_PATH"); ok {
+	if path, ok := env.Lookup("AUTH_JWT_PUBLIC_KEY_PATH"); ok {
 		key, err := readRSAPublicKey(path)
 		if err != nil {
 			return nil, fmt.Errorf("reading AUTH_JWT_PUBLIC_KEY_PATH: %w", err)
 		}
 		publicKey = key
 	}
-	jwksURL, ok := runtime.Optional("JWKS_URL")
+	jwksURL, ok := env.Lookup("JWKS_URL")
 	if !ok {
 		if publicKey == nil {
 			return nil, errors.New("set JWKS_URL (or AUTH_JWT_PUBLIC_KEY_PATH for static RSA)")
 		}
 		return &jwks.TokenVerifier{Kind: jwks.VerifierStatic, PublicKey: publicKey, Leeway: 20 * time.Second}, nil
 	}
-	client := jwks.NewJwksClient(jwksURL, time.Duration(runtime.EnvOr("JWKS_CACHE_TTL_SECONDS", 300))*time.Second)
-	client.SpawnBackgroundRefresh(ctx, time.Duration(runtime.EnvOr("JWKS_REFRESH_SECONDS", 60))*time.Second)
+	client := jwks.NewJwksClient(jwksURL, time.Duration(env.Int("JWKS_CACHE_TTL_SECONDS", 300))*time.Second)
+	client.SpawnBackgroundRefresh(ctx, time.Duration(env.Int("JWKS_REFRESH_SECONDS", 60))*time.Second)
 	return &jwks.TokenVerifier{Kind: jwks.VerifierAuto, Keys: client, PublicKey: publicKey, Leeway: 20 * time.Second}, nil
 }
 
@@ -128,11 +131,11 @@ func readRSAPublicKey(path string) (*rsa.PublicKey, error) {
 }
 
 func main() {
-	host, _ := runtime.Optional("HOST")
+	host, _ := env.Lookup("HOST")
 	if host == "" {
 		host = "0.0.0.0"
 	}
-	port := runtime.EnvOr("PORT", 4000)
+	port := env.Int("PORT", 4000)
 	ctx := context.Background()
 	verifier, err := buildVerifier(ctx)
 	if err != nil {
@@ -205,7 +208,7 @@ func main() {
 	}
 	// Analytics read models: shape registered here, data served by the Analytics plane's query
 	// API (ANALYTICS_URL) with the caller's own token.
-	analyticsURL, _ := runtime.Optional("ANALYTICS_URL")
+	analyticsURL, _ := env.Lookup("ANALYTICS_URL")
 	if analyticsURL == "" {
 		analyticsURL = "http://localhost:3030"
 	}
@@ -215,36 +218,37 @@ func main() {
 	}
 	owners[analytics.SecurityEvents] = &analytics.Backend{Client: analytics.NewClient(analyticsURL)}
 
-	rest := graphqlgateway.RestURLs{
+	rest := wafgateway.RestURLs{
 		Zones:    byName["zones"].restURL,
 		Scanning: byName["scanning"].restURL,
 		Alerting: byName["alerting"].restURL,
 	}
 
-	schema, err := graphqlgateway.BuildSchema(registry, owners, rest)
+	schema, err := gw.BuildSchema(registry, owners,
+		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(rest)))
 	if err != nil {
 		slog.Error("building GraphQL schema", "error", err)
 		os.Exit(1)
 	}
 
-	defaults := graphqlgateway.DefaultLimits()
-	limits := graphqlgateway.Limits{
-		MaxDepth:      runtime.EnvOr("GRAPHQL_MAX_DEPTH", defaults.MaxDepth),
-		MaxComplexity: runtime.EnvOr("GRAPHQL_MAX_COMPLEXITY", defaults.MaxComplexity),
+	defaults := gw.DefaultLimits()
+	limits := gw.Limits{
+		MaxDepth:      env.Int("GRAPHQL_MAX_DEPTH", defaults.MaxDepth),
+		MaxComplexity: env.Int("GRAPHQL_MAX_COMPLEXITY", defaults.MaxComplexity),
 	}
-	server := graphqlgateway.NewServer(schema, verifier, limits)
+	server := gw.NewServer(schema, verifier, limits)
 	server.ServeMetadataFor(registry, analytics.SecurityEvents)
 
-	corsOrigins, _ := runtime.Optional("CORS_ORIGINS")
+	corsOrigins, _ := env.Lookup("CORS_ORIGINS")
 	var origins []string
 	if corsOrigins != "" {
 		origins = strings.Split(corsOrigins, ",")
 	}
-	handler := runtime.CORS(runtime.CORSOptions{
+	handler := httpx.Recover(runtime.CORS(runtime.CORSOptions{
 		Origins: origins,
 		Methods: []string{"GET", "POST", "OPTIONS"},
 		Headers: []string{"Authorization", "Content-Type", "X-CSRF-Token"},
-	})(server.Router())
+	})(server.Router()))
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	slog.Info("waf-graphql-gateway listening", "addr", addr, "entities", len(owners))

@@ -15,7 +15,7 @@ Rust original's own hard rule) reached full build/test/vet-clean parity and was 
 against real Postgres/Redis/HTTP. `edge-plane/go`'s one disclosed behavioral divergence: Go's
 `net.IP` has no explicit V4/V6 discriminant independent of bit pattern, so an IPv4-mapped IPv6
 client address matches a plain IPv4 CIDR rule there, where the Rust original's own test pinned
-the opposite as a documented gap. `management-plane/go`'s `graphqlgateway` package is a **bespoke**
+the opposite as a documented gap. `management-plane`'s gateway (generic part now `metap`'s `pkg/graphqlgateway`, since 2026-11-14; the WAF-only mutations stay in `management-plane/wafgateway`) is a **bespoke**
 forwarding gateway (`github.com/graphql-go/graphql`, no codegen) rather than a port of
 `metap-graphql`'s generic dynamic-schema-from-metadata engine — that engine was never built in
 `metap-go` at all (see `../metap/CLAUDE.md`), so a direct port wasn't possible; confirmed with
@@ -505,6 +505,7 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   then re-run with `--drop-data`. Read-back differences to expect in tests/portal: `datetime` as `+00:00` not `Z`, `money`
   with 4 decimals. Not yet run against the real dev DB (no copy available in the session that built this).
 - **Merge PR: luôn dùng squash merge** (chủ dự án, 2026-11-13), không dùng merge commit hay rebase merge, để `master` mỗi PR chỉ còn 1 commit. Chỉ merge khi người dùng nói "merge" và CI xanh hết. Một nhánh làm việc đã squash vào `master` thì dựng lại từ `master`; nếu không push ghi đè được thì gộp nhánh cũ bằng `merge -s ours` (PR sẽ hiện nhiều commit nhưng squash gộp lại).
+- **HTTP baseline (2026-11-14, audit P0):** every listener uses `metap`'s `pkg/kit/httpx` — `Serve`/`ServeContext` (server timeouts), `DecodeJSON`/`DecodeJSONBody` (bounded body, 413), `WriteJSON`/`WriteError` (the one `{"error":{code,message}}` shape), `Recover`, `SecretEqual` (constant-time shared secret), `BearerToken` — never a local `writeJSON`, a hand-rolled `ConstantTimeCompare`, or `json.NewDecoder(r.Body)` on its own. The edge buffers request bodies up to `MAX_REQUEST_BODY_BYTES` (default 10 MiB, 413 beyond) and gives the origin 30s to send headers. `devtools/` is left alone (separate modules, no `metap` dependency).
 - Three independent Cargo workspaces, one per plane — never one workspace spanning them, since a
   shared workspace would mean a portal change rebuilds and redeploys the edge. `cargo
   build/test/clippy --workspace` from `management-plane/`, `control-plane/`, or `edge-plane/`

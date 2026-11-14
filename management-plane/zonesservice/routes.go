@@ -27,24 +27,24 @@ import (
 
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/query"
-	"github.com/metap-org/metap/pkg/runtime"
 )
 
 func scanningURL() string {
-	v, _ := runtime.Optional("SCANNING_URL")
+	v, _ := env.Lookup("SCANNING_URL")
 	return orDefault(v, "http://localhost:3010")
 }
 func alertingURL() string {
-	v, _ := runtime.Optional("ALERTING_URL")
+	v, _ := env.Lookup("ALERTING_URL")
 	return orDefault(v, "http://localhost:3020")
 }
 func dohURL() string {
-	v, _ := runtime.Optional("DOH_RESOLVER_URL")
+	v, _ := env.Lookup("DOH_RESOLVER_URL")
 	return orDefault(v, "https://dns.google/resolve")
 }
 func edgeCNAMETarget() string {
-	v, _ := runtime.Optional("EDGE_CNAME_TARGET")
+	v, _ := env.Lookup("EDGE_CNAME_TARGET")
 	return orDefault(v, "edge.waf.local")
 }
 
@@ -116,14 +116,6 @@ func trimOneLayer(s string, c byte) string {
 	return s
 }
 
-func writeCrudError(w http.ResponseWriter, status uint16, errorCode string, message *string, fieldErrors map[string][]string) {
-	msg := ""
-	if message != nil {
-		msg = *message
-	}
-	httpserver.WriteServiceError(w, int(status), errorCode, msg, fieldErrors)
-}
-
 // VerifyDNS is POST /api/waf.zones/{id}/verify-dns — the informational DNS routing check: is
 // this zone's own hostname actually pointed at edge-plane yet? Never gates activation, purely
 // informational.
@@ -139,14 +131,10 @@ func VerifyDNS(w http.ResponseWriter, r *http.Request, state *httpserver.AppStat
 	}
 	got, err := state.Crud.Get(r.Context(), "waf.zones", zoneID, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
-	if !got.IsOk {
-		writeCrudError(w, got.Status, got.ErrorCode, got.Message, got.FieldErrors)
-		return
-	}
-	record := got.Data.Record
+	record := got.Record
 
 	hostname, _ := jsonAsString(record.Data["hostname"])
 	if hostname == "" {
@@ -175,15 +163,11 @@ func VerifyDNS(w http.ResponseWriter, r *http.Request, state *httpserver.AppStat
 	}
 	updated, err := state.Crud.Update(r.Context(), "waf.zones", zoneID, record.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
-	}
-	if !updated.IsOk {
-		writeCrudError(w, updated.Status, updated.ErrorCode, updated.Message, updated.FieldErrors)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
 	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
-		"zone": updated.Data, "dnsRouted": routed,
+		"zone": updated, "dnsRouted": routed,
 		"checked": map[string]any{"cname": cname, "expectedTarget": target},
 	}})
 }
@@ -215,20 +199,16 @@ func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.A
 		return
 	}
 	var body verifyDNSBody
-	if r.ContentLength != 0 {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+	if r.ContentLength != 0 && !httpserver.DecodeJSONBody(w, r, &body) {
+		return
 	}
 
 	got, err := state.Crud.Get(r.Context(), "waf.domains", domainID, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
-	if !got.IsOk {
-		writeCrudError(w, got.Status, got.ErrorCode, got.Message, got.FieldErrors)
-		return
-	}
-	domain := got.Data.Record
+	domain := got.Record
 
 	apexDomain, _ := jsonAsString(domain.Data["apexDomain"])
 	if apexDomain == "" {
@@ -267,11 +247,7 @@ func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	patch := crud.JsonObject{"verificationStatus": jsonString("verified")}
 	updatedDomain, err := state.Crud.Update(r.Context(), "waf.domains", domainID, domain.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
-	}
-	if !updatedDomain.IsOk {
-		writeCrudError(w, updatedDomain.Status, updatedDomain.ErrorCode, updatedDomain.Message, updatedDomain.FieldErrors)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
 
@@ -279,7 +255,7 @@ func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	// not stop the others, and must not undo the domain's own now-verified status).
 	listInput := query.ListInput{Limit: 100, Filters: [][2]string{{"domainId", domainID.String()}}}
 	zones, err := state.Crud.List(r.Context(), "waf.zones", listInput, rc)
-	if err == nil && zones.IsOk {
+	if err == nil {
 		for _, zone := range zones.Data {
 			zonePatch := crud.JsonObject{"verificationStatus": jsonString("verified")}
 			if _, err := state.Crud.Update(r.Context(), "waf.zones", zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
@@ -290,7 +266,7 @@ func VerifyDomainDNS(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	}
 
 	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
-		"domain": updatedDomain.Data, "ownershipVerified": true,
+		"domain": updatedDomain, "ownershipVerified": true,
 		"checked": map[string]any{"txt": txt, "expectedToken": expectedToken},
 	}})
 }
@@ -309,14 +285,10 @@ func TestOrigin(w http.ResponseWriter, r *http.Request, state *httpserver.AppSta
 	}
 	got, err := state.Crud.Get(r.Context(), "waf.zones", zoneID, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
-	if !got.IsOk {
-		writeCrudError(w, got.Status, got.ErrorCode, got.Message, got.FieldErrors)
-		return
-	}
-	origin, _ := jsonAsString(got.Data.Record.Data["originAddress"])
+	origin, _ := jsonAsString(got.Record.Data["originAddress"])
 	if origin == "" {
 		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Zone has no origin address.", nil)
 		return
@@ -355,50 +327,35 @@ func SyncConfigState(w http.ResponseWriter, r *http.Request, state *httpserver.A
 		return
 	}
 
-	anyForZone := func(entity string) (bool, *crud.ServiceResult[[]crud.RecordDto], error) {
+	anyForZone := func(entity string) (bool, error) {
 		input := query.ListInput{Limit: 1, Filters: [][2]string{{"zoneId", zoneID.String()}}}
 		result, err := state.Crud.List(r.Context(), entity, input, rc)
 		if err != nil {
-			return false, nil, err
+			return false, err
 		}
-		if !result.IsOk {
-			return false, &result, nil
-		}
-		return len(result.Data) > 0, nil, nil
+		return len(result.Data) > 0, nil
 	}
 
 	// A caller who cannot list rules cannot be told a zone has none either — surfacing "false"
 	// here would silently flip hasConfig off on a permission error.
-	hasDdos, errA, err := anyForZone("waf.ddos_policies")
+	hasDdos, err := anyForZone("waf.ddos_policies")
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
-	if errA != nil {
-		writeCrudError(w, errA.Status, errA.ErrorCode, errA.Message, errA.FieldErrors)
-		return
-	}
-	hasFirewall, errB, err := anyForZone("waf.firewall_rules")
+	hasFirewall, err := anyForZone("waf.firewall_rules")
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
-	}
-	if errB != nil {
-		writeCrudError(w, errB.Status, errB.ErrorCode, errB.Message, errB.FieldErrors)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
 	hasConfig := hasDdos || hasFirewall
 
 	got, err := state.Crud.Get(r.Context(), "waf.zones", zoneID, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
-	if !got.IsOk {
-		writeCrudError(w, got.Status, got.ErrorCode, got.Message, got.FieldErrors)
-		return
-	}
-	zone := got.Data.Record
+	zone := got.Record
 
 	currentHasConfig, _ := jsonAsBool(zone.Data["hasConfig"])
 	if currentHasConfig == hasConfig {
@@ -409,13 +366,9 @@ func SyncConfigState(w http.ResponseWriter, r *http.Request, state *httpserver.A
 	}
 
 	patch := crud.JsonObject{"hasConfig": jsonBool(hasConfig)}
-	updated, err := state.Crud.Update(r.Context(), "waf.zones", zoneID, zone.Version, patch, rc, nil)
+	_, err = state.Crud.Update(r.Context(), "waf.zones", zoneID, zone.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
-		return
-	}
-	if !updated.IsOk {
-		writeCrudError(w, updated.Status, updated.ErrorCode, updated.Message, updated.FieldErrors)
+		httpserver.WriteCrudError(w, err)
 		return
 	}
 	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"hasConfig": hasConfig, "changed": true}})

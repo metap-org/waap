@@ -15,20 +15,15 @@ package main
 
 import (
 	"github.com/metap-org/metap/pkg/app"
-	"github.com/metap-org/metap/pkg/metadata"
 
 	"github.com/metap-org/waap/management-plane/alertingservice"
-	"github.com/metap-org/waap/management-plane/alertingservice/entities"
+	// Declared entities register themselves in init(); app.Main reconciles them, referenced first.
+	_ "github.com/metap-org/waap/management-plane/alertingservice/entities"
 )
 
 func main() {
 	app.Main(app.Options{
-		Name: "alerting-service",
-		Entities: []metadata.EntityDefinition{
-			entities.AlertPolicyEntity(),
-			entities.AlertNotificationEntity(),
-			entities.IncidentEntity(),
-		},
+		Name:     "alerting-service",
 		GRPCPort: 3021,
 		Routes:   alertingservice.MountRoutes,
 	})

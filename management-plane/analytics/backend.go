@@ -54,22 +54,24 @@ func ToRecord(e Event) crud.RecordDto {
 	}
 }
 
-func failure[T any](err error) (crud.ServiceResult[T], error) {
+// failure maps an Analytics API error onto a ServiceError, keeping its status and code; any
+// other error (network, decode) stays a plain internal error.
+func failure(err error) error {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
-		return crud.ResultErrWithMessage[T](uint16(apiErr.Status), apiErr.Code, apiErr.Message), nil
+		return crud.NewServiceErrorMsg(uint16(apiErr.Status), apiErr.Code, apiErr.Message)
 	}
-	return crud.ServiceResult[T]{}, err
+	return err
 }
 
-func readOnly[T any]() (crud.ServiceResult[T], error) {
-	return crud.ResultErrWithMessage[T](http.StatusMethodNotAllowed, "read_only",
-		"Security events are written by the edge through the Analytics plane, not through this API."), nil
+func readOnly() error {
+	return crud.NewServiceErrorMsg(http.StatusMethodNotAllowed, "read_only",
+		"Security events are written by the edge through the Analytics plane, not through this API.")
 }
 
-func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc *permission.RequestContext) (crud.ServiceResult[[]crud.RecordDto], error) {
+func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc *permission.RequestContext) (crud.ListResult, error) {
 	if input.JQL != nil && strings.TrimSpace(*input.JQL) != "" {
-		return crud.ResultErrWithMessage[[]crud.RecordDto](http.StatusBadRequest, "invalid_query", "jql is not supported for security events; use filter."), nil
+		return crud.ListResult{}, crud.NewServiceErrorMsg(http.StatusBadRequest, "invalid_query", "jql is not supported for security events; use filter.")
 	}
 	p := ListParams{Filters: map[string]string{}, Limit: int(input.Limit)}
 	for _, f := range input.Filters {
@@ -85,51 +87,52 @@ func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc 
 	}
 	page, err := b.Client.List(ctx, token(rc), p)
 	if err != nil {
-		return failure[[]crud.RecordDto](err)
+		return crud.ListResult{}, failure(err)
 	}
 	out := make([]crud.RecordDto, 0, len(page.Records))
 	for _, e := range page.Records {
 		out = append(out, ToRecord(e))
 	}
-	return crud.ResultOkWithPage(out, crud.PageInfo{Limit: int64(p.Limit), NextCursor: page.NextCursor}), nil
+	return crud.ListResult{Data: out, Page: crud.PageInfo{Limit: int64(p.Limit), NextCursor: page.NextCursor}}, nil
 }
 
-func (b *Backend) Get(ctx context.Context, _ string, id uuid.UUID, rc *permission.RequestContext) (crud.ServiceResult[crud.GetResult], error) {
+func (b *Backend) Get(ctx context.Context, _ string, id uuid.UUID, rc *permission.RequestContext) (crud.GetResult, error) {
 	e, err := b.Client.Get(ctx, token(rc), id)
 	if err != nil {
-		return failure[crud.GetResult](err)
+		return crud.GetResult{}, failure(err)
 	}
-	return crud.ResultOk(crud.GetResult{Record: ToRecord(e)}), nil
+	return crud.GetResult{Record: ToRecord(e)}, nil
 }
 
-func (b *Backend) GetMany(ctx context.Context, entity string, ids []uuid.UUID, rc *permission.RequestContext) (crud.ServiceResult[[]crud.GetManyResult], error) {
+func (b *Backend) GetMany(ctx context.Context, entity string, ids []uuid.UUID, rc *permission.RequestContext) ([]crud.GetManyResult, error) {
 	out := make([]crud.GetManyResult, 0, len(ids))
 	for _, id := range ids {
 		r, err := b.Get(ctx, entity, id, rc)
 		if err != nil {
-			return crud.ServiceResult[[]crud.GetManyResult]{}, err
+			if _, business := crud.AsServiceError(err); business {
+				continue // a missing or denied id is simply absent from the batch
+			}
+			return nil, err
 		}
-		if r.IsOk {
-			out = append(out, crud.GetManyResult{ID: id, Record: r.Data.Record})
-		}
+		out = append(out, crud.GetManyResult{ID: id, Record: r.Record})
 	}
-	return crud.ResultOk(out), nil
+	return out, nil
 }
 
-func (b *Backend) Create(context.Context, string, crud.JsonObject, *permission.RequestContext, *string) (crud.ServiceResult[crud.RecordDto], error) {
-	return readOnly[crud.RecordDto]()
+func (b *Backend) Create(context.Context, string, crud.JsonObject, *permission.RequestContext, *string) (crud.RecordDto, error) {
+	return crud.RecordDto{}, readOnly()
 }
 
-func (b *Backend) Update(context.Context, string, uuid.UUID, int32, crud.JsonObject, *permission.RequestContext, *string) (crud.ServiceResult[crud.RecordDto], error) {
-	return readOnly[crud.RecordDto]()
+func (b *Backend) Update(context.Context, string, uuid.UUID, int32, crud.JsonObject, *permission.RequestContext, *string) (crud.RecordDto, error) {
+	return crud.RecordDto{}, readOnly()
 }
 
-func (b *Backend) Transition(context.Context, string, uuid.UUID, string, int32, crud.JsonObject, *permission.RequestContext, *string) (crud.ServiceResult[crud.RecordDto], error) {
-	return readOnly[crud.RecordDto]()
+func (b *Backend) Transition(context.Context, string, uuid.UUID, string, int32, crud.JsonObject, *permission.RequestContext, *string) (crud.RecordDto, error) {
+	return crud.RecordDto{}, readOnly()
 }
 
-func (b *Backend) Delete(context.Context, string, uuid.UUID, int32, *permission.RequestContext, *string) (crud.ServiceResult[crud.RecordDto], error) {
-	return readOnly[crud.RecordDto]()
+func (b *Backend) Delete(context.Context, string, uuid.UUID, int32, *permission.RequestContext, *string) (crud.RecordDto, error) {
+	return crud.RecordDto{}, readOnly()
 }
 
 func deref(s *string) string {
@@ -139,7 +142,7 @@ func deref(s *string) string {
 	return *s
 }
 
-func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateSpec, rc *permission.RequestContext) (crud.ServiceResult[[]json.RawMessage], error) {
+func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateSpec, rc *permission.RequestContext) ([]json.RawMessage, error) {
 	req := AggregateSpec{
 		Metrics: spec.Metrics, GroupBy: deref(spec.GroupBy), Bucket: deref(spec.Bucket),
 		TimeField: deref(spec.TimeField), Filters: spec.Filters, Since: deref(spec.Since), Until: deref(spec.Until),
@@ -149,9 +152,9 @@ func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateS
 	}
 	rows, err := b.Client.Aggregate(ctx, token(rc), req)
 	if err != nil {
-		return failure[[]json.RawMessage](err)
+		return nil, failure(err)
 	}
-	return crud.ResultOk(rows), nil
+	return rows, nil
 }
 
 // Window lists events since a cutoff, newest first, up to limit — what alerting-service's

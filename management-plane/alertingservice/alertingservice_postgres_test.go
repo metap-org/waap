@@ -291,7 +291,7 @@ func TestEvaluateAlertsFiresAWebhookNotification(t *testing.T) {
 	}
 	policyResult, err := state.Crud.Create(ctx, "waf.alert_policies", policyData, rc, nil)
 	require.NoError(t, err, "create alert policy: %v / %+v", err, policyResult)
-	require.True(t, policyResult.IsOk, "create alert policy: %v / %+v", err, policyResult)
+	require.NoError(t, err)
 
 	fa := startAnalytics(t)
 	zoneID := "zone-" + uuid.New().String()
@@ -319,7 +319,7 @@ func TestEvaluateAlertsFiresAWebhookNotification(t *testing.T) {
 
 	notifications, err := state.Crud.List(ctx, "waf.alert_notifications", listAllInput(), rc)
 	require.NoError(t, err, "list notifications: %v / %+v", err, notifications)
-	require.True(t, notifications.IsOk, "list notifications: %v / %+v", err, notifications)
+	require.NoError(t, err)
 	require.Len(t, notifications.Data, 1, "expected 1 sent notification, got %+v", notifications.Data)
 	require.NotNil(t, notifications.Data[0].Data["deliveryStatus"], "expected 1 sent notification, got %+v", notifications.Data)
 }
@@ -351,8 +351,8 @@ func TestTestAlertPolicySendsAndRecordsANotification(t *testing.T) {
 	}
 	policyResult, err := state.Crud.Create(ctx, "waf.alert_policies", policyData, rc, nil)
 	require.NoError(t, err, "create alert policy: %v / %+v", err, policyResult)
-	require.True(t, policyResult.IsOk, "create alert policy: %v / %+v", err, policyResult)
-	policyID := policyResult.Data.ID
+	require.NoError(t, err)
+	policyID := policyResult.ID
 
 	baseURL := startServer(t, state)
 	token, err := peripherals.MintJWT(privPEM, tenantID, userID, 3600)
@@ -365,6 +365,6 @@ func TestTestAlertPolicySendsAndRecordsANotification(t *testing.T) {
 
 	notifications, err := state.Crud.List(ctx, "waf.alert_notifications", listAllInput(), rc)
 	require.NoError(t, err, "expected exactly 1 notification row, got %v / %+v", err, notifications)
-	require.True(t, notifications.IsOk, "expected exactly 1 notification row, got %v / %+v", err, notifications)
+	require.NoError(t, err)
 	require.Len(t, notifications.Data, 1, "expected exactly 1 notification row, got %v / %+v", err, notifications)
 }

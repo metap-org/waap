@@ -13,16 +13,15 @@ package main
 
 import (
 	"github.com/metap-org/metap/pkg/app"
-	"github.com/metap-org/metap/pkg/metadata"
 
 	"github.com/metap-org/waap/management-plane/scanningservice"
-	"github.com/metap-org/waap/management-plane/scanningservice/entities"
+	// Declared entities register themselves in init(); app.Main reconciles them, referenced first.
+	_ "github.com/metap-org/waap/management-plane/scanningservice/entities"
 )
 
 func main() {
 	app.Main(app.Options{
 		Name:     "scanning-service",
-		Entities: []metadata.EntityDefinition{entities.ScanJobEntity(), entities.ScanFindingEntity()},
 		GRPCPort: 3011,
 		Routes:   scanningservice.MountRoutes,
 	})
