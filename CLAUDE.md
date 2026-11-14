@@ -152,6 +152,10 @@ reaches them over gRPC (`wafgateway.Invokers`), no longer through each service's
 `UPSTREAM_N_REST_URL` is now needed only for the platform admin fields. `POST /internal/scan-jobs/{id}/findings` (scanner
 callback) and `/ingest/events` (edge to control) stay REST.
 
+**Shared names live in `model/` (2026-11-14, `../metap-docs/docs/roadmap/110-magic-literals-audit.md`):** entity names
+(`model.Zones`, ...), `model.FieldZoneID`/`FieldDomainID` and the action names (`model.ActionVerifyDNS`, ...). Never retype
+`"waf.zones"` or `"zoneId"`; careful with struct tags (`json:"zoneId"` stays a tag).
+
 ## Domain model (business-level, not yet `EntityDefinition` code)
 
 `docs/management/02-domain-model.md` has full field-level detail. Summary of the entity graph:
