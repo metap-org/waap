@@ -17,7 +17,7 @@ import (
 func FirewallRuleEntity() metadata.EntityDefinition {
 	// zoneId is nullable since the tenant-wide ("global") scope feature: zoneId == nil means this
 	// rule applies to every zone in the tenant, not just one.
-	zoneID := refField("zoneId", "Zone", "waf.zones", "hostname", false, true)
+	zoneID := metadata.RefField("zoneId", "Zone", "waf.zones", "hostname").Index()
 
 	return metadata.EntityDefinition{
 		Name:      "waf.firewall_rules",
@@ -25,23 +25,23 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn("waf.firewall_rules", "waf"),
 		Fields: []metadata.EntityField{
 			zoneID,
-			sortableField("name", "Name", metadata.KindString, true, false, true),
-			sortableField("priority", "Priority", metadata.KindNumber, true, false, true),
-			field("matchCondition", "Match Condition", metadata.KindJSON, true, false),
+			metadata.NewField("name", "Name", metadata.KindString).Require().Sort(),
+			metadata.NewField("priority", "Priority", metadata.KindNumber).Require().Sort(),
+			metadata.NewField("matchCondition", "Match Condition", metadata.KindJSON).Require(),
 			// ipFirewall/geoFirewall were removed once waf.ip_access_lists took over IP/CIDR
 			// whitelist and blacklist. Geo (country-code) access rules stay expressible as an
 			// ordinary ruleType "waf" rule with a matchCondition field of "country".
-			enumField("ruleType", "Rule Type", []string{"waf", "rateLimit"}, true, true),
-			field("rateLimitThreshold", "Rate Limit Threshold", metadata.KindNumber, false, false),
-			field("rateLimitWindow", "Rate Limit Window (s)", metadata.KindNumber, false, false),
-			enumField("action", "Action", []string{"allow", "block", "challenge", "log"}, true, false),
-			field("enabled", "Enabled", metadata.KindBoolean, false, true),
+			metadata.EnumField("ruleType", "Rule Type", "waf", "rateLimit").Require().Index(),
+			metadata.NewField("rateLimitThreshold", "Rate Limit Threshold", metadata.KindNumber),
+			metadata.NewField("rateLimitWindow", "Rate Limit Window (s)", metadata.KindNumber),
+			metadata.EnumField("action", "Action", "allow", "block", "challenge", "log").Require(),
+			metadata.NewField("enabled", "Enabled", metadata.KindBoolean).Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
 			Fields:      []string{"zoneId", "name", "priority", "ruleType", "action", "enabled"},
 			Filters:     []string{"zoneId", "ruleType", "enabled"},
-			DefaultSort: strPtr("priority"),
+			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    100,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},

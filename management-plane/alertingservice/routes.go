@@ -34,9 +34,9 @@ import (
 
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
-	"github.com/metap-org/metap/pkg/kit/env"
 
 	"github.com/metap-org/waap/management-plane/analytics"
 )

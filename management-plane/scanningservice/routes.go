@@ -28,8 +28,8 @@ import (
 
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
-	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/permission"
 )
 
 // scannerURL: where a scan request is handed off. Unset (the default) means "no scanner

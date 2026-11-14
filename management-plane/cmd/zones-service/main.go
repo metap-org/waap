@@ -21,23 +21,15 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/env"
-	"github.com/metap-org/metap/pkg/metadata"
 
 	"github.com/metap-org/waap/management-plane/zonesservice"
-	"github.com/metap-org/waap/management-plane/zonesservice/entities"
+	// Declared entities register themselves in init(); app.Main reconciles them, referenced first.
+	_ "github.com/metap-org/waap/management-plane/zonesservice/entities"
 )
 
 func main() {
 	app.Main(app.Options{
-		Name: "zones-service",
-		// Reference targets first: domains <- zones <- ddos_policies/firewall_rules/ip_access_lists.
-		Entities: []metadata.EntityDefinition{
-			entities.DomainEntity(),
-			entities.ZoneEntity(),
-			entities.DdosPolicyEntity(),
-			entities.FirewallRuleEntity(),
-			entities.IPAccessListEntity(),
-		},
+		Name:     "zones-service",
 		GRPCPort: 3001,
 		// The gRPC API (what waf-graphql-gateway calls) goes through the zone/firewall/IP-list
 		// guards and the cross-service zone-delete check.

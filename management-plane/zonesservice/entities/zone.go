@@ -25,12 +25,12 @@ import (
 )
 
 func ZoneEntity() metadata.EntityDefinition {
-	hostname := sortableField("hostname", "Hostname", metadata.KindString, true, true, true)
-	hostname.Unique = boolPtr(true)
+	hostname := metadata.NewField("hostname", "Hostname", metadata.KindString).Require().Index().Sort()
+	hostname.Unique = metadata.Ptr(true)
 	// A hostname is served by exactly one zone across every tenant, not once per tenant.
 	globalScope := metadata.UniqueScopeGlobal
 	hostname.UniqueScope = &globalScope
-	hostname.Searchable = boolPtr(true)
+	hostname.Searchable = metadata.Ptr(true)
 
 	activateGuard := permission.AllCondition(
 		permission.AttributeCondition("hasConfig", permission.OpEq, permission.LiteralValue(json.RawMessage("true"))),
@@ -43,15 +43,15 @@ func ZoneEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn("waf.zones", "waf"),
 		Fields: []metadata.EntityField{
 			hostname,
-			field("originAddress", "Origin Address", metadata.KindString, true, false),
-			enumField("status", "Status", []string{"pending", "active", "paused", "suspended"}, false, true),
-			enumField("protectionMode", "Protection Mode", []string{"monitor", "enforce"}, true, true),
-			sortableField("configVersion", "Config Version", metadata.KindNumber, false, false, true),
-			field("hasConfig", "Has Config", metadata.KindBoolean, false, false),
-			refField("domainId", "Domain", "waf.domains", "apexDomain", true, true),
-			enumField("verificationStatus", "Verification Status", []string{"unverified", "verified"}, false, true),
-			enumField("dnsRoutingStatus", "DNS Routing Status", []string{"notRouted", "routed", "unknown"}, false, false),
-			sortableField("lastDnsCheckAt", "Last DNS Check At", metadata.KindDatetime, false, false, true),
+			metadata.NewField("originAddress", "Origin Address", metadata.KindString).Require(),
+			metadata.EnumField("status", "Status", "pending", "active", "paused", "suspended").Index(),
+			metadata.EnumField("protectionMode", "Protection Mode", "monitor", "enforce").Require().Index(),
+			metadata.NewField("configVersion", "Config Version", metadata.KindNumber).Sort(),
+			metadata.NewField("hasConfig", "Has Config", metadata.KindBoolean),
+			metadata.RefField("domainId", "Domain", "waf.domains", "apexDomain").Require().Index(),
+			metadata.EnumField("verificationStatus", "Verification Status", "unverified", "verified").Index(),
+			metadata.EnumField("dnsRoutingStatus", "DNS Routing Status", "notRouted", "routed", "unknown"),
+			metadata.NewField("lastDnsCheckAt", "Last DNS Check At", metadata.KindDatetime).Sort(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
@@ -60,7 +60,7 @@ func ZoneEntity() metadata.EntityDefinition {
 			// hostname (which zone) and status (is it even protecting anything) are the 2
 			// columns nobody should be able to hide from this list.
 			RequiredFields: []string{"hostname", "status"},
-			DefaultSort:    strPtr("-createdAt"),
+			DefaultSort:    metadata.Ptr("-createdAt"),
 			MaxLimit:       50,
 		}},
 		Workflow: &metadata.EntityWorkflow{

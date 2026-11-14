@@ -33,3 +33,19 @@ func TestOwnsExactlyItsOwnFiveEntities(t *testing.T) {
 	}
 	assert.Len(t, names, len(expected), "unexpected entity count: %v", names)
 }
+
+// app.Main reconciles metadata.Registry.Definitions() when no explicit list is given, so the
+// order it derives must put every Reference target before the entities pointing at it.
+func TestSubmittedEntitiesReconcileInReferenceOrder(t *testing.T) {
+	reg := metadata.NewMetadataRegistry()
+	require.NoError(t, reg.RegisterAllSubmitted())
+	pos := map[string]int{}
+	for i, e := range reg.Definitions() {
+		pos[e.Name] = i
+	}
+	require.Contains(t, pos, "waf.zones")
+	require.Less(t, pos["waf.domains"], pos["waf.zones"])
+	for _, child := range []string{"waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists"} {
+		require.Less(t, pos["waf.zones"], pos[child], child)
+	}
+}

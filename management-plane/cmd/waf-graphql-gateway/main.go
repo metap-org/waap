@@ -33,8 +33,8 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/jwks"
-	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/runtime"
 
 	_ "github.com/metap-org/waap/management-plane/alertingservice/entities"
