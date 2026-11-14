@@ -13,6 +13,7 @@ package graphqlgateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/metap-org/metap/pkg/kit/httpx"
 	"io"
@@ -131,8 +132,15 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 			"errors": []map[string]string{{"message": "malformed request body"}},
 		})
 	}
-	raw, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBytes))
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
 	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]interface{}{
+				"errors": []map[string]string{{"message": "request body is too large"}},
+			})
+			return
+		}
 		malformed()
 		return
 	}

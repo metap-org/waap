@@ -68,7 +68,7 @@ func (p *platformREST) call(ctx context.Context, method, path string, query url.
 	if resp.StatusCode == http.StatusNotFound && notFoundAsNull {
 		return nil, nil
 	}
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := readUpstream(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response from %s %s: %w", method, path, err)
 	}

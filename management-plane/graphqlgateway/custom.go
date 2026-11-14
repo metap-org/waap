@@ -12,7 +12,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -53,7 +52,7 @@ func forwardPost(ctx context.Context, url string, body interface{}) (interface{}
 		return nil, fmt.Errorf("calling %s: %w", url, err)
 	}
 	defer resp.Body.Close()
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readUpstream(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response from %s: %w", url, err)
 	}
