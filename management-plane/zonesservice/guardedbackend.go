@@ -30,6 +30,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"sync"
 
 	"github.com/google/uuid"
@@ -38,7 +39,6 @@ import (
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
-	"github.com/metap-org/metap/pkg/runtime"
 )
 
 func jsonString(s string) json.RawMessage {
@@ -88,7 +88,7 @@ func (l *crossServiceLink) get() crud.RecordBackend {
 	// sets RequestContext.ForwardedBearerToken, which GrpcBackend prefers unconditionally over
 	// this source. It exists only because ConnectGrpcBackend requires a *ServiceTokenSource to
 	// construct one at all.
-	placeholder := runtime.NewStaticServiceTokenSource("unused-forwarded-token-always-wins")
+	placeholder := httpx.NewStaticServiceTokenSource("unused-forwarded-token-always-wins")
 	backend, err := grpcapi.ConnectGrpcBackend(l.addr, placeholder)
 	if err != nil {
 		return nil

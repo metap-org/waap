@@ -13,11 +13,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/httpx"
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/metap-org/metap/pkg/runtime"
 )
 
 // IngestHeader carries the ingest secret (analytics-plane/api.IngestHeader).
@@ -27,10 +26,10 @@ type Client struct {
 	url         string
 	ingestToken string
 	http        *http.Client
-	token       *runtime.ServiceTokenSource
+	token       *httpx.ServiceTokenSource
 }
 
-func New(httpClient *http.Client, baseURL, ingestToken string, token *runtime.ServiceTokenSource) *Client {
+func New(httpClient *http.Client, baseURL, ingestToken string, token *httpx.ServiceTokenSource) *Client {
 	return &Client{url: strings.TrimSuffix(baseURL, "/") + "/v1/security-events/ingest", ingestToken: ingestToken, http: httpClient, token: token}
 }
 

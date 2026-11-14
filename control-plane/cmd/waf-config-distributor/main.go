@@ -17,12 +17,13 @@ package main
 
 import (
 	"context"
+	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/kit/shutdown"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/metap-org/metap/pkg/infra"
-	"github.com/metap-org/metap/pkg/runtime"
 
 	"github.com/metap-org/waap/control-plane/analytics"
 	"github.com/metap-org/waap/control-plane/config"
@@ -50,11 +51,11 @@ func main() {
 	consumerCtx, cancelConsumer := context.WithCancel(bg)
 	defer cancelConsumer()
 
-	httpClient := runtime.DefaultHTTPClient()
+	httpClient := httpx.DefaultClient()
 	// Fails boot if it can't log in — unlike cron-scheduler, which degrades because some of its
 	// job types need no credential. Here every single thing this process does needs management-plane,
 	// so starting up without a session would just be a process that logs errors forever.
-	token, err := runtime.StartServiceTokenSource(bg, httpClient, cfg.LoginURL, cfg.ServiceEmail, cfg.ServicePassword)
+	token, err := httpx.StartServiceTokenSource(bg, httpClient, cfg.LoginURL, cfg.ServiceEmail, cfg.ServicePassword)
 	if err != nil {
 		slog.Error("logging into management-plane", "error", err)
 		os.Exit(1)
@@ -88,10 +89,10 @@ func main() {
 	}
 
 	// One shutdown signal, three listeners.
-	shutdown := make(chan struct{})
+	stop := make(chan struct{})
 	go func() {
-		runtime.WaitForShutdownSignal()
-		close(shutdown)
+		shutdown.Wait()
+		close(stop)
 		cancelConsumer()
 	}()
 
@@ -105,17 +106,17 @@ func main() {
 	resyncDone := make(chan struct{})
 	go func() {
 		defer close(resyncDone)
-		resync.RunLoop(bg, dp, distributor, cfg.ResyncInterval, shutdown)
+		resync.RunLoop(bg, dp, distributor, cfg.ResyncInterval, stop)
 	}()
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
-		ingest.RunWriter(bg, events, queue, cfg.IngestMaxBatch, shutdown)
+		ingest.RunWriter(bg, events, queue, cfg.IngestMaxBatch, stop)
 	}()
 
 	slog.Info("waf-config-distributor starting", "addr", cfg.Addr(), "zones_url", cfg.ZonesURL,
 		"redis", cfg.RedisURL, "resync_seconds", cfg.ResyncInterval.Seconds())
-	if err := runtime.Serve(cfg.Addr(), ingest.Router(ingestState)); err != nil && err != http.ErrServerClosed {
+	if err := httpx.Serve(cfg.Addr(), ingest.Router(ingestState)); err != nil && err != http.ErrServerClosed {
 		slog.Error("waf-config-distributor exited with an error", "error", err)
 	}
 
