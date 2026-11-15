@@ -155,6 +155,9 @@ callback) and `/ingest/events` (edge to control) stay REST.
 **Shared names live in `model/` (2026-11-14, `../metap-docs/docs/roadmap/110-magic-literals-audit.md`):** entity names
 (`model.Zones`, ...), `model.FieldZoneID`/`FieldDomainID` and the action names (`model.ActionVerifyDNS`, ...). Never retype
 `"waf.zones"` or `"zoneId"`; careful with struct tags (`json:"zoneId"` stays a tag).
+Wave 2 (same doc): `model/fields.go` has every entity field name (`model.FieldHostname`, ...), `model/workflow.go` the workflow
+states and transition actions (`model.ZoneStatusActive`, `model.ScanJobRun`, ...), and product error codes live in `model.go`.
+Timestamps, headers, media types and log keys come from metap's `pkg/kit/standard`; error codes from `pkg/kit/errcode`.
 
 ## Domain model (business-level, not yet `EntityDefinition` code)
 
