@@ -9,6 +9,7 @@
  * escape hatch rather than as the product.
  */
 import { ENTITIES } from "./api/waf";
+import { navIcons } from "./components/navIcons";
 import {
   Navigate,
   Outlet,
@@ -26,7 +27,6 @@ import {
   GeneratedForm,
   GeneratedList,
   LocaleProvider,
-  LowCodeEntitiesAdminPage,
   OidcCallbackPage,
   PoliciesAdminPage,
   RecordDetail,
@@ -35,7 +35,6 @@ import {
 } from "@metap/platform-ui";
 import type { ShellNavItem } from "@metap/platform-ui";
 import { LoginPage } from "./demo/LoginPage";
-import { EntitiesPage } from "./demo/EntitiesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { ZonesPage } from "./pages/ZonesPage";
@@ -78,43 +77,95 @@ function RequireAuth() {
     return <Navigate to="/login" replace />;
   }
 
+  // Grouped like a dashboard sidebar: overview, the zone-centric protection config, the work queue
+  // (incidents, findings, alerts), then administration.
+  const overview = t("waf.navGroup.overview");
+  const protection = t("waf.navGroup.protection");
+  const operations = t("waf.navGroup.operations");
+  const admin = t("waf.navGroup.admin");
   const navItems: ShellNavItem[] = [
-    { to: "/", label: t("waf.nav.dashboard") },
-    { to: "/zones", label: t("waf.nav.zones"), entity: ENTITIES.zones },
+    {
+      to: "/",
+      label: t("waf.nav.dashboard"),
+      group: overview,
+      icon: navIcons.dashboard,
+    },
+    {
+      to: "/analytics",
+      label: t("waf.nav.analytics"),
+      group: overview,
+      icon: navIcons.analytics,
+    },
+    {
+      to: "/zones",
+      label: t("waf.nav.zones"),
+      group: protection,
+      icon: navIcons.zones,
+      entity: ENTITIES.zones,
+    },
     {
       to: "/rules/global",
       label: t("waf.nav.globalRules"),
+      group: protection,
+      icon: navIcons.rules,
       entity: ENTITIES.firewallRules,
     },
     {
       to: "/access-lists/global",
       label: t("waf.nav.globalAccessLists"),
+      group: protection,
+      icon: navIcons.accessLists,
       entity: ENTITIES.ipAccessLists,
     },
     {
       to: "/incidents",
       label: t("waf.nav.incidents"),
+      group: operations,
+      icon: navIcons.incidents,
       entity: ENTITIES.incidents,
     },
     {
       to: "/findings",
       label: t("waf.nav.findings"),
+      group: operations,
+      icon: navIcons.findings,
       entity: ENTITIES.scanFindings,
     },
     {
       to: "/alerting",
       label: t("waf.nav.alerting"),
+      group: operations,
+      icon: navIcons.alerting,
       entity: ENTITIES.alertPolicies,
     },
-    { to: "/analytics", label: t("waf.nav.analytics") },
-    { to: "/settings", label: t("waf.nav.settings"), roles: ["admin"] },
-    { to: "/admin/users", label: t("shell.navUsers"), roles: ["admin"] },
-    { to: "/admin/policies", label: t("shell.navPolicies"), roles: ["admin"] },
-    { to: "/admin/cron-jobs", label: t("shell.navCronJobs"), roles: ["admin"] },
-    { to: "/admin/lowcode", label: t("shell.navLowCode"), roles: ["admin"] },
-    // The old entity-per-nav-item harness, kept behind one link: still the fastest way to inspect
-    // raw records when a product screen doesn't show the field you need.
-    { to: "/records", label: t("waf.nav.rawRecords"), roles: ["admin"] },
+    {
+      to: "/settings",
+      label: t("waf.nav.settings"),
+      group: admin,
+      icon: navIcons.settings,
+      roles: ["admin"],
+    },
+    {
+      to: "/admin/users",
+      label: t("shell.navUsers"),
+      group: admin,
+      icon: navIcons.users,
+      roles: ["admin"],
+    },
+    {
+      to: "/admin/policies",
+      label: t("shell.navPolicies"),
+      group: admin,
+      icon: navIcons.policies,
+      roles: ["admin"],
+    },
+    {
+      to: "/admin/cron-jobs",
+      label: t("shell.navCronJobs"),
+      group: admin,
+      icon: navIcons.cron,
+      roles: ["admin"],
+    },
   ];
 
   return (
@@ -202,10 +253,9 @@ export default function App() {
             <Route path="/alerting" element={<AlertingPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
 
-            {/* Generic CRUD escape hatch — the whole of the previous app, now one section.
-                `/records` itself (the entity picker) is admin-gated below; a specific entity's
-                list/new/detail/edit stay reachable by anyone authenticated, same as before this
-                route table was restructured. */}
+            {/* Generic record screens, reached from a list row's "view" action and the generic
+                create/edit forms. No longer in the nav, and no entity picker at `/records`: the
+                product screens above are the portal (2026-11-15). */}
             <Route path="/records/:entityName" element={<RecordsRoute />} />
             <Route
               path="/records/:entityName/new"
@@ -222,14 +272,9 @@ export default function App() {
 
             <Route element={<RequireAdmin />}>
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/records" element={<EntitiesPage />} />
               <Route path="/admin/users" element={<UsersAdminPage />} />
               <Route path="/admin/policies" element={<PoliciesAdminPage />} />
               <Route path="/admin/cron-jobs" element={<CronJobsAdminPage />} />
-              <Route
-                path="/admin/lowcode"
-                element={<LowCodeEntitiesAdminPage />}
-              />
             </Route>
           </Route>
         </Routes>

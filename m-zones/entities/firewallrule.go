@@ -45,7 +45,7 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    model.LargeMaxListLimit,
 		}},
-		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Audit: &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
 	}
 }
 
