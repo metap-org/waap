@@ -100,18 +100,73 @@ async function mergeEntityList(
 ) {
   try {
     const headers: Record<string, string> = {};
-    if (req.headers.authorization) headers.authorization = req.headers.authorization;
+    if (req.headers.authorization)
+      headers.authorization = req.headers.authorization;
     if (req.headers.cookie) headers.cookie = req.headers.cookie;
     const responses = await Promise.all(
       [ZONES, SCANNING, ALERTING, GATEWAY].map(
         (base) =>
-          fetch(`${base}/metadata/entities`, { headers }).then((r) => r.json()) as Promise<{
+          fetch(`${base}/metadata/entities`, { headers }).then((r) =>
+            r.json(),
+          ) as Promise<{
             data?: unknown[];
           }>,
       ),
     );
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ data: responses.flatMap((r) => r.data ?? []) }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** `GET /metadata/entity-access` (the caller's per-entity read/create/update/delete map, which
+ *  `@metap/platform-ui` uses to hide nav entries and buttons) — same shape of problem as
+ *  `mergeEntityList`: each service only answers for its own entities, so fan out to the 3
+ *  services and merge their `{ data: { <entity>: {...} } }` maps. A service that is down or
+ *  answers with an error is skipped rather than failing the whole map: an entity missing from it
+ *  reads as "unknown" in platform-ui, never as "denied". */
+async function mergeEntityAccess(
+  req: IncomingMessage,
+  res: ServerResponse,
+  next: (err?: unknown) => void,
+) {
+  try {
+    const headers: Record<string, string> = {};
+    if (req.headers.authorization)
+      headers.authorization = req.headers.authorization;
+    if (req.headers.cookie) headers.cookie = req.headers.cookie;
+    const responses = await Promise.all(
+      [ZONES, SCANNING, ALERTING].map((base) =>
+        fetch(`${base}/metadata/entity-access`, { headers })
+          .then(async (r) => ({
+            status: r.status,
+            body: r.ok ? await r.json() : null,
+          }))
+          .catch(() => ({ status: 502, body: null })),
+      ),
+    );
+    // Every service refusing the session (401) is the caller's problem, not a partial outage:
+    // pass it through so platform-ui's normal session handling sees it.
+    if (responses.every((r) => r.status === 401)) {
+      res.statusCode = 401;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          error: { code: "unauthorized", message: "Not signed in." },
+        }),
+      );
+      return;
+    }
+    const data = Object.assign(
+      {},
+      ...responses.map(
+        (r) =>
+          (r.body as { data?: Record<string, unknown> } | null)?.data ?? {},
+      ),
+    );
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ data }));
   } catch (err) {
     next(err);
   }
@@ -127,6 +182,9 @@ export default defineConfig({
           const url = req.url ?? "";
           if (url === "/metadata/entities" || url === "/metadata/entities/") {
             return void mergeEntityList(req, res, next);
+          }
+          if (url === "/metadata/entity-access") {
+            return void mergeEntityAccess(req, res, next);
           }
           if (
             url.startsWith("/api/") ||
