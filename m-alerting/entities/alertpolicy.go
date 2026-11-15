@@ -19,7 +19,7 @@ func AlertPolicyEntity() metadata.EntityDefinition {
 			metadata.NewField(model.FieldThresholdCount, "Threshold Count", metadata.KindNumber).Require(),
 			metadata.NewField(model.FieldWindowMinutes, "Window (minutes)", metadata.KindNumber).Require(),
 			metadata.NewField(model.FieldChannels, "Channels", metadata.KindJSON).Require(),
-			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index().WithWidget(metadata.WidgetSwitch),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",

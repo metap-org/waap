@@ -26,7 +26,7 @@ func IPAccessListEntity() metadata.EntityDefinition {
 			// validateIPAccessList. Bulk-add in the portal creates N rows client-side rather
 			// than this field taking a list.
 			metadata.NewField(model.FieldValue, "IP / CIDR", metadata.KindString).Require(),
-			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index().WithWidget(metadata.WidgetSwitch),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",

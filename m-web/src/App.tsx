@@ -8,6 +8,7 @@
  * and the generic per-entity CRUD screens stay reachable under `/records/*` as an admin/debug
  * escape hatch rather than as the product.
  */
+import { ENTITIES } from "./api/waf";
 import {
   Navigate,
   Outlet,
@@ -79,12 +80,32 @@ function RequireAuth() {
 
   const navItems: ShellNavItem[] = [
     { to: "/", label: t("waf.nav.dashboard") },
-    { to: "/zones", label: t("waf.nav.zones") },
-    { to: "/rules/global", label: t("waf.nav.globalRules") },
-    { to: "/access-lists/global", label: t("waf.nav.globalAccessLists") },
-    { to: "/incidents", label: t("waf.nav.incidents") },
-    { to: "/findings", label: t("waf.nav.findings") },
-    { to: "/alerting", label: t("waf.nav.alerting") },
+    { to: "/zones", label: t("waf.nav.zones"), entity: ENTITIES.zones },
+    {
+      to: "/rules/global",
+      label: t("waf.nav.globalRules"),
+      entity: ENTITIES.firewallRules,
+    },
+    {
+      to: "/access-lists/global",
+      label: t("waf.nav.globalAccessLists"),
+      entity: ENTITIES.ipAccessLists,
+    },
+    {
+      to: "/incidents",
+      label: t("waf.nav.incidents"),
+      entity: ENTITIES.incidents,
+    },
+    {
+      to: "/findings",
+      label: t("waf.nav.findings"),
+      entity: ENTITIES.scanFindings,
+    },
+    {
+      to: "/alerting",
+      label: t("waf.nav.alerting"),
+      entity: ENTITIES.alertPolicies,
+    },
     { to: "/analytics", label: t("waf.nav.analytics") },
     { to: "/settings", label: t("waf.nav.settings"), roles: ["admin"] },
     { to: "/admin/users", label: t("shell.navUsers"), roles: ["admin"] },
