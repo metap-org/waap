@@ -15,11 +15,11 @@ func AlertPolicyEntity() metadata.EntityDefinition {
 		Label:     "Alert Policy",
 		TableName: reconciler.QualifiedTableNameIn(model.AlertPolicies, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.NewField("name", "Name", metadata.KindString).Require().Sort(),
-			metadata.NewField("thresholdCount", "Threshold Count", metadata.KindNumber).Require(),
-			metadata.NewField("windowMinutes", "Window (minutes)", metadata.KindNumber).Require(),
-			metadata.NewField("channels", "Channels", metadata.KindJSON).Require(),
-			metadata.NewField("enabled", "Enabled", metadata.KindBoolean).Index(),
+			metadata.NewField(model.FieldName, "Name", metadata.KindString).Require().Sort(),
+			metadata.NewField(model.FieldThresholdCount, "Threshold Count", metadata.KindNumber).Require(),
+			metadata.NewField(model.FieldWindowMinutes, "Window (minutes)", metadata.KindNumber).Require(),
+			metadata.NewField(model.FieldChannels, "Channels", metadata.KindJSON).Require(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",

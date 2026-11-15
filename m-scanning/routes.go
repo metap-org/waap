@@ -29,6 +29,8 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/waap/model"
 )
@@ -76,11 +78,11 @@ func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.
 	if job.Status != nil {
 		status = *job.Status
 	}
-	if status == "queued" || status == "running" {
-		return nil, crud.NewServiceErrorMsg(http.StatusConflict, "scan_already_in_progress", "This scan job is already "+status+".")
+	if status == model.ScanJobQueued || status == model.ScanJobRunning {
+		return nil, crud.NewServiceErrorMsg(http.StatusConflict, model.ErrScanAlreadyInProgress, "This scan job is already "+status+".")
 	}
 
-	queued, err := doTransition(ctx, state, job, "run", rc)
+	queued, err := doTransition(ctx, state, job, model.ScanJobRun, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -96,24 +98,24 @@ func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.
 	// Fire-and-forget by design: the scanner reports back through the findings callback below,
 	// so this request doesn't wait out a scan that can take minutes.
 	payload := map[string]any{
-		"scanJobId": queued.ID, model.FieldZoneID: queued.Data[model.FieldZoneID], "scanType": queued.Data["scanType"],
+		"scanJobId": queued.ID, model.FieldZoneID: queued.Data[model.FieldZoneID], "scanType": queued.Data[model.FieldScanType],
 		"callbackPath": fmt.Sprintf("/internal/scan-jobs/%s/findings", queued.ID),
 	}
 	body, _ := json.Marshal(payload)
-	resp, err := httpClient().Post(scanner+"/scans", "application/json", bytes.NewReader(body))
+	resp, err := httpClient().Post(scanner+"/scans", standard.MediaTypeJSON, bytes.NewReader(body))
 	if err != nil {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadGateway, "scanner_unavailable", "Could not reach the scanner: "+err.Error())
+		return nil, crud.NewServiceErrorMsg(http.StatusBadGateway, model.ErrScannerUnavailable, "Could not reach the scanner: "+err.Error())
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return map[string]any{"job": queued, "dispatched": true, "detail": "Handed to scanner."}, nil
 	}
 	detail := fmt.Sprintf("Scanner rejected the request (%d)", resp.StatusCode)
-	running, err := doTransition(ctx, state, queued, "start", rc)
+	running, err := doTransition(ctx, state, queued, model.ScanJobStart, rc)
 	if err != nil {
 		return nil, err
 	}
-	failed, err := doTransition(ctx, state, running, "fail", rc)
+	failed, err := doTransition(ctx, state, running, model.ScanJobFail, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +151,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	}
 	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid job id.", nil)
+		httpserver.WriteServiceError(w, http.StatusBadRequest, errcode.ValidationFailed, "Invalid job id.", nil)
 		return
 	}
 	var body findingsBody
@@ -166,16 +168,16 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 		return
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := standard.NowRFC3339()
 	created := make([]uuid.UUID, 0, len(body.Findings))
 	for _, finding := range body.Findings {
 		data := crud.JsonObject{
-			"scanJobId": jsonStr(job.ID.String()), "severity": jsonStr(finding.Severity),
-			"category": jsonStr(finding.Category), "endpoint": jsonStr(finding.Endpoint),
-			"firstSeenAt": jsonStr(now), "lastSeenAt": jsonStr(now),
+			model.FieldScanJobID: jsonStr(job.ID.String()), model.FieldSeverity: jsonStr(finding.Severity),
+			model.FieldCategory: jsonStr(finding.Category), model.FieldEndpoint: jsonStr(finding.Endpoint),
+			model.FieldFirstSeenAt: jsonStr(now), model.FieldLastSeenAt: jsonStr(now),
 		}
 		if finding.Description != nil {
-			data["description"] = jsonStr(*finding.Description)
+			data[model.FieldDescription] = jsonStr(*finding.Description)
 		}
 		result, err := state.Crud.Create(r.Context(), model.ScanFindings, data, rc, nil)
 		if err != nil {
@@ -188,16 +190,16 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	// The job may still be "queued" if the scanner was quick — walk it through start first so
 	// the transition graph is respected rather than jumped over.
 	current := job
-	if current.Status != nil && *current.Status == "queued" {
-		current, err = doTransition(r.Context(), state, current, "start", rc)
+	if current.Status != nil && *current.Status == model.ScanJobQueued {
+		current, err = doTransition(r.Context(), state, current, model.ScanJobStart, rc)
 		if err != nil {
 			httpserver.WriteInternalError(w, err)
 			return
 		}
 	}
-	finish := "complete"
+	finish := model.ScanJobComplete
 	if !succeeded {
-		finish = "fail"
+		finish = model.ScanJobFail
 	}
 	finished, err := doTransition(r.Context(), state, current, finish, rc)
 	if err != nil {
@@ -207,7 +209,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 
 	// lastRunAt isn't part of any transition's SetFields, so it's written here — the one field
 	// this flow owns that the workflow itself doesn't.
-	patch := crud.JsonObject{"lastRunAt": jsonStr(now)}
+	patch := crud.JsonObject{model.FieldLastRunAt: jsonStr(now)}
 	jobAfter, err := state.Crud.Update(r.Context(), model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
 	if err != nil {
 		httpserver.WriteCrudError(w, err)

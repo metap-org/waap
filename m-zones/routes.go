@@ -29,6 +29,8 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/waap/model"
@@ -129,9 +131,9 @@ func verifyDNS(ctx context.Context, state *httpserver.AppState, rc *permission.R
 	}
 	record := got.Record
 
-	hostname, _ := jsonAsString(record.Data["hostname"])
+	hostname, _ := jsonAsString(record.Data[model.FieldHostname])
 	if hostname == "" {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Zone has no hostname.")
+		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no hostname.")
 	}
 
 	client := httpClient()
@@ -145,13 +147,13 @@ func verifyDNS(ctx context.Context, state *httpserver.AppState, rc *permission.R
 		}
 	}
 
-	status := "notRouted"
+	status := model.DNSNotRouted
 	if routed {
-		status = "routed"
+		status = model.DNSRouted
 	}
 	patch := crud.JsonObject{
-		"dnsRoutingStatus": jsonString(status),
-		"lastDnsCheckAt":   jsonString(time.Now().UTC().Format(time.RFC3339)),
+		model.FieldDNSRoutingStatus: jsonString(status),
+		model.FieldLastDNSCheckAt:   jsonString(standard.NowRFC3339()),
 	}
 	updated, err := state.Crud.Update(ctx, model.Zones, zoneID, record.Version, patch, rc, nil)
 	if err != nil {
@@ -187,15 +189,15 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 	}
 	domain := got.Record
 
-	apexDomain, _ := jsonAsString(domain.Data["apexDomain"])
+	apexDomain, _ := jsonAsString(domain.Data[model.FieldApexDomain])
 	if apexDomain == "" {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Domain has no apexDomain.")
+		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Domain has no apexDomain.")
 	}
 	expectedToken := ""
 	if body.ExpectedToken != nil {
 		expectedToken = *body.ExpectedToken
 	} else {
-		expectedToken, _ = jsonAsString(domain.Data["verificationToken"])
+		expectedToken, _ = jsonAsString(domain.Data[model.FieldVerificationToken])
 	}
 
 	client := httpClient()
@@ -219,7 +221,7 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 		}, nil
 	}
 
-	patch := crud.JsonObject{"verificationStatus": jsonString("verified")}
+	patch := crud.JsonObject{model.FieldVerificationStatus: jsonString(model.VerificationVerified)}
 	updatedDomain, err := state.Crud.Update(ctx, model.Domains, domainID, domain.Version, patch, rc, nil)
 	if err != nil {
 		return nil, err
@@ -227,14 +229,14 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 
 	// Cascade onto every zone under this domain — best-effort per zone (one failing zone must
 	// not stop the others, and must not undo the domain's own now-verified status).
-	listInput := query.ListInput{Limit: 100, Filters: [][2]string{{"domainId", domainID.String()}}}
+	listInput := query.ListInput{Limit: 100, Filters: [][2]string{{model.FieldDomainID, domainID.String()}}}
 	zones, err := state.Crud.List(ctx, model.Zones, listInput, rc)
 	if err == nil {
 		for _, zone := range zones.Data {
-			zonePatch := crud.JsonObject{"verificationStatus": jsonString("verified")}
+			zonePatch := crud.JsonObject{model.FieldVerificationStatus: jsonString(model.VerificationVerified)}
 			if _, err := state.Crud.Update(ctx, model.Zones, zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
 				slog.Error("domain verified but cascading verificationStatus onto this zone failed",
-					"zone_id", zone.ID, "domain_id", domainID, "error", err)
+					"zone_id", zone.ID, "domain_id", domainID, standard.LogError, err)
 			}
 		}
 	}
@@ -252,9 +254,9 @@ func testOrigin(ctx context.Context, state *httpserver.AppState, rc *permission.
 	if err != nil {
 		return nil, err
 	}
-	origin, _ := jsonAsString(got.Record.Data["originAddress"])
+	origin, _ := jsonAsString(got.Record.Data[model.FieldOriginAddress])
 	if origin == "" {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Zone has no origin address.")
+		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no origin address.")
 	}
 	// A customer types "1.2.3.4" or "origin.example.com" as often as a full URL.
 	targetURL := origin
@@ -308,14 +310,14 @@ func syncConfigState(ctx context.Context, state *httpserver.AppState, rc *permis
 	}
 	zone := got.Record
 
-	currentHasConfig, _ := jsonAsBool(zone.Data["hasConfig"])
+	currentHasConfig, _ := jsonAsBool(zone.Data[model.FieldHasConfig])
 	if currentHasConfig == hasConfig {
 		// Already correct — skip the write so this doesn't bump version/updatedAt on every call
 		// and turn an idempotent sync into a source of version conflicts for the portal.
 		return map[string]any{"hasConfig": hasConfig, "changed": false}, nil
 	}
 
-	patch := crud.JsonObject{"hasConfig": jsonBool(hasConfig)}
+	patch := crud.JsonObject{model.FieldHasConfig: jsonBool(hasConfig)}
 	_, err = state.Crud.Update(ctx, model.Zones, zoneID, zone.Version, patch, rc, nil)
 	if err != nil {
 		return nil, err
@@ -371,7 +373,7 @@ func MountRoutes(r chi.Router, state *httpserver.AppState) {
 		}
 		id, err := uuid.Parse(chi.URLParam(req, "id"))
 		if err != nil {
-			httpserver.WriteServiceError(w, http.StatusBadRequest, "validation_failed", "Invalid domain id.", nil)
+			httpserver.WriteServiceError(w, http.StatusBadRequest, errcode.ValidationFailed, "Invalid domain id.", nil)
 			return
 		}
 		var body verifyDNSBody

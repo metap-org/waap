@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"io"
 	"net/http"
 	"strings"
@@ -45,8 +46,8 @@ func (c *Client) WriteSecurityEvents(ctx context.Context, events []map[string]an
 	if err != nil {
 		return 0, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.token.Current())
+	req.Header.Set(standard.HeaderContentType, standard.MediaTypeJSON)
+	req.Header.Set(standard.HeaderAuthorization, standard.BearerPrefix+c.token.Current())
 	if c.ingestToken != "" {
 		req.Header.Set(IngestHeader, c.ingestToken)
 	}

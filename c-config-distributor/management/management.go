@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/model"
 	"net/http"
 	"strings"
@@ -98,10 +99,10 @@ func recordFromJSON(raw map[string]json.RawMessage, fields []string) Record {
 }
 
 var (
-	zoneFields         = []string{"hostname", "originAddress", "protectionMode", "configVersion"}
-	ddosFields         = []string{"enabled", "sensitivity", "action", "requestRateThreshold", "burstWindow", "pathPrefix", "httpMethod", "priority"}
-	ruleFields         = []string{"enabled", "ruleType", "matchCondition", "rateLimitThreshold", "rateLimitWindow", "name", "action", "priority"}
-	ipAccessListFields = []string{"enabled", "type", "value"}
+	zoneFields         = []string{model.FieldHostname, model.FieldOriginAddress, model.FieldProtectionMode, model.FieldConfigVersion}
+	ddosFields         = []string{model.FieldEnabled, model.FieldSensitivity, model.FieldAction, model.FieldRequestRateThreshold, model.FieldBurstWindow, model.FieldPathPrefix, model.FieldHTTPMethod, model.FieldPriority}
+	ruleFields         = []string{model.FieldEnabled, model.FieldRuleType, model.FieldMatchCondition, model.FieldRateLimitThreshold, model.FieldRateLimitWindow, model.FieldName, model.FieldAction, model.FieldPriority}
+	ipAccessListFields = []string{model.FieldEnabled, model.FieldType, model.FieldValue}
 )
 
 type Client struct {
@@ -145,8 +146,8 @@ func (d *Client) graphql(ctx context.Context, base, query string, variables any)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+d.token.Current())
+	req.Header.Set(standard.HeaderContentType, standard.MediaTypeJSON)
+	req.Header.Set(standard.HeaderAuthorization, standard.BearerPrefix+d.token.Current())
 	resp, err := d.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("POST %s: %w", url, err)

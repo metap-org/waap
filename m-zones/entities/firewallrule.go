@@ -26,17 +26,17 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn(model.FirewallRules, "waf"),
 		Fields: []metadata.EntityField{
 			zoneID,
-			metadata.NewField("name", "Name", metadata.KindString).Require().Sort(),
-			metadata.NewField("priority", "Priority", metadata.KindNumber).Require().Sort(),
-			metadata.NewField("matchCondition", "Match Condition", metadata.KindJSON).Require(),
+			metadata.NewField(model.FieldName, "Name", metadata.KindString).Require().Sort(),
+			metadata.NewField(model.FieldPriority, "Priority", metadata.KindNumber).Require().Sort(),
+			metadata.NewField(model.FieldMatchCondition, "Match Condition", metadata.KindJSON).Require(),
 			// ipFirewall/geoFirewall were removed once waf.ip_access_lists took over IP/CIDR
 			// whitelist and blacklist. Geo (country-code) access rules stay expressible as an
 			// ordinary ruleType "waf" rule with a matchCondition field of "country".
-			metadata.EnumField("ruleType", "Rule Type", "waf", "rateLimit").Require().Index(),
-			metadata.NewField("rateLimitThreshold", "Rate Limit Threshold", metadata.KindNumber),
-			metadata.NewField("rateLimitWindow", "Rate Limit Window (s)", metadata.KindNumber),
-			metadata.EnumField("action", "Action", "allow", "block", "challenge", "log").Require(),
-			metadata.NewField("enabled", "Enabled", metadata.KindBoolean).Index(),
+			metadata.EnumField(model.FieldRuleType, "Rule Type", "waf", "rateLimit").Require().Index(),
+			metadata.NewField(model.FieldRateLimitThreshold, "Rate Limit Threshold", metadata.KindNumber),
+			metadata.NewField(model.FieldRateLimitWindow, "Rate Limit Window (s)", metadata.KindNumber),
+			metadata.EnumField(model.FieldAction, "Action", "allow", "block", "challenge", "log").Require(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",

@@ -24,7 +24,7 @@ const SecurityEvents = model.SecurityEvents
 // and the GraphQL schema see no change. zoneId/triggeredById stay plain strings (no reference
 // field), as before: zones live in another service and a rule id points at one of two entities.
 func SecurityEventEntity() metadata.EntityDefinition {
-	name := metadata.NewField("triggeredByName", "Triggered By Name", metadata.KindString)
+	name := metadata.NewField(model.FieldTriggeredByName, "Triggered By Name", metadata.KindString)
 	return metadata.EntityDefinition{
 		Name:  SecurityEvents,
 		Label: "Security Event",
@@ -33,19 +33,19 @@ func SecurityEventEntity() metadata.EntityDefinition {
 		TableName: "analytics.security_events",
 		Fields: []metadata.EntityField{
 			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
-			metadata.EnumField("triggeredBy", "Triggered By", "ddosPolicy", "firewallRule").Require().Index(),
-			metadata.NewField("triggeredById", "Triggered By Id", metadata.KindString).Require(),
+			metadata.EnumField(model.FieldTriggeredBy, "Triggered By", "ddosPolicy", "firewallRule").Require().Index(),
+			metadata.NewField(model.FieldTriggeredByID, "Triggered By Id", metadata.KindString).Require(),
 			name,
-			metadata.EnumField("action", "Action", "logged", "challenged", "blocked").Require().Index(),
-			metadata.NewField("sourceIp", "Source IP", metadata.KindString).Require().Index(),
-			metadata.NewField("requestPath", "Request Path", metadata.KindString).Require(),
-			metadata.NewField("occurredAt", "Occurred At", metadata.KindDatetime).Require().Index().Sort(),
+			metadata.EnumField(model.FieldAction, "Action", "logged", "challenged", "blocked").Require().Index(),
+			metadata.NewField(model.FieldSourceIP, "Source IP", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldRequestPath, "Request Path", metadata.KindString).Require(),
+			metadata.NewField(model.FieldOccurredAt, "Occurred At", metadata.KindDatetime).Require().Index().Sort(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",
 			Label:       "Default",
-			Fields:      []string{model.FieldZoneID, "triggeredByName", "action", "sourceIp", "requestPath", "occurredAt"},
-			Filters:     []string{model.FieldZoneID, "triggeredBy", "action", "sourceIp"},
+			Fields:      []string{model.FieldZoneID, model.FieldTriggeredByName, model.FieldAction, model.FieldSourceIP, model.FieldRequestPath, model.FieldOccurredAt},
+			Filters:     []string{model.FieldZoneID, model.FieldTriggeredBy, model.FieldAction, model.FieldSourceIP},
 			DefaultSort: metadata.Ptr("-occurredAt"),
 			MaxLimit:    50,
 		}},

@@ -15,10 +15,10 @@ func AlertNotificationEntity() metadata.EntityDefinition {
 		Label:     "Alert Notification",
 		TableName: reconciler.QualifiedTableNameIn(model.AlertNotifications, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.RefField("alertPolicyId", "Alert Policy", model.AlertPolicies, "name").Require().Index(),
-			metadata.NewField("triggeredAt", "Triggered At", metadata.KindDatetime).Require().Index().Sort(),
-			metadata.EnumField("channel", "Channel", "email", "webhook").Require(),
-			metadata.EnumField("deliveryStatus", "Delivery Status", "sent", "failed").Require().Index(),
+			metadata.RefField(model.FieldAlertPolicyID, "Alert Policy", model.AlertPolicies, "name").Require().Index(),
+			metadata.NewField(model.FieldTriggeredAt, "Triggered At", metadata.KindDatetime).Require().Index().Sort(),
+			metadata.EnumField(model.FieldChannel, "Channel", "email", "webhook").Require(),
+			metadata.EnumField(model.FieldDeliveryStatus, "Delivery Status", "sent", "failed").Require().Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name:        "default",

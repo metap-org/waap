@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/metap-org/metap/pkg/kit/standard"
 )
 
 type SecurityEvent struct {
@@ -108,21 +110,21 @@ func RunShipper(t *Telemetry, ingestURL string, ingestToken *string, maxBatch in
 func ship(client *http.Client, url string, token *string, events []SecurityEvent, t *Telemetry) {
 	body, err := json.Marshal(batch{Events: events})
 	if err != nil {
-		slog.Warn("failed to encode telemetry batch", "error", err)
+		slog.Warn("failed to encode telemetry batch", standard.LogError, err)
 		return
 	}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		slog.Warn("failed to build telemetry request", "error", err)
+		slog.Warn("failed to build telemetry request", standard.LogError, err)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(standard.HeaderContentType, standard.MediaTypeJSON)
 	if token != nil {
 		req.Header.Set("X-WAF-Ingest-Token", *token)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Warn("failed to ship telemetry batch", "error", err, "count", len(events))
+		slog.Warn("failed to ship telemetry batch", standard.LogError, err, "count", len(events))
 		return
 	}
 	defer resp.Body.Close()
@@ -134,5 +136,5 @@ func ship(client *http.Client, url string, token *string, events []SecurityEvent
 }
 
 func NowRFC3339() string {
-	return time.Now().UTC().Format(time.RFC3339)
+	return standard.NowRFC3339()
 }

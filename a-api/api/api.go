@@ -18,8 +18,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/a-api/auth"
 	"github.com/metap-org/waap/a-api/events"
 	"github.com/metap-org/waap/a-api/store"
@@ -73,8 +75,8 @@ func fail(w http.ResponseWriter, err error) {
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "Security event not found.")
 	default:
-		slog.Error("analytics query failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error", "Internal error.")
+		slog.Error("analytics query failed", standard.LogError, err)
+		writeError(w, http.StatusInternalServerError, errcode.InternalError, "Internal error.")
 	}
 }
 
@@ -93,7 +95,7 @@ type rejection struct {
 
 func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	if s.IngestToken != "" && !httpx.SecretEqual(r.Header.Get(IngestHeader), s.IngestToken) {
-		writeError(w, http.StatusForbidden, "forbidden", "missing or wrong ingest token")
+		writeError(w, http.StatusForbidden, errcode.Forbidden, "missing or wrong ingest token")
 		return
 	}
 	id, _ := auth.FromContext(r.Context())
@@ -102,7 +104,7 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := httpx.DecodeJSON(w, r, &body, maxBodyBytes); err != nil {
 		if errors.Is(err, httpx.ErrBodyTooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "ingest body is too large")
+			writeError(w, http.StatusRequestEntityTooLarge, errcode.PayloadTooLarge, "ingest body is too large")
 			return
 		}
 		writeError(w, http.StatusBadRequest, "malformed_body", "body must be {\"events\": [...]}")
@@ -124,7 +126,7 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 		valid = append(valid, e)
 	}
 	if err := s.Store.Insert(r.Context(), id.TenantID, valid); err != nil {
-		slog.Error("inserting security events", "error", err, "count", len(valid))
+		slog.Error("inserting security events", standard.LogError, err, "count", len(valid))
 		writeError(w, http.StatusServiceUnavailable, "store_unavailable", "could not store events; retry")
 		return
 	}
@@ -210,7 +212,7 @@ func (s *Server) aggregate(w http.ResponseWriter, r *http.Request) {
 	if err := dec.Decode(&q); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "aggregate spec is too large")
+			writeError(w, http.StatusRequestEntityTooLarge, errcode.PayloadTooLarge, "aggregate spec is too large")
 			return
 		}
 		writeError(w, http.StatusBadRequest, "invalid_query", "malformed aggregate spec: "+strings.TrimPrefix(err.Error(), "json: "))

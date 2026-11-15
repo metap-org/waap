@@ -35,6 +35,8 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 
@@ -139,7 +141,7 @@ func severityFor(count int) string {
 }
 
 func occurredAtOrFallback(event crud.RecordDto) time.Time {
-	if raw, ok := jsonAsString(event.Data["occurredAt"]); ok {
+	if raw, ok := jsonAsString(event.Data[model.FieldOccurredAt]); ok {
 		if t, err := time.Parse(time.RFC3339, raw); err == nil {
 			return t.UTC()
 		}
@@ -197,7 +199,7 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 			continue
 		}
 		zoneID := strField(event, model.FieldZoneID)
-		sourceIP := strField(event, "sourceIp")
+		sourceIP := strField(event, model.FieldSourceIP)
 		if zoneID == "" || sourceIP == "" {
 			continue
 		}
@@ -211,13 +213,13 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 			continue
 		}
 		existing, err := listRecords(ctx, state, model.Incidents,
-			[][2]string{{model.FieldZoneID, key.zoneID}, {"status", "open"}}, 50, rc)
+			[][2]string{{model.FieldZoneID, key.zoneID}, {model.FieldStatus, model.IncidentOpen}}, 50, rc)
 		if err != nil {
 			return nil, err
 		}
 		alreadyOpen := false
 		for _, incident := range existing {
-			if strings.Contains(strField(incident, "title"), key.sourceIP) {
+			if strings.Contains(strField(incident, model.FieldTitle), key.sourceIP) {
 				alreadyOpen = true
 				break
 			}
@@ -228,10 +230,10 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 		}
 
 		data := crud.JsonObject{
-			model.FieldZoneID: jsonStr(key.zoneID),
-			"title":           jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
-			"severity":        jsonStr(severityFor(count)),
-			"eventCount":      json.RawMessage(fmt.Sprintf("%d", count)),
+			model.FieldZoneID:     jsonStr(key.zoneID),
+			model.FieldTitle:      jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
+			model.FieldSeverity:   jsonStr(severityFor(count)),
+			model.FieldEventCount: json.RawMessage(fmt.Sprintf("%d", count)),
 		}
 		result, err := state.Crud.Create(ctx, model.Incidents, data, rc, nil)
 		if err != nil {
@@ -264,7 +266,7 @@ func deliver(channels json.RawMessage, payload any) (bool, string) {
 	if raw, ok := obj["webhook"]; ok {
 		if url, ok := jsonAsString(raw); ok {
 			body, _ := json.Marshal(payload)
-			resp, err := httpClient().Post(url, "application/json", bytes.NewReader(body))
+			resp, err := httpClient().Post(url, standard.MediaTypeJSON, bytes.NewReader(body))
 			if err != nil {
 				return false, fmt.Sprintf("webhook error: %v", err)
 			}
@@ -302,10 +304,10 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 		status = "sent"
 	}
 	data := crud.JsonObject{
-		"alertPolicyId":  jsonStr(policy.ID.String()),
-		"channel":        jsonStr(channel),
-		"deliveryStatus": jsonStr(status),
-		"triggeredAt":    jsonStr(time.Now().UTC().Format(time.RFC3339)),
+		model.FieldAlertPolicyID:  jsonStr(policy.ID.String()),
+		model.FieldChannel:        jsonStr(channel),
+		model.FieldDeliveryStatus: jsonStr(status),
+		model.FieldTriggeredAt:    jsonStr(standard.NowRFC3339()),
 	}
 	result, err := state.Crud.Create(ctx, model.AlertNotifications, data, rc, nil)
 	if err != nil {
@@ -317,14 +319,14 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 // evaluateAlerts is POST /internal/alerts/evaluate — every enabled AlertPolicy, evaluated against
 // the recent event stream, counted PER ZONE (never summed across zones).
 func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext) (map[string]any, error) {
-	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{"enabled", "true"}}, 50, rc)
+	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{model.FieldEnabled, "true"}}, 50, rc)
 	if err != nil {
 		return nil, err
 	}
 	// One read covering the widest policy window; each policy then counts only its own window.
 	widest := int64(defaultWindowMinutes)
 	for _, policy := range policies {
-		if m, ok := jsonAsInt(policy.Data["windowMinutes"]); ok && m > widest {
+		if m, ok := jsonAsInt(policy.Data[model.FieldWindowMinutes]); ok && m > widest {
 			widest = m
 		}
 	}
@@ -335,8 +337,8 @@ func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permiss
 
 	fired := make([]map[string]any, 0)
 	for _, policy := range policies {
-		threshold, _ := jsonAsInt(policy.Data["thresholdCount"])
-		windowMinutes, ok := jsonAsInt(policy.Data["windowMinutes"])
+		threshold, _ := jsonAsInt(policy.Data[model.FieldThresholdCount])
+		windowMinutes, ok := jsonAsInt(policy.Data[model.FieldWindowMinutes])
 		if !ok {
 			windowMinutes = defaultWindowMinutes
 		}
@@ -350,13 +352,13 @@ func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permiss
 			perZone[strField(event, model.FieldZoneID)]++
 		}
 
-		channels := policy.Data["channels"]
+		channels := policy.Data[model.FieldChannels]
 		for zoneID, count := range perZone {
 			if threshold == 0 || int64(count) < threshold {
 				continue
 			}
 			payload := map[string]any{
-				"policy":          strField(policy, "name"),
+				"policy":          strField(policy, model.FieldName),
 				model.FieldZoneID: zoneID,
 				"eventCount":      count,
 				"windowMinutes":   windowMinutes,
@@ -390,10 +392,10 @@ func testAlertPolicy(ctx context.Context, state *httpserver.AppState, rc *permis
 	}
 	policy := getResult.Record
 
-	channels := policy.Data["channels"]
+	channels := policy.Data[model.FieldChannels]
 	payload := map[string]any{
 		"test":    true,
-		"policy":  strField(policy, "name"),
+		"policy":  strField(policy, model.FieldName),
 		"message": "Test alert from the WAF portal",
 	}
 	delivered, detail := deliver(channels, payload)
@@ -449,7 +451,7 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 		}
 		var body correlateBody
 		if err := json.Unmarshal(raw, &body); err != nil {
-			return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, "validation_failed", "Invalid correlate input.")
+			return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Invalid correlate input.")
 		}
 		return crud.ToObject(correlateIncidents(ctx, state, c.RC, body))
 	}); err != nil {

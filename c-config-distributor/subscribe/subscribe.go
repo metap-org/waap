@@ -17,6 +17,7 @@ import (
 	"github.com/metap-org/metap/pkg/events"
 	"log/slog"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/ports"
 
 	"github.com/metap-org/metap/pkg/infra/eventbus"
@@ -67,7 +68,7 @@ func handle(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSi
 		// A rule/policy event with no zoneId (a delete, which carries no data) can't be
 		// resolved to a zone from the event alone. Ack it and let the periodic resync pick the
 		// change up — better than requeueing forever on a message that will never carry more.
-		slog.Debug("event carries no resolvable zone, leaving it to the next resync", "routing_key", event.RoutingKey)
+		slog.Debug("event carries no resolvable zone, leaving it to the next resync", standard.LogRoutingKey, event.RoutingKey)
 		event.AckLogged()
 		return
 	}
@@ -82,7 +83,7 @@ func handle(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSi
 		// Requeue: the usual cause is management-plane or Redis being briefly unreachable, which
 		// clears on its own. The periodic resync is the backstop if it doesn't, so this never
 		// needs to be the only thing that can recover.
-		slog.Warn("failed to sync zone, requeueing", "error", err, "zone_id", zoneID)
+		slog.Warn("failed to sync zone, requeueing", standard.LogError, err, "zone_id", zoneID)
 		event.NackLogged(true)
 		return
 	}

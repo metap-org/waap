@@ -40,6 +40,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/e-edge/cache"
 	"github.com/metap-org/waap/e-edge/clearance"
 	"github.com/metap-org/waap/e-edge/config"
@@ -68,7 +69,7 @@ func main() {
 
 	ruleCache, err := cache.New(cfg.RedisURL)
 	if err != nil {
-		slog.Error("building rule-set cache", "error", err)
+		slog.Error("building rule-set cache", standard.LogError, err)
 		os.Exit(1)
 	}
 	// Fatal on purpose: a node that starts with no rule-sets answers every request with
@@ -76,7 +77,7 @@ func main() {
 	// total outage.
 	bg := context.Background()
 	if err := ruleCache.LoadInitial(bg); err != nil {
-		slog.Error("loading initial rule-sets", "error", err)
+		slog.Error("loading initial rule-sets", standard.LogError, err)
 		os.Exit(1)
 	}
 
@@ -118,7 +119,7 @@ func main() {
 	serveErr := httpx.ServeContext(ctx, server, 10*time.Second)
 	close(stopLoops)
 	if serveErr != nil {
-		slog.Error("waf-edge exited with an error", "error", serveErr)
+		slog.Error("waf-edge exited with an error", standard.LogError, serveErr)
 		os.Exit(1)
 	}
 	slog.Info("shut down cleanly")
@@ -157,7 +158,7 @@ func (e *edge) handle(w http.ResponseWriter, r *http.Request) {
 	// loaded at all.
 	if r.URL.Path == "/__edge/health" {
 		sent, dropped := e.telemetry.Stats()
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(standard.HeaderContentType, standard.MediaTypeJSON)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(healthJSON(e.cache.ZoneCount(), e.cache.Epoch(), e.limiter.TrackedKeys(), sent, dropped)))
 		return
@@ -235,7 +236,7 @@ func (e *edge) passThrough(w http.ResponseWriter, r *http.Request, zone *ruleset
 			pages.PayloadTooLarge(w, pages.RayID())
 			return
 		}
-		slog.Warn("origin request failed", "hostname", zone.Hostname, "origin", zone.OriginAddress, "error", err)
+		slog.Warn("origin request failed", "hostname", zone.Hostname, "origin", zone.OriginAddress, standard.LogError, err)
 		pages.OriginUnreachable(w, pages.RayID())
 	}
 }

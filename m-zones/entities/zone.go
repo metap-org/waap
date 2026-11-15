@@ -26,7 +26,7 @@ import (
 )
 
 func ZoneEntity() metadata.EntityDefinition {
-	hostname := metadata.NewField("hostname", "Hostname", metadata.KindString).Require().Index().Sort()
+	hostname := metadata.NewField(model.FieldHostname, "Hostname", metadata.KindString).Require().Index().Sort()
 	hostname.Unique = metadata.Ptr(true)
 	// A hostname is served by exactly one zone across every tenant, not once per tenant.
 	globalScope := metadata.UniqueScopeGlobal
@@ -35,7 +35,7 @@ func ZoneEntity() metadata.EntityDefinition {
 
 	activateGuard := permission.AllCondition(
 		permission.AttributeCondition("hasConfig", permission.OpEq, permission.LiteralValue(json.RawMessage("true"))),
-		permission.AttributeCondition("verificationStatus", permission.OpEq, permission.LiteralValue(json.RawMessage(`"verified"`))),
+		permission.AttributeCondition(model.FieldVerificationStatus, permission.OpEq, permission.LiteralValue(json.RawMessage(`"verified"`))),
 	)
 
 	return metadata.EntityDefinition{
@@ -44,15 +44,15 @@ func ZoneEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn(model.Zones, "waf"),
 		Fields: []metadata.EntityField{
 			hostname,
-			metadata.NewField("originAddress", "Origin Address", metadata.KindString).Require(),
-			metadata.EnumField("status", "Status", "pending", "active", "paused", "suspended").Index(),
-			metadata.EnumField("protectionMode", "Protection Mode", "monitor", "enforce").Require().Index(),
-			metadata.NewField("configVersion", "Config Version", metadata.KindNumber).Sort(),
-			metadata.NewField("hasConfig", "Has Config", metadata.KindBoolean),
-			metadata.RefField("domainId", "Domain", model.Domains, "apexDomain").Require().Index(),
-			metadata.EnumField("verificationStatus", "Verification Status", "unverified", "verified").Index(),
-			metadata.EnumField("dnsRoutingStatus", "DNS Routing Status", "notRouted", "routed", "unknown"),
-			metadata.NewField("lastDnsCheckAt", "Last DNS Check At", metadata.KindDatetime).Sort(),
+			metadata.NewField(model.FieldOriginAddress, "Origin Address", metadata.KindString).Require(),
+			metadata.EnumField(model.FieldStatus, "Status", "pending", "active", "paused", "suspended").Index(),
+			metadata.EnumField(model.FieldProtectionMode, "Protection Mode", "monitor", "enforce").Require().Index(),
+			metadata.NewField(model.FieldConfigVersion, "Config Version", metadata.KindNumber).Sort(),
+			metadata.NewField(model.FieldHasConfig, "Has Config", metadata.KindBoolean),
+			metadata.RefField(model.FieldDomainID, "Domain", model.Domains, "apexDomain").Require().Index(),
+			metadata.EnumField(model.FieldVerificationStatus, "Verification Status", model.VerificationUnverified, model.VerificationVerified).Index(),
+			metadata.EnumField(model.FieldDNSRoutingStatus, "DNS Routing Status", model.DNSNotRouted, model.DNSRouted, "unknown"),
+			metadata.NewField(model.FieldLastDNSCheckAt, "Last DNS Check At", metadata.KindDatetime).Sort(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
@@ -65,13 +65,13 @@ func ZoneEntity() metadata.EntityDefinition {
 			MaxLimit:       50,
 		}},
 		Workflow: &metadata.EntityWorkflow{
-			StateField: "status", InitialState: "pending", TerminalStates: []string{"suspended"},
+			StateField: model.FieldStatus, InitialState: model.ZoneStatusPending, TerminalStates: []string{model.ZoneStatusSuspended},
 			Transitions: []metadata.WorkflowTransition{
-				{Action: "activate", From: "pending", To: "active", Label: "Activate", Guard: &activateGuard},
-				{Action: "pause", From: "active", To: "paused", Label: "Pause"},
-				{Action: "resume", From: "paused", To: "active", Label: "Resume"},
-				{Action: "suspend", From: "active", To: "suspended", Label: "Suspend"},
-				{Action: "suspend", From: "paused", To: "suspended", Label: "Suspend"},
+				{Action: model.ZoneActivate, From: model.ZoneStatusPending, To: model.ZoneStatusActive, Label: "Activate", Guard: &activateGuard},
+				{Action: model.ZonePause, From: model.ZoneStatusActive, To: model.ZoneStatusPaused, Label: "Pause"},
+				{Action: model.ZoneResume, From: model.ZoneStatusPaused, To: model.ZoneStatusActive, Label: "Resume"},
+				{Action: model.ZoneSuspend, From: model.ZoneStatusActive, To: model.ZoneStatusSuspended, Label: "Suspend"},
+				{Action: model.ZoneSuspend, From: model.ZoneStatusPaused, To: model.ZoneStatusSuspended, Label: "Suspend"},
 			},
 		},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
