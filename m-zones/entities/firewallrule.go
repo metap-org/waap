@@ -36,7 +36,7 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 			metadata.NewField(model.FieldRateLimitThreshold, "Rate Limit Threshold", metadata.KindNumber),
 			metadata.NewField(model.FieldRateLimitWindow, "Rate Limit Window (s)", metadata.KindNumber),
 			metadata.EnumField(model.FieldAction, "Action", "allow", "block", "challenge", "log").Require(),
-			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index().WithWidget(metadata.WidgetSwitch),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
@@ -45,7 +45,7 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    model.LargeMaxListLimit,
 		}},
-		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Audit: &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
 	}
 }
 

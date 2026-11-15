@@ -46,7 +46,7 @@ func ZoneEntity() metadata.EntityDefinition {
 			hostname,
 			metadata.NewField(model.FieldOriginAddress, "Origin Address", metadata.KindString).Require(),
 			metadata.EnumField(model.FieldStatus, "Status", "pending", "active", "paused", "suspended").Index(),
-			metadata.EnumField(model.FieldProtectionMode, "Protection Mode", "monitor", "enforce").Require().Index(),
+			metadata.EnumField(model.FieldProtectionMode, "Protection Mode", "monitor", "enforce").Require().Index().WithWidget(metadata.WidgetRadio),
 			metadata.NewField(model.FieldConfigVersion, "Config Version", metadata.KindNumber).Sort(),
 			metadata.NewField(model.FieldHasConfig, "Has Config", metadata.KindBoolean),
 			metadata.RefField(model.FieldDomainID, "Domain", model.Domains, "apexDomain").Require().Index(),
@@ -56,7 +56,7 @@ func ZoneEntity() metadata.EntityDefinition {
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:  []string{"hostname", "status", "protectionMode", "configVersion"},
+			Fields:  []string{"hostname", "status", "protectionMode", "verificationStatus", "dnsRoutingStatus", "hasConfig", "configVersion"},
 			Filters: []string{"hostname", "status", "protectionMode"},
 			// hostname (which zone) and status (is it even protecting anything) are the 2
 			// columns nobody should be able to hide from this list.
@@ -102,12 +102,14 @@ func ZoneRelatedViews() []metadata.RelatedView {
 // reads the same colour on the generic escape-hatch screen as it does on the product's own
 // StatusBadge.
 func ZoneFieldDisplayHints() []metadata.FieldDisplayHint {
-	return []metadata.FieldDisplayHint{{
-		Field: "status",
-		EnumTones: map[string]string{
+	return []metadata.FieldDisplayHint{
+		{Field: "status", EnumTones: map[string]string{
 			"active": "default", "pending": "secondary", "paused": "outline", "suspended": "destructive",
-		},
-	}}
+		}},
+		{Field: "protectionMode", EnumTones: map[string]string{"monitor": "outline", "enforce": "default"}},
+		{Field: "verificationStatus", EnumTones: map[string]string{"verified": "default", "unverified": "outline"}},
+		{Field: "dnsRoutingStatus", EnumTones: map[string]string{"routed": "default", "notRouted": "outline"}},
+	}
 }
 
 func init() {

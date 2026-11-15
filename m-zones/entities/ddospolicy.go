@@ -18,11 +18,11 @@ func DdosPolicyEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn(model.DdosPolicies, "waf"),
 		Fields: []metadata.EntityField{
 			metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Require().Index(),
-			metadata.EnumField(model.FieldSensitivity, "Sensitivity", "low", "medium", "high", "aggressive").Require(),
+			metadata.EnumField(model.FieldSensitivity, "Sensitivity", "low", "medium", "high", "aggressive").Require().WithWidget(metadata.WidgetRadio),
 			metadata.NewField(model.FieldRequestRateThreshold, "Request Rate Threshold", metadata.KindNumber).Require().Sort(),
 			metadata.NewField(model.FieldBurstWindow, "Burst Window (s)", metadata.KindNumber).Require(),
 			metadata.EnumField(model.FieldAction, "Action", "log", "challenge", "block").Require(),
-			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index().WithWidget(metadata.WidgetSwitch),
 			metadata.NewField(model.FieldPriority, "Priority", metadata.KindNumber).Require().Sort(),
 			// Absent/empty = applies to every path — same "empty means unscoped" convention as
 			// FirewallRule.matchCondition's nil case.
@@ -36,7 +36,7 @@ func DdosPolicyEntity() metadata.EntityDefinition {
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    model.DefaultMaxListLimit,
 		}},
-		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Audit: &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
 	}
 }
 

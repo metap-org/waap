@@ -20,7 +20,12 @@ export const wafEn = {
       alerting: "Alerting",
       analytics: "Analytics",
       settings: "Settings",
-      rawRecords: "Raw records",
+    },
+    navGroup: {
+      overview: "Overview",
+      protection: "Protection",
+      operations: "Operations",
+      admin: "Administration",
     },
     common: {
       loading: "Loading…",
@@ -572,7 +577,12 @@ export const wafVi = {
       alerting: "Cảnh báo",
       analytics: "Phân tích",
       settings: "Cài đặt",
-      rawRecords: "Bản ghi thô",
+    },
+    navGroup: {
+      overview: "Tổng quan",
+      protection: "Bảo vệ",
+      operations: "Vận hành",
+      admin: "Quản trị",
     },
     common: {
       loading: "Đang tải…",
