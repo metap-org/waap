@@ -34,7 +34,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/ports"
 	"github.com/metap-org/waap/model"
 
@@ -73,17 +75,17 @@ func ingestHandler(state *State) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// SecretEqual compares in constant time and never matches an empty token.
 		if state.IngestToken != nil && !httpx.SecretEqual(r.Header.Get("x-waf-ingest-token"), *state.IngestToken) {
-			httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid ingest token")
+			httpx.WriteError(w, http.StatusUnauthorized, errcode.Unauthorized, "invalid ingest token")
 			return
 		}
 
 		var body ingestBody
 		if err := httpx.DecodeJSON(w, r, &body, maxIngestBodyBytes); err != nil {
 			if errors.Is(err, httpx.ErrBodyTooLarge) {
-				httpx.WriteError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "ingest body is too large")
+				httpx.WriteError(w, http.StatusRequestEntityTooLarge, errcode.PayloadTooLarge, "ingest body is too large")
 				return
 			}
-			httpx.WriteError(w, http.StatusBadRequest, "invalid_request_body", "malformed body")
+			httpx.WriteError(w, http.StatusBadRequest, errcode.InvalidRequestBody, "malformed body")
 			return
 		}
 		if len(body.Events) > state.MaxRequestEvents {
@@ -173,7 +175,7 @@ func RunWriter(ctx context.Context, dp ports.EventSink, queue <-chan EdgeEvent, 
 			// Logged and dropped, not retried: a retry loop here would stall the whole buffer
 			// behind one bad batch, and this package's own doc comment already owns the
 			// "telemetry is lossy under failure" trade.
-			slog.Warn("failed to write security events", "error", err, "batch", len(batch))
+			slog.Warn("failed to write security events", standard.LogError, err, "batch", len(batch))
 			continue
 		}
 		if rejected > 0 {

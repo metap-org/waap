@@ -20,10 +20,11 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/management"
 	"github.com/metap-org/waap/c-config-distributor/ruleset"
+	"github.com/metap-org/waap/model"
 )
 
 // Publishable reports whether this zone should be served at the edge at all.
@@ -34,7 +35,7 @@ import (
 // not "stop serving": the edge still needs the origin address to pass traffic through, and
 // protectionMode handling is what makes it inert.
 func Publishable(zone management.Record) bool {
-	status, ok := zone.Str("status")
+	status, ok := zone.Str(model.FieldStatus)
 	if !ok && zone.Status != nil {
 		status = *zone.Status
 		ok = true
@@ -42,7 +43,7 @@ func Publishable(zone management.Record) bool {
 	if !ok {
 		return false
 	}
-	return status == "active" || status == "paused"
+	return status == model.ZoneStatusActive || status == model.ZoneStatusPaused
 }
 
 func actionFrom(raw string) ruleset.Action {
@@ -275,35 +276,35 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 }
 
 func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
-	if enabled, ok := rule.Bool("enabled"); ok && !enabled {
+	if enabled, ok := rule.Bool(model.FieldEnabled); ok && !enabled {
 		return ruleset.CompiledRule{}, false
 	}
-	ruleType, ok := rule.Str("ruleType")
+	ruleType, ok := rule.Str(model.FieldRuleType)
 	if !ok {
 		ruleType = "waf"
 	}
-	matchExpr, ok := ParseMatch(rule.Data["matchCondition"])
+	matchExpr, ok := ParseMatch(rule.Data[model.FieldMatchCondition])
 	if !ok {
 		return ruleset.CompiledRule{}, false
 	}
 	var rateLimit *ruleset.RateLimit
 	if ruleType == "rateLimit" {
-		threshold, ok := rule.Int64("rateLimitThreshold")
+		threshold, ok := rule.Int64(model.FieldRateLimitThreshold)
 		if !ok || threshold < 1 {
 			threshold = 100
 		}
-		window, ok := rule.Int64("rateLimitWindow")
+		window, ok := rule.Int64(model.FieldRateLimitWindow)
 		if !ok || window < 1 {
 			window = 60
 		}
 		rateLimit = &ruleset.RateLimit{Threshold: uint32(threshold), WindowSeconds: uint32(window)}
 	}
-	name, ok := rule.Str("name")
+	name, ok := rule.Str(model.FieldName)
 	if !ok {
 		name = "unnamed"
 	}
-	action, _ := rule.Str("action")
-	priority, ok := rule.Int64("priority")
+	action, _ := rule.Str(model.FieldAction)
+	priority, ok := rule.Int64(model.FieldPriority)
 	if !ok {
 		priority = 1000
 	}
@@ -329,14 +330,14 @@ func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
 // actually gives these rows evaluate-before-everything-else priority, by where it places them
 // in the compiled list, not anything the edge's evaluator reads off this field.
 func compileIPAccessList(entry management.Record) (ruleset.CompiledRule, bool) {
-	if enabled, ok := entry.Bool("enabled"); ok && !enabled {
+	if enabled, ok := entry.Bool(model.FieldEnabled); ok && !enabled {
 		return ruleset.CompiledRule{}, false
 	}
-	listType, ok := entry.Str("type")
+	listType, ok := entry.Str(model.FieldType)
 	if !ok {
 		return ruleset.CompiledRule{}, false
 	}
-	value, ok := entry.Str("value")
+	value, ok := entry.Str(model.FieldValue)
 	if !ok {
 		return ruleset.CompiledRule{}, false
 	}
@@ -358,31 +359,31 @@ func compileIPAccessList(entry management.Record) (ruleset.CompiledRule, bool) {
 }
 
 func compileDdos(policy management.Record) (ruleset.CompiledDdos, bool) {
-	if enabled, ok := policy.Bool("enabled"); ok && !enabled {
+	if enabled, ok := policy.Bool(model.FieldEnabled); ok && !enabled {
 		return ruleset.CompiledDdos{}, false
 	}
 	var pathPrefix *string
-	if p, ok := policy.Str("pathPrefix"); ok && p != "" {
+	if p, ok := policy.Str(model.FieldPathPrefix); ok && p != "" {
 		pathPrefix = &p
 	}
 	var httpMethod *string
-	if m, ok := policy.Str("httpMethod"); ok && m != "" {
+	if m, ok := policy.Str(model.FieldHTTPMethod); ok && m != "" {
 		httpMethod = &m
 	}
-	sensitivity, ok := policy.Str("sensitivity")
+	sensitivity, ok := policy.Str(model.FieldSensitivity)
 	if !ok {
 		sensitivity = "medium"
 	}
-	action, _ := policy.Str("action")
-	threshold, ok := policy.Int64("requestRateThreshold")
+	action, _ := policy.Str(model.FieldAction)
+	threshold, ok := policy.Int64(model.FieldRequestRateThreshold)
 	if !ok || threshold < 1 {
 		threshold = 500
 	}
-	burstWindow, ok := policy.Int64("burstWindow")
+	burstWindow, ok := policy.Int64(model.FieldBurstWindow)
 	if !ok || burstWindow < 1 {
 		burstWindow = 60
 	}
-	priority, ok := policy.Int64("priority")
+	priority, ok := policy.Int64(model.FieldPriority)
 	if !ok {
 		priority = 1000
 	}
@@ -412,7 +413,7 @@ func compileDdosPolicies(policies []management.Record) []ruleset.CompiledDdos {
 }
 
 func CompileZone(zone management.Record, tenantID string, ddosPolicies, rules, ipAccessLists []management.Record) (ruleset.CompiledZone, bool) {
-	hostname, ok := zone.Str("hostname")
+	hostname, ok := zone.Str(model.FieldHostname)
 	if !ok {
 		return ruleset.CompiledZone{}, false
 	}
@@ -455,19 +456,19 @@ func CompileZone(zone management.Record, tenantID string, ddosPolicies, rules, i
 
 	compiled := append(accessRules, regularRules...)
 
-	status, ok := zone.Str("status")
+	status, ok := zone.Str(model.FieldStatus)
 	if !ok {
-		status = "pending"
+		status = model.ZoneStatusPending
 		if zone.Status != nil {
 			status = *zone.Status
 		}
 	}
-	originAddress, _ := zone.Str("originAddress")
-	protectionMode, ok := zone.Str("protectionMode")
+	originAddress, _ := zone.Str(model.FieldOriginAddress)
+	protectionMode, ok := zone.Str(model.FieldProtectionMode)
 	if !ok {
 		protectionMode = "monitor"
 	}
-	configVersion, _ := zone.Int64("configVersion")
+	configVersion, _ := zone.Int64(model.FieldConfigVersion)
 
 	return ruleset.CompiledZone{
 		SchemaVersion:  ruleset.RulesetSchemaVersion,
@@ -480,6 +481,6 @@ func CompileZone(zone management.Record, tenantID string, ddosPolicies, rules, i
 		ConfigVersion:  configVersion,
 		Ddos:           compileDdosPolicies(ddosPolicies),
 		Rules:          compiled,
-		CompiledAt:     time.Now().UTC().Format(time.RFC3339),
+		CompiledAt:     standard.NowRFC3339(),
 	}, true
 }

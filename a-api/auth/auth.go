@@ -23,7 +23,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/kit/standard"
 )
 
 const (
@@ -169,15 +171,15 @@ func WithIdentity(ctx context.Context, id Identity) context.Context {
 func Middleware(v Verifier, onError func(w http.ResponseWriter, status int, code, msg string)) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			header := r.Header.Get("Authorization")
+			header := r.Header.Get(standard.HeaderAuthorization)
 			token, ok := httpx.BearerToken(header)
 			if !ok {
-				onError(w, http.StatusUnauthorized, "unauthorized", "missing or malformed Authorization header")
+				onError(w, http.StatusUnauthorized, errcode.Unauthorized, "missing or malformed Authorization header")
 				return
 			}
 			id, err := v.Verify(r.Context(), token)
 			if err != nil {
-				onError(w, http.StatusUnauthorized, "unauthorized", "invalid token")
+				onError(w, http.StatusUnauthorized, errcode.Unauthorized, "invalid token")
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(WithIdentity(r.Context(), id)))

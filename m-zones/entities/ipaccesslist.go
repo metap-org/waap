@@ -13,7 +13,7 @@ func IPAccessListEntity() metadata.EntityDefinition {
 	// zoneId is nullable for the same tenant-wide ("global") reason as FirewallRule.zoneId —
 	// nil applies to every zone in the tenant.
 	zoneID := metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Index()
-	typ := metadata.EnumField("type", "Type", "whitelist", "blacklist").Require().Index()
+	typ := metadata.EnumField(model.FieldType, "Type", "whitelist", "blacklist").Require().Index()
 
 	return metadata.EntityDefinition{
 		Name:      model.IPAccessLists,
@@ -25,8 +25,8 @@ func IPAccessListEntity() metadata.EntityDefinition {
 			// One IP or CIDR per row, validated at save time by guardedbackend's
 			// validateIPAccessList. Bulk-add in the portal creates N rows client-side rather
 			// than this field taking a list.
-			metadata.NewField("value", "IP / CIDR", metadata.KindString).Require(),
-			metadata.NewField("enabled", "Enabled", metadata.KindBoolean).Index(),
+			metadata.NewField(model.FieldValue, "IP / CIDR", metadata.KindString).Require(),
+			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",

@@ -35,6 +35,7 @@ import (
 	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/jwks"
 	"github.com/metap-org/metap/pkg/kit/env"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/metadata"
 
 	_ "github.com/metap-org/waap/m-alerting/entities"
@@ -139,7 +140,7 @@ func main() {
 	ctx := context.Background()
 	verifier, err := buildVerifier(ctx)
 	if err != nil {
-		slog.Error("configuring token verification", "error", err)
+		slog.Error("configuring token verification", standard.LogError, err)
 		os.Exit(1)
 	}
 
@@ -159,12 +160,12 @@ func main() {
 		byName[u.name] = u
 		token, err := httpx.StartServiceTokenSource(ctx, httpClient, u.loginURL, u.serviceEmail, u.servicePassword)
 		if err != nil {
-			slog.Error("logging into upstream", "upstream", u.name, "error", err)
+			slog.Error("logging into upstream", "upstream", u.name, standard.LogError, err)
 			os.Exit(1)
 		}
 		backend, err := grpcapi.ConnectGrpcBackend(u.grpcAddr, token)
 		if err != nil {
-			slog.Error("connecting to upstream gRPC", "upstream", u.name, "addr", u.grpcAddr, "error", err)
+			slog.Error("connecting to upstream gRPC", "upstream", u.name, "addr", u.grpcAddr, standard.LogError, err)
 			os.Exit(1)
 		}
 		backendByName[u.name] = backend
@@ -203,7 +204,7 @@ func main() {
 	}
 	registry := metadata.NewMetadataRegistry()
 	if err := registry.RegisterAllSubmitted(); err != nil {
-		slog.Error("registering WAF entity metadata", "error", err)
+		slog.Error("registering WAF entity metadata", standard.LogError, err)
 		os.Exit(1)
 	}
 	// Analytics read models: shape registered here, data served by the Analytics plane's query
@@ -213,7 +214,7 @@ func main() {
 		analyticsURL = "http://localhost:3030"
 	}
 	if err := registry.Register(analytics.SecurityEventEntity()); err != nil {
-		slog.Error("registering analytics read models", "error", err)
+		slog.Error("registering analytics read models", standard.LogError, err)
 		os.Exit(1)
 	}
 	owners[analytics.SecurityEvents] = &analytics.Backend{Client: analytics.NewClient(analyticsURL)}
@@ -229,7 +230,7 @@ func main() {
 			Zones: zonesBackend, Scanning: scanningBackend, Alerting: alertingBackend,
 		})))
 	if err != nil {
-		slog.Error("building GraphQL schema", "error", err)
+		slog.Error("building GraphQL schema", standard.LogError, err)
 		os.Exit(1)
 	}
 
@@ -249,13 +250,13 @@ func main() {
 	handler := httpx.Recover(httpx.CORS(httpx.CORSOptions{
 		Origins: origins,
 		Methods: []string{"GET", "POST", "OPTIONS"},
-		Headers: []string{"Authorization", "Content-Type", "X-CSRF-Token"},
+		Headers: []string{standard.HeaderAuthorization, standard.HeaderContentType, standard.HeaderCSRFToken},
 	})(server.Router()))
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	slog.Info("waf-graphql-gateway listening", "addr", addr, "entities", len(owners))
 	if err := httpx.Serve(addr, handler); err != nil && err != http.ErrServerClosed {
-		slog.Error("waf-graphql-gateway exited with an error", "error", err)
+		slog.Error("waf-graphql-gateway exited with an error", standard.LogError, err)
 		os.Exit(1)
 	}
 }

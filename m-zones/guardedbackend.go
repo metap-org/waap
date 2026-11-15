@@ -30,6 +30,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
 	"sync"
 
@@ -117,7 +118,7 @@ var _ crud.RecordBackend = (*GuardedZonesBackend)(nil)
 // Domain row for hostname's apex and returns its id to inject into the create payload.
 func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, error) {
 	apex := ApexDomain(hostname)
-	existing, err := b.inner.List(ctx, model.Domains, query.ListInput{Limit: 1, Filters: [][2]string{{"apexDomain", apex}}}, rc)
+	existing, err := b.inner.List(ctx, model.Domains, query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldApexDomain, apex}}}, rc)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -126,10 +127,10 @@ func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname stri
 	}
 
 	newDomain := crud.JsonObject{
-		"apexDomain":         jsonString(apex),
-		"verificationToken":  jsonString(fmt.Sprintf("waf-verify-%s", uuid.New())),
-		"verificationMethod": jsonString("dnsTxt"),
-		"verificationStatus": jsonString("unverified"),
+		model.FieldApexDomain:         jsonString(apex),
+		model.FieldVerificationToken:  jsonString(fmt.Sprintf("waf-verify-%s", uuid.New())),
+		model.FieldVerificationMethod: jsonString(model.VerificationMethodDNSTxt),
+		model.FieldVerificationStatus: jsonString(model.VerificationUnverified),
 	}
 	created, err := b.inner.Create(ctx, model.Domains, newDomain, rc, nil)
 	if err != nil {
@@ -140,20 +141,20 @@ func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname stri
 
 // validateFirewallRule ports firewallRuleMatchConditionGuard's validation verbatim.
 func validateFirewallRule(data crud.JsonObject) error {
-	condition, ok := data["matchCondition"]
+	condition, ok := data[model.FieldMatchCondition]
 	if ok && !IsValidMatchCondition(condition) {
-		return crud.NewServiceErrorFields(422, "validation_failed",
-			map[string][]string{"matchCondition": {"not a recognized rule expression"}})
+		return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
+			map[string][]string{model.FieldMatchCondition: {"not a recognized rule expression"}})
 	}
 	return nil
 }
 
 // validateIPAccessList ports ipAccessListValueGuard's validation verbatim.
 func validateIPAccessList(data crud.JsonObject) error {
-	value, ok := jsonAsString(data["value"])
+	value, ok := jsonAsString(data[model.FieldValue])
 	if ok && !IsValidIPOrCIDR(value) {
-		return crud.NewServiceErrorFields(422, "validation_failed",
-			map[string][]string{"value": {"not a valid IP address or CIDR"}})
+		return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
+			map[string][]string{model.FieldValue: {"not a valid IP address or CIDR"}})
 	}
 	return nil
 }
@@ -166,7 +167,7 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 	// rc by metap's HTTP/gRPC auth). No token means we cannot ask on the caller's behalf, and an
 	// unchecked delete could orphan scan jobs/incidents — refuse rather than guess.
 	if rc.ForwardedBearerToken == "" {
-		return "", crud.NewServiceErrorMsg(503, "reference_check_unavailable",
+		return "", crud.NewServiceErrorMsg(503, model.ErrReferenceCheckUnavailable,
 			"Could not verify cross-service references (no caller token to forward); refusing to delete.")
 	}
 	forwardedRC := *rc
@@ -184,7 +185,7 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 	for _, check := range checks {
 		backend := check.link.get()
 		if backend == nil {
-			return "", crud.NewServiceErrorMsg(503, "reference_check_unavailable",
+			return "", crud.NewServiceErrorMsg(503, model.ErrReferenceCheckUnavailable,
 				fmt.Sprintf("Could not verify cross-service references (%s unreachable); refusing to delete.", check.entity))
 		}
 		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, &forwardedRC)
@@ -213,7 +214,7 @@ func (b *GuardedZonesBackend) GetMany(ctx context.Context, entity string, ids []
 func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	switch entity {
 	case model.Zones:
-		hostname, ok := jsonAsString(data["hostname"])
+		hostname, ok := jsonAsString(data[model.FieldHostname])
 		if !ok {
 			// No hostname at all — let the real create reject it with its own "required field"
 			// validation error rather than this wrapper inventing a different one.
@@ -224,7 +225,7 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 			return crud.RecordDto{}, err
 		}
 		withDomain := cloneJsonObject(data)
-		withDomain["domainId"] = jsonString(domainID.String())
+		withDomain[model.FieldDomainID] = jsonString(domainID.String())
 		return b.inner.Create(ctx, entity, withDomain, rc, reason)
 	case model.FirewallRules:
 		if err := validateFirewallRule(data); err != nil {
@@ -268,7 +269,7 @@ func (b *GuardedZonesBackend) Delete(ctx context.Context, entity string, id uuid
 			return crud.RecordDto{}, err
 		}
 		if blockingEntity != "" {
-			return crud.RecordDto{}, crud.NewServiceErrorMsg(409, "record_referenced",
+			return crud.RecordDto{}, crud.NewServiceErrorMsg(409, errcode.RecordReferenced,
 				fmt.Sprintf("This zone is still referenced by %q and cannot be deleted.", blockingEntity))
 		}
 	}

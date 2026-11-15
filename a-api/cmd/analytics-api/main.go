@@ -27,6 +27,7 @@ import (
 	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/kit/httpx"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/a-api/api"
 	"github.com/metap-org/waap/a-api/auth"
 	"github.com/metap-org/waap/a-api/store"
@@ -34,7 +35,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		slog.Error("analytics-api exited", "error", err)
+		slog.Error("analytics-api exited", standard.LogError, err)
 		os.Exit(1)
 	}
 }
@@ -57,7 +58,7 @@ func run() error {
 		if ctx.Err() != nil {
 			return fmt.Errorf("ClickHouse never became reachable: %w", err)
 		}
-		slog.Warn("waiting for ClickHouse", "attempt", attempt, "error", err)
+		slog.Warn("waiting for ClickHouse", standard.LogAttempt, attempt, standard.LogError, err)
 		time.Sleep(2 * time.Second)
 	}
 	defer st.Close()

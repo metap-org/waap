@@ -13,6 +13,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/kit/standard"
 )
 
 // Event mirrors the Analytics query API's event shape.
@@ -68,7 +71,7 @@ func NewClient(baseURL string) *Client {
 
 func (c *Client) do(ctx context.Context, token, method, path string, body any, out any) error {
 	if token == "" {
-		return &APIError{Status: http.StatusUnauthorized, Code: "unauthorized", Message: "no caller token to forward to Analytics"}
+		return &APIError{Status: http.StatusUnauthorized, Code: errcode.Unauthorized, Message: "no caller token to forward to Analytics"}
 	}
 	var reader io.Reader
 	if body != nil {
@@ -82,9 +85,9 @@ func (c *Client) do(ctx context.Context, token, method, path string, body any, o
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set(standard.HeaderAuthorization, standard.BearerPrefix+token)
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(standard.HeaderContentType, standard.MediaTypeJSON)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {

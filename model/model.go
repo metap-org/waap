@@ -35,3 +35,10 @@ const (
 	ActionEvaluate        = "evaluate"        // alert_policies
 	ActionCorrelate       = "correlate"       // incidents
 )
+
+// Error codes this product adds to metap's (errcode): returned to the portal, which switches on them.
+const (
+	ErrScanAlreadyInProgress     = "scan_already_in_progress"
+	ErrScannerUnavailable        = "scanner_unavailable"
+	ErrReferenceCheckUnavailable = "reference_check_unavailable"
+)

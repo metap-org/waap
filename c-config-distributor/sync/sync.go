@@ -43,7 +43,7 @@ func Zone(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSink
 		return nil
 	}
 
-	hostname, hasHostname := zone.Str("hostname")
+	hostname, hasHostname := zone.Str(model.FieldHostname)
 	if !compile.Publishable(*zone) {
 		if hasHostname {
 			return distributor.Unpublish(ctx, hostname)
@@ -131,7 +131,7 @@ func HostnameFromEvent(payload json.RawMessage) (string, bool) {
 	if err := json.Unmarshal(payload, &envelope); err != nil {
 		return "", false
 	}
-	raw, ok := envelope.Data["hostname"]
+	raw, ok := envelope.Data[model.FieldHostname]
 	if !ok {
 		return "", false
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/metap-org/metap/pkg/crud"
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/waap/model"
@@ -38,16 +39,16 @@ func token(rc *permission.RequestContext) string {
 func ToRecord(e Event) crud.RecordDto {
 	str := func(s string) json.RawMessage { raw, _ := json.Marshal(s); return raw }
 	data := crud.JsonObject{
-		model.FieldZoneID: str(e.ZoneID),
-		"triggeredBy":     str(e.TriggeredBy),
-		"triggeredById":   str(e.TriggeredByID),
-		"action":          str(e.Action),
-		"sourceIp":        str(e.SourceIP),
-		"requestPath":     str(e.RequestPath),
-		"occurredAt":      str(e.OccurredAt.UTC().Format("2006-01-02T15:04:05.000Z07:00")),
+		model.FieldZoneID:        str(e.ZoneID),
+		model.FieldTriggeredBy:   str(e.TriggeredBy),
+		model.FieldTriggeredByID: str(e.TriggeredByID),
+		model.FieldAction:        str(e.Action),
+		model.FieldSourceIP:      str(e.SourceIP),
+		model.FieldRequestPath:   str(e.RequestPath),
+		model.FieldOccurredAt:    str(e.OccurredAt.UTC().Format(standard.TimestampMillis)),
 	}
 	if e.TriggeredByName != "" {
-		data["triggeredByName"] = str(e.TriggeredByName)
+		data[model.FieldTriggeredByName] = str(e.TriggeredByName)
 	}
 	return crud.RecordDto{
 		ID: e.ID, Entity: SecurityEvents, Data: data, Version: 1,

@@ -25,6 +25,7 @@ import (
 
 	"github.com/metap-org/metap/pkg/infra"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/analytics"
 	"github.com/metap-org/waap/c-config-distributor/config"
 	"github.com/metap-org/waap/c-config-distributor/distribute"
@@ -38,7 +39,7 @@ func main() {
 	infra.InitTracing()
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("loading config", "error", err)
+		slog.Error("loading config", standard.LogError, err)
 		os.Exit(1)
 	}
 
@@ -57,7 +58,7 @@ func main() {
 	// so starting up without a session would just be a process that logs errors forever.
 	token, err := httpx.StartServiceTokenSource(bg, httpClient, cfg.LoginURL, cfg.ServiceEmail, cfg.ServicePassword)
 	if err != nil {
-		slog.Error("logging into management-plane", "error", err)
+		slog.Error("logging into management-plane", standard.LogError, err)
 		os.Exit(1)
 	}
 
@@ -65,11 +66,11 @@ func main() {
 	events := analytics.New(httpClient, cfg.AnalyticsURL, cfg.AnalyticsIngestToken, token)
 	distributor, err := distribute.Connect(cfg.RedisURL)
 	if err != nil {
-		slog.Error("connecting to redis", "error", err)
+		slog.Error("connecting to redis", standard.LogError, err)
 		os.Exit(1)
 	}
 	if err := distributor.Ping(bg); err != nil {
-		slog.Error("pinging redis", "error", err)
+		slog.Error("pinging redis", standard.LogError, err)
 		os.Exit(1)
 	}
 
@@ -79,7 +80,7 @@ func main() {
 	if err := resync.RunOnce(bg, dp, distributor); err != nil {
 		// Not fatal — the timer will retry, and refusing to boot would take the ingest endpoint
 		// down with it for a problem that may well be a slow management-plane still starting up.
-		slog.Error("initial resync failed, continuing", "error", err)
+		slog.Error("initial resync failed, continuing", standard.LogError, err)
 	}
 
 	queue := make(chan ingest.EdgeEvent, 10_000)
@@ -100,7 +101,7 @@ func main() {
 	go func() {
 		defer close(subscribeDone)
 		if err := subscribe.Run(consumerCtx, cfg.AmqpURL, cfg.Queue, dp, distributor); err != nil {
-			slog.Error("subscribe loop exited with an error", "error", err)
+			slog.Error("subscribe loop exited with an error", standard.LogError, err)
 		}
 	}()
 	resyncDone := make(chan struct{})
@@ -117,7 +118,7 @@ func main() {
 	slog.Info("waf-config-distributor starting", "addr", cfg.Addr(), "zones_url", cfg.ZonesURL,
 		"redis", cfg.RedisURL, "resync_seconds", cfg.ResyncInterval.Seconds())
 	if err := httpx.Serve(cfg.Addr(), ingest.Router(ingestState)); err != nil && err != http.ErrServerClosed {
-		slog.Error("waf-config-distributor exited with an error", "error", err)
+		slog.Error("waf-config-distributor exited with an error", standard.LogError, err)
 	}
 
 	// Serve returns on the same shutdown signal, so by here the other three are stopping too —

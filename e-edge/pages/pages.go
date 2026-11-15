@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/metap-org/metap/pkg/kit/standard"
 )
 
 // RayID is a short random token shown to the visitor and attached to the security event, so a
@@ -41,7 +43,7 @@ func page(title, headline, detail, ray string) string {
 }
 
 func writeHTML(w http.ResponseWriter, status int, body string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(standard.HeaderContentType, standard.MediaTypeHTML)
 	// A blocked/challenge/error response must never be cached by anything in between — the rule
 	// that produced it can be changed at any moment, and a cached response would outlive it.
 	w.Header().Set("Cache-Control", "no-store")
@@ -81,7 +83,7 @@ func Challenge(w http.ResponseWriter, clearanceCookie, ray string) {
   <code>Ray ID: %s</code>
   <script>setTimeout(function () { location.reload(); }, 1200);</script>
 </main></body></html>`, ray)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(standard.HeaderContentType, standard.MediaTypeHTML)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Retry-After", "2")
 	w.Header().Set("Set-Cookie", clearanceCookie)

@@ -29,6 +29,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/e-edge/ruleset"
 )
 
@@ -114,7 +115,7 @@ func (c *RuleSetCache) refreshOnce(ctx context.Context) (int, error) {
 
 		var zone ruleset.CompiledZone
 		if err := json.Unmarshal([]byte(raw), &zone); err != nil {
-			slog.Error("failed to parse rule-set, keeping previous", "hostname", hostname, "error", err)
+			slog.Error("failed to parse rule-set, keeping previous", "hostname", hostname, standard.LogError, err)
 			if existing, ok := previous.zones[hostname]; ok {
 				zones[hostname] = existing
 			}
@@ -168,7 +169,7 @@ func (c *RuleSetCache) RunRefreshLoop(ctx context.Context, interval time.Duratio
 				// Never fatal, and deliberately not escalating: the previous snapshot is still
 				// serving traffic correctly. Redis being down degrades config freshness, not
 				// availability.
-				slog.Warn("rule-set refresh failed, serving previous snapshot", "error", err)
+				slog.Warn("rule-set refresh failed, serving previous snapshot", standard.LogError, err)
 				continue
 			}
 			if fetched > 0 {

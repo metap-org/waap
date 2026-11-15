@@ -11,7 +11,7 @@ import (
 )
 
 func DomainEntity() metadata.EntityDefinition {
-	apexDomain := metadata.NewField("apexDomain", "Apex Domain", metadata.KindString).Require().Index()
+	apexDomain := metadata.NewField(model.FieldApexDomain, "Apex Domain", metadata.KindString).Require().Index()
 	apexDomain.Unique = metadata.Ptr(true)
 	// A domain belongs to one tenant platform-wide, not once per tenant.
 	globalScope := metadata.UniqueScopeGlobal
@@ -26,9 +26,9 @@ func DomainEntity() metadata.EntityDefinition {
 			apexDomain,
 			// Auto-generated server-side (guardedbackend.resolveDomainID) when a zone's hostname
 			// resolves to a new apex domain — never entered by hand.
-			metadata.NewField("verificationToken", "Verification Token", metadata.KindString).Require(),
-			metadata.EnumField("verificationMethod", "Verification Method", "dnsTxt", "httpFile").Require().Index(),
-			metadata.EnumField("verificationStatus", "Verification Status", "unverified", "verified").Require().Index(),
+			metadata.NewField(model.FieldVerificationToken, "Verification Token", metadata.KindString).Require(),
+			metadata.EnumField(model.FieldVerificationMethod, "Verification Method", model.VerificationMethodDNSTxt, "httpFile").Require().Index(),
+			metadata.EnumField(model.FieldVerificationStatus, "Verification Status", model.VerificationUnverified, model.VerificationVerified).Require().Index(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",

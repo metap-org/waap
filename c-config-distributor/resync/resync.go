@@ -15,9 +15,11 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/ports"
 
 	"github.com/metap-org/waap/c-config-distributor/compile"
+	"github.com/metap-org/waap/model"
 )
 
 func RunOnce(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleSink) error {
@@ -40,7 +42,7 @@ func RunOnce(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleS
 	expected := make(map[string]struct{})
 
 	for _, zone := range zones {
-		hostname, ok := zone.Str("hostname")
+		hostname, ok := zone.Str(model.FieldHostname)
 		if !ok {
 			continue
 		}
@@ -118,7 +120,7 @@ func RunLoop(ctx context.Context, dp ports.ConfigSource, distributor ports.RuleS
 			if err := RunOnce(ctx, dp, distributor); err != nil {
 				// Never fatal: the next tick retries, and the incremental path is still
 				// running. A resync failure degrades freshness, it does not stop the worker.
-				slog.Error("resync failed", "error", err)
+				slog.Error("resync failed", standard.LogError, err)
 			}
 		}
 	}
