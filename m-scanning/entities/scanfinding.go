@@ -31,7 +31,7 @@ func ScanFindingEntity() metadata.EntityDefinition {
 			Fields:      []string{"scanJobId", "severity", "category", "endpoint", "remediationStatus", "lastSeenAt"},
 			Filters:     []string{"scanJobId", "severity", "remediationStatus"},
 			DefaultSort: metadata.Ptr("-lastSeenAt"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Workflow: &metadata.EntityWorkflow{
 			StateField: model.FieldRemediationStatus, InitialState: model.FindingOpen,

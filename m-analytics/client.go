@@ -66,7 +66,7 @@ type Client struct {
 }
 
 func NewClient(baseURL string) *Client {
-	return &Client{base: strings.TrimSuffix(baseURL, "/"), http: &http.Client{Timeout: 15 * time.Second}}
+	return &Client{base: strings.TrimSuffix(baseURL, "/"), http: &http.Client{Timeout: requestTimeout}}
 }
 
 func (c *Client) do(ctx context.Context, token, method, path string, body any, out any) error {
@@ -168,3 +168,6 @@ func (c *Client) Aggregate(ctx context.Context, token string, spec AggregateSpec
 	err := c.do(ctx, token, http.MethodPost, "/v1/security-events/aggregate", spec, &rows)
 	return rows, err
 }
+
+// requestTimeout bounds one call to the analytics plane.
+const requestTimeout = 15 * time.Second

@@ -33,7 +33,7 @@ func DomainEntity() metadata.EntityDefinition {
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
 			Fields: []string{"apexDomain", "verificationStatus"}, Filters: []string{"apexDomain", "verificationStatus"},
-			MaxLimit: 100,
+			MaxLimit: model.LargeMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{

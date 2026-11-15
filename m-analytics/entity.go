@@ -47,7 +47,7 @@ func SecurityEventEntity() metadata.EntityDefinition {
 			Fields:      []string{model.FieldZoneID, model.FieldTriggeredByName, model.FieldAction, model.FieldSourceIP, model.FieldRequestPath, model.FieldOccurredAt},
 			Filters:     []string{model.FieldZoneID, model.FieldTriggeredBy, model.FieldAction, model.FieldSourceIP},
 			DefaultSort: metadata.Ptr("-occurredAt"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 	}
 }

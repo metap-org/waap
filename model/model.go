@@ -42,3 +42,10 @@ const (
 	ErrScannerUnavailable        = "scanner_unavailable"
 	ErrReferenceCheckUnavailable = "reference_check_unavailable"
 )
+
+// List page sizes: the MaxLimit of an entity's list views. Most entities cap at DefaultMaxListLimit;
+// the ones a zone's detail page shows in full (rules, access lists, domains) allow more.
+const (
+	DefaultMaxListLimit = 50
+	LargeMaxListLimit   = 100
+)

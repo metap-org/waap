@@ -62,7 +62,7 @@ func ZoneEntity() metadata.EntityDefinition {
 			// columns nobody should be able to hide from this list.
 			RequiredFields: []string{"hostname", "status"},
 			DefaultSort:    metadata.Ptr("-createdAt"),
-			MaxLimit:       50,
+			MaxLimit:       model.DefaultMaxListLimit,
 		}},
 		Workflow: &metadata.EntityWorkflow{
 			StateField: model.FieldStatus, InitialState: model.ZoneStatusPending, TerminalStates: []string{model.ZoneStatusSuspended},

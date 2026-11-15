@@ -63,9 +63,18 @@ func orDefault(v, def string) string {
 // httpClient: an origin under test is attacker-adjacent input (a customer types the address) and
 // a redirect chain is not what "is this origin reachable" is asking about, so redirects are
 // disabled on purpose.
+// probeTimeout bounds one DNS or origin probe.
+const probeTimeout = 10 * time.Second
+
+// existenceCheckLimit asks a list for one row: "is there any", not "how many".
+const existenceCheckLimit = 1
+
+// zoneCascadeLimit is how many zones one domain verification cascades its verified status onto.
+const zoneCascadeLimit = 100
+
 func httpClient() *http.Client {
 	return &http.Client{
-		Timeout:       10 * time.Second,
+		Timeout:       probeTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
 	}
 }
@@ -229,7 +238,7 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 
 	// Cascade onto every zone under this domain — best-effort per zone (one failing zone must
 	// not stop the others, and must not undo the domain's own now-verified status).
-	listInput := query.ListInput{Limit: 100, Filters: [][2]string{{model.FieldDomainID, domainID.String()}}}
+	listInput := query.ListInput{Limit: zoneCascadeLimit, Filters: [][2]string{{model.FieldDomainID, domainID.String()}}}
 	zones, err := state.Crud.List(ctx, model.Zones, listInput, rc)
 	if err == nil {
 		for _, zone := range zones.Data {
@@ -284,7 +293,7 @@ func testOrigin(ctx context.Context, state *httpserver.AppState, rc *permission.
 func syncConfigState(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
 
 	anyForZone := func(entity string) (bool, error) {
-		input := query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}
+		input := query.ListInput{Limit: existenceCheckLimit, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}
 		result, err := state.Crud.List(ctx, entity, input, rc)
 		if err != nil {
 			return false, err

@@ -38,7 +38,7 @@ func IncidentEntity() metadata.EntityDefinition {
 			Fields:      []string{"title", model.FieldZoneID, "severity", "status", "assignedTo"},
 			Filters:     []string{model.FieldZoneID, "severity", "status", "assignedTo"},
 			DefaultSort: metadata.Ptr("-createdAt"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Workflow: &metadata.EntityWorkflow{
 			StateField:     model.FieldStatus,

@@ -27,7 +27,7 @@ func AlertPolicyEntity() metadata.EntityDefinition {
 			Fields:      []string{"name", "thresholdCount", "windowMinutes", "enabled"},
 			Filters:     []string{"enabled"},
 			DefaultSort: metadata.Ptr("-createdAt"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
