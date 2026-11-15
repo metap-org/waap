@@ -381,7 +381,7 @@ func compileDdos(policy management.Record) (ruleset.CompiledDdos, bool) {
 	}
 	burstWindow, ok := policy.Int64(model.FieldBurstWindow)
 	if !ok || burstWindow < 1 {
-		burstWindow = 60
+		burstWindow = defaultBurstWindowSeconds
 	}
 	priority, ok := policy.Int64(model.FieldPriority)
 	if !ok {
@@ -484,3 +484,6 @@ func CompileZone(zone management.Record, tenantID string, ddosPolicies, rules, i
 		CompiledAt:     standard.NowRFC3339(),
 	}, true
 }
+
+// defaultBurstWindowSeconds is the DDoS burst window used when a policy leaves it unset or invalid.
+const defaultBurstWindowSeconds = 60

@@ -34,7 +34,7 @@ func DdosPolicyEntity() metadata.EntityDefinition {
 			Fields:      []string{model.FieldZoneID, "sensitivity", "action", "pathPrefix", "httpMethod", "priority", "enabled"},
 			Filters:     []string{model.FieldZoneID, "enabled"},
 			DefaultSort: metadata.Ptr("priority"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 	}

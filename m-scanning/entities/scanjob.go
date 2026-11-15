@@ -38,7 +38,7 @@ func ScanJobEntity() metadata.EntityDefinition {
 			Fields:      []string{model.FieldZoneID, "scanType", "schedule", "status", "lastRunAt"},
 			Filters:     []string{model.FieldZoneID, "status"},
 			DefaultSort: metadata.Ptr("-createdAt"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Workflow: &metadata.EntityWorkflow{
 			StateField: model.FieldStatus, InitialState: model.ScanJobIdle, TerminalStates: []string{},

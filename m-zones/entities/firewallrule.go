@@ -43,7 +43,7 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 			Fields:      []string{model.FieldZoneID, "name", "priority", "ruleType", "action", "enabled"},
 			Filters:     []string{model.FieldZoneID, "ruleType", "enabled"},
 			DefaultSort: metadata.Ptr("priority"),
-			MaxLimit:    100,
+			MaxLimit:    model.LargeMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 	}

@@ -55,7 +55,13 @@ const (
 	eventScanLimit = 200
 )
 
-func httpClient() *http.Client { return &http.Client{Timeout: 10 * time.Second} }
+// deliveryTimeout bounds one alert delivery (webhook or similar) so a slow endpoint cannot stall a sweep.
+const deliveryTimeout = 10 * time.Second
+
+// recordScanLimit is how many incidents or alert policies one sweep reads.
+const recordScanLimit = 50
+
+func httpClient() *http.Client { return &http.Client{Timeout: deliveryTimeout} }
 
 // analyticsClient: where security events are read from (the Analytics plane's query API).
 func analyticsClient() *analytics.Client {
@@ -213,7 +219,7 @@ func correlateIncidents(ctx context.Context, state *httpserver.AppState, rc *per
 			continue
 		}
 		existing, err := listRecords(ctx, state, model.Incidents,
-			[][2]string{{model.FieldZoneID, key.zoneID}, {model.FieldStatus, model.IncidentOpen}}, 50, rc)
+			[][2]string{{model.FieldZoneID, key.zoneID}, {model.FieldStatus, model.IncidentOpen}}, recordScanLimit, rc)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +325,7 @@ func recordNotification(ctx context.Context, state *httpserver.AppState, rc *per
 // evaluateAlerts is POST /internal/alerts/evaluate — every enabled AlertPolicy, evaluated against
 // the recent event stream, counted PER ZONE (never summed across zones).
 func evaluateAlerts(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext) (map[string]any, error) {
-	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{model.FieldEnabled, "true"}}, 50, rc)
+	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{model.FieldEnabled, "true"}}, recordScanLimit, rc)
 	if err != nil {
 		return nil, err
 	}

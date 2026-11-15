@@ -107,11 +107,11 @@ func buildVerifier(ctx context.Context) (*jwks.TokenVerifier, error) {
 		if publicKey == nil {
 			return nil, errors.New("set JWKS_URL (or AUTH_JWT_PUBLIC_KEY_PATH for static RSA)")
 		}
-		return &jwks.TokenVerifier{Kind: jwks.VerifierStatic, PublicKey: publicKey, Leeway: 20 * time.Second}, nil
+		return &jwks.TokenVerifier{Kind: jwks.VerifierStatic, PublicKey: publicKey, Leeway: jwks.DefaultLeeway}, nil
 	}
 	client := jwks.NewJwksClient(jwksURL, time.Duration(env.Int("JWKS_CACHE_TTL_SECONDS", 300))*time.Second)
 	client.SpawnBackgroundRefresh(ctx, time.Duration(env.Int("JWKS_REFRESH_SECONDS", 60))*time.Second)
-	return &jwks.TokenVerifier{Kind: jwks.VerifierAuto, Keys: client, PublicKey: publicKey, Leeway: 20 * time.Second}, nil
+	return &jwks.TokenVerifier{Kind: jwks.VerifierAuto, Keys: client, PublicKey: publicKey, Leeway: jwks.DefaultLeeway}, nil
 }
 
 func readRSAPublicKey(path string) (*rsa.PublicKey, error) {

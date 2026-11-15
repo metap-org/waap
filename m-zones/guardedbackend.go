@@ -118,7 +118,7 @@ var _ crud.RecordBackend = (*GuardedZonesBackend)(nil)
 // Domain row for hostname's apex and returns its id to inject into the create payload.
 func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, error) {
 	apex := ApexDomain(hostname)
-	existing, err := b.inner.List(ctx, model.Domains, query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldApexDomain, apex}}}, rc)
+	existing, err := b.inner.List(ctx, model.Domains, query.ListInput{Limit: existenceCheckLimit, Filters: [][2]string{{model.FieldApexDomain, apex}}}, rc)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -188,7 +188,7 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 			return "", crud.NewServiceErrorMsg(503, model.ErrReferenceCheckUnavailable,
 				fmt.Sprintf("Could not verify cross-service references (%s unreachable); refusing to delete.", check.entity))
 		}
-		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, &forwardedRC)
+		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: existenceCheckLimit, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, &forwardedRC)
 		if err != nil {
 			return "", err
 		}

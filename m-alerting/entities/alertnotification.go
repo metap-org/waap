@@ -26,7 +26,7 @@ func AlertNotificationEntity() metadata.EntityDefinition {
 			Fields:      []string{"alertPolicyId", "triggeredAt", "channel", "deliveryStatus"},
 			Filters:     []string{"alertPolicyId", "deliveryStatus"},
 			DefaultSort: metadata.Ptr("-triggeredAt"),
-			MaxLimit:    50,
+			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 	}

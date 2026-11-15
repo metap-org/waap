@@ -32,7 +32,7 @@ func IPAccessListEntity() metadata.EntityDefinition {
 			Name: "default", Label: "Default",
 			Fields:   []string{model.FieldZoneID, "type", "value", "enabled"},
 			Filters:  []string{model.FieldZoneID, "type", "enabled"},
-			MaxLimit: 100,
+			MaxLimit: model.LargeMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 	}

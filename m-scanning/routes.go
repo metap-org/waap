@@ -40,7 +40,10 @@ import (
 // nothing is going to run it yet.
 func scannerURL() (string, bool) { return env.Lookup("SCANNER_URL") }
 
-func httpClient() *http.Client { return &http.Client{Timeout: 15 * time.Second} }
+// scannerTimeout bounds the hand-off request to the scanner backend (the scan itself runs on).
+const scannerTimeout = 15 * time.Second
+
+func httpClient() *http.Client { return &http.Client{Timeout: scannerTimeout} }
 
 // doTransition applies one workflow transition, mapping a service-level failure into a plain
 // error. Transition names come from entities.ScanJobEntity's workflow (run/start/complete/fail)
