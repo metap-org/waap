@@ -7,5 +7,9 @@ const uiLibPreset = require("@metap/ui/tailwind-preset").default;
 module.exports = {
   presets: [uiLibPreset],
   corePlugins: { preflight: false },
-  content: ["./index.html", "./src/**/*.{ts,tsx}", "../../../platform-ui/src/**/*.{ts,tsx}"],
+  content: [
+    "./index.html",
+    "./src/**/*.{ts,tsx}",
+    "../../platform-ui/src/**/*.{ts,tsx}",
+  ],
 };
