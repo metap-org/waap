@@ -172,6 +172,32 @@ async function mergeEntityAccess(
   }
 }
 
+/** Prefixes proxied to the backend that SPA routes share (`/admin/users`, `/admin/roles`,
+ *  `/admin/policies`, `/admin/cron-jobs`, `/auth/oidc/callback`). */
+const PROXIED_PREFIXES = [
+  "/admin",
+  "/auth",
+  "/users",
+  "/preferences",
+  "/metadata",
+  "/health",
+];
+
+/** A browser opening (or reloading) a page under one of PROXIED_PREFIXES, as opposed to the app's
+ *  own API calls: GET with `Accept: text/html`, which `fetch` never sends by default. Those get the
+ *  SPA, so a hard refresh of `/admin/users` no longer lands on the backend's 404. Kept on the
+ *  backend: the SSO buttons' `/auth/{oidc,oauth2}/<tenant>/login`, which redirect to the IdP.
+ *  `nginx.conf` applies the same rule in production. */
+function isSpaNavigation(req: IncomingMessage): boolean {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  if (!(req.headers.accept ?? "").includes("text/html")) return false;
+  const path = (req.url ?? "").split("?")[0] ?? "";
+  if (/^\/auth\/(oidc|oauth2)\/[^/]+\/login\/?$/.test(path)) return false;
+  return PROXIED_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -179,6 +205,11 @@ export default defineConfig({
       name: "waf-multi-service-routing",
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
+          // Runs before Vite's own proxy: a page load is served the SPA's index.html.
+          if (isSpaNavigation(req)) {
+            req.url = "/index.html";
+            return next();
+          }
           const url = req.url ?? "";
           if (url === "/metadata/entities" || url === "/metadata/entities/") {
             return void mergeEntityList(req, res, next);
