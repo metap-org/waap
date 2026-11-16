@@ -25,8 +25,8 @@ x-service-env: &service-env
   GRPC_ENABLED: "true"
 
 x-health: &health
-  interval: 5s
-  timeout: 3s
+  interval: 30s
+  timeout: 5s
   retries: 60 # the first `go run` compiles everything
   start_period: 20s
 
@@ -45,11 +45,18 @@ services:
       # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
       # dns.google — set records at http://localhost:8053.
       DOH_RESOLVER_URL: http://dns-mock:8053/resolve
+      # Invitation and password-reset emails go to the dev mail mock (read them at
+      # http://localhost:8025); the links point at the Vite dev server.
+      SMTP_HOST: mail-mock
+      SMTP_PORT: "1025"
+      SMTP_FROM: "WAF Portal <no-reply@waf.local>"
+      PUBLIC_APP_URL: http://localhost:5173
     healthcheck:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3000/health"]
     depends_on:
       dns-mock: { condition: service_started }
+      mail-mock: { condition: service_started }
 
   # Stand-in for the outside world's DNS (../devtools/dns-mock): real DNS on host :15353 (udp+tcp; container :5353 — host 5353 is usually mDNS; try
   # `dig @127.0.0.1 -p 15353 ...`), DoH + admin API + UI on :8053. State survives restarts in the
@@ -67,6 +74,14 @@ services:
       - go-cache:/root/.cache/go-build
       - go-mod:/go/pkg/mod
       - dns-mock:/var/lib/dns-mock
+
+  # Stand-in for the outside world's mail relay (../devtools/mail-mock): SMTP on :1025, UI + API on
+  # host :8025. Accepts every message and delivers none; messages live in memory.
+  mail-mock:
+    <<: *go
+    working_dir: /workspace/waap/devtools/mail-mock
+    command: go run .
+    ports: ["1025:1025", "8025:8025"]
 
   scanning-service:
     <<: *go
@@ -173,6 +188,7 @@ services:
       SCANNING_URL: http://scanning-service:3010
       ALERTING_URL: http://alerting-service:3020
       GATEWAY_URL: http://graphql-gateway:4000
+      VITE_USE_POLLING: "true"
     ports: ["5173:5173"]
     depends_on:
       zones-service: { condition: service_healthy }

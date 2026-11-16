@@ -225,8 +225,17 @@ func main() {
 		Alerting: byName["alerting"].restURL,
 	}
 
+	// zones-service is the token issuer, so it owns identities: user administration and the
+	// caller's own account go to its gRPC listener (roadmap 113), not through a REST forward.
+	identityClient, err := grpcapi.ConnectIdentity(byName["zones"].grpcAddr)
+	if err != nil {
+		slog.Error("connecting to the identity service", "addr", byName["zones"].grpcAddr, standard.LogError, err)
+		os.Exit(1)
+	}
+	defer identityClient.Close()
+
 	schema, err := gw.BuildSchema(registry, owners,
-		gw.WithPlatformBase(rest.Zones), gw.WithExtensions(wafgateway.AddCustomFields(wafgateway.Invokers{
+		gw.WithPlatformBase(rest.Zones), gw.WithIdentity(identityClient), gw.WithExtensions(wafgateway.AddCustomFields(wafgateway.Invokers{
 			Zones: zonesBackend, Scanning: scanningBackend, Alerting: alertingBackend,
 		})))
 	if err != nil {

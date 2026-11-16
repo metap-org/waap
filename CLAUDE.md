@@ -114,7 +114,9 @@ own Go module with no `metap` dependency and never deployed to production. `devt
 plays every external DNS (customer DNS providers, public resolvers): real DNS on :5353 (host :15353 under compose), DoH on
 :8053, records/faults set via API or its UI. Both `management-plane` compose files run it, and point
 zones-service's `DOH_RESOLVER_URL` at it. Anything that needs "real" DNS in dev goes through it
-rather than a real domain.
+rather than a real domain. `devtools/mail-mock` (2026-11-16, roadmap 113 P2) plays the outside mail
+relay: SMTP on :1025, UI + API on :8025, accepts everything and delivers nothing; both compose files
+run it and point zones-service's `SMTP_HOST` at it (invitation and password-reset emails).
 
 Key rule, stated repeatedly in the docs: **`edge-plane` never talks to `management-plane` directly.** It
 only reads config that `control-plane` has already computed into Redis/DragonflyDB.

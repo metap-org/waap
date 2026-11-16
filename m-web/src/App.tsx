@@ -31,6 +31,10 @@ import {
   PoliciesAdminPage,
   RecordDetail,
   UsersAdminPage,
+  AcceptInvitePage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  RolesAdminPage,
   useAuth,
 } from "@metap/platform-ui";
 import type { ShellNavItem } from "@metap/platform-ui";
@@ -153,6 +157,13 @@ function RequireAuth() {
       roles: ["admin"],
     },
     {
+      to: "/admin/roles",
+      label: t("shell.navRoles"),
+      group: admin,
+      icon: navIcons.roles,
+      roles: ["admin"],
+    },
+    {
       to: "/admin/policies",
       label: t("shell.navPolicies"),
       group: admin,
@@ -184,6 +195,34 @@ function RequireAdmin() {
       <Outlet />
     </Can>
   );
+}
+
+/** Protection config vs. the operational work queue — the same split as the sidebar's groups. */
+const PROTECTION_ENTITIES = new Set<string>([
+  ENTITIES.zones,
+  ENTITIES.domains,
+  ENTITIES.ddosPolicies,
+  ENTITIES.firewallRules,
+  ENTITIES.ipAccessLists,
+]);
+
+/** The permission editors group entities into the sidebar's own sections. */
+function usePermissionGroups() {
+  const { t } = useTranslation();
+  return (entity: { name: string }) =>
+    PROTECTION_ENTITIES.has(entity.name)
+      ? t("waf.navGroup.protection")
+      : entity.name.startsWith("waf.")
+        ? t("waf.navGroup.operations")
+        : entity.name;
+}
+
+function RolesRoute() {
+  return <RolesAdminPage permissionGroups={usePermissionGroups()} />;
+}
+
+function PoliciesRoute() {
+  return <PoliciesAdminPage permissionGroups={usePermissionGroups()} />;
 }
 
 function RecordsRoute() {
@@ -229,6 +268,10 @@ export default function App() {
       <LocaleProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* Public account pages the invitation and password-reset emails link to. */}
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/oidc/callback" element={<OidcCallbackPage />} />
 
           {/* Layout route — `RequireAuth` mounts `AppShellLayout` once and renders every child
@@ -273,7 +316,8 @@ export default function App() {
             <Route element={<RequireAdmin />}>
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/admin/users" element={<UsersAdminPage />} />
-              <Route path="/admin/policies" element={<PoliciesAdminPage />} />
+              <Route path="/admin/roles" element={<RolesRoute />} />
+              <Route path="/admin/policies" element={<PoliciesRoute />} />
               <Route path="/admin/cron-jobs" element={<CronJobsAdminPage />} />
             </Route>
           </Route>
