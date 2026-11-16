@@ -238,6 +238,14 @@ export default defineConfig({
     ],
   },
   server: {
+    // Inside the dev compose container, file events from the bind mount don't reach Vite's
+    // watcher, so an edit (to this app or to ../../platform-ui) kept serving the old module
+    // until the container restarted. Polling is opt-in (VITE_USE_POLLING, set by
+    // m-deploy/docker-compose.dev.yml) so plain `pnpm dev` on the host keeps native events.
+    watch:
+      process.env.VITE_USE_POLLING === "true"
+        ? { usePolling: true, interval: 300 }
+        : undefined,
     // `platform-ui`/`design-system` live outside this workspace root — Vite's default `fs.allow`
     // would 403 every request for their files through `/@fs/...`.
     fs: {
