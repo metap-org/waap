@@ -108,6 +108,7 @@ fn load(path: &str) -> Result<Snapshot, String> {
 }
 
 struct Shared {
+    baseline: bool,
     snap: ArcSwap<Snapshot>,
     waf: Vec<InspectionClient<Channel>>,
     rr: AtomicU64,
@@ -195,6 +196,11 @@ impl ProxyHttp for L7 {
     }
 
     async fn request_filter(&self, session: &mut Session, ctx: &mut Ctx) -> Result<bool> {
+        // Profiling switch: answer immediately, to measure framework cost without any L7 logic.
+        if self.0.baseline {
+            deny(session, 403).await?;
+            return Ok(true);
+        }
         let snap = self.0.snap.load();
         let host = session
             .req_header()
@@ -369,7 +375,7 @@ fn main() {
             InspectionClient::new(Endpoint::from_shared(waf_addr.clone()).unwrap().connect_lazy())
         })
         .collect();
-    let shared = Arc::new(Shared { snap: ArcSwap::from_pointee(snap), waf, rr: AtomicU64::new(0), waf_calls: AtomicU64::new(0), waf_errors: AtomicU64::new(0) });
+    let shared = Arc::new(Shared { baseline: std::env::var("BASELINE").is_ok(), snap: ArcSwap::from_pointee(snap), waf, rr: AtomicU64::new(0), waf_calls: AtomicU64::new(0), waf_errors: AtomicU64::new(0) });
 
     // Snapshot watcher: re-read when mtime changes; swap on success, keep the old one on error (NACK).
     {
