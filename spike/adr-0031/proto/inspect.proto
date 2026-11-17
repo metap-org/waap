@@ -1,0 +1,40 @@
+// Inspection API rút gọn cho spike ADR-0031 (L7 -> WAF).
+// Khác bản thiết kế ở docs 5.5: unary thay vì stream, body gửi một lần (đã bị giới hạn ở L7).
+// Mục đích: đo chi phí callout và độ khớp CRS, không phải hợp đồng cuối.
+syntax = "proto3";
+package inspect.v1;
+option go_package = "spike/waf/inspectpb";
+
+service Inspection {
+  rpc Inspect(InspectRequest) returns (Verdict);
+}
+
+message Header {
+  string name = 1;
+  string value = 2;
+}
+
+message InspectRequest {
+  string zone_id = 1;
+  string request_id = 2;
+  string method = 3;
+  string uri = 4;
+  string http_version = 5;
+  string client_ip = 6;
+  repeated Header headers = 7;
+  bytes body = 8;
+  uint64 policy_version = 9;
+  uint32 deadline_ms = 10;
+  repeated uint32 exclude_rule_ids = 11; // ngoại lệ theo zone, không build lại instance
+}
+
+message Verdict {
+  enum Action {
+    ALLOW = 0;
+    BLOCK = 1;
+  }
+  Action action = 1;
+  uint32 status = 2;
+  repeated uint32 rule_ids = 3;
+  uint64 ruleset_version = 4;
+}
