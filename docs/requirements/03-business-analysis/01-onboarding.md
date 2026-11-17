@@ -1,6 +1,6 @@
 # 3.1 Onboarding một website
 
-> **Trạng thái: đang mở, chưa có quyết định nào.** Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở Phụ lục A. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
 > khi viết luồng onboarding. Cột "ghi chú ban đầu" chỉ là ý kiến lúc ghi, **không phải quyết định**. Lần phân
 > tích tiếp (2026-11-07) thêm trục K–N, hồ sơ khách điển hình ([§6](#6-hồ-sơ-khách-điển-hình-đề-xuất-chờ-duyệt)),
 > cây quyết định kết nối ([§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt)) và phân tích các câu ở
@@ -303,7 +303,10 @@ flowchart TB
     port -->|không| ok
 ```
 
-## 8. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 8. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định
+
 
 | Câu | Phương án | Đánh đổi | Đề xuất |
 |---|---|---|---|
@@ -324,10 +327,11 @@ flowchart TB
 | OQ-149 | Nhập cấu hình từ nơi khác | | Mở rộng: nhập bản ghi DNS và IP allowlist; rule không chuyển tự động, chỉ có hướng dẫn tương đương |
 | OQ-150 | Từ chối lĩnh vực bị cấm từ đầu | Kiểm trước thì chậm, dễ sai | Điều khoản cấm, kiểm domain với danh sách đen đã biết lúc thêm zone, còn lại xử lý qua abuse (OQ-88) |
 
-## Phụ lục A. Bản nháp luồng đầu tiên (chưa duyệt)
+## Phụ lục A. Luồng onboarding (bước 2, cập nhật 2026-11-17)
 
-> Viết trước khi hỏi chủ dự án, chỉ đi theo một kịch bản: khách có DNS đầy đủ, origin có IP public, cổng
-> chuẩn. **Không dùng làm căn cứ.** Giữ lại để không mất các ý đã có khi phân tích lại.
+> Bản nháp đầu tiên đi theo một kịch bản (DNS đầy đủ, origin có IP public, cổng chuẩn). Sau khi chủ dự án duyệt OQ-21…OQ-32 và OQ-147…OQ-150
+> (2026-11-17), luồng này là **căn cứ cho kịch bản chính**; các điều chỉnh theo quyết định nằm ở [A.10](#a10-điều-chỉnh-theo-quyết-định-2026-11-17).
+> A.6 (hồ sơ khách) và cây quyết định ở [§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt) **chưa duyệt riêng**. OQ-17…OQ-20 ở A.9 đã được duyệt theo đề xuất ngày 2026-11-17.
 
 ### A.1 Mục tiêu và định nghĩa "xong"
 
@@ -649,3 +653,20 @@ Phương thức kết nối:
 | OQ-18 | Cert theo từng hostname hay một cert gộp nhiều SAN cho cả zone? | Theo hostname (lỗi một hostname không kéo các hostname khác), riêng apex và `www` gộp một cert |
 | OQ-19 | Có làm hostname xem trước (`*.preview.<ncc>`) ở MVP không? Nó mở thêm một đường vào origin cần bảo vệ | Không ở MVP, chỉ `curl --resolve` và `hosts`; xem lại khi có phản hồi của khách |
 | OQ-20 | Bản ghi TXT (không uỷ quyền) có còn được hỗ trợ không, khi nó làm cert đầu phải chờ tới lúc đổi DNS? | Có, cho khách không chấp nhận uỷ quyền DNS, kèm cảnh báo rõ về khoảng lỗi cert hoặc yêu cầu tải cert lên |
+
+### A.10 Điều chỉnh theo quyết định 2026-11-17
+
+| Bước | Điều chỉnh | Câu hỏi |
+|---|---|---|
+| OB2 Thêm domain | Mặc định zone là domain gốc. Cho phép zone chỉ gồm **một hostname** khi khách chứng minh quyền với chính hostname đó; zone đó **không giữ claim của apex**, chủ apex vẫn onboard được phần còn lại. Lúc thêm zone **kiểm domain với danh sách đen đã biết**; phần còn lại xử lý qua abuse ([3.10](10-cache-performance.md)) | OQ-21, OQ-150 |
+| OB2, A.2 Tra DNS | Phát hiện traffic không phải HTTP trên cùng domain bằng DNS (bản ghi MX, SRV, hostname khác trỏ cùng IP với apex); **chỉ cảnh báo và hướng dẫn tách hostname**; không quét cổng origin của khách. Không nhận quản lý toàn bộ DNS (nameserver) ở MVP | OQ-24, OQ-25 |
+| OB3 Xác minh sở hữu | Dự phòng khi không tạo được `_acme-challenge`: **TXT tên khác** và **file HTTP** ở MVP; thẻ meta ở Mở rộng; **không dùng email**. Có hướng dẫn riêng (kèm ảnh) cho 5–6 nhà DNS trong nước; khảo sát trước MVP nhà nào không cho `_` | OQ-147, OQ-26 |
+| OB4 Origin | Cổng phía client: danh sách nhỏ cổng HTTP/HTTPS hay dùng (8080, 8443…) cho mọi gói; cổng tuỳ ý chỉ Enterprise có IP riêng. Origin là nền tảng SaaS (Shopify, Haravan, Sapo…): không hỗ trợ chính thức ở MVP, có trang hướng dẫn chung. Tunnel cho origin không có IP public và định tuyến theo path / nhiều origin: **Mở rộng** (tunnel ưu tiên cao) | OQ-23, OQ-30, OQ-28, OQ-29 |
+| OB5 Cert | Edge **chuyển challenge ACME của origin (certbot) về origin** theo mặc định: token không phải của NCC thì chuyển về origin | OQ-31 |
+| OB7 Kiểm thử | Edge gửi vài request về origin và phát hiện **vòng chuyển hướng**, `403`/`429` từ origin (origin chặn IP edge), nội dung hỗn hợp trên trang chủ | OQ-148 |
+| OG2, OB8 Đổi DNS | Cấp **dải IP dùng chung theo region, có IPv4 và IPv6** từ MVP; UI luôn đề xuất CNAME hoặc ALIAS trước và nói rõ cái giá của A tĩnh; IP riêng theo zone cho Enterprise; anycast theo lộ trình hạ tầng. Thay đề xuất OQ-16 | OQ-22 |
+| OG4 Hoàn tất | **Cảnh báo đỏ ở mọi bước** và **không cho hoàn tất** khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin; không chặn các bước khác | OQ-32 |
+| Phân khúc | Chính ở MVP: H1 (VPS) và H6 (doanh nghiệp có IT); H2 (shared hosting) chạy được nhưng không khoá được origin, nói rõ; H8 (agency) dùng nhiều org. Nhập cấu hình từ Cloudflare và nhà khác: Mở rộng (bản ghi DNS và IP allowlist; rule không chuyển tự động, chỉ có hướng dẫn tương đương) | OQ-27, OQ-149 |
+
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F2 thêm zone theo một hostname, dải IP dùng chung IPv4/IPv6, danh sách cổng, xác minh dự phòng (TXT tên khác, file HTTP), phát hiện sự cố
+thường gặp trong OB7 và chặn OG4 khi còn họ IP trỏ thẳng origin; BR kiểm domain với danh sách đen.

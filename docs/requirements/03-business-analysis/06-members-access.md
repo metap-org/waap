@@ -1,6 +1,6 @@
 # 3.6 Quản lý thành viên, SSO, API key
 
-> **Trạng thái: đã quyết OQ-62 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.** Quyết định ở [§3](#3-đã-quyết).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định ở [§3](#3-đã-quyết).
 
 ## 1. Phạm vi
 
@@ -86,7 +86,10 @@ service account) và người của NCC. Liên quan: F1 ở [§1](../01-function
 | OQ-67 | Đăng nhập Google, Microsoft cho khách nhỏ có ở MVP không? | KB6-C6 | |
 | OQ-68 | Quyền xem dữ liệu request có tách thành quyền riêng không? | KB6-D3 | Gộp với OQ-50 |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định
+
 
 Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). **Chưa câu nào được coi là quyết định** cho tới khi
 chủ dự án duyệt.
@@ -103,3 +106,39 @@ chủ dự án duyệt.
 ## 6. Phụ thuộc
 
 FR-1-01…FR-1-17, BR-13…BR-15, BR-20, DT-1, OQ-1 ở [§2](../02-requirements.md).
+
+## 7. Luồng: thành viên, SSO, API key, khôi phục (bước 2, 2026-11-17)
+
+> Dựa trên [§3](#3-đã-quyết) (một người thuộc nhiều org, OQ-62) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17).
+
+**Định nghĩa "xong":** người đúng đã vào đúng org với đúng vai trò, truy cập đúng cách xác thực mà org yêu cầu, mọi thao tác nhạy cảm có audit.
+
+```mermaid
+flowchart TB
+    MB1["MB1 Mời thành viên<br/>vai trò theo org"]
+    MB2["MB2 Đăng nhập<br/>mật khẩu, Google, Microsoft, SSO"]
+    G1{"MBG1 Org bắt buộc SSO?"}
+    MB3["MB3 Qua SSO của org"]
+    MB4["MB4 Dùng portal<br/>chuyển org trong portal"]
+    MB5["MB5 Tạo API key<br/>gắn một org"]
+    MB6["MB6 Thu hồi, hết hạn,<br/>lộ key"]
+    MB7["MB7 Khôi phục owner"]
+    MB1 --> MB2 --> G1
+    G1 -->|có| MB3 --> MB4
+    G1 -->|không| MB4
+    MB4 --> MB5 --> MB6
+    MB4 --> MB7
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| MB1 Mời | Owner, admin | Một người **thuộc nhiều org**; agency là thành viên của org khách với vai trò được cấp, khách cuối là owner org của mình ([OQ-62](#3-đã-quyết), [OQ-63](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Lời mời hết hạn: gửi lại | `Invitation`, `Membership` |
+| MB2 Đăng nhập | Thành viên | Mật khẩu hoặc **Google, Microsoft (OIDC) có ở MVP** ([OQ-67](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)); MFA gắn với người, chính sách MFA bắt buộc áp theo org | Sai nhiều lần: khoá tạm, báo | `LoginEvent` |
+| MBG1, MB3 SSO | Hệ thống | SSO bắt buộc của org A áp khi vào org A, không chặn vào org B bằng mật khẩu. **Tài khoản khẩn:** tối đa **hai owner** được miễn SSO, dùng mật khẩu và khoá bảo mật phần cứng; mỗi lần đăng nhập báo mọi admin ([OQ-65](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | IdP sập: owner miễn SSO vào được | `SsoSession`, thông báo cho admin |
+| MB5 API key | Thành viên có quyền | Key thuộc **một org**. Không bắt buộc hạn, mặc định gợi ý **90 ngày**; org bật được "bắt buộc hạn". Key có tiền tố nhận diện, đăng ký với chương trình quét secret của GitHub ([OQ-66](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `ApiKey` (chỉ lưu băm) |
+| MB6 Thu hồi | Owner, hệ thống | Key lộ công khai: **thu hồi tự động** và báo owner | Không thu hồi được: báo sự cố | `ApiKeyRevoked`, audit |
+| MB7 Khôi phục owner | NCC | Owner duy nhất mất truy cập: **hai bằng chứng trong ba**: tạo bản ghi DNS trên domain của zone, giấy tờ doanh nghiệp khớp tên trên hoá đơn, xác nhận của chủ phương thức thanh toán. **Chờ 72 giờ**, báo mọi admin còn lại của org; ghi audit ([OQ-64](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Thiếu bằng chứng: từ chối, không có đường tắt | `OwnerRecovery`, audit |
+| Quyền xem dữ liệu request | Admin | Quyền riêng, mặc định chỉ security admin ([OQ-68](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), [OQ-50](04-false-positive.md)) | | `Permission` |
+
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F1 thêm đăng nhập Google/Microsoft, tài khoản khẩn miễn SSO (tối đa hai), khôi phục owner với hai bằng chứng và chờ 72 giờ,
+API key hạn tuỳ chọn và thu hồi tự động khi lộ; quyền riêng xem dữ liệu request.

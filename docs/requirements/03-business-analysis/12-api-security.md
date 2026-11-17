@@ -1,6 +1,6 @@
 # 3.12 API security
 
-> **Trạng thái: đang mở (2026-11-07). Đã quyết ở [3.13](13-configuration-surface.md#4-đã-quyết): kiểm schema chạy trước managed ruleset, endpoint enforce schema được giảm paranoia (BR-35); rate limit theo API key, JWT ở MVP (FR-3-06).** Tách ra từ trang bot cũ để 3.9 chỉ còn bot và
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt đề xuất cho các câu OQ của trang này** (trừ OQ-118 của 3.11 vẫn hoãn). Luồng (bước 2) ở mục 6. Tách ra từ trang bot cũ để 3.9 chỉ còn bot và
 > challenge. Trang này chỉ liệt kê kịch bản và câu hỏi. Thiết kế kỹ thuật ở kiến trúc 8.17.
 
 ## 1. Phạm vi
@@ -82,3 +82,43 @@ mà WAF thông thường không thấy. Liên quan: F3.7, F5.1.8 ở [§1](../01
 ## 4. Phụ thuộc
 
 FR-3-09, FR-5-19 ở [§2](../02-requirements.md); kiến trúc 8.17, ADR-0039; QS-22, QS-23.
+
+## 5. Đã quyết (duyệt 2026-11-17)
+
+> Chủ dự án duyệt tất cả đề xuất dưới đây ngày 2026-11-17. Đề xuất do Claude viết (trang gốc chưa có mục phân tích); con số là ước lượng đã được duyệt.
+
+| Câu | Quyết định |
+|---|---|
+| OQ-84 | (b): mặc định chỉ lưu cấu trúc (tên field, kiểu, độ dài) và cờ nhạy cảm. Lưu mẫu thật chỉ khi khách bật theo endpoint, che theo BR-44, giữ 7 ngày |
+| OQ-107 | (b): vào hàng đợi "đề xuất"; shadow API hiện ở danh mục chưa xác nhận kèm cảnh báo; zombie không tự chặn, khách chọn gỡ hoặc chặn |
+| OQ-108 | Tối thiểu 7 ngày log-only; chặn theo từng endpoint, không cả API; cho phép nhiều version schema song song cho client cũ |
+| OQ-109 | Không ở MVP; Nâng cao: phát hiện dữ liệu nhạy cảm (số thẻ, CMND) và kích thước bất thường theo lấy mẫu |
+| OQ-110 | Có ở Nâng cao, dạng cảnh báo theo baseline hành vi, không chặn; khách khai báo claim định danh và tham số ID |
+| OQ-111 | Thứ tự: API key trong header, rồi `sub` của JWT (khách khai báo claim), cuối cùng IP kèm dấu vân tay TLS |
+
+## 6. Luồng: API discovery và chặn theo schema (bước 2, 2026-11-17)
+
+```mermaid
+flowchart TB
+    AS1["AS1 Discovery từ traffic<br/>chỉ lưu cấu trúc"]
+    AS2["AS2 Hàng đợi đề xuất<br/>endpoint mới, shadow, zombie"]
+    AS3["AS3 Khách xác nhận<br/>hoặc tải OpenAPI"]
+    AS4["AS4 Log-only theo endpoint<br/>tối thiểu 7 ngày"]
+    G1{{"ASG1 Số liệu đủ, client cũ ổn?"}}
+    AS5["AS5 Chặn theo schema<br/>từng endpoint"]
+    AS6["AS6 Theo dõi, cảnh báo BOLA<br/>Nâng cao"]
+    AS1 --> AS2 --> AS3 --> AS4 --> G1
+    G1 -->|có| AS5 --> AS6
+    G1 -->|không| AS4
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| AS1 Discovery | Hệ thống | **Mặc định chỉ lưu cấu trúc** (tên field, kiểu, độ dài) và cờ nhạy cảm; lưu mẫu thật chỉ khi khách bật theo endpoint, che theo BR-44, giữ 7 ngày ([OQ-84](#5-đã-quyết-duyệt-2026-11-17)) | Lộ dữ liệu cá nhân: tắt lưu mẫu, xoá | `ApiEndpointShape` |
+| AS2 Đề xuất | Hệ thống | Endpoint mới **vào hàng đợi "đề xuất"**, không tự thêm (endpoint do kẻ tấn công dò cũng xuất hiện); shadow API hiện ở danh mục chưa xác nhận kèm cảnh báo; zombie không tự chặn (OQ-107) | | `ApiEndpointProposal` |
+| AS3 Xác nhận | Khách | Xác nhận endpoint, hoặc tải OpenAPI; schema cũ không khớp thực tế thì báo khác biệt | | `ApiSchema` |
+| AS4 Log-only | Hệ thống | Tối thiểu 7 ngày, **theo từng endpoint, không cả API**; hỗ trợ nhiều version schema song song cho client cũ (OQ-108) | Client mobile cũ gửi sai schema: giữ version cũ, không chặn | `ApiSchemaEvent` |
+| AS5 Chặn | Khách, qua change request ([3.2](02-policy-change.md)) | Kiểm schema chạy trước managed ruleset (BR-35) | | `ApiEnforce` |
+| AS6 Theo dõi | Khách, SOC | **BOLA** ở Nâng cao: cảnh báo theo baseline hành vi, không chặn; khách khai báo claim định danh và tham số ID (OQ-110). Edge **không kiểm response** ở MVP; Nâng cao: phát hiện dữ liệu nhạy cảm và kích thước bất thường theo lấy mẫu (OQ-109) | | `ApiAlert` |
+
+**Consumer mặc định (OQ-111):** theo thứ tự API key trong header, rồi `sub` của JWT (khách khai báo claim), cuối cùng IP kèm dấu vân tay TLS (IP là mức cuối vì NAT).

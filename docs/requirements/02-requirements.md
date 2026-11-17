@@ -1,6 +1,6 @@
 # 2. Requirements
 
-> **Trạng thái: bản nháp chờ review (2026-11-06).** Mọi dòng ở đây là **đề xuất**. Các điểm cần quyết
+> **Trạng thái: OQ-1…OQ-15 đã duyệt 2026-11-17 (OQ-1 hoãn; OQ-9, OQ-10 sửa); phần còn lại vẫn là bản nháp chờ review (2026-11-06).** Mọi dòng ở đây là **đề xuất**. Các điểm cần quyết
 > nằm ở [§9](#9-câu-hỏi-mở-cho-review). Khi chốt xong, requirements là căn cứ để đối chiếu lại module
 > ([5.8.12](../architecture/05-building-blocks/08-components/12-management.md)) và database
 > ([5.8.14](../architecture/05-building-blocks/08-components/14-management-database.md)).
@@ -67,6 +67,12 @@ một hay nhiều chức năng lá `F…`. Requirement chất lượng không vi
 | FR-1-17 | Kiểm toán phải lọc audit theo người, đối tượng, loại hành động, thời gian, và xuất CSV/JSON | F1.5.2, F1.5.3 | MVP | Xuất 1 triệu dòng không làm chậm portal của tenant khác |
 | FR-1-19 | Audit log phải đẩy liên tục sang SIEM của khách qua cùng exporter với security event, gồm thao tác của nhân viên NCC trên zone khách, và có chuỗi hash để kiểm toàn vẹn (PCI DSS 10) | F1.5.3, F1.5.4 | MVP | Sửa hoặc xoá một dòng audit làm kiểm chuỗi hash báo lỗi |
 | FR-1-18 | Một tài khoản người dùng phải thuộc được nhiều org; người dùng chuyển org trong portal; SSO bắt buộc và chính sách MFA áp theo từng org; API key luôn thuộc một org ([3.6](03-business-analysis/06-members-access.md#3-đã-quyết)) | F1.2.6 | MVP | Gỡ khỏi org A không ảnh hưởng quyền ở org B; SCIM của org A chỉ đổi membership trong org A |
+| FR-1-20 | Hệ thống phải cho tối đa hai owner được miễn SSO bằng mật khẩu và khoá bảo mật phần cứng, và báo mọi admin mỗi lần họ đăng nhập (BR-48) | F1.3.5 | MVP | IdP sập vẫn vào được; thông báo tới mọi admin |
+| FR-1-21 | Hệ thống phải cho khôi phục owner duy nhất qua hai bằng chứng trong ba, chờ 72 giờ, báo mọi admin còn lại (BR-48) | F1.2.7 | MVP | Thiếu bằng chứng thì từ chối; có audit |
+| FR-1-22 | Hệ thống phải hỗ trợ đăng nhập Google, Microsoft qua OIDC | F1.3.6 | MVP |  |
+| FR-1-23 | API key phải có tiền tố nhận diện, hạn không bắt buộc (gợi ý 90 ngày, org bật được bắt buộc hạn); key lộ công khai phải bị thu hồi tự động và báo owner | F1.4.4 | MVP | Đăng ký quét secret của GitHub |
+| FR-1-24 | Hệ thống phải có quyền riêng "xem dữ liệu request", mặc định chỉ security admin (BR-44) | F1.2.8 | MVP |  |
+| FR-1-25 | Hệ thống phải cho owner huỷ yêu cầu xoá org trong 30 ngày, khôi phục zone gỡ nhầm trong 30 ngày, và xuất cấu hình JSON, log trước khi xoá; bản sao lưu giữ tối đa 35 ngày (BR-56) | F1.1.5, F1.1.6 | MVP | Backup khôi phục phải áp lại danh sách xoá |
 
 ### F2 Zone và onboarding
 
@@ -105,6 +111,12 @@ một hay nhiều chức năng lá `F…`. Requirement chất lượng không vi
 | FR-2-28 | Hệ thống phải hướng dẫn khoá origin (dải IP của edge có version, header bí mật, mTLS) và ghi nhận đã khoá hay bỏ qua; nên kiểm origin còn lộ từ điểm không thuộc edge | F2.7.5, F2.2.6 | MVP / MR | Bỏ qua khoá origin có audit |
 | FR-2-29 | Danh sách zone phải hiện tiến độ onboarding theo bước; hệ thống nhắc ở ngày 1, 3, 7 tới đúng người của bước đang dừng | F2.7.6 | MVP | Zone bỏ dở lọc được |
 | FR-2-30 | Hệ thống nên nhập hàng loạt hostname và origin qua CSV, API | F2.2.7 | MR | 1.000 hostname ≤ 5 phút, báo lỗi theo dòng |
+| FR-2-31 | Hệ thống phải cho tạo zone chỉ gồm một hostname khi khách chứng minh quyền với hostname đó; zone đó không giữ claim của apex (BR-53); phải kiểm domain với danh sách đen lúc thêm zone | F2.1.9, F2.1.10 | MVP | Chủ apex vẫn onboard được phần còn lại |
+| FR-2-32 | Hệ thống phải hỗ trợ xác minh dự phòng bằng TXT tên khác và file HTTP; không dùng email | F2.1.11 | MVP |  |
+| FR-2-33 | Hệ thống phải cấp dải IP dùng chung theo region (IPv4 và IPv6) và nêu rõ cái giá của A tĩnh; hỗ trợ danh sách cổng phía client; cảnh báo traffic không phải HTTP trên cùng domain | F2.2.8, F2.2.9, F2.2.10 | MVP | UI đề xuất CNAME hoặc ALIAS trước |
+| FR-2-34 | Edge phải chuyển challenge ACME của origin về origin theo mặc định; khi kiểm thử phải tự phát hiện vòng chuyển hướng, origin chặn IP edge và nội dung hỗn hợp | F2.3.7, F2.6.4 | MVP |  |
+| FR-2-35 | Hệ thống không được cho hoàn tất onboarding khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin (BR-52) | F2.7.7 | MVP | Cảnh báo đỏ ở mọi bước |
+| FR-2-36 | Zone đã gỡ mà DNS còn trỏ phải được chuyển tiếp không bảo vệ 30 ngày rồi trả trang giải thích (BR-55); chuyển zone giữa org cần owner hai org xác nhận (BR-57); phải phát hiện domain hết hạn hoặc đổi chủ | F2.7.8, F2.1.12, F2.1.13 | MVP |  |
 
 ### F3 Bảo vệ runtime và F4 Hiệu năng
 
@@ -131,11 +143,15 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-3-17 | Edge nên có hành động tarpit có trần theo node | F3.8.5 | MR | Vượt trần, request tarpit mới chuyển thành block, không tăng số kết nối giữ |
 | FR-3-18 | Edge nên có SSL passthrough theo SNI cho hostname Enterprise chọn: không giải mã, chỉ định tuyến và chống DDoS L3/L4; UI ghi rõ hostname đó không được kiểm | F3.1.5 | MR | Hostname passthrough không có event WAF, bot, cache nào |
 | FR-3-19 | Edge phải chạy pipeline theo thứ tự [BR-32](#4-quy-tắc-nghiệp-vụ) | F3 | MVP | Request bị chặn ở một bước không tốn CPU của các bước sau |
+| FR-3-20 | Khi bật bot management, hệ thống phải hỏi về crawler AI và cung cấp 4 preset ngành; không challenge tương tác trên request không phải điều hướng trang (BR-46) | F3.6.4, F3.6.5 | MVP | Preset báo chí chặn crawler huấn luyện |
+| FR-3-21 | API discovery chỉ lưu cấu trúc, endpoint mới chờ khách xác nhận (BR-60); chặn theo schema theo từng endpoint sau log-only tối thiểu 7 ngày (BR-61); consumer nhận diện theo API key, JWT, rồi IP | F3.7.5, F3.7.6, F3.7.7 | MVP |  |
 | FR-4-01 | Edge phải cache theo Cache-Control và cache rule của khách, phục vụ bản cũ khi origin lỗi | F4.1.1, F4.1.2, F3.9.3 | MVP | |
 | FR-4-02 | Người dùng phải purge toàn zone, theo URL, theo prefix trong hạn mức gói | F4.2.1 | MVP | QS-15 |
 | FR-4-03 | DNS điều hướng phải trả IP PoP khoẻ, gần client | F4.3.1 | MVP | QS-16 |
 | FR-4-04 | Khách nên dùng được DNS authoritative với bản ghi proxied, DNSSEC | F4.3.2 | MR | |
 | FR-4-05 | Khách gói Business, Enterprise nên cấu hình nhóm origin active-passive, round-robin hoặc theo trọng số, health check chủ động và thụ động; origin chính lỗi liên tiếp trong cửa sổ cấu hình thì edge chuyển sang origin dự phòng và báo khách | F4.4.1 | MR | Request không idempotent (POST, PATCH...) không bao giờ được gửi lại sang origin khác |
+| FR-4-06 | Hệ thống phải có công tắc "chỉ WAF, không cache"; luật an toàn cache luôn áp và chỉ ghi đè được có xác nhận và audit (BR-47); cache key bỏ tham số marketing; nén gzip và brotli | F4.1.4, F4.1.5, F4.1.6, F4.1.7 | MVP |  |
+| FR-4-07 | Xoá cache toàn zone phải xác nhận lại và hiện ước lượng tải dồn về origin | F4.2.3 | MVP | Gói thấp có giới hạn tần suất |
 
 ### F5 Vòng đời policy
 
@@ -165,6 +181,8 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-5-22 | Cấu hình có ba tầng: system, global, website ([3.14](03-business-analysis/14-config-tiers-attack-history-thresholds.md)); tầng trên ghi đè tầng dưới ([BR-37](#4-quy-tắc-nghiệp-vụ)) | F5.7.1–F5.7.4 | MVP (system, website); MR (global) | Khách xem được rule nào áp lên website của mình và từ tầng nào |
 | FR-5-23 | Số rule và tập rule tầng website bị giới hạn theo gói | F5.7.3 | MVP | Vượt trần thì từ chối khi lưu, nêu rõ trần của gói |
 | FR-5-24 | NCC phải tạo được tập rule custom ở tầng global và gán cho domain, cluster hoặc node; phát qua đường thường có canary | F5.7.2 | MR | Tập rule gán cho một domain chỉ ảnh hưởng domain đó |
+| FR-5-25 | Hệ thống phải cho org một người tự xác nhận diff rồi tự phát hành; 4-eyes chỉ bật khi có từ hai người duyệt (BR-40); phát hành theo đợt, bỏ qua và báo zone biên dịch lỗi; support của NCC sửa policy theo BR-41 | F5.3.6, F5.3.7, F5.3.8 | MVP |  |
+| FR-5-26 | Rollback về version đã được duyệt không cần duyệt lại; rule mới của release NCC vào log-only 7 ngày rồi tự chặn (BR-54), Enterprise ghim version tối đa 90 ngày | F5.4.4, F5.5.4 | MVP |  |
 
 ### F6 Phân phối cấu hình và F11 Threat intelligence
 
@@ -188,7 +206,7 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-7-01 | Analytics phải nhận đủ security event, access log lấy mẫu theo gói, và đối soát số bản ghi | F7.1.1, F7.1.2, F7.1.4 | MVP | QS-10 |
 | FR-7-02 | Portal phải hiện luồng security event trực tiếp của zone đang xem | F7.2.1 | MVP | QS-37, QS-38 |
 | FR-7-03 | Người dùng phải tra một request ID và thấy rule, bước pipeline, policy version, người duyệt | F7.3.1 | MVP | QS-11, QS-12 |
-| FR-7-04 | Người dùng phải lọc, nhóm event theo trường và thời gian trong retention của gói | F7.3.2 | MVP | Truy vấn 24 giờ của một zone ≤ 3 s p95 ([OQ-9](#9-câu-hỏi-mở-cho-review)) |
+| FR-7-04 | Người dùng phải lọc, nhóm event theo trường và thời gian trong retention của gói | F7.3.2 | MVP | Truy vấn 24 giờ của một zone ≤ 3 s p95, 30 ngày ≤ 30 s p95 ([OQ-9](#9-câu-hỏi-mở-cho-review)) |
 | FR-7-05 | Người dùng phải lưu truy vấn và chia sẻ trong account | F7.3.3 | MVP | |
 | FR-7-06 | Portal phải có dashboard traffic, bảo mật, cache, origin, hiệu quả rule | F7.4.1, F7.4.2 | MVP | |
 | FR-7-07 | Người dùng phải đánh dấu event là chặn nhầm, thấy tỉ lệ chặn nhầm theo rule, và tạo nháp exception từ event | F7.5.1–F7.5.3 | MVP | Exception nháp điền sẵn rule, đường dẫn, trường |
@@ -215,6 +233,8 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-8-09 | Thông báo nên kèm link xử lý một bấm tới mitigation đề xuất theo [BR-30](#4-quy-tắc-nghiệp-vụ) | F8.3.3 | MR | Mở link bằng trình quét link (không đăng nhập) không thay đổi gì |
 | FR-8-10 | Mỗi loại tấn công (DDoS L7, vuln-scan và các loại khác) phải có ngưỡng mặc định ở ba mức low, medium, high; khách chỉnh ở tầng zone; chạm ngưỡng mới lên cảnh báo | F8.2.5 | MVP | Zone không chỉnh gì vẫn nhận cảnh báo theo mặc định |
 | FR-8-11 | Nội dung thông báo dùng template có biến, có mẫu mặc định, khách tuỳ chỉnh được | F8.2.6 | MVP | Xem trước được trước khi lưu |
+| FR-8-12 | NCC phải phân loại tấn công (zone hay nền tảng), bật mitigation không cần hỏi, chuyển zone sang cell cách ly khi vượt khả năng và không bao giờ trả DNS về origin (BR-42); phải có báo cáo sau sự cố | F8.4.5, F8.4.6 | MVP | Báo khách mỗi bước |
+| FR-8-13 | Trang chặn phải có nút "báo chặn nhầm" từ gói Pro, vào hộp thư zone, có giới hạn tần suất và challenge chống spam | F8.4.7 | MVP | Chỉ kèm request ID và mô tả ngắn |
 
 ### F9 Báo cáo và tuân thủ
 
@@ -234,7 +254,7 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-10-01 | NCC phải định nghĩa gói, giá (VND, USD), hạn mức, đơn giá vượt, entitlements; thay đổi gói tạo version mới, subscription cũ giữ version cũ tới khi gia hạn | F10.1.1 | MVP | Hoá đơn của kỳ luôn tính theo version gói của kỳ đó |
 | FR-10-02 | Sales phải tạo gói riêng cho một hợp đồng Enterprise | F10.1.2 | MVP | Gói riêng không hiện cho tenant khác |
 | FR-10-03 | Khách phải dùng thử 14 ngày tính năng Business trên một zone có trần ([BR-8](#4-quy-tắc-nghiệp-vụ)) | F10.2.1 | MVP | |
-| FR-10-04 | Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay, hạ có hiệu lực cuối kỳ ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.2.2 | MVP | QS-14, QS-34 |
+| FR-10-04 | Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay và tính phần còn lại của gói cũ vào gói mới kèm bonus ([OQ-56](03-business-analysis/05-plans-billing.md), bonus 10% giá trị còn lại của gói cũ, tối đa một tháng phí chênh), hạ có hiệu lực cuối kỳ ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.2.2 | MVP | QS-14, QS-34 |
 | FR-10-05 | Quá hạn thanh toán phải chuyển zone sang chuyển tiếp tối giản 30 ngày rồi tạm dừng ([BR-9](#4-quy-tắc-nghiệp-vụ)) | F10.2.3 | MVP | Có thông báo ở mỗi bước |
 | FR-10-06 | Management phải tính entitlements của zone từ gói, add-on, hợp đồng và phát sang Control khi đổi | F10.3.1, F10.3.2 | MVP | QS-14 |
 | FR-10-07 | Management phải từ chối tạo đối tượng vượt giới hạn gói (số rule, đích export, kênh…) | F10.3.3 | MVP | Lỗi nêu giới hạn và gói cần nâng |
@@ -245,6 +265,9 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-10-12 | Hệ thống phải thu tiền qua cổng thanh toán; chỉ lưu token của cổng | F10.6.2 | MVP | Không có số thẻ trong hệ thống (ngoài phạm vi PCI DSS SAQ D) |
 | FR-10-13 | NCC nên điều chỉnh, hoàn tiền, ghi có | F10.6.4 | MR | Mọi điều chỉnh có audit và lý do |
 | FR-10-14 | Khách phải đặt được trần chi tiêu; cách xử lý phần dùng vượt quota (trừ sau bao nhiêu, trừ vào đâu) chờ phân tích ([3.5](03-business-analysis/05-plans-billing.md#3-đã-quyết)) | F10.5.3 | MVP | |
+| FR-10-15 | Nâng gói phải có hiệu lực ngay và tính phần còn lại cộng bonus; hạ gói cuối kỳ với ân hạn 3 ngày và báo trước 7 ngày khi áp retention mới (BR-49, BR-50) | F10.2.4, F10.2.5 | MVP | Bonus 10%, tối đa một tháng phí chênh |
+| FR-10-16 | Hệ thống phải có gói nhóm nhiều site nhỏ, trả sau theo hợp đồng, thanh toán thẻ, VietQR, hoá đơn; huỷ theo BR-51 | F10.2.6, F10.2.7, F10.2.8, F10.2.9 | MVP |  |
+| FR-10-17 | Hợp đồng Enterprise kết thúc phải có 30 ngày chuyển tiếp rồi chuyển gói tự phục vụ hoặc xử lý như zone bỏ hoang | F10.2.10 | MVP |  |
 
 ### F12 Vận hành NCC
 
@@ -257,6 +280,8 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-12-05 | NCC phải quản lý danh mục gói, đối tác hạ tầng, PoP | F12.4.2 | MVP | |
 | FR-12-06 | NCC phải bật được mitigation (Under Attack mode, rule tạm) trên zone của khách từ portal vận hành của NCC; khách tự bật trên portal của khách; mọi lần NCC bật hiện cho khách và có audit ([3.3](03-business-analysis/03-attack-response.md#3-đã-quyết)) | F12.4.3 | MVP | |
 | FR-12-07 | Support NCC phải đặt được log-only có hạn cho một rule khẩn của NCC trên đúng một zone bị chặn nhầm, có audit; khách không tự tắt được rule khẩn ([BR-33](#4-quy-tắc-nghiệp-vụ)) | F12.4.4 | MVP | Hết hạn thì rule khẩn tự chặn lại trên zone đó |
+| FR-12-08 | NCC phải có quy trình abuse (đầu mối, xác minh 24 giờ, khoá zone khi phishing, mã độc đã xác minh) và ghi sổ yêu cầu của cơ quan chức năng | F12.1.3 | MVP | Cần tư vấn pháp lý trước khi bán |
+| FR-12-09 | NCC phải có support theo gói, trang trạng thái công khai, hotline khẩn khi portal sập, rule khẩn CVE trong 24 giờ, POC Enterprise 30 ngày, on-prem do khách vận hành; thông báo đóng PoP, region trước 90 ngày (Enterprise 180 ngày) (BR-58) | F12.1.4, F12.1.5, F12.1.6, F12.1.7 | MVP |  |
 
 ## 4. Quy tắc nghiệp vụ
 
@@ -272,7 +297,7 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | BR-8 | Mỗi org dùng thử một lần; định danh dùng thử gồm org, domain email của owner, phương thức thanh toán, domain zone | F10.2.1 |
 | BR-9 | Không cắt traffic đột ngột: hết dùng thử, quá hạn, bị khoá đều qua chuyển tiếp tối giản 30 ngày rồi mới tạm dừng | F10.2.3, F12.4.1 |
 | BR-10 | Gói trả phí không bị cắt traffic vì vượt hạn mức, chỉ tính phí vượt. Gói có trần bị áp trần | F10.5 |
-| BR-11 | Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói khi đang vượt giới hạn mới thì bị từ chối tới khi giảm bớt ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.3.3 |
+| BR-11 | Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói có hiệu lực cuối kỳ; nếu khi đó khách vượt giới hạn mới thì được cảnh báo sau 6 giờ, 12 giờ rồi mỗi ngày trong 3 ngày ân hạn, hết hạn thì chặn phần vượt (không cho tạo thêm vượt giới hạn, phần vượt mới nhất trước ngừng áp, không khoá tài khoản) ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.3.3 |
 | BR-12 | Audit không xoá, không sửa. Dữ liệu cá nhân trong audit xử lý theo [OQ-6](#9-câu-hỏi-mở-cho-review) | F1.5, F9.3.2 |
 | BR-13 | Org luôn có ít nhất một owner; không gỡ hay hạ quyền được owner cuối cùng | F1.2.4 |
 | BR-14 | Secret của API key chỉ hiện lúc tạo; hệ thống chỉ lưu hash và tiền tố để nhận diện | F1.4.1 |
@@ -297,9 +322,32 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | BR-33 | Xung đột rule: (1) trong một chặng, rule chạy theo priority từ trên xuống, gặp hành động kết thúc (block, challenge, allow, trust) đầu tiên thì dừng chặng đó; `log` không dừng; (2) trong access list, mục cụ thể hơn thắng: IP > CIDR > ASN > quốc gia; (3) giữa NCC và khách: block của NCC (lớp rule khẩn) > allow của khách > block của khách > allow của NCC. Khách không tự tắt được rule khẩn; support đặt log-only có hạn cho đúng một zone (FR-12-07) | F3.5, F3.8, F12.4.4 |
 | BR-34 | Hành động mặc định theo bot score (1–99, thấp là bot) và nhóm path: path thường: dưới 10 challenge, 10 đến dưới 50 log, từ 50 allow; path nhạy cảm (login, checkout): dưới 10 block, 10 đến dưới 50 challenge tương tác, từ 50 allow; path API: không challenge, dùng rate limit theo consumer. Mặc định dùng managed challenge (edge tự chọn JS hay tương tác theo điểm). Khách sửa được mọi mốc | F3.6.2 |
 | BR-35 | Endpoint API có schema: kiểm schema chạy trước managed ruleset trong tầng WAF, request sai schema bị loại không quét signature; endpoint đang enforce schema được giảm paranoia CRS để giảm chặn nhầm | F3.7.1 |
-| BR-36 | Log-only không bao giờ tự chuyển sang chặn: sau thời gian quan sát (mặc định 7 ngày, BR-24) hệ thống gửi báo cáo số request sẽ bị chặn và rule nghi chặn nhầm; người dùng bấm chuyển, bước chuyển đi qua change request | F5.1.6 |
+| BR-36 | Log-only do khách hoặc onboarding đặt không bao giờ tự chuyển sang chặn (ngoại lệ có chủ đích: rule mới của release NCC, xem [BR-54](#4-quy-tắc-nghiệp-vụ)): sau thời gian quan sát (mặc định 7 ngày, BR-24) hệ thống gửi báo cáo số request sẽ bị chặn và rule nghi chặn nhầm; người dùng bấm chuyển, bước chuyển đi qua change request | F5.1.6 |
 | BR-37 | Giữa các tầng cấu hình: tầng trên ghi đè tầng dưới (system trên global trên website). Whitelist ưu tiên trong các cặp whitelist, blacklist cùng tầng; whitelist của website không thắng tầng trên và không bỏ qua WAF, rate limit, DDoS ([BR-28](#4-quy-tắc-nghiệp-vụ)); rule khẩn của NCC không bị whitelist nào đè ([BR-33](#4-quy-tắc-nghiệp-vụ)); whitelist của global thắng blacklist của website và CRS ([OQ-163](03-business-analysis/14-config-tiers-attack-history-thresholds.md#4-đã-chốt-theo-đề-xuất-của-claude)) | F5.7.4 |
 | BR-38 | Một đợt tấn công là một bản ghi, thuộc đúng một trong hai loại (DDoS L7, vuln-scan); chỉ mở đợt và gửi cảnh báo khi vượt ngưỡng đã cấu hình | F7.7.1 |
+| BR-39 | Thay đổi ảnh hưởng traffic (rule, origin, TLS, fail mode, cache rule) luôn qua change request; đổi tên, mô tả, tag không cần nhưng vẫn ghi audit; purge là lệnh, không qua change request | F5.3 |
+| BR-40 | 4-eyes chỉ bật được khi account có ít nhất hai người có quyền duyệt; khi bật, mọi change request cần duyệt, ngoại lệ duy nhất là rollback về version đã từng được duyệt | F5.3, F5.4 |
+| BR-41 | Support của NCC chỉ sửa policy khi khách đã cấp quyền (BR-20); thay đổi là change request đứng tên support, cần một người của khách duyệt; mitigation khi bị tấn công thì NCC bật không cần duyệt | F5.3, F8.4 |
+| BR-42 | Không bao giờ trả DNS về origin khi zone bị tấn công vượt khả năng; đi theo cell cách ly, rồi challenge mọi request và trần rps cứng | F8.4 |
+| BR-43 | Gói có trần cứng: traffic gắn cờ "nghi tấn công" trong sự cố không tính vào trần; khách gửi yêu cầu hoàn tiền trong 30 ngày, phần được xác nhận là tấn công thì ghi có | F10.5 |
+| BR-44 | Dữ liệu request luôn che mật khẩu, header Authorization, cookie phiên, token, số thẻ; khách thêm được trường cần che; xem dữ liệu request cần quyền riêng | F1.2 |
+| BR-45 | Nhãn chặn nhầm dùng chéo tenant chỉ ở dạng thống kê gộp (rule ID, đặc điểm request đã bỏ payload), ghi trong điều khoản; Enterprise được chọn không tham gia | F8.4 |
+| BR-46 | Không challenge tương tác trên request không phải điều hướng trang; trả 403 hoặc 429 có mã lỗi JSON và header gợi ý | F3.6 |
+| BR-47 | Response có Set-Cookie hoặc request có Authorization không bao giờ được lưu cache; khách chỉ ghi đè theo từng path, phải xác nhận cảnh báo và có audit | F4.1 |
+| BR-48 | Tối đa hai owner được miễn SSO; khôi phục owner duy nhất cần hai bằng chứng trong ba và chờ 72 giờ, báo mọi admin còn lại | F1.2, F1.3 |
+| BR-49 | Nâng gói có hiệu lực ngay; hạ gói có hiệu lực cuối kỳ; vượt giới hạn gói mới thì cảnh báo sau 6 giờ, 12 giờ, mỗi ngày trong 3 ngày ân hạn, rồi chặn phần vượt | F10.2 |
+| BR-50 | Khi hạ gói, log ngoài retention mới chỉ bị áp retention sau khi báo trước 7 ngày; khách xuất trước nếu muốn giữ | F10.2 |
+| BR-51 | Huỷ gói tháng không hoàn; gói năm hoàn theo tháng chưa dùng, trừ phần chiết khấu năm; không có gói tạm ngừng (dùng tạm dừng zone và hạ gói) | F10.2 |
+| BR-52 | Onboarding không hoàn tất khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin | F2.7 |
+| BR-53 | Zone chỉ gồm một hostname không giữ claim của apex; chủ apex vẫn onboard được phần còn lại | F2.1 |
+| BR-54 | Rule mới của một release NCC vào zone ở log-only 7 ngày có báo cáo rồi tự chặn (ngoại lệ có chủ đích của BR-36, vì rule do NCC phát hành); Business trở lên chọn duyệt thủ công; rule khẩn cho CVE áp ngay ở chế độ chặn | F5.5 |
+| BR-55 | Zone đã gỡ mà DNS còn trỏ về edge: chuyển tiếp không bảo vệ, không cache 30 ngày, nhắc hằng tuần, rồi trả trang giải thích; không bao giờ lỗi im lặng | F2.7 |
+| BR-56 | Giữ dữ liệu: huỷ xoá org trong 30 ngày (chỉ owner), khôi phục zone gỡ nhầm trong 30 ngày (cấu hình, không log), bản sao lưu giữ tối đa 35 ngày | F1.1 |
+| BR-57 | Chuyển zone giữa org cần owner của cả hai org xác nhận; policy đi theo, log, audit, hoá đơn ở lại org cũ; bí mật bị xoá và phải tạo lại | F2.1 |
+| BR-58 | NCC báo trước tối thiểu 90 ngày (Enterprise 180 ngày) khi đóng PoP hoặc rút region, kèm dải IP mới | F12.1 |
+| BR-59 | NCC là bên xử lý dữ liệu log, khách là bên kiểm soát: yêu cầu của người dùng cuối chuyển cho khách trong 72 giờ; IP nằm trong nhiều tenant thì xoá theo từng tenant yêu cầu | F9 |
+| BR-60 | API discovery mặc định chỉ lưu cấu trúc (tên field, kiểu, độ dài), không lưu mẫu request, response; lưu mẫu thật chỉ khi khách bật theo endpoint, che theo BR-44, giữ 7 ngày; endpoint phát hiện mới chờ khách xác nhận | F3.7 |
+| BR-61 | Chặn theo schema: log-only tối thiểu 7 ngày, áp theo từng endpoint không cả API; cho phép nhiều version schema song song | F3.7 |
 
 ## 5. Yêu cầu dữ liệu
 
@@ -377,21 +425,21 @@ Phân rã theo plane, thành phần và các liên kết `LK-…` giữa plane �
 
 ## 9. Câu hỏi mở cho review
 
-| ID | Câu hỏi | Đề xuất hiện tại | Ảnh hưởng |
+| ID | Câu hỏi | Quyết định (2026-11-17) | Ảnh hưởng |
 |---|---|---|---|
-| OQ-1 | Phân cấp org → account → zone có đủ không, hay cần thêm cấp (đơn vị, dự án) cho khách lớn? | Đủ cho MVP; nhóm zone thay cho cấp thứ tư | DT-1, quyền |
-| OQ-2 | Tenant B muốn bảo vệ `shop.example.com` khi tenant A giữ `example.com`: từ chối, hay cho phép khi A đồng ý? | Từ chối ở MVP | BR-1, DT-2 |
-| OQ-3 | Mất bản ghi xác minh thì làm gì, sau bao lâu? | Cảnh báo ở ngày 7, tạm dừng ở ngày 14 | FR-2-02 |
-| OQ-4 | Hết 7 ngày log-only: tự chuyển sang chặn, hay chờ khách bấm? | Chờ khách bấm, nhắc mỗi tuần | FR-2-11 |
-| OQ-5 | Hạn tối đa của rule tạm qua kênh khẩn | 72 giờ | BR-6 |
-| OQ-6 | Xoá org và xoá dữ liệu cá nhân khi audit không được xoá: ẩn danh danh tính trong audit, hay giữ nguyên vì nghĩa vụ pháp lý? Thời hạn giữ sau khi xoá org? | Ẩn danh trường danh tính (thay bằng mã), giữ bản ghi; giữ 30 ngày sau yêu cầu xoá org | BR-12, FR-1-03, FR-9-05, DT-7 |
-| OQ-7 | Giữ bao nhiêu PolicyVersion mỗi zone? | Tất cả trong 13 tháng, sau đó 50 bản gần nhất + bản đang chạy | DT-5, dung lượng |
-| OQ-8 | Sai lệch cho phép của rate limit toàn fleet | ≤ 10% | FR-3-06 |
-| OQ-9 | Mục tiêu độ trễ truy vấn event cho khoảng dài (30 ngày, 365 ngày) | 24 giờ ≤ 3 s; 30 ngày ≤ 15 s | FR-7-04 |
-| OQ-10 | Hạ gói: hiệu lực ngay hay cuối kỳ; xử lý phần vượt giới hạn gói mới thế nào? | Cuối kỳ; chặn hạ gói tới khi khách giảm bớt | FR-10-04, BR-11 |
-| OQ-11 | WCAG có bắt buộc cho khách khu vực công không? | AA cho luồng chính | NFR-11 |
-| OQ-12 | Cổng thanh toán cụ thể và tính phí theo kỳ trả trước hay trả sau? | Phí nền trả trước, phí vượt trả sau | IR-2, FR-10-11 |
-| OQ-13 | Developer có được tạo exception không cần duyệt trong zone được giao không? | Không, luôn qua change request | FR-1-06, F5.1.4 |
-| OQ-14 | Billing theo account hay theo org (một hoá đơn cho cả org)? | Theo account, gộp được ở cấp org | DT-8 |
-| OQ-15 | Chốt các hợp đồng tạm ở [5.5](../architecture/05-building-blocks/05-contracts.md#hợp-đồng-bổ-sung-tạm-2026-11-06) (purge, kết quả biên dịch, rollout, cert, kiểm zone, kiểm origin, `PopState`, `PermissionsChanged`, cấu hình alert/export, nhãn chặn nhầm, replay, xoá dữ liệu, cách ly, reputation) | Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3 | 5.5, outbox của Management |
-| OQ-16…OQ-165 | OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ ([§3](03-business-analysis/00-index.md)); OQ-127…OQ-142 về định hướng sản phẩm ([§4](04-product-direction/00-index.md)) | Một số đã quyết hoặc có đề xuất chờ duyệt | Theo trang |
+| OQ-1 | Phân cấp org → account → zone có đủ không, hay cần thêm cấp (đơn vị, dự án) cho khách lớn? | **Hoãn**; đề xuất để lại: Đủ cho MVP; nhóm zone thay cho cấp thứ tư | DT-1, quyền |
+| OQ-2 | Tenant B muốn bảo vệ `shop.example.com` khi tenant A giữ `example.com`: từ chối, hay cho phép khi A đồng ý? | **Duyệt.** Từ chối ở MVP | BR-1, DT-2 |
+| OQ-3 | Mất bản ghi xác minh thì làm gì, sau bao lâu? | **Duyệt.** Cảnh báo ở ngày 7, tạm dừng ở ngày 14 | FR-2-02 |
+| OQ-4 | Hết 7 ngày log-only: tự chuyển sang chặn, hay chờ khách bấm? | **Duyệt.** Chờ khách bấm, nhắc mỗi tuần | FR-2-11 |
+| OQ-5 | Hạn tối đa của rule tạm qua kênh khẩn | **Duyệt.** 72 giờ | BR-6 |
+| OQ-6 | Xoá org và xoá dữ liệu cá nhân khi audit không được xoá: ẩn danh danh tính trong audit, hay giữ nguyên vì nghĩa vụ pháp lý? Thời hạn giữ sau khi xoá org? | **Duyệt.** Ẩn danh trường danh tính (thay bằng mã), giữ bản ghi; giữ 30 ngày sau yêu cầu xoá org | BR-12, FR-1-03, FR-9-05, DT-7 |
+| OQ-7 | Giữ bao nhiêu PolicyVersion mỗi zone? | **Duyệt.** Tất cả trong 13 tháng, sau đó 50 bản gần nhất + bản đang chạy | DT-5, dung lượng |
+| OQ-8 | Sai lệch cho phép của rate limit toàn fleet | **Duyệt.** ≤ 10% | FR-3-06 |
+| OQ-9 | Mục tiêu độ trễ truy vấn event cho khoảng dài (30 ngày, 365 ngày) | **Sửa.** 24 giờ ≤ 3 s; 30 ngày ≤ 30 s | FR-7-04 |
+| OQ-10 | Hạ gói: hiệu lực ngay hay cuối kỳ; xử lý phần vượt giới hạn gói mới thế nào? | **Sửa.** Cuối kỳ; cảnh báo vượt giới hạn mới sau 6 giờ, 12 giờ, 1 ngày cho tới hết 3 ngày; khách được quá hạn tối đa 3 ngày, sau đó chặn phần vượt | FR-10-04, BR-11 |
+| OQ-11 | WCAG có bắt buộc cho khách khu vực công không? | **Duyệt.** AA cho luồng chính | NFR-11 |
+| OQ-12 | Cổng thanh toán cụ thể và tính phí theo kỳ trả trước hay trả sau? | **Duyệt.** Phí nền trả trước, phí vượt trả sau | IR-2, FR-10-11 |
+| OQ-13 | Developer có được tạo exception không cần duyệt trong zone được giao không? | **Duyệt.** Không, luôn qua change request | FR-1-06, F5.1.4 |
+| OQ-14 | Billing theo account hay theo org (một hoá đơn cho cả org)? | **Duyệt.** Theo account, gộp được ở cấp org | DT-8 |
+| OQ-15 | Chốt các hợp đồng tạm ở [5.5](../architecture/05-building-blocks/05-contracts.md#hợp-đồng-bổ-sung-tạm-2026-11-06) (purge, kết quả biên dịch, rollout, cert, kiểm zone, kiểm origin, `PopState`, `PermissionsChanged`, cấu hình alert/export, nhãn chặn nhầm, replay, xoá dữ liệu, cách ly, reputation) | **Duyệt.** Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3 | 5.5, outbox của Management |
+| OQ-16…OQ-165 | OQ-16…OQ-20 thuộc bản nháp onboarding cũ (OQ-17…OQ-20 duyệt 2026-11-17); OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ ([§3](03-business-analysis/00-index.md)); OQ-127…OQ-142 về định hướng sản phẩm ([§4](04-product-direction/00-index.md)) | Một số đã quyết hoặc có đề xuất chờ duyệt | Theo trang |
