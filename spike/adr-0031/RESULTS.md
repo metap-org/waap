@@ -29,4 +29,4 @@ Kết luận tạm về tiêu chí "ít reload": cả hai đều **không rớt 
 
 Xem bảng đầy đủ và nhận định ở ADR-0031 §7.1. Mã thêm vào spike: LB + health check + retry, cache + PURGE (`pingora-cache`, `MemCache`), HTTP/2, đọc `:authority`.
 
-Cảnh báo khi đọc số: flood và RAM kết nối cho thấy Pingora bản spike kém NGINX; chưa profile nên không kết luận do thiết kế hay do mã spike. NGINX OSS thiếu purge và health check chủ động; Pingora thiếu HTTP/3 và tầng cache đĩa.
+Đính chính: số flood ban đầu của Pingora sai do mã spike dùng `respond_error` (đóng kết nối); sau khi sửa, Pingora ~1,5 lần CPU của NGINX ở pre-filter. RAM kết nối rảnh của Pingora (31 KB; 20 KB với jemalloc) cao hơn nhiều so với NGINX (0,5 KB), chưa giải thích được. NGINX OSS thiếu purge và health check chủ động; Pingora thiếu HTTP/3 và tầng cache đĩa.

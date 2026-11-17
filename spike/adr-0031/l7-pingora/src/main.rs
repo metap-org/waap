@@ -25,6 +25,9 @@ use pingora::tls::x509::X509;
 use serde::Deserialize;
 use tonic::transport::{Channel, Endpoint};
 
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 pub mod pb {
     tonic::include_proto!("inspect.v1");
 }
@@ -122,6 +125,17 @@ struct Ctx {
     tries: u32,
 }
 
+/// Short internally generated answer that keeps the client connection alive.
+/// `Session::respond_error` closes the downstream connection on purpose (pingora-core's own TODO),
+/// which turns every blocked request into a new TCP accept under flood.
+async fn deny(session: &mut Session, code: u16) -> Result<()> {
+    let mut resp = ResponseHeader::build(code, Some(2))?;
+    resp.insert_header("content-length", "0")?;
+    session.write_response_header(Box::new(resp), true).await?;
+    session.finish_body().await?;
+    Ok(())
+}
+
 const MAX_BODY: usize = 64 * 1024;
 static CACHE: LazyLock<MemCache> = LazyLock::new(MemCache::new);
 
@@ -195,7 +209,7 @@ impl ProxyHttp for L7 {
         let zone = match snap.zones.get(&host) {
             Some(z) => z.clone(),
             None => {
-                session.respond_error(404).await?;
+                deny(session, 404).await?;
                 return Ok(true);
             }
         };
@@ -203,7 +217,7 @@ impl ProxyHttp for L7 {
         let ip_only = client_ip.rsplit_once(':').map(|(a, _)| a.to_string()).unwrap_or(client_ip.clone());
         // pre-filter: ACL
         if zone.cfg.acl_deny.iter().any(|d| *d == ip_only) {
-            session.respond_error(403).await?;
+            deny(session, 403).await?;
             return Ok(true);
         }
         // pre-filter: per-second rate limit (fixed window)
@@ -213,7 +227,7 @@ impl ProxyHttp for L7 {
                 zone.hits.store(0, Ordering::Relaxed);
             }
             if zone.hits.fetch_add(1, Ordering::Relaxed) >= zone.cfg.rps {
-                session.respond_error(429).await?;
+                deny(session, 429).await?;
                 return Ok(true);
             }
         }
@@ -236,12 +250,12 @@ impl ProxyHttp for L7 {
             let req = session.req_header().clone();
             match self.inspect(&zone, &req, &ip_only, snap.version, &[]).await {
                 Ok(Some(st)) => {
-                    session.respond_error(st).await?;
+                    deny(session, st).await?;
                     return Ok(true);
                 }
                 Ok(None) => {}
                 Err(()) if !zone.cfg.fail_open => {
-                    session.respond_error(503).await?;
+                    deny(session, 503).await?;
                     return Ok(true);
                 }
                 Err(()) => {}

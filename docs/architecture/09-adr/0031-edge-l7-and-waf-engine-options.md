@@ -197,17 +197,16 @@ Cả hai không rớt request ở quy mô thử. Khác biệt là **chi phí**: 
 
 | Phép đo | Pingora | NGINX |
 |---|---|---|
-| Chặn ở pre-filter (403), 20.000 rps | 0,45 ms CPU/request, p99 26 ms | 0,18 ms CPU/request, p99 5,7 ms |
-| Chặn ở pre-filter, tải 40.000 rps | bão hòa ~32.000 rps, p50 1,5 s | giữ 40.000 rps, p99 34 ms |
-| RAM cho 10.000 kết nối rảnh | +303 MB (31 KB/kết nối) | +5 MB (0,5 KB/kết nối, sau khi tăng `worker_connections`) |
+| Chặn ở pre-filter (403, keep-alive), 20.000 / 40.000 / 60.000 rps | giữ đủ tải, 0,028 / 0,021 / 0,017 ms CPU/request | giữ đủ tải, 0,017 / 0,013 / 0,011 ms CPU/request |
+| RAM cho 10.000 kết nối rảnh | +303 MB (31 KB/kết nối); với jemalloc +194 MB (20 KB/kết nối) | +5 MB (0,5 KB/kết nối, sau khi tăng `worker_connections`) |
 
-Lần đo RAM NGINX đầu tiên cho +0 MB là sai (cấu hình `worker_connections` chỉ cho ~8.000 kết nối); số trong bảng là lần chạy lại. Hai kết quả này **ngược kỳ vọng** của §6.1 về RAM/hiệu năng: Pingora bản spike kém NGINX rõ rệt trên đường chặn đơn giản và tốn RAM mỗi kết nối. Chưa biết bao nhiêu do mã spike (mỗi request cấp phát, `respond_error`) và bao nhiêu do thiết kế; cần profile trước khi kết luận.
+**Đính chính:** lần đo đầu cho Pingora 0,45 ms CPU/request và bão hòa ~32.000 rps **là lỗi của mã spike**, không phải giới hạn của Pingora: `Session::respond_error` luôn đóng kết nối downstream (có ghi chú trong source pingora-core), nên mỗi 403 buộc client mở kết nối TCP mới. Sau khi trả lời bằng `write_response_header` giữ keep-alive, chi phí giảm 15–30 lần và Pingora chênh NGINX khoảng 1,5 lần. Phần chênh còn lại có thể do mã spike (cấp phát chuỗi mỗi request, ACL quét tuyến tính); chưa profile. Lần đo RAM NGINX đầu cho +0 MB cũng sai (cấu hình `worker_connections` chỉ cho ~8.000 kết nối); số trong bảng là lần chạy lại. RAM mỗi kết nối rảnh của Pingora cao gấp 40 lần NGINX và **chưa giải thích được** (jemalloc giảm một phần); đo bằng RSS nên nhiễu giữa các lần chạy liên tiếp.
 
 **Đối chiếu điều kiện bỏ Pingora (§6.1):** cert theo SNI động, chọn upstream theo request và nâng binary không rớt kết nối đều làm được, nên điều kiện cứng thứ nhất **không kích hoạt**. Điều kiện thứ hai (công sức cache, purge, tầng đĩa) **có dấu hiệu kích hoạt**: LB/health check, cache đĩa, eviction và HTTP/3 đều phải tự viết hoặc chưa có.
 
 **Nhận định sơ bộ (chờ duyệt, chưa phải kết luận):**
 - Về T14, Pingora thắng ở chi phí đổi cấu hình nhưng NGINX **không rớt request** nên khoảng cách nhỏ hơn dự đoán.
-- Về tính năng và hiệu năng đường nhanh, NGINX hơn. Pingora đòi tự dev: LB/health check, cache đĩa + eviction + lock, HTTP/3 (hiện không có), và có thể cả tối ưu đường nhanh.
+- Về hiệu năng đường nhanh, khoảng cách nhỏ sau khi sửa lỗi spike (≈1,5 lần CPU ở pre-filter), nhưng RAM mỗi kết nối rảnh của Pingora cao hơn nhiều. Về tính năng, NGINX hơn: Pingora đòi tự dev LB/health check, cache đĩa + eviction + lock, HTTP/3 (hiện không có).
 - Nếu cache và HTTP/3 là yêu cầu bán hàng, nghiêng về **NGINX cho tầng cache/L7 phổ thông** và giữ hợp đồng I1 để sau này thay L7; Pingora hợp hơn nếu ưu tiên số một là policy agent trong binary và đổi nóng toàn bộ cấu hình zone.
 - Envoy **chưa được đo** trong spike này; mọi so sánh với Envoy trong ADR vẫn là suy luận.
 
