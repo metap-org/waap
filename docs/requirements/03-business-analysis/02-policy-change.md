@@ -208,6 +208,6 @@ flowchart TB
 **Mở ra cho bước 2 tiếp theo:** drift được phát hiện lúc nào và báo cho ai (KB2-G2); ai bật chế độ doanh nghiệp cho một account;
 phát hành theo phần trăm traffic (KB2-F5, để Nâng cao).
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F5 (change request, template, rollout) thêm
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F5 (change request, template, rollout) thêm
 "tự xác nhận diff" và "rollback về version đã duyệt"; BR mới: 4-eyes chỉ bật khi có ít nhất hai người duyệt, thay đổi
 ảnh hưởng traffic luôn qua change request; FR cho phát hành theo đợt và báo zone biên dịch lỗi.

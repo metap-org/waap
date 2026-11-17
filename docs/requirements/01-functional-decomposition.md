@@ -120,15 +120,20 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F1.2.4 | Gỡ thành viên, thu hồi mọi phiên và key của họ | M | MVP | **Member**, Session, **ApiKey** |
 | F1.2.5 | Đồng bộ user và nhóm từ IdP qua SCIM | M | MR | **Member**, **Group** |
 | F1.2.6 | Một người thuộc nhiều org, chuyển org trong portal ([3.6](03-business-analysis/06-members-access.md#3-đã-quyết)) | M | MVP | User, **Member** |
+| F1.2.7 | Khôi phục owner duy nhất: hai bằng chứng trong ba, chờ 72 giờ, báo mọi admin còn lại (OQ-64) | M | MVP | **OwnerRecovery**, **AuditEntry** |
+| F1.2.8 | Quyền riêng "xem dữ liệu request", mặc định chỉ security admin (OQ-50, OQ-68) | M | MVP | **Permission** |
 | **F1.3** | **Đăng nhập và SSO** | | | |
 | F1.3.1 | Đăng nhập email + mật khẩu, MFA (TOTP, WebAuthn) | M | MVP | User, **MfaFactor** |
 | F1.3.2 | Cấu hình SSO SAML/OIDC theo domain email | M | MVP | **SsoConnection**, **SsoDomain** |
 | F1.3.3 | Bắt buộc SSO, bắt buộc MFA theo org | M | MVP | **Org**.securitySettings |
 | F1.3.4 | Quản lý phiên: xem, đăng xuất từ xa, hết hạn | M | MVP | Session |
+| F1.3.5 | Tài khoản khẩn miễn SSO: tối đa hai owner, mật khẩu và khoá bảo mật phần cứng, báo mọi admin khi đăng nhập ([3.6](03-business-analysis/06-members-access.md) OQ-65) | M | MVP | **Org**.securitySetting |
+| F1.3.6 | Đăng nhập Google, Microsoft qua đường OIDC có sẵn (OQ-67) | M | MVP | SsoConnection (NCC) |
 | **F1.4** | **API key** | | | |
 | F1.4.1 | Tạo API key có phạm vi (quyền, zone) và ngày hết hạn | M | MVP | **ApiKey** |
 | F1.4.2 | Xoay, thu hồi API key; xem lần dùng cuối | M | MVP | **ApiKey**.lastUsedAt |
 | F1.4.3 | Service account cho CI/CD, Terraform | M | MVP | **ServiceAccount** |
+| F1.4.4 | API key: hạn không bắt buộc (gợi ý 90 ngày), org bật được bắt buộc hạn; tiền tố nhận diện; thu hồi tự động khi lộ công khai (OQ-66) | M | MVP | **ApiKey** |
 | **F1.5** | **Audit log** | | | |
 | F1.5.1 | Ghi mọi thay đổi: ai, cái gì, trước/sau, lúc nào, từ IP nào, qua UI hay API | M | MVP | **AuditEntry** |
 | F1.5.2 | Xem, lọc audit log theo người, đối tượng, thời gian | M | MVP | AuditEntry |
@@ -154,6 +159,9 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.1.6 | Gợi ý hostname từ DNS và Certificate Transparency | C | MR | DnsSnapshot |
 | F2.1.7 | Kiểm trạng thái trỏ DNS về edge từ nhiều resolver, theo hostname | C | MVP | **Hostname**.dnsRoutingStatus |
 | F2.1.8 | Huỷ claim chưa xác minh sau 14 ngày, giải phóng domain | M | MVP | **DomainClaim** |
+| F2.1.9 | Zone chỉ gồm một hostname khi khách chứng minh quyền với hostname đó; không giữ claim của apex ([3.1](03-business-analysis/01-onboarding.md) OQ-21) | M | MVP | **Zone**, **DomainClaim** |
+| F2.1.10 | Kiểm domain với danh sách đen đã biết lúc thêm zone (OQ-150) | M | MVP | **DomainDenylist** |
+| F2.1.11 | Xác minh dự phòng: TXT tên khác, file HTTP; không dùng email (OQ-147) | C | MVP | **DomainClaim** |
 | **F2.2** | **Hostname và origin** | | | |
 | F2.2.1 | Thêm, xoá hostname trong zone; wildcard | M | MVP | **Hostname**, **HostnameClaim** (toàn cục) |
 | F2.2.2 | Khai báo origin (IP, hostname, cổng, giao thức, SNI, header host) | M | MVP | **Origin** |
@@ -162,6 +170,9 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.2.5 | Chế độ đứng sau CDN của khách (tin IP và header client của CDN đó) | M | MVP | **ZoneSettings** |
 | F2.2.6 | Kiểm origin còn lộ: thử kết nối từ điểm không thuộc edge | C | MR | **OriginCheck** |
 | F2.2.7 | Nhập hàng loạt hostname, origin (CSV, API) | M | MR | **BulkOperation** |
+| F2.2.8 | Cấp dải IP dùng chung theo region, IPv4 và IPv6, cho khách trỏ A/AAAA; IP riêng theo zone cho Enterprise (OQ-22) | E | MVP | **EdgeAddressPool** |
+| F2.2.9 | Danh sách cổng phía client cho mọi gói; cổng tuỳ ý chỉ Enterprise có IP riêng (OQ-23) | E | MVP | — |
+| F2.2.10 | Cảnh báo traffic không phải HTTP trên cùng domain bằng DNS (MX, SRV, hostname khác cùng IP với apex) (OQ-24) | C | MVP | DnsSnapshot |
 | **F2.3** | **Chứng chỉ TLS** | | | |
 | F2.3.1 | Cấp cert tự động (ACME) cho hostname đã xác minh | C | MVP | **CertRequest**, Cert (khoá ở secret store) |
 | F2.3.2 | Gia hạn tự động, cảnh báo khi gia hạn lỗi | C | MVP | Cert |
@@ -169,6 +180,7 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.3.4 | Cấu hình TLS: phiên bản tối thiểu, cipher, HSTS, chế độ TLS tới origin | M | MVP | **ZoneSettings** |
 | F2.3.5 | Keyless (khoá ở hạ tầng khách) | E | NC | — |
 | F2.3.6 | Kiểm CAA trước khi xin cert, báo bản ghi cần thêm | C | MVP | DnsSnapshot |
+| F2.3.7 | Chuyển challenge ACME của origin (certbot) về origin theo mặc định (OQ-31) | E | MVP | — |
 | **F2.4** | **Vòng đời zone** | | | |
 | F2.4.1 | Kích hoạt zone khi qua cổng OG1 (xác minh, cert, origin, preset), phát cấu hình xuống edge | M | MVP | **Zone**.status |
 | F2.4.2 | Tạm dừng zone (chuyển tiếp không bảo vệ), mở lại | M | MVP | **Zone**.status |
@@ -181,6 +193,7 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.6.1 | Chọn preset theo loại ứng dụng: managed ruleset log-only, DDoS L7 và lọc sớm bật chặn, exception sẵn có | M | MVP | **ZonePreset** (NCC), **PolicyDraft** |
 | F2.6.2 | Phục vụ request kiểm thử qua edge trước khi đổi DNS (`curl --resolve`, `hosts`) | E | MVP | — |
 | F2.6.3 | Checklist kiểm thử (trang, đăng nhập, upload, API, WebSocket) và kết quả | M | MR | **OnboardingProgress** |
+| F2.6.4 | Tự phát hiện sự cố thường gặp khi kiểm thử: vòng chuyển hướng, origin trả 403/429 với IP edge, nội dung hỗn hợp (OQ-148) | C | MVP | **ZoneCheckResult** |
 | **F2.7** | **Chuyển traffic và hoàn tất** ([requirements §3.1](03-business-analysis/01-onboarding.md) OB8–OB12) | | | |
 | F2.7.1 | Hướng dẫn hạ TTL, đổi DNS, kế hoạch quay lui (lưu bản ghi cũ) | M | MVP | DnsSnapshot |
 | F2.7.2 | Ghi nhận traffic thật đầu tiên qua edge theo hostname | M | MVP | **OnboardingProgress** |
@@ -188,6 +201,7 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.7.4 | Bật chặn theo bậc nhóm rule qua change request | M | MVP | **ChangeRequest** |
 | F2.7.5 | Hướng dẫn khoá origin, ghi nhận đã khoá hoặc bỏ qua | M | MVP | **OnboardingProgress** |
 | F2.7.6 | Tiến độ onboarding theo bước, nhắc khi bỏ dở ở ngày 1, 3, 7 | M | MVP | **OnboardingProgress** |
+| F2.7.7 | Không cho hoàn tất onboarding khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin (OQ-32) | M | MVP | **OnboardingProgress** |
 
 ## F3 Bảo vệ runtime
 
@@ -226,6 +240,8 @@ Chạy trên từng request ở edge. Không có UI riêng: cấu hình qua F5, 
 | F3.6.1 | Chặn bot xấu rõ ràng, nhận diện bot đã xác minh | E | MVP | Verified bot list (đọc) |
 | F3.6.2 | Tính điểm bot và áp policy theo đường dẫn | E | MR | BotPolicy (đọc) |
 | F3.6.3 | Chống chiếm tài khoản (credential stuffing) | E | NC | — |
+| F3.6.4 | Preset bot theo ngành: thương mại điện tử, ngân hàng/ví, vé/đặt chỗ, báo chí; hỏi một câu về crawler AI khi bật ([3.9](03-business-analysis/09-bot-management.md) OQ-82, OQ-124) | M | MVP | **BotPolicy** |
+| F3.6.5 | Không challenge tương tác trên request không phải điều hướng trang: trả 403/429 có mã lỗi JSON và header gợi ý (OQ-101) | E | MVP | — |
 | **F3.7** | **API security** | | | |
 | F3.7.1 | Kiểm request theo schema OpenAPI của endpoint | E | MR | ApiSchema (đọc) |
 | F3.7.2 | Xác thực JWT (JWKS của khách), mTLS client | E | MR | ApiAuthConfig (đọc) |
@@ -250,9 +266,14 @@ Chạy trên từng request ở edge. Không có UI riêng: cấu hình qua F5, 
 | F4.1.1 | Cache theo Cache-Control, stale-if-error | E | MVP | Cache |
 | F4.1.2 | Cache rule của khách: cache key, TTL, bỏ qua cache | M | MVP | **CacheRule** |
 | F4.1.3 | Tiered cache, origin shield | E | MR | — |
+| F4.1.4 | Công tắc "chỉ WAF, không cache" ở mọi gói; WAF trước cache là mặc định ([3.10](03-business-analysis/10-cache-performance.md) OQ-143, OQ-145) | M | MVP | **CacheMode** |
+| F4.1.5 | Luật an toàn cache luôn áp; khách ghi đè theo path phải xác nhận cảnh báo và có audit; chống cache deception mặc định (OQ-112, OQ-113) | E | MVP | **SafetyOverride** |
+| F4.1.6 | Cache key mặc định bỏ utm_*, fbclid, gclid, zalo_*; khách sửa danh sách (OQ-114) | E | MVP | **CacheRule** |
+| F4.1.7 | Nén gzip và brotli; HTTP/3 nếu nền L7 chọn ở ADR-0031 có sẵn (OQ-117) | E | MVP | — |
 | **F4.2** | **Purge** | | | |
 | F4.2.1 | Purge toàn zone, theo URL, theo prefix | M | MVP | **PurgeRequest** |
 | F4.2.2 | Purge theo tag | M | MR | **PurgeRequest** |
+| F4.2.3 | Xoá toàn zone cần xác nhận lại và hiện ước lượng tải dồn về origin; gói thấp có giới hạn tần suất (OQ-115) | M | MVP | **PurgeRequest** |
 | **F4.3** | **DNS điều hướng** | | | |
 | F4.3.1 | Trả IP PoP gần và khoẻ cho hostname của khách | E | MVP | PoP health (đọc) |
 | F4.3.2 | DNS authoritative cho khách: bản ghi proxied, DNSSEC | M | MR | **DnsRecord** |
@@ -285,14 +306,19 @@ Mọi thay đổi ảnh hưởng tới traffic đi qua nhóm này. Persona chín
 | F5.3.3 | Khung giờ được phép thay đổi | M | MR | **ChangeWindow** |
 | F5.3.4 | Phát hành: tạo PolicyVersion bất biến, gửi sang Control | M | MVP | **PolicyVersion**, Outbox |
 | F5.3.5 | Theo dõi trạng thái phát hành tới edge realtime trên portal (đã biên dịch, % node đã áp), lý do khi dừng hoặc rollback | C | MVP | **RolloutStatus** |
+| F5.3.6 | Org một người tự xác nhận diff rồi tự phát hành; 4-eyes chỉ bật khi có từ hai người duyệt ([3.2](03-business-analysis/02-policy-change.md) OQ-34) | M | MVP | **ChangeRequest** |
+| F5.3.7 | Phát hành theo đợt; zone biên dịch lỗi bị bỏ qua và báo, không chặn cả nhóm; khách thấy canary đang ở đâu (OQ-38, OQ-39) | C | MVP | **RolloutState** |
+| F5.3.8 | Support của NCC chỉ sửa policy khi khách cấp quyền; thay đổi là change request đứng tên support, một người của khách duyệt (OQ-40) | M | MVP | **ChangeRequest** |
 | **F5.4** | **Version và rollback** | | | |
 | F5.4.1 | Xem lịch sử version của zone, ai duyệt, khi nào | M | MVP | PolicyVersion |
 | F5.4.2 | So sánh hai version | M | MVP | PolicyVersion |
 | F5.4.3 | Rollback một bấm về version bất kỳ còn giữ | M | MVP | **PolicyVersion** (version mới từ nội dung cũ) |
+| F5.4.4 | Rollback về version đã từng được duyệt không cần duyệt lại (OQ-37) | M | MVP | **PolicyVersion** |
 | **F5.5** | **Kênh khẩn** | | | |
 | F5.5.1 | Bật Under Attack mode không cần duyệt | M | MVP | **ZoneSettings**, AuditEntry |
 | F5.5.2 | Rule tạm có hạn từ case hoặc từ SOC, tự hết hạn | M | MVP | **TemporaryMitigation** |
 | F5.5.3 | Emergency override ở account cần duyệt: áp ngay thay đổi siết chặt, có hạn, duyệt bù, cảnh báo critical tới Owner và Admin | M | MR | **ChangeRequest**.emergency |
+| F5.5.4 | Rule mới của release NCC vào log-only 7 ngày rồi tự chặn; Business trở lên chọn duyệt thủ công; Enterprise ghim version tối đa 90 ngày; rule khẩn CVE áp ngay (OQ-36) | C | MVP | **RulesetRelease** |
 | **F5.6** | **Policy as code** | | | |
 | F5.6.1 | Toàn bộ F5.1–F5.4 qua public API | M | MVP | — |
 | F5.6.2 | Terraform provider | M | MR | — |
@@ -393,6 +419,9 @@ Persona chính: SOC analyst, quản trị bảo mật; support của NCC với q
 | F8.4.2 | Gắn event, truy vấn, mitigation vào case | M | MR | **CaseLink** |
 | F8.4.3 | Workflow case: mở → tiếp nhận → giảm thiểu → đóng, người phụ trách, SLA | M | MR | **Case**.status |
 | F8.4.4 | Đóng case kèm tóm tắt | M | MR | **Case** |
+| F8.4.5 | Phân loại tấn công ảnh hưởng zone hay nền tảng; NCC bật mitigation không cần hỏi; chuyển zone sang cell cách ly khi vượt khả năng ([3.3](03-business-analysis/03-attack-response.md) OQ-41, OQ-42) | M | MVP | **Case**, **Mitigation** |
+| F8.4.6 | Báo cáo tự động sau sự cố cho mọi gói; Enterprise do NCC viết; SLA credit theo thời gian edge không phục vụ được (OQ-44) | A | MVP | **IncidentReport** |
+| F8.4.7 | Nút "báo chặn nhầm" trên trang chặn từ gói Pro, vào hộp thư zone, có giới hạn tần suất ([3.4](03-business-analysis/04-false-positive.md) OQ-48) | M | MVP | **FalsePositiveReport** |
 
 ## F9 Báo cáo và tuân thủ
 
@@ -426,6 +455,12 @@ Persona chính: chủ tài khoản, bộ phận tài chính của khách; sales 
 | F10.2.1 | Dùng thử 14 ngày, giới hạn số lượt dùng thử mỗi khách | M | MVP | **Subscription**, **TrialClaim** (toàn cục) |
 | F10.2.2 | Mua, nâng, hạ gói theo zone hoặc account | M | MVP | **Subscription** |
 | F10.2.3 | Quá hạn thanh toán: chuyển tiếp tối giản 30 ngày rồi tạm dừng | M | MVP | **Subscription**.status |
+| F10.2.4 | Nâng gói có hiệu lực ngay, tính phần còn lại của gói cũ vào gói mới kèm bonus ([3.5](03-business-analysis/05-plans-billing.md) OQ-56) | M | MVP | **ProrationCredit** |
+| F10.2.5 | Hạ gói cuối kỳ; vượt giới hạn mới thì cảnh báo và ân hạn 3 ngày rồi chặn phần vượt; báo trước 7 ngày khi áp retention mới (OQ-10, OQ-58) | M | MVP | **DowngradeScheduled** |
+| F10.2.6 | Gói nhóm "nhiều site nhỏ" dùng chung hạn mức cho N zone ít traffic; subscription gắn account (OQ-54) | M | MVP | **Subscription** |
+| F10.2.7 | Trả sau theo hợp đồng cho Business, Enterprise, hạn mức nợ, quy trình nhắc nợ (OQ-57) | M | MVP | **Subscription**, **DunningStep** |
+| F10.2.8 | Thanh toán: thẻ quốc tế, VietQR, chuyển khoản theo hoá đơn; ví điện tử để sau (OQ-60) | M | MVP | **Payment** |
+| F10.2.9 | Huỷ: gói tháng không hoàn, gói năm hoàn theo tháng chưa dùng trừ chiết khấu; không có gói tạm ngừng (OQ-61) | M | MVP | **Cancellation** |
 | **F10.3** | **Entitlements** | | | |
 | F10.3.1 | Tính entitlements của zone từ gói, add-on, hợp đồng | M | MVP | **Entitlements** |
 | F10.3.2 | Phát entitlements mới khi đổi gói, có hiệu lực ≤ 5 phút | M | MVP | Outbox |
@@ -466,6 +501,7 @@ Persona chính: NOC/SRE, support, product. Chi tiết vận hành ở [8.12](../
 |---|---|---|---|---|
 | F12.1.1 | Giám sát SLI, probe tổng hợp, lan truyền cấu hình | mọi plane | MVP | Metric |
 | F12.1.2 | Giám sát dung lượng PoP, cell, chống noisy neighbor | C | MR | Metric |
+| F12.1.3 | Quy trình abuse: đầu mối riêng, xác minh trong 24 giờ, khoá zone ngay khi phishing hoặc mã độc đã xác minh; yêu cầu của cơ quan chức năng chỉ nhận văn bản qua đầu mối pháp chế ([3.10](03-business-analysis/10-cache-performance.md) OQ-88, [3.3](03-business-analysis/03-attack-response.md) OQ-45) | M | MVP | **AbuseCase**, **LegalRequestLog** |
 | F12.2.1 | Rút PoP khỏi DNS, chuyển traffic | C | MVP | **PopState** |
 | F12.2.2 | Đóng băng phát hành toàn fleet | C | MVP | **FleetFreeze** |
 | F12.3.1 | Support tra request ID của khách không cần đọc toàn bộ tenant | A | MVP | **SupportAccessGrant** |

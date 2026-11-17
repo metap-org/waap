@@ -140,5 +140,5 @@ flowchart TB
 [3.2](02-policy-change.md)). Thời hạn rollback, cách báo khách và credit **chưa quyết** (OQ-52 hoãn); đề xuất cũ để lại: rollback toàn fleet ≤ 15 phút
 sau xác nhận, báo khách kèm danh sách request, không credit riêng ngoài SLA.
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F5/F6 thêm nút báo chặn nhầm từ Pro và hộp thư zone; quyền riêng "xem dữ liệu request"; danh sách trường luôn che;
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F5/F6 thêm nút báo chặn nhầm từ Pro và hộp thư zone; quyền riêng "xem dữ liệu request"; danh sách trường luôn che;
 cảnh báo khi allowlist dải dùng chung; điều khoản về thống kê gộp chéo tenant.

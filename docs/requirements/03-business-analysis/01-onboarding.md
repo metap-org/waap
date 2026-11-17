@@ -668,5 +668,5 @@ Phương thức kết nối:
 | OG4 Hoàn tất | **Cảnh báo đỏ ở mọi bước** và **không cho hoàn tất** khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin; không chặn các bước khác | OQ-32 |
 | Phân khúc | Chính ở MVP: H1 (VPS) và H6 (doanh nghiệp có IT); H2 (shared hosting) chạy được nhưng không khoá được origin, nói rõ; H8 (agency) dùng nhiều org. Nhập cấu hình từ Cloudflare và nhà khác: Mở rộng (bản ghi DNS và IP allowlist; rule không chuyển tự động, chỉ có hướng dẫn tương đương) | OQ-27, OQ-149 |
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F2 thêm zone theo một hostname, dải IP dùng chung IPv4/IPv6, danh sách cổng, xác minh dự phòng (TXT tên khác, file HTTP), phát hiện sự cố
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F2 thêm zone theo một hostname, dải IP dùng chung IPv4/IPv6, danh sách cổng, xác minh dự phòng (TXT tên khác, file HTTP), phát hiện sự cố
 thường gặp trong OB7 và chặn OG4 khi còn họ IP trỏ thẳng origin; BR kiểm domain với danh sách đen.

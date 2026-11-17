@@ -160,5 +160,5 @@ flowchart TB
 | Khách bị tống tiền DDoS ([OQ-46](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | NCC không đàm phán thay; bật bảo vệ cao, cung cấp log để khách trình báo; Enterprise có kỹ sư hỗ trợ trực tiếp |
 | Endpoint đắt bị đánh dưới ngưỡng DDoS ([OQ-47](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | MVP: preset có rate limit mặc định cho đăng nhập, tìm kiếm. Mở rộng: edge giới hạn rps vào path đắt khi origin chậm hoặc lỗi tăng |
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F8 thêm bước phân loại phạm vi (zone hay nền tảng), chuyển cell cách ly,
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F8 thêm bước phân loại phạm vi (zone hay nền tảng), chuyển cell cách ly,
 báo cáo sau sự cố; BR cho "không bao giờ trả DNS về origin", cờ "nghi tấn công" không tính vào trần chi tiêu, thời hạn yêu cầu hoàn tiền 30 ngày.

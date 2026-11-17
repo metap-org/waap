@@ -253,4 +253,4 @@ flowchart TB
 **Tuỳ chọn và lộ trình:** challenge tương tác tự làm là mặc định, captcha bên thứ ba là tuỳ chọn khách tự bật ([OQ-81](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Add-on "bảo vệ đăng nhập và OTP" cho gói Pro ([OQ-106](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Nhận diện app mobile thật (SDK, attestation) ở Nâng cao; trước đó app dùng
 danh tính consumer (API key, JWT) và rate limit theo 8.17 ([OQ-83](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Hàng đợi ảo (waiting room) không có ở MVP, ghi vào Mở rộng ([OQ-126](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)).
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F4/F5 thêm câu hỏi crawler AI khi bật, 4 preset ngành, danh sách bot trong nước, quy tắc không challenge tương tác trên AJAX/API, clearance 30 phút; add-on đăng nhập/OTP ở 8.18.
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F4/F5 thêm câu hỏi crawler AI khi bật, 4 preset ngành, danh sách bot trong nước, quy tắc không challenge tương tác trên AJAX/API, clearance 30 phút; add-on đăng nhập/OTP ở 8.18.

@@ -140,5 +140,5 @@ flowchart TB
 | MB7 Khôi phục owner | NCC | Owner duy nhất mất truy cập: **hai bằng chứng trong ba**: tạo bản ghi DNS trên domain của zone, giấy tờ doanh nghiệp khớp tên trên hoá đơn, xác nhận của chủ phương thức thanh toán. **Chờ 72 giờ**, báo mọi admin còn lại của org; ghi audit ([OQ-64](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Thiếu bằng chứng: từ chối, không có đường tắt | `OwnerRecovery`, audit |
 | Quyền xem dữ liệu request | Admin | Quyền riêng, mặc định chỉ security admin ([OQ-68](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), [OQ-50](04-false-positive.md)) | | `Permission` |
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F1 thêm đăng nhập Google/Microsoft, tài khoản khẩn miễn SSO (tối đa hai), khôi phục owner với hai bằng chứng và chờ 72 giờ,
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F1 thêm đăng nhập Google/Microsoft, tài khoản khẩn miễn SSO (tối đa hai), khôi phục owner với hai bằng chứng và chờ 72 giờ,
 API key hạn tuỳ chọn và thu hồi tự động khi lộ; quyền riêng xem dữ liệu request.

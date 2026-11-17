@@ -271,5 +271,5 @@ flowchart TB
 | Plugin cho nền tảng | **Plugin theo từng framework và client** (xoá cache khi sửa bài, gợi ý cache rule); **MVP làm plugin WordPress trước**; trước đó có hướng dẫn gọi API ([OQ-87](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), đã sửa) |
 | Chính sách abuse | Đầu mối abuse riêng (email và form công khai); xác minh trong **24 giờ**; phishing và mã độc đã xác minh thì **khoá zone ngay** và báo khách; không tiết lộ origin trừ khi có văn bản của cơ quan có thẩm quyền; cần tư vấn pháp lý ([OQ-88](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) |
 
-**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F3 thêm công tắc chỉ WAF, luật an toàn cache ghi đè có xác nhận và audit, danh sách tham số marketing bỏ khỏi cache key,
+**Đã cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md) (2026-11-17, FR và BR mới):** F3 thêm công tắc chỉ WAF, luật an toàn cache ghi đè có xác nhận và audit, danh sách tham số marketing bỏ khỏi cache key,
 xác nhận khi xoá toàn zone, nén gzip/brotli; mục plugin theo framework và mục abuse ở F9 hoặc 8.x.
