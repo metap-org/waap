@@ -331,7 +331,7 @@ flowchart TB
 
 > Bản nháp đầu tiên đi theo một kịch bản (DNS đầy đủ, origin có IP public, cổng chuẩn). Sau khi chủ dự án duyệt OQ-21…OQ-32 và OQ-147…OQ-150
 > (2026-11-17), luồng này là **căn cứ cho kịch bản chính**; các điều chỉnh theo quyết định nằm ở [A.10](#a10-điều-chỉnh-theo-quyết-định-2026-11-17).
-> A.6 (hồ sơ khách) và cây quyết định ở [§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt) **chưa duyệt riêng**. OQ-17, OQ-18, OQ-19, OQ-20 ở A.9 chưa có quyết định riêng.
+> A.6 (hồ sơ khách) và cây quyết định ở [§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt) **chưa duyệt riêng**. OQ-17…OQ-20 ở A.9 đã được duyệt theo đề xuất ngày 2026-11-17.
 
 ### A.1 Mục tiêu và định nghĩa "xong"
 

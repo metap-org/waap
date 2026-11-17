@@ -115,7 +115,7 @@ chủ dự án duyệt.
 | Câu | Phương án | Đánh đổi | Đề xuất |
 |---|---|---|---|
 | OQ-54 | (a) Theo zone; (b) theo account; (c) gói nhóm cho khách nhỏ | (a) đắt cho người có nhiều site nhỏ; (b) khó so với chi phí phục vụ từng zone | Gói vẫn tính theo zone (như 8.18) để giá bám chi phí; thêm gói nhóm "nhiều site nhỏ" dùng chung một hạn mức cho N zone ít traffic. Subscription gắn với account; hoá đơn gộp theo account, gộp được ở cấp org |
-| OQ-56 | (a) Tính theo ngày còn lại; (b) từ kỳ sau | (b) khách nâng gói khi bị tấn công sẽ chờ tới kỳ sau | **Đã sửa 2026-11-17:** Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hệ thống tự tính phần giá trị còn lại của gói cũ kể từ ngày nâng, trừ vào gói mới, và cộng thêm một khoản bonus vào gói mới (**mức bonus chưa định**, cần chốt cùng bảng giá ADR-0043). Hạ: có hiệu lực cuối kỳ |
+| OQ-56 | (a) Tính theo ngày còn lại; (b) từ kỳ sau | (b) khách nâng gói khi bị tấn công sẽ chờ tới kỳ sau | **Đã sửa 2026-11-17:** Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hệ thống tự tính phần giá trị còn lại của gói cũ kể từ ngày nâng, trừ vào gói mới, và cộng thêm một khoản bonus vào gói mới (**bonus 10% giá trị còn lại của gói cũ, tối đa một tháng phí chênh**, duyệt 2026-11-17; cần business xác nhận cùng bảng giá ADR-0043). Hạ: có hiệu lực cuối kỳ |
 | OQ-57 | Trả sau bằng chuyển khoản ở MVP | Cấp dịch vụ trước khi thu tiền | Có, cho doanh nghiệp có hợp đồng (Business, Enterprise); hạn mức nợ theo hợp đồng; quy trình nhắc nợ riêng, quá hạn thì áp BR-9 |
 | OQ-58 | (a) Xoá log ngay; (b) giữ tới hết hạn cũ | (b) tốn chi phí lưu trữ không được trả | Báo trước 7 ngày, sau đó áp retention mới; khách muốn giữ thì xuất trước |
 | OQ-59 | Reseller ở MVP | | Không ở MVP. Một người thuộc nhiều org (đã quyết ở 3.6) đủ cho agency quản lý hộ; mô hình reseller, nhãn trắng để sau |
@@ -128,7 +128,7 @@ FR-10-01…FR-10-13, BR-7…BR-11, DT-8, IR-2, IR-3, OQ-10, OQ-12, OQ-14 ở [§
 
 ## 7. Luồng: mua, đổi gói, vượt hạn mức, thanh toán (bước 2, 2026-11-17)
 
-> Dựa trên [§3](#3-đã-quyết) (trần chi tiêu, OQ-55) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). Giá và hạn mức ở kiến trúc 8.18 / ADR-0043. **Còn thiếu một số:** mức bonus khi nâng gói ([OQ-56](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)); bảng giá do business chốt.
+> Dựa trên [§3](#3-đã-quyết) (trần chi tiêu, OQ-55) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). Giá và hạn mức ở kiến trúc 8.18 / ADR-0043. Mức bonus đã chốt 10% (xem BL5); bảng giá do business chốt.
 
 **Định nghĩa "xong":** subscription của account khớp với gói khách muốn, hoá đơn đúng, thanh toán đã ghi, giới hạn của zone phản ánh gói mới.
 
@@ -159,7 +159,7 @@ flowchart TB
 | BLG1 | Hệ thống | Đã thu tiền, **hoặc** doanh nghiệp có hợp đồng (Business, Enterprise) được trả sau với hạn mức nợ theo hợp đồng ([OQ-57](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `Subscription.active` |
 | BL4 Dùng | Hệ thống | Đo usage; trần chi tiêu đã quyết ở OQ-55; traffic "nghi tấn công" không tính vào trần ([3.3](03-attack-response.md)) | Chạm trần: cảnh báo, rồi áp hành vi theo trần mềm hay cứng | `UsageReport` |
 | BL5 Nâng | Owner, billing | **Hiệu lực ngay.** Hệ thống tự tính giá trị còn lại của gói cũ từ ngày nâng, trừ vào gói mới và **cộng thêm một khoản bonus** vào gói mới ([OQ-56](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), mức bonus chưa định) | Thanh toán phần chênh lỗi: giữ gói cũ, báo | `ProrationCredit`, giới hạn mới của zone |
-| BL6 Hạ | Owner, billing | Hạ có hiệu lực **cuối kỳ**. Nếu lúc đó khách vượt giới hạn gói mới: cảnh báo sau 6 giờ, 12 giờ, 1 ngày và mỗi ngày trong **3 ngày ân hạn**, hết hạn thì chặn phần vượt ([OQ-10](../02-requirements.md#9-câu-hỏi-mở-cho-review)). Log ngoài retention mới: **báo trước 7 ngày** rồi áp retention mới; khách muốn giữ thì xuất trước ([OQ-58](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Khách không giảm bớt: sau ân hạn chặn phần vượt, không xoá cấu hình | `DowngradeScheduled`, `QuotaWarning` |
+| BL6 Hạ | Owner, billing | Hạ có hiệu lực **cuối kỳ**. Nếu lúc đó khách vượt giới hạn gói mới: cảnh báo sau 6 giờ, 12 giờ, 1 ngày và mỗi ngày trong **3 ngày ân hạn**, hết hạn thì chặn phần vượt: không cho tạo thêm vượt giới hạn và phần vượt (mới nhất trước) ngừng áp, không khoá tài khoản ([OQ-10](../02-requirements.md#9-câu-hỏi-mở-cho-review)). Log ngoài retention mới: **báo trước 7 ngày** rồi áp retention mới; khách muốn giữ thì xuất trước ([OQ-58](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Khách không giảm bớt: sau ân hạn chặn phần vượt, không xoá cấu hình | `DowngradeScheduled`, `QuotaWarning` |
 | BL7 Huỷ | Owner | Gói tháng **không hoàn**; gói năm hoàn theo tháng chưa dùng, trừ phần chiết khấu năm; **không có gói tạm ngừng**, dùng tạm dừng zone và hạ gói ([OQ-61](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `Cancellation` |
 | BL8 Hoá đơn | Hệ thống | Hoá đơn gộp theo account, gộp được ở cấp org ([OQ-14](../02-requirements.md#9-câu-hỏi-mở-cho-review)); phí nền trả trước, phí vượt trả sau ([OQ-12](../02-requirements.md#9-câu-hỏi-mở-cho-review)); nợ quá hạn có quy trình nhắc riêng, quá hạn thì áp BR-9 | Thanh toán chậm: nhắc, rồi BR-9 | `Invoice`, `DunningStep` |
 

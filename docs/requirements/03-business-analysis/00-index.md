@@ -1,6 +1,6 @@
 # 3. Phân tích nghiệp vụ
 
-> **Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-125).** Luồng (bước 2) đã viết cho 3.1–3.6, 3.9, 3.10 (2026-11-17); luồng chưa được chủ dự án duyệt, chỉ các OQ làm căn cứ đã duyệt.
+> **Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-118, OQ-125); đợt hai duyệt 3.7, 3.11, 3.12 và 7 việc nhỏ.** Luồng (bước 2) đã viết cho 3.1–3.7, 3.9–3.12 (2026-11-17); luồng chưa được chủ dự án duyệt, chỉ các OQ làm căn cứ đã duyệt.
 
 Bản đồ phân rã nói hệ thống **có** những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
 thật làm. Khi xong, mỗi nghiệp vụ trả lời được các câu hỏi sau:
@@ -31,12 +31,12 @@ Mỗi nghiệp vụ đi qua hai bước, và **không viết bước 2 khi chủ
 | [3.4](04-false-positive.md) | Xử lý chặn nhầm | OQ-48…OQ-53 | **Đã duyệt 2026-11-17** (xem trang). Đã quyết cách xử lý và OQ-49; các câu còn lại có đề xuất chờ duyệt |
 | [3.5](05-plans-billing.md) | Mua, đổi gói, vượt hạn mức, thanh toán | OQ-54…OQ-61 | **Đã duyệt 2026-11-17** (xem trang). Đã quyết một phần OQ-55 (có trần chi tiêu); trừ phần vượt quota để sau; các câu còn lại có đề xuất chờ duyệt |
 | [3.6](06-members-access.md) | Quản lý thành viên, SSO, API key | OQ-62…OQ-68 | **Đã duyệt 2026-11-17** (xem trang). Đã quyết OQ-62 (một người nhiều org); các câu còn lại có đề xuất chờ duyệt |
-| [3.7](07-offboarding.md) | Rời dịch vụ | OQ-69…OQ-74, OQ-94…OQ-99 | Bước 1, đã thêm kịch bản F–M |
+| [3.7](07-offboarding.md) | Rời dịch vụ | OQ-69…OQ-74, OQ-94…OQ-99 | **Đã duyệt 2026-11-17** (xem trang). Bước 1, đã thêm kịch bản F–M |
 | [3.8](08-monitoring-investigation.md) | Giám sát, điều tra, cảnh báo, báo cáo | OQ-75…OQ-80 | **Tạm hoãn** theo chủ dự án |
 | [3.9](09-bot-management.md) | Bot management và challenge | OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124…OQ-126 | **Đã duyệt 2026-11-17** (xem trang). Bước 1 mở rộng (trục J–L), có mô hình quyết định và phân tích mọi câu, đề xuất chờ duyệt |
 | [3.10](10-cache-performance.md) | Cache, hiệu năng, nội dung (gồm chính sách abuse) | OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146 | **Đã duyệt 2026-11-17** (xem trang). Bước 1 mở rộng (trục J–N), có mô hình quyết định và phân tích mọi câu, đề xuất chờ duyệt |
-| [3.11](11-provider-operations.md) | Vận hành của NCC | OQ-89…OQ-93, OQ-118…OQ-123 | Bước 1, đã thêm trục F–N |
-| [3.12](12-api-security.md) | API security | OQ-84, OQ-107…OQ-111 | Bước 1, tách từ trang bot cũ |
+| [3.11](11-provider-operations.md) | Vận hành của NCC | OQ-89…OQ-93, OQ-118…OQ-123 | **Đã duyệt 2026-11-17** (xem trang). Bước 1, đã thêm trục F–N |
+| [3.12](12-api-security.md) | API security | OQ-84, OQ-107…OQ-111 | **Đã duyệt 2026-11-17** (xem trang). Bước 1, tách từ trang bot cũ |
 | [3.13](13-configuration-surface.md) | Bề mặt cấu hình: rule và setting trên portal, cấu hình nâng cao cho admin | OQ-151…OQ-162 | Đã quyết nhóm tính năng theo plane (trang lỗi, emergency override, Trust/Skip, audit export, rollout, dry-run, failover, tarpit, IP thật sau CDN, xử lý một bấm, live tail, chống bão, lọc export); danh mục và các câu còn lại ở bước 1 |
 | [3.14](14-config-tiers-attack-history-thresholds.md) | Cấu hình nhiều tầng, lịch sử tấn công, ngưỡng cảnh báo | OQ-163…OQ-165 | Đã quyết hướng và chốt OQ-163…165 theo đề xuất của Claude (ba tầng, hai loại đợt tấn công, ngưỡng ba mức); luồng chưa vẽ |
 

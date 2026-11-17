@@ -113,6 +113,8 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F1.1.2 | Tạo, đổi tên, đóng account trong org | M | MVP | **Account** |
 | F1.1.3 | Chọn region dữ liệu cho account | M | NC | **Account**.region |
 | F1.1.4 | Xoá org theo yêu cầu (sau thời hạn giữ dữ liệu) | M | MVP | **Org**, toàn bộ dữ liệu tenant |
+| F1.1.5 | Huỷ yêu cầu xoá org trong 30 ngày (chỉ owner); khôi phục zone gỡ nhầm trong 30 ngày; bản sao lưu giữ tối đa 35 ngày ([3.7](03-business-analysis/07-offboarding.md) OQ-70, OQ-71) | M | MVP | **RetentionHold**, **DeletionRecord** |
+| F1.1.6 | Xuất cấu hình JSON qua API cho mọi gói, log CSV/JSON trước khi xoá (OQ-72); Terraform ở Mở rộng | M | MVP | **ExportJob** |
 | **F1.2** | **Thành viên và phân quyền** | | | |
 | F1.2.1 | Mời thành viên qua email, chấp nhận lời mời | M | MVP | **Invitation**, **Member** |
 | F1.2.2 | Gán vai trò có sẵn ở cấp org, account, nhóm zone hoặc zone | M | MVP | **RoleBinding** |
@@ -162,6 +164,8 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.1.9 | Zone chỉ gồm một hostname khi khách chứng minh quyền với hostname đó; không giữ claim của apex ([3.1](03-business-analysis/01-onboarding.md) OQ-21) | M | MVP | **Zone**, **DomainClaim** |
 | F2.1.10 | Kiểm domain với danh sách đen đã biết lúc thêm zone (OQ-150) | M | MVP | **DomainDenylist** |
 | F2.1.11 | Xác minh dự phòng: TXT tên khác, file HTTP; không dùng email (OQ-147) | C | MVP | **DomainClaim** |
+| F2.1.12 | Chuyển zone sang org khác: owner hai org xác nhận, policy đi theo, log, audit, hoá đơn ở lại, bí mật bị xoá (OQ-94) | M | MVP | **ZoneTransfer** |
+| F2.1.13 | Phát hiện domain hết hạn hoặc đổi chủ qua kiểm lại bản ghi xác minh và RDAP; chủ mới phải xác minh lại (OQ-74) | C | MVP | **DomainClaim** |
 | **F2.2** | **Hostname và origin** | | | |
 | F2.2.1 | Thêm, xoá hostname trong zone; wildcard | M | MVP | **Hostname**, **HostnameClaim** (toàn cục) |
 | F2.2.2 | Khai báo origin (IP, hostname, cổng, giao thức, SNI, header host) | M | MVP | **Origin** |
@@ -202,6 +206,7 @@ Ai là khách, ai được làm gì. Persona chính: chủ tài khoản, quản 
 | F2.7.5 | Hướng dẫn khoá origin, ghi nhận đã khoá hoặc bỏ qua | M | MVP | **OnboardingProgress** |
 | F2.7.6 | Tiến độ onboarding theo bước, nhắc khi bỏ dở ở ngày 1, 3, 7 | M | MVP | **OnboardingProgress** |
 | F2.7.7 | Không cho hoàn tất onboarding khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin (OQ-32) | M | MVP | **OnboardingProgress** |
+| F2.7.8 | Zone đã gỡ mà DNS còn trỏ: chuyển tiếp không bảo vệ 30 ngày rồi trả trang giải thích (OQ-69); zone bỏ hoang theo BR-9 rồi cùng cơ chế (OQ-95) | E | MVP | **ZoneState** |
 
 ## F3 Bảo vệ runtime
 
@@ -247,6 +252,9 @@ Chạy trên từng request ở edge. Không có UI riêng: cấu hình qua F5, 
 | F3.7.2 | Xác thực JWT (JWKS của khách), mTLS client | E | MR | ApiAuthConfig (đọc) |
 | F3.7.3 | Ghi nhận endpoint để discovery | E | MR | Telemetry |
 | F3.7.4 | Phát hiện BOLA, dữ liệu nhạy cảm trong response | E | NC | — |
+| F3.7.5 | API discovery chỉ lưu cấu trúc, lưu mẫu thật khi khách bật theo endpoint; endpoint mới vào hàng đợi đề xuất ([3.12](03-business-analysis/12-api-security.md) OQ-84, OQ-107) | A | MVP | **ApiEndpointShape**, **ApiEndpointProposal** |
+| F3.7.6 | Chặn theo schema theo từng endpoint sau log-only tối thiểu 7 ngày, nhiều version schema song song (OQ-108) | E | MVP | **ApiSchema** |
+| F3.7.7 | Nhận diện consumer: API key, `sub` của JWT, rồi IP kèm dấu vân tay TLS (OQ-111); BOLA và kiểm response ở Nâng cao (OQ-109, OQ-110) | E | NC | — |
 | **F3.8** | **Thực thi hành động** | | | |
 | F3.8.1 | Block, challenge (JS, tương tác, managed: edge tự chọn theo điểm), log, allow, trust, skip | E | MVP | — |
 | F3.8.2 | Trang lỗi tuỳ biến theo tenant hoặc zone, map với từng loại lỗi (403 WAF, 429, 502, 504, 503 bảo trì, trang challenge), JSON cho path API | E | MR | **CustomErrorPage** (đọc) |
@@ -461,6 +469,7 @@ Persona chính: chủ tài khoản, bộ phận tài chính của khách; sales 
 | F10.2.7 | Trả sau theo hợp đồng cho Business, Enterprise, hạn mức nợ, quy trình nhắc nợ (OQ-57) | M | MVP | **Subscription**, **DunningStep** |
 | F10.2.8 | Thanh toán: thẻ quốc tế, VietQR, chuyển khoản theo hoá đơn; ví điện tử để sau (OQ-60) | M | MVP | **Payment** |
 | F10.2.9 | Huỷ: gói tháng không hoàn, gói năm hoàn theo tháng chưa dùng trừ chiết khấu; không có gói tạm ngừng (OQ-61) | M | MVP | **Cancellation** |
+| F10.2.10 | Hợp đồng Enterprise kết thúc: 30 ngày chuyển tiếp, chuyển gói tự phục vụ hoặc theo bỏ hoang, thu hồi cell và database riêng (OQ-96) | M | MVP | **Subscription** |
 | **F10.3** | **Entitlements** | | | |
 | F10.3.1 | Tính entitlements của zone từ gói, add-on, hợp đồng | M | MVP | **Entitlements** |
 | F10.3.2 | Phát entitlements mới khi đổi gói, có hiệu lực ≤ 5 phút | M | MVP | Outbox |
@@ -502,6 +511,10 @@ Persona chính: NOC/SRE, support, product. Chi tiết vận hành ở [8.12](../
 | F12.1.1 | Giám sát SLI, probe tổng hợp, lan truyền cấu hình | mọi plane | MVP | Metric |
 | F12.1.2 | Giám sát dung lượng PoP, cell, chống noisy neighbor | C | MR | Metric |
 | F12.1.3 | Quy trình abuse: đầu mối riêng, xác minh trong 24 giờ, khoá zone ngay khi phishing hoặc mã độc đã xác minh; yêu cầu của cơ quan chức năng chỉ nhận văn bản qua đầu mối pháp chế ([3.10](03-business-analysis/10-cache-performance.md) OQ-88, [3.3](03-business-analysis/03-attack-response.md) OQ-45) | M | MVP | **AbuseCase**, **LegalRequestLog** |
+| F12.1.4 | Support theo gói (kênh, giờ, thời gian phản hồi), trang trạng thái công khai, hotline và mã khẩn khi portal sập ([3.11](03-business-analysis/11-provider-operations.md) OQ-89, OQ-90, OQ-119) | M | MVP | **SupportTicket**, **StatusIncident** |
+| F12.1.5 | Rule khẩn cho CVE nghiêm trọng trong 24 giờ, SOC hai người duyệt (OQ-91) | C | MVP | **EmergencyRule** |
+| F12.1.6 | POC Enterprise 30 ngày; on-prem do khách vận hành, NCC cấp license và cập nhật ruleset (OQ-92, OQ-93) | M | MR | **License** |
+| F12.1.7 | Chia sẻ chỉ dấu tấn công dạng gộp với CERT; chính sách công bố lỗ hổng (OQ-121, OQ-123) | M | MR | — |
 | F12.2.1 | Rút PoP khỏi DNS, chuyển traffic | C | MVP | **PopState** |
 | F12.2.2 | Đóng băng phát hành toàn fleet | C | MVP | **FleetFreeze** |
 | F12.3.1 | Support tra request ID của khách không cần đọc toàn bộ tenant | A | MVP | **SupportAccessGrant** |

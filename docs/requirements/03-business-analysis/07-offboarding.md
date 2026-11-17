@@ -1,6 +1,6 @@
 # 3.7 Rời dịch vụ: gỡ zone, xoá org, xoá dữ liệu
 
-> **Trạng thái: đang mở, chưa có quyết định nào.** Bổ sung kịch bản F–M theo yêu cầu "nghĩ thêm kịch bản" (2026-11-07).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt đề xuất cho các câu OQ của trang này** (trừ OQ-118 của 3.11 vẫn hoãn). Luồng (bước 2) ở mục 6. Bổ sung kịch bản F–M theo yêu cầu "nghĩ thêm kịch bản" (2026-11-07).
 
 ## 1. Phạm vi
 
@@ -143,3 +143,59 @@ dữ liệu. Liên quan: F2.4.3, F1.1.4, F9.3 ở [§1](../01-functional-decompo
 
 FR-1-03, FR-2-13, FR-9-03…FR-9-05, BR-12, BR-16, DT-7, OQ-6 ở [§2](../02-requirements.md); `DataErasureRequested`
 ở kiến trúc 5.5.
+
+## 5. Đã quyết (duyệt 2026-11-17)
+
+> Chủ dự án duyệt tất cả đề xuất dưới đây ngày 2026-11-17. Đề xuất do Claude viết (trang gốc chưa có mục phân tích); con số là ước lượng đã được duyệt.
+
+| Câu | Quyết định |
+|---|---|
+| OQ-69 | (b): 30 ngày chuyển tiếp không bảo vệ, không cache, nhắc khách hằng tuần; sau đó trả trang giải thích "zone đã gỡ". Không bao giờ trả lỗi im lặng |
+| OQ-70 | 30 ngày cho cả hai: huỷ được yêu cầu xoá org trong 30 ngày (chỉ owner); zone gỡ nhầm khôi phục được cấu hình trong 30 ngày; log không khôi phục |
+| OQ-71 | (b): backup giữ tối đa 35 ngày; khi khôi phục từ backup phải áp lại danh sách xoá; ghi rõ trong điều khoản |
+| OQ-72 | (a) JSON theo API cho mọi gói, đủ để dựng lại; Terraform ở Mở rộng. Log xuất CSV/JSON; mọi gói xuất được trước khi xoá |
+| OQ-73 | Theo OQ-45: chỉ nhận văn bản chính thức qua đầu mối pháp chế, ghi sổ, báo khách trừ khi văn bản cấm. Vi phạm đã xác minh thì khoá zone ngay; khoá đảo ngược được khi vi phạm được gỡ. **Cần tư vấn pháp lý** |
+| OQ-74 | Cả hai: kiểm lại bản ghi xác minh định kỳ (OQ-3: cảnh báo ngày 7, tạm dừng ngày 14) và RDAP khi có. Chủ mới phải xác minh lại; không thừa hưởng cấu hình và log của chủ cũ |
+| OQ-94 | Policy và cấu hình đi theo; log, audit, hoá đơn ở lại org cũ. Cần owner của **cả hai** org xác nhận; bí mật (key API, webhook secret) bị xoá và phải tạo lại; hiệu lực ngay, subscription gán lại account mới |
+| OQ-95 | Theo BR-9, rồi: 30 ngày chuyển tiếp tối giản; 30 ngày chuyển tiếp không bảo vệ (như OQ-69); sau đó gỡ zone và gửi thông báo cuối. Không bao giờ chặn traffic hợp pháp |
+| OQ-96 | (a) có thẻ thì chuyển sang gói tự phục vụ phù hợp nhất, nếu không thì theo OQ-95; 30 ngày chuyển tiếp giữ nguyên dịch vụ; thu hồi cell, database riêng sau 30 ngày kèm xuất dữ liệu; gia hạn đang đàm phán: tiếp tục tối đa 15 ngày khi có xác nhận bằng văn bản |
+| OQ-97 | Trong 30 ngày kể từ xoá: khôi phục cấu hình. Sau đó chỉ khôi phục từ bản xuất của chính khách; không giữ log |
+| OQ-98 | NCC chuyển yêu cầu cho khách trong 72 giờ, không tự trả lời người dùng cuối. IP nằm trong nhiều tenant: xoá theo từng tenant yêu cầu, dữ liệu gộp ẩn danh không bị xoá. **Cần tư vấn pháp lý** |
+| OQ-99 | Đóng PoP hoặc rút region: báo trước tối thiểu 90 ngày (Enterprise 180 ngày) kèm dải IP mới. Ngừng kinh doanh: Enterprise được bảo đảm xuất cấu hình và 180 ngày chuyển đổi |
+
+## 6. Luồng: rời dịch vụ, chuyển zone, bỏ hoang (bước 2, 2026-11-17)
+
+```mermaid
+flowchart TB
+    OF1["OF1 Yêu cầu<br/>gỡ zone, chuyển zone, xoá org,<br/>huỷ gói, hết hợp đồng"]
+    OF2["OF2 Xuất dữ liệu<br/>cấu hình JSON, log CSV/JSON"]
+    G1{{"OFG1 Còn DNS trỏ về edge?"}}
+    OF3["OF3 Chuyển tiếp không bảo vệ<br/>30 ngày, nhắc hằng tuần"]
+    OF4["OF4 Trang giải thích<br/>zone đã gỡ"]
+    OF5["OF5 Giữ 30 ngày<br/>huỷ xoá, khôi phục"]
+    OF6["OF6 Xoá dữ liệu<br/>backup hết hạn ≤ 35 ngày"]
+    OF1 --> OF2 --> G1
+    G1 -->|có| OF3 --> OF4 --> OF5
+    G1 -->|không| OF5
+    OF5 --> OF6
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| OF1 Yêu cầu | Owner (xoá org chỉ owner); NCC khi vi phạm hoặc theo yêu cầu cơ quan nhà nước | Gỡ nhầm khôi phục trong 30 ngày | Yêu cầu của cơ quan: theo OQ-45, ghi sổ | `OffboardingRequest` |
+| OF2 Xuất | Khách | Cấu hình dạng JSON theo API cho mọi gói (đủ để dựng lại), log CSV hoặc JSON; Terraform ở Mở rộng | Log quá lớn: xuất theo đợt | `ExportJob` |
+| OFG1, OF3 | Hệ thống | Zone đã gỡ mà DNS còn trỏ: **chuyển tiếp thẳng tới origin 30 ngày**, không bảo vệ, không cache, nhắc khách hằng tuần | Origin không phản hồi: trả trang lỗi có giải thích | `ZoneState.passthrough` |
+| OF4 | Hệ thống | Sau 30 ngày trả **trang giải thích "zone đã gỡ"**, không lỗi im lặng | | — |
+| OF5 Giữ | Hệ thống | **30 ngày** sau yêu cầu xoá org (huỷ được, chỉ owner) và 30 ngày khôi phục zone gỡ nhầm (cấu hình, không log) | Quay lại sau thời hạn: chỉ khôi phục từ bản xuất của khách | `RetentionHold` |
+| OF6 Xoá | Hệ thống | Xoá dữ liệu sống; **bản sao lưu giữ tối đa 35 ngày**, khôi phục từ backup phải áp lại danh sách xoá | | `DeletionRecord` |
+
+**Nhánh khác:**
+
+| Tình huống | Xử lý |
+|---|---|
+| Chuyển zone sang org khác (OQ-94) | Cần owner **cả hai org** xác nhận; policy và cấu hình đi theo; log, audit, hoá đơn ở lại org cũ; bí mật (key API, webhook secret) bị xoá và phải tạo lại; hiệu lực ngay, subscription gán lại account mới |
+| Zone bỏ hoang (OQ-95) | Theo BR-9, rồi 30 ngày chuyển tiếp tối giản, 30 ngày chuyển tiếp không bảo vệ, rồi gỡ và gửi thông báo cuối. Không bao giờ chặn traffic hợp pháp |
+| Hợp đồng Enterprise kết thúc (OQ-96) | 30 ngày chuyển tiếp giữ nguyên dịch vụ; có thẻ thì chuyển gói tự phục vụ phù hợp nhất, không thì như zone bỏ hoang; cell và database riêng thu hồi sau 30 ngày kèm xuất dữ liệu; gia hạn đang đàm phán tiếp tục tối đa 15 ngày khi có xác nhận bằng văn bản |
+| Domain hết hạn hoặc đổi chủ (OQ-74) | Kiểm lại bản ghi xác minh định kỳ (cảnh báo ngày 7, tạm dừng ngày 14, OQ-3) và RDAP khi có; chủ mới phải xác minh lại, không thừa hưởng cấu hình và log |
+| Người dùng cuối yêu cầu dữ liệu log (OQ-98) | NCC là bên xử lý: chuyển cho khách trong 72 giờ; IP nằm trong nhiều tenant thì xoá theo từng tenant yêu cầu, dữ liệu gộp ẩn danh không xoá. Cần tư vấn pháp lý |
+| NCC đóng PoP, rút region, ngừng kinh doanh (OQ-99) | Báo trước tối thiểu 90 ngày (Enterprise 180 ngày) kèm dải IP mới; Enterprise được bảo đảm xuất cấu hình và 180 ngày chuyển đổi |

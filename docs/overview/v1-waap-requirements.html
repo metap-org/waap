@@ -365,6 +365,20 @@ hiện ở Analytics, F10.4 Đo usage đếm ở Edge và gộp ở Analytics. B
 <td><strong>Org</strong>, toàn bộ dữ liệu tenant</td>
 </tr>
 <tr>
+<td>F1.1.5</td>
+<td>Huỷ yêu cầu xoá org trong 30 ngày (chỉ owner); khôi phục zone gỡ nhầm trong 30 ngày; bản sao lưu giữ tối đa 35 ngày (<a href="#f-03-business-analysis-07-offboarding">3.7</a> OQ-70, OQ-71)</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>RetentionHold</strong>, <strong>DeletionRecord</strong></td>
+</tr>
+<tr>
+<td>F1.1.6</td>
+<td>Xuất cấu hình JSON qua API cho mọi gói, log CSV/JSON trước khi xoá (OQ-72); Terraform ở Mở rộng</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>ExportJob</strong></td>
+</tr>
+<tr>
 <td><strong>F1.2</strong></td>
 <td><strong>Thành viên và phân quyền</strong></td>
 <td></td>
@@ -651,6 +665,20 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td><strong>DomainClaim</strong></td>
 </tr>
 <tr>
+<td>F2.1.12</td>
+<td>Chuyển zone sang org khác: owner hai org xác nhận, policy đi theo, log, audit, hoá đơn ở lại, bí mật bị xoá (OQ-94)</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>ZoneTransfer</strong></td>
+</tr>
+<tr>
+<td>F2.1.13</td>
+<td>Phát hiện domain hết hạn hoặc đổi chủ qua kiểm lại bản ghi xác minh và RDAP; chủ mới phải xác minh lại (OQ-74)</td>
+<td>C</td>
+<td>MVP</td>
+<td><strong>DomainClaim</strong></td>
+</tr>
+<tr>
 <td><strong>F2.2</strong></td>
 <td><strong>Hostname và origin</strong></td>
 <td></td>
@@ -930,6 +958,13 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td>MVP</td>
 <td><strong>OnboardingProgress</strong></td>
 </tr>
+<tr>
+<td>F2.7.8</td>
+<td>Zone đã gỡ mà DNS còn trỏ: chuyển tiếp không bảo vệ 30 ngày rồi trả trang giải thích (OQ-69); zone bỏ hoang theo BR-9 rồi cùng cơ chế (OQ-95)</td>
+<td>E</td>
+<td>MVP</td>
+<td><strong>ZoneState</strong></td>
+</tr>
 </tbody>
 </table>
 <h2 id="f-01-functional-decomposition--f3-bảo-vệ-runtime">F3 Bảo vệ runtime</h2>
@@ -1207,6 +1242,27 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <tr>
 <td>F3.7.4</td>
 <td>Phát hiện BOLA, dữ liệu nhạy cảm trong response</td>
+<td>E</td>
+<td>NC</td>
+<td>—</td>
+</tr>
+<tr>
+<td>F3.7.5</td>
+<td>API discovery chỉ lưu cấu trúc, lưu mẫu thật khi khách bật theo endpoint; endpoint mới vào hàng đợi đề xuất (<a href="#f-03-business-analysis-12-api-security">3.12</a> OQ-84, OQ-107)</td>
+<td>A</td>
+<td>MVP</td>
+<td><strong>ApiEndpointShape</strong>, <strong>ApiEndpointProposal</strong></td>
+</tr>
+<tr>
+<td>F3.7.6</td>
+<td>Chặn theo schema theo từng endpoint sau log-only tối thiểu 7 ngày, nhiều version schema song song (OQ-108)</td>
+<td>E</td>
+<td>MVP</td>
+<td><strong>ApiSchema</strong></td>
+</tr>
+<tr>
+<td>F3.7.7</td>
+<td>Nhận diện consumer: API key, <code>sub</code> của JWT, rồi IP kèm dấu vân tay TLS (OQ-111); BOLA và kiểm response ở Nâng cao (OQ-109, OQ-110)</td>
 <td>E</td>
 <td>NC</td>
 <td>—</td>
@@ -2511,6 +2567,13 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td><strong>Cancellation</strong></td>
 </tr>
 <tr>
+<td>F10.2.10</td>
+<td>Hợp đồng Enterprise kết thúc: 30 ngày chuyển tiếp, chuyển gói tự phục vụ hoặc theo bỏ hoang, thu hồi cell và database riêng (OQ-96)</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>Subscription</strong></td>
+</tr>
+<tr>
 <td><strong>F10.3</strong></td>
 <td><strong>Entitlements</strong></td>
 <td></td>
@@ -2722,6 +2785,34 @@ từ bản nháp onboarding chưa duyệt; onboarding đang được phân tích
 <td>M</td>
 <td>MVP</td>
 <td><strong>AbuseCase</strong>, <strong>LegalRequestLog</strong></td>
+</tr>
+<tr>
+<td>F12.1.4</td>
+<td>Support theo gói (kênh, giờ, thời gian phản hồi), trang trạng thái công khai, hotline và mã khẩn khi portal sập (<a href="#f-03-business-analysis-11-provider-operations">3.11</a> OQ-89, OQ-90, OQ-119)</td>
+<td>M</td>
+<td>MVP</td>
+<td><strong>SupportTicket</strong>, <strong>StatusIncident</strong></td>
+</tr>
+<tr>
+<td>F12.1.5</td>
+<td>Rule khẩn cho CVE nghiêm trọng trong 24 giờ, SOC hai người duyệt (OQ-91)</td>
+<td>C</td>
+<td>MVP</td>
+<td><strong>EmergencyRule</strong></td>
+</tr>
+<tr>
+<td>F12.1.6</td>
+<td>POC Enterprise 30 ngày; on-prem do khách vận hành, NCC cấp license và cập nhật ruleset (OQ-92, OQ-93)</td>
+<td>M</td>
+<td>MR</td>
+<td><strong>License</strong></td>
+</tr>
+<tr>
+<td>F12.1.7</td>
+<td>Chia sẻ chỉ dấu tấn công dạng gộp với CERT; chính sách công bố lỗ hổng (OQ-121, OQ-123)</td>
+<td>M</td>
+<td>MR</td>
+<td>—</td>
 </tr>
 <tr>
 <td>F12.2.1</td>
@@ -3676,6 +3767,13 @@ lặp lại ở đây.</li>
 <td>MVP</td>
 <td></td>
 </tr>
+<tr>
+<td>FR-1-25</td>
+<td>Hệ thống phải cho owner huỷ yêu cầu xoá org trong 30 ngày, khôi phục zone gỡ nhầm trong 30 ngày, và xuất cấu hình JSON, log trước khi xoá; bản sao lưu giữ tối đa 35 ngày (BR-56)</td>
+<td>F1.1.5, F1.1.6</td>
+<td>MVP</td>
+<td>Backup khôi phục phải áp lại danh sách xoá</td>
+</tr>
 </tbody>
 </table>
 <h3 id="f-02-requirements--f2-zone-và-onboarding">F2 Zone và onboarding</h3>
@@ -3939,6 +4037,13 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>MVP</td>
 <td>Cảnh báo đỏ ở mọi bước</td>
 </tr>
+<tr>
+<td>FR-2-36</td>
+<td>Zone đã gỡ mà DNS còn trỏ phải được chuyển tiếp không bảo vệ 30 ngày rồi trả trang giải thích (BR-55); chuyển zone giữa org cần owner hai org xác nhận (BR-57); phải phát hiện domain hết hạn hoặc đổi chủ</td>
+<td>F2.7.8, F2.1.12, F2.1.13</td>
+<td>MVP</td>
+<td></td>
+</tr>
 </tbody>
 </table>
 <h3 id="f-02-requirements--f3-bảo-vệ-runtime-và-f4-hiệu-năng">F3 Bảo vệ runtime và F4 Hiệu năng</h3>
@@ -4093,6 +4198,13 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>F3.6.4, F3.6.5</td>
 <td>MVP</td>
 <td>Preset báo chí chặn crawler huấn luyện</td>
+</tr>
+<tr>
+<td>FR-3-21</td>
+<td>API discovery chỉ lưu cấu trúc, endpoint mới chờ khách xác nhận (BR-60); chặn theo schema theo từng endpoint sau log-only tối thiểu 7 ngày (BR-61); consumer nhận diện theo API key, JWT, rồi IP</td>
+<td>F3.7.5, F3.7.6, F3.7.7</td>
+<td>MVP</td>
+<td></td>
 </tr>
 <tr>
 <td>FR-4-01</td>
@@ -4733,7 +4845,7 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 </tr>
 <tr>
 <td>FR-10-04</td>
-<td>Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay và tính phần còn lại của gói cũ vào gói mới kèm bonus (<a href="#f-03-business-analysis-05-plans-billing">OQ-56</a>, mức bonus chưa định), hạ có hiệu lực cuối kỳ (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
+<td>Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay và tính phần còn lại của gói cũ vào gói mới kèm bonus (<a href="#f-03-business-analysis-05-plans-billing">OQ-56</a>, bonus 10% giá trị còn lại của gói cũ, tối đa một tháng phí chênh), hạ có hiệu lực cuối kỳ (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
 <td>F10.2.2</td>
 <td>MVP</td>
 <td>QS-14, QS-34</td>
@@ -4813,12 +4925,19 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>Nâng gói phải có hiệu lực ngay và tính phần còn lại cộng bonus; hạ gói cuối kỳ với ân hạn 3 ngày và báo trước 7 ngày khi áp retention mới (BR-49, BR-50)</td>
 <td>F10.2.4, F10.2.5</td>
 <td>MVP</td>
-<td>Mức bonus chưa định</td>
+<td>Bonus 10%, tối đa một tháng phí chênh</td>
 </tr>
 <tr>
 <td>FR-10-16</td>
 <td>Hệ thống phải có gói nhóm nhiều site nhỏ, trả sau theo hợp đồng, thanh toán thẻ, VietQR, hoá đơn; huỷ theo BR-51</td>
 <td>F10.2.6, F10.2.7, F10.2.8, F10.2.9</td>
+<td>MVP</td>
+<td></td>
+</tr>
+<tr>
+<td>FR-10-17</td>
+<td>Hợp đồng Enterprise kết thúc phải có 30 ngày chuyển tiếp rồi chuyển gói tự phục vụ hoặc xử lý như zone bỏ hoang</td>
+<td>F10.2.10</td>
 <td>MVP</td>
 <td></td>
 </tr>
@@ -4892,6 +5011,13 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>MVP</td>
 <td>Cần tư vấn pháp lý trước khi bán</td>
 </tr>
+<tr>
+<td>FR-12-09</td>
+<td>NCC phải có support theo gói, trang trạng thái công khai, hotline khẩn khi portal sập, rule khẩn CVE trong 24 giờ, POC Enterprise 30 ngày, on-prem do khách vận hành; thông báo đóng PoP, region trước 90 ngày (Enterprise 180 ngày) (BR-58)</td>
+<td>F12.1.4, F12.1.5, F12.1.6, F12.1.7</td>
+<td>MVP</td>
+<td></td>
+</tr>
 </tbody>
 </table>
 <h2 id="f-02-requirements--4-quy-tắc-nghiệp-vụ">4. Quy tắc nghiệp vụ</h2>
@@ -4956,7 +5082,7 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 </tr>
 <tr>
 <td>BR-11</td>
-<td>Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói có hiệu lực cuối kỳ; nếu khi đó khách vượt giới hạn mới thì được cảnh báo sau 6 giờ, 12 giờ rồi mỗi ngày trong 3 ngày ân hạn, hết hạn thì chặn phần vượt (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
+<td>Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói có hiệu lực cuối kỳ; nếu khi đó khách vượt giới hạn mới thì được cảnh báo sau 6 giờ, 12 giờ rồi mỗi ngày trong 3 ngày ân hạn, hết hạn thì chặn phần vượt (không cho tạo thêm vượt giới hạn, phần vượt mới nhất trước ngừng áp, không khoá tài khoản) (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
 <td>F10.3.3</td>
 </tr>
 <tr>
@@ -5173,6 +5299,41 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>BR-54</td>
 <td>Rule mới của một release NCC vào zone ở log-only 7 ngày có báo cáo rồi tự chặn (ngoại lệ có chủ đích của BR-36, vì rule do NCC phát hành); Business trở lên chọn duyệt thủ công; rule khẩn cho CVE áp ngay ở chế độ chặn</td>
 <td>F5.5</td>
+</tr>
+<tr>
+<td>BR-55</td>
+<td>Zone đã gỡ mà DNS còn trỏ về edge: chuyển tiếp không bảo vệ, không cache 30 ngày, nhắc hằng tuần, rồi trả trang giải thích; không bao giờ lỗi im lặng</td>
+<td>F2.7</td>
+</tr>
+<tr>
+<td>BR-56</td>
+<td>Giữ dữ liệu: huỷ xoá org trong 30 ngày (chỉ owner), khôi phục zone gỡ nhầm trong 30 ngày (cấu hình, không log), bản sao lưu giữ tối đa 35 ngày</td>
+<td>F1.1</td>
+</tr>
+<tr>
+<td>BR-57</td>
+<td>Chuyển zone giữa org cần owner của cả hai org xác nhận; policy đi theo, log, audit, hoá đơn ở lại org cũ; bí mật bị xoá và phải tạo lại</td>
+<td>F2.1</td>
+</tr>
+<tr>
+<td>BR-58</td>
+<td>NCC báo trước tối thiểu 90 ngày (Enterprise 180 ngày) khi đóng PoP hoặc rút region, kèm dải IP mới</td>
+<td>F12.1</td>
+</tr>
+<tr>
+<td>BR-59</td>
+<td>NCC là bên xử lý dữ liệu log, khách là bên kiểm soát: yêu cầu của người dùng cuối chuyển cho khách trong 72 giờ; IP nằm trong nhiều tenant thì xoá theo từng tenant yêu cầu</td>
+<td>F9</td>
+</tr>
+<tr>
+<td>BR-60</td>
+<td>API discovery mặc định chỉ lưu cấu trúc (tên field, kiểu, độ dài), không lưu mẫu request, response; lưu mẫu thật chỉ khi khách bật theo endpoint, che theo BR-44, giữ 7 ngày; endpoint phát hiện mới chờ khách xác nhận</td>
+<td>F3.7</td>
+</tr>
+<tr>
+<td>BR-61</td>
+<td>Chặn theo schema: log-only tối thiểu 7 ngày, áp theo từng endpoint không cả API; cho phép nhiều version schema song song</td>
+<td>F3.7</td>
 </tr>
 </tbody>
 </table>
@@ -5632,7 +5793,7 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 </tr>
 <tr>
 <td>OQ-16…OQ-165</td>
-<td>OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ (<a href="#f-03-business-analysis-00-index">§3</a>); OQ-127…OQ-142 về định hướng sản phẩm (<a href="#f-04-product-direction-00-index">§4</a>)</td>
+<td>OQ-16…OQ-20 thuộc bản nháp onboarding cũ (OQ-17…OQ-20 duyệt 2026-11-17); OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ (<a href="#f-03-business-analysis-00-index">§3</a>); OQ-127…OQ-142 về định hướng sản phẩm (<a href="#f-04-product-direction-00-index">§4</a>)</td>
 <td>Một số đã quyết hoặc có đề xuất chờ duyệt</td>
 <td>Theo trang</td>
 </tr>
@@ -5641,7 +5802,7 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 </section>
 <section class="doc" id="f-03-business-analysis-00-index"><div class="path">03-business-analysis/00-index.md</div><h1 id="f-03-business-analysis-00-index--3-phân-tích-nghiệp-vụ">3. Phân tích nghiệp vụ</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-125).</strong> Luồng (bước 2) đã viết cho 3.1–3.6, 3.9, 3.10 (2026-11-17); luồng chưa được chủ dự án duyệt, chỉ các OQ làm căn cứ đã duyệt.</p>
+<p><strong>Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-118, OQ-125); đợt hai duyệt 3.7, 3.11, 3.12 và 7 việc nhỏ.</strong> Luồng (bước 2) đã viết cho 3.1–3.7, 3.9–3.12 (2026-11-17); luồng chưa được chủ dự án duyệt, chỉ các OQ làm căn cứ đã duyệt.</p>
 </blockquote>
 <p>Bản đồ phân rã nói hệ thống <strong>có</strong> những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
 thật làm. Khi xong, mỗi nghiệp vụ trả lời được các câu hỏi sau:</p>
@@ -5713,7 +5874,7 @@ xuất chờ duyệt.</li>
 <td><a href="#f-03-business-analysis-07-offboarding">3.7</a></td>
 <td>Rời dịch vụ</td>
 <td>OQ-69…OQ-74, OQ-94…OQ-99</td>
-<td>Bước 1, đã thêm kịch bản F–M</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Bước 1, đã thêm kịch bản F–M</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-08-monitoring-investigation">3.8</a></td>
@@ -5737,13 +5898,13 @@ xuất chờ duyệt.</li>
 <td><a href="#f-03-business-analysis-11-provider-operations">3.11</a></td>
 <td>Vận hành của NCC</td>
 <td>OQ-89…OQ-93, OQ-118…OQ-123</td>
-<td>Bước 1, đã thêm trục F–N</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Bước 1, đã thêm trục F–N</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-12-api-security">3.12</a></td>
 <td>API security</td>
 <td>OQ-84, OQ-107…OQ-111</td>
-<td>Bước 1, tách từ trang bot cũ</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Bước 1, tách từ trang bot cũ</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-13-configuration-surface">3.13</a></td>
@@ -6824,7 +6985,7 @@ xếp khách vào hồ sơ, rồi chỉ hiện các bước của hồ sơ đó,
 <blockquote>
 <p>Bản nháp đầu tiên đi theo một kịch bản (DNS đầy đủ, origin có IP public, cổng chuẩn). Sau khi chủ dự án duyệt OQ-21…OQ-32 và OQ-147…OQ-150
 (2026-11-17), luồng này là <strong>căn cứ cho kịch bản chính</strong>; các điều chỉnh theo quyết định nằm ở <a href="#f-03-business-analysis-01-onboarding--a10-điều-chỉnh-theo-quyết-định-2026-11-17">A.10</a>.
-A.6 (hồ sơ khách) và cây quyết định ở <a href="#f-03-business-analysis-01-onboarding--7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt">§7</a> <strong>chưa duyệt riêng</strong>. OQ-17, OQ-18, OQ-19, OQ-20 ở A.9 chưa có quyết định riêng.</p>
+A.6 (hồ sơ khách) và cây quyết định ở <a href="#f-03-business-analysis-01-onboarding--7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt">§7</a> <strong>chưa duyệt riêng</strong>. OQ-17…OQ-20 ở A.9 đã được duyệt theo đề xuất ngày 2026-11-17.</p>
 </blockquote>
 <h3 id="f-03-business-analysis-01-onboarding--a1-mục-tiêu-và-định-nghĩa-xong">A.1 Mục tiêu và định nghĩa &quot;xong&quot;</h3>
 <p>Onboarding bắt đầu khi khách nhập domain và kết thúc khi website <strong>được bảo vệ thật</strong>. Website được bảo
@@ -9645,7 +9806,7 @@ chủ dự án duyệt.</p>
 <td>OQ-56</td>
 <td>(a) Tính theo ngày còn lại; (b) từ kỳ sau</td>
 <td>(b) khách nâng gói khi bị tấn công sẽ chờ tới kỳ sau</td>
-<td><strong>Đã sửa 2026-11-17:</strong> Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hệ thống tự tính phần giá trị còn lại của gói cũ kể từ ngày nâng, trừ vào gói mới, và cộng thêm một khoản bonus vào gói mới (<strong>mức bonus chưa định</strong>, cần chốt cùng bảng giá ADR-0043). Hạ: có hiệu lực cuối kỳ</td>
+<td><strong>Đã sửa 2026-11-17:</strong> Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hệ thống tự tính phần giá trị còn lại của gói cũ kể từ ngày nâng, trừ vào gói mới, và cộng thêm một khoản bonus vào gói mới (<strong>bonus 10% giá trị còn lại của gói cũ, tối đa một tháng phí chênh</strong>, duyệt 2026-11-17; cần business xác nhận cùng bảng giá ADR-0043). Hạ: có hiệu lực cuối kỳ</td>
 </tr>
 <tr>
 <td>OQ-57</td>
@@ -9683,7 +9844,7 @@ chủ dự án duyệt.</p>
 <p>FR-10-01…FR-10-13, BR-7…BR-11, DT-8, IR-2, IR-3, OQ-10, OQ-12, OQ-14 ở <a href="#f-02-requirements">§2</a>.</p>
 <h2 id="f-03-business-analysis-05-plans-billing--7-luồng-mua-đổi-gói-vượt-hạn-mức-thanh-toán-bước-2-2026-11-17">7. Luồng: mua, đổi gói, vượt hạn mức, thanh toán (bước 2, 2026-11-17)</h2>
 <blockquote>
-<p>Dựa trên <a href="#f-03-business-analysis-05-plans-billing--3-đã-quyết">§3</a> (trần chi tiêu, OQ-55) và <a href="#f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>. Giá và hạn mức ở kiến trúc 8.18 / ADR-0043. <strong>Còn thiếu một số:</strong> mức bonus khi nâng gói (<a href="#f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">OQ-56</a>); bảng giá do business chốt.</p>
+<p>Dựa trên <a href="#f-03-business-analysis-05-plans-billing--3-đã-quyết">§3</a> (trần chi tiêu, OQ-55) và <a href="#f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>. Giá và hạn mức ở kiến trúc 8.18 / ADR-0043. Mức bonus đã chốt 10% (xem BL5); bảng giá do business chốt.</p>
 </blockquote>
 <p><strong>Định nghĩa &quot;xong&quot;:</strong> subscription của account khớp với gói khách muốn, hoá đơn đúng, thanh toán đã ghi, giới hạn của zone phản ánh gói mới.</p>
 <div class="diagram"><pre class="mermaid">flowchart TB
@@ -9753,7 +9914,7 @@ chủ dự án duyệt.</p>
 <tr>
 <td>BL6 Hạ</td>
 <td>Owner, billing</td>
-<td>Hạ có hiệu lực <strong>cuối kỳ</strong>. Nếu lúc đó khách vượt giới hạn gói mới: cảnh báo sau 6 giờ, 12 giờ, 1 ngày và mỗi ngày trong <strong>3 ngày ân hạn</strong>, hết hạn thì chặn phần vượt (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>). Log ngoài retention mới: <strong>báo trước 7 ngày</strong> rồi áp retention mới; khách muốn giữ thì xuất trước (<a href="#f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">OQ-58</a>)</td>
+<td>Hạ có hiệu lực <strong>cuối kỳ</strong>. Nếu lúc đó khách vượt giới hạn gói mới: cảnh báo sau 6 giờ, 12 giờ, 1 ngày và mỗi ngày trong <strong>3 ngày ân hạn</strong>, hết hạn thì chặn phần vượt: không cho tạo thêm vượt giới hạn và phần vượt (mới nhất trước) ngừng áp, không khoá tài khoản (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>). Log ngoài retention mới: <strong>báo trước 7 ngày</strong> rồi áp retention mới; khách muốn giữ thì xuất trước (<a href="#f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">OQ-58</a>)</td>
 <td>Khách không giảm bớt: sau ân hạn chặn phần vượt, không xoá cấu hình</td>
 <td><code>DowngradeScheduled</code>, <code>QuotaWarning</code></td>
 </tr>
@@ -10217,7 +10378,7 @@ API key hạn tuỳ chọn và thu hồi tự động khi lộ; quyền riêng x
 </section>
 <section class="doc" id="f-03-business-analysis-07-offboarding"><div class="path">03-business-analysis/07-offboarding.md</div><h1 id="f-03-business-analysis-07-offboarding--37-rời-dịch-vụ-gỡ-zone-xoá-org-xoá-dữ-liệu">3.7 Rời dịch vụ: gỡ zone, xoá org, xoá dữ liệu</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở, chưa có quyết định nào.</strong> Bổ sung kịch bản F–M theo yêu cầu &quot;nghĩ thêm kịch bản&quot; (2026-11-07).</p>
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt đề xuất cho các câu OQ của trang này</strong> (trừ OQ-118 của 3.11 vẫn hoãn). Luồng (bước 2) ở mục 6. Bổ sung kịch bản F–M theo yêu cầu &quot;nghĩ thêm kịch bản&quot; (2026-11-07).</p>
 </blockquote>
 <h2 id="f-03-business-analysis-07-offboarding--1-phạm-vi">1. Phạm vi</h2>
 <p>Khách gỡ một zone, huỷ gói, xoá org, hoặc NCC chấm dứt dịch vụ. Gồm việc trả traffic về origin, xuất và xoá
@@ -10707,6 +10868,172 @@ dữ liệu. Liên quan: F2.4.3, F1.1.4, F9.3 ở <a href="#f-01-functional-deco
 <h2 id="f-03-business-analysis-07-offboarding--4-phụ-thuộc">4. Phụ thuộc</h2>
 <p>FR-1-03, FR-2-13, FR-9-03…FR-9-05, BR-12, BR-16, DT-7, OQ-6 ở <a href="#f-02-requirements">§2</a>; <code>DataErasureRequested</code>
 ở kiến trúc 5.5.</p>
+<h2 id="f-03-business-analysis-07-offboarding--5-đã-quyết-duyệt-2026-11-17">5. Đã quyết (duyệt 2026-11-17)</h2>
+<blockquote>
+<p>Chủ dự án duyệt tất cả đề xuất dưới đây ngày 2026-11-17. Đề xuất do Claude viết (trang gốc chưa có mục phân tích); con số là ước lượng đã được duyệt.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Câu</th>
+<th>Quyết định</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OQ-69</td>
+<td>(b): 30 ngày chuyển tiếp không bảo vệ, không cache, nhắc khách hằng tuần; sau đó trả trang giải thích &quot;zone đã gỡ&quot;. Không bao giờ trả lỗi im lặng</td>
+</tr>
+<tr>
+<td>OQ-70</td>
+<td>30 ngày cho cả hai: huỷ được yêu cầu xoá org trong 30 ngày (chỉ owner); zone gỡ nhầm khôi phục được cấu hình trong 30 ngày; log không khôi phục</td>
+</tr>
+<tr>
+<td>OQ-71</td>
+<td>(b): backup giữ tối đa 35 ngày; khi khôi phục từ backup phải áp lại danh sách xoá; ghi rõ trong điều khoản</td>
+</tr>
+<tr>
+<td>OQ-72</td>
+<td>(a) JSON theo API cho mọi gói, đủ để dựng lại; Terraform ở Mở rộng. Log xuất CSV/JSON; mọi gói xuất được trước khi xoá</td>
+</tr>
+<tr>
+<td>OQ-73</td>
+<td>Theo OQ-45: chỉ nhận văn bản chính thức qua đầu mối pháp chế, ghi sổ, báo khách trừ khi văn bản cấm. Vi phạm đã xác minh thì khoá zone ngay; khoá đảo ngược được khi vi phạm được gỡ. <strong>Cần tư vấn pháp lý</strong></td>
+</tr>
+<tr>
+<td>OQ-74</td>
+<td>Cả hai: kiểm lại bản ghi xác minh định kỳ (OQ-3: cảnh báo ngày 7, tạm dừng ngày 14) và RDAP khi có. Chủ mới phải xác minh lại; không thừa hưởng cấu hình và log của chủ cũ</td>
+</tr>
+<tr>
+<td>OQ-94</td>
+<td>Policy và cấu hình đi theo; log, audit, hoá đơn ở lại org cũ. Cần owner của <strong>cả hai</strong> org xác nhận; bí mật (key API, webhook secret) bị xoá và phải tạo lại; hiệu lực ngay, subscription gán lại account mới</td>
+</tr>
+<tr>
+<td>OQ-95</td>
+<td>Theo BR-9, rồi: 30 ngày chuyển tiếp tối giản; 30 ngày chuyển tiếp không bảo vệ (như OQ-69); sau đó gỡ zone và gửi thông báo cuối. Không bao giờ chặn traffic hợp pháp</td>
+</tr>
+<tr>
+<td>OQ-96</td>
+<td>(a) có thẻ thì chuyển sang gói tự phục vụ phù hợp nhất, nếu không thì theo OQ-95; 30 ngày chuyển tiếp giữ nguyên dịch vụ; thu hồi cell, database riêng sau 30 ngày kèm xuất dữ liệu; gia hạn đang đàm phán: tiếp tục tối đa 15 ngày khi có xác nhận bằng văn bản</td>
+</tr>
+<tr>
+<td>OQ-97</td>
+<td>Trong 30 ngày kể từ xoá: khôi phục cấu hình. Sau đó chỉ khôi phục từ bản xuất của chính khách; không giữ log</td>
+</tr>
+<tr>
+<td>OQ-98</td>
+<td>NCC chuyển yêu cầu cho khách trong 72 giờ, không tự trả lời người dùng cuối. IP nằm trong nhiều tenant: xoá theo từng tenant yêu cầu, dữ liệu gộp ẩn danh không bị xoá. <strong>Cần tư vấn pháp lý</strong></td>
+</tr>
+<tr>
+<td>OQ-99</td>
+<td>Đóng PoP hoặc rút region: báo trước tối thiểu 90 ngày (Enterprise 180 ngày) kèm dải IP mới. Ngừng kinh doanh: Enterprise được bảo đảm xuất cấu hình và 180 ngày chuyển đổi</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-03-business-analysis-07-offboarding--6-luồng-rời-dịch-vụ-chuyển-zone-bỏ-hoang-bước-2-2026-11-17">6. Luồng: rời dịch vụ, chuyển zone, bỏ hoang (bước 2, 2026-11-17)</h2>
+<div class="diagram"><pre class="mermaid">flowchart TB
+    OF1[&quot;OF1 Yêu cầu&lt;br/&gt;gỡ zone, chuyển zone, xoá org,&lt;br/&gt;huỷ gói, hết hợp đồng&quot;]
+    OF2[&quot;OF2 Xuất dữ liệu&lt;br/&gt;cấu hình JSON, log CSV/JSON&quot;]
+    G1{{&quot;OFG1 Còn DNS trỏ về edge?&quot;}}
+    OF3[&quot;OF3 Chuyển tiếp không bảo vệ&lt;br/&gt;30 ngày, nhắc hằng tuần&quot;]
+    OF4[&quot;OF4 Trang giải thích&lt;br/&gt;zone đã gỡ&quot;]
+    OF5[&quot;OF5 Giữ 30 ngày&lt;br/&gt;huỷ xoá, khôi phục&quot;]
+    OF6[&quot;OF6 Xoá dữ liệu&lt;br/&gt;backup hết hạn ≤ 35 ngày&quot;]
+    OF1 --&gt; OF2 --&gt; G1
+    G1 --&gt;|có| OF3 --&gt; OF4 --&gt; OF5
+    G1 --&gt;|không| OF5
+    OF5 --&gt; OF6
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Ai</th>
+<th>Điều kiện hoặc cổng</th>
+<th>Hỏng thì xử lý</th>
+<th>Dữ liệu sinh ra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OF1 Yêu cầu</td>
+<td>Owner (xoá org chỉ owner); NCC khi vi phạm hoặc theo yêu cầu cơ quan nhà nước</td>
+<td>Gỡ nhầm khôi phục trong 30 ngày</td>
+<td>Yêu cầu của cơ quan: theo OQ-45, ghi sổ</td>
+<td><code>OffboardingRequest</code></td>
+</tr>
+<tr>
+<td>OF2 Xuất</td>
+<td>Khách</td>
+<td>Cấu hình dạng JSON theo API cho mọi gói (đủ để dựng lại), log CSV hoặc JSON; Terraform ở Mở rộng</td>
+<td>Log quá lớn: xuất theo đợt</td>
+<td><code>ExportJob</code></td>
+</tr>
+<tr>
+<td>OFG1, OF3</td>
+<td>Hệ thống</td>
+<td>Zone đã gỡ mà DNS còn trỏ: <strong>chuyển tiếp thẳng tới origin 30 ngày</strong>, không bảo vệ, không cache, nhắc khách hằng tuần</td>
+<td>Origin không phản hồi: trả trang lỗi có giải thích</td>
+<td><code>ZoneState.passthrough</code></td>
+</tr>
+<tr>
+<td>OF4</td>
+<td>Hệ thống</td>
+<td>Sau 30 ngày trả <strong>trang giải thích &quot;zone đã gỡ&quot;</strong>, không lỗi im lặng</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>OF5 Giữ</td>
+<td>Hệ thống</td>
+<td><strong>30 ngày</strong> sau yêu cầu xoá org (huỷ được, chỉ owner) và 30 ngày khôi phục zone gỡ nhầm (cấu hình, không log)</td>
+<td>Quay lại sau thời hạn: chỉ khôi phục từ bản xuất của khách</td>
+<td><code>RetentionHold</code></td>
+</tr>
+<tr>
+<td>OF6 Xoá</td>
+<td>Hệ thống</td>
+<td>Xoá dữ liệu sống; <strong>bản sao lưu giữ tối đa 35 ngày</strong>, khôi phục từ backup phải áp lại danh sách xoá</td>
+<td></td>
+<td><code>DeletionRecord</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Nhánh khác:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tình huống</th>
+<th>Xử lý</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chuyển zone sang org khác (OQ-94)</td>
+<td>Cần owner <strong>cả hai org</strong> xác nhận; policy và cấu hình đi theo; log, audit, hoá đơn ở lại org cũ; bí mật (key API, webhook secret) bị xoá và phải tạo lại; hiệu lực ngay, subscription gán lại account mới</td>
+</tr>
+<tr>
+<td>Zone bỏ hoang (OQ-95)</td>
+<td>Theo BR-9, rồi 30 ngày chuyển tiếp tối giản, 30 ngày chuyển tiếp không bảo vệ, rồi gỡ và gửi thông báo cuối. Không bao giờ chặn traffic hợp pháp</td>
+</tr>
+<tr>
+<td>Hợp đồng Enterprise kết thúc (OQ-96)</td>
+<td>30 ngày chuyển tiếp giữ nguyên dịch vụ; có thẻ thì chuyển gói tự phục vụ phù hợp nhất, không thì như zone bỏ hoang; cell và database riêng thu hồi sau 30 ngày kèm xuất dữ liệu; gia hạn đang đàm phán tiếp tục tối đa 15 ngày khi có xác nhận bằng văn bản</td>
+</tr>
+<tr>
+<td>Domain hết hạn hoặc đổi chủ (OQ-74)</td>
+<td>Kiểm lại bản ghi xác minh định kỳ (cảnh báo ngày 7, tạm dừng ngày 14, OQ-3) và RDAP khi có; chủ mới phải xác minh lại, không thừa hưởng cấu hình và log</td>
+</tr>
+<tr>
+<td>Người dùng cuối yêu cầu dữ liệu log (OQ-98)</td>
+<td>NCC là bên xử lý: chuyển cho khách trong 72 giờ; IP nằm trong nhiều tenant thì xoá theo từng tenant yêu cầu, dữ liệu gộp ẩn danh không xoá. Cần tư vấn pháp lý</td>
+</tr>
+<tr>
+<td>NCC đóng PoP, rút region, ngừng kinh doanh (OQ-99)</td>
+<td>Báo trước tối thiểu 90 ngày (Enterprise 180 ngày) kèm dải IP mới; Enterprise được bảo đảm xuất cấu hình và 180 ngày chuyển đổi</td>
+</tr>
+</tbody>
+</table>
 </section>
 <section class="doc" id="f-03-business-analysis-08-monitoring-investigation"><div class="path">03-business-analysis/08-monitoring-investigation.md</div><h1 id="f-03-business-analysis-08-monitoring-investigation--38-giám-sát-điều-tra-cảnh-báo-báo-cáo">3.8 Giám sát, điều tra, cảnh báo, báo cáo</h1>
 <blockquote>
@@ -12628,7 +12955,7 @@ xác nhận khi xoá toàn zone, nén gzip/brotli; mục plugin theo framework v
 </section>
 <section class="doc" id="f-03-business-analysis-11-provider-operations"><div class="path">03-business-analysis/11-provider-operations.md</div><h1 id="f-03-business-analysis-11-provider-operations--311-vận-hành-của-ncc">3.11 Vận hành của NCC</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở, đã quyết phân quyền của admin NCC (2026-11-07).</strong> Mở rộng theo yêu cầu &quot;vận hành thì suy nghĩ
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt đề xuất cho các câu OQ của trang này</strong> (trừ OQ-118 của 3.11 vẫn hoãn). Luồng (bước 2) ở mục 7. Mở rộng theo yêu cầu &quot;vận hành thì suy nghĩ
 thêm&quot;: thêm các trục F–N. Trang này chỉ liệt kê kịch bản và câu hỏi. Vận hành kỹ thuật (runbook, giám sát) ở
 kiến trúc 8.12, 8.13.</p>
 </blockquote>
@@ -13167,10 +13494,168 @@ khỏi portal của khách; các trục dưới đây là những gì portal và
 </table>
 <h2 id="f-03-business-analysis-11-provider-operations--5-phụ-thuộc">5. Phụ thuộc</h2>
 <p>FR-11-01…FR-11-03, FR-12-01…FR-12-05 ở <a href="#f-02-requirements">§2</a>; runbook ở kiến trúc 8.13.</p>
+<h2 id="f-03-business-analysis-11-provider-operations--6-đã-quyết-duyệt-2026-11-17">6. Đã quyết (duyệt 2026-11-17)</h2>
+<blockquote>
+<p>Chủ dự án duyệt tất cả đề xuất dưới đây ngày 2026-11-17. Đề xuất do Claude viết (trang gốc chưa có mục phân tích); con số là ước lượng đã được duyệt.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Câu</th>
+<th>Quyết định</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OQ-89</td>
+<td>Free, Pro: email, giờ hành chính, phản hồi 1 ngày làm việc. Business: thêm chat, phản hồi 4 giờ với sự cố nghiêm trọng trong giờ hành chính. Enterprise: điện thoại, 1 giờ với sự cố nghiêm trọng, kênh riêng</td>
+</tr>
+<tr>
+<td>OQ-90</td>
+<td>(a): trạng thái tổng thể và theo region, lịch sử 90 ngày, đăng ký nhận. Sự cố nền tảng gửi owner, billing và liên hệ kỹ thuật qua email và portal; Enterprise có kênh riêng</td>
+</tr>
+<tr>
+<td>OQ-91</td>
+<td>Rule khẩn trong 24 giờ với CVE nghiêm trọng đang bị khai thác, SOC hai người duyệt. Trang công bố theo CVE ở Mở rộng; MVP có trang cập nhật đơn giản</td>
+</tr>
+<tr>
+<td>OQ-92</td>
+<td>30 ngày, miễn phí, kỹ sư pre-sales vận hành cùng khách, tiêu chí thành công thoả thuận trước bằng văn bản; NCC chịu chi phí hạ tầng</td>
+</tr>
+<tr>
+<td>OQ-93</td>
+<td>(a): NCC cấp license và cập nhật ruleset (online hoặc gói offline), hỗ trợ; NCC vận hành hộ là dịch vụ trả phí ở Nâng cao. Gắn với rủi ro ADR-0006</td>
+</tr>
+<tr>
+<td>OQ-119</td>
+<td>Hotline và email khẩn cho Business trở lên; xác minh bằng mã khẩn đặt trước và người liên hệ được uỷ quyền; NCC bật Under Attack thay. Free, Pro: email và trang trạng thái</td>
+</tr>
+<tr>
+<td>OQ-120</td>
+<td>ISO 27001 trước, SOC 2 Type II sau, PCI DSS nhà cung cấp dịch vụ khi bán cho ngân hàng và thương mại điện tử có thẻ</td>
+</tr>
+<tr>
+<td>OQ-121</td>
+<td>(b): chỉ IP, ASN nguồn tấn công và chữ ký; không có dữ liệu request hay khách; Enterprise chọn không tham gia</td>
+</tr>
+<tr>
+<td>OQ-122</td>
+<td>Không ở MVP: lịch trực luân phiên ngoài giờ cho sự cố nghiêm trọng, chỉ cam kết cho Business trở lên; Enterprise 24/7 khi đội đủ</td>
+</tr>
+<tr>
+<td>OQ-123</td>
+<td>Chính sách công bố lỗ hổng (security.txt, email) từ MVP; bug bounty trả tiền ở Nâng cao, sau chứng chỉ</td>
+</tr>
+<tr>
+<td>OQ-118</td>
+<td><strong>Vẫn hoãn</strong> (2026-11-07), làm cùng tính năng phân quyền</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-03-business-analysis-11-provider-operations--7-luồng-hỗ-trợ-sự-cố-nền-tảng-vận-hành-của-ncc-bước-2-2026-11-17">7. Luồng: hỗ trợ, sự cố nền tảng, vận hành của NCC (bước 2, 2026-11-17)</h2>
+<div class="diagram"><pre class="mermaid">flowchart TB
+    PO1[&quot;PO1 Khách liên hệ&lt;br/&gt;kênh theo gói&quot;]
+    PO2[&quot;PO2 Phân loại&lt;br/&gt;mức nghiêm trọng&quot;]
+    G1{{&quot;POG1 Sự cố nền tảng?&quot;}}
+    PO3[&quot;PO3 Trang trạng thái&lt;br/&gt;và báo owner, billing, kỹ thuật&quot;]
+    PO4[&quot;PO4 Xử lý, leo thang&lt;br/&gt;trực ngoài giờ cho Business trở lên&quot;]
+    PO5[&quot;PO5 Báo cáo sau sự cố&quot;]
+    PO1 --&gt; PO2 --&gt; G1
+    G1 --&gt;|có| PO3 --&gt; PO4
+    G1 --&gt;|không| PO4
+    PO4 --&gt; PO5
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Ai</th>
+<th>Điều kiện hoặc cổng</th>
+<th>Hỏng thì xử lý</th>
+<th>Dữ liệu sinh ra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PO1 Liên hệ</td>
+<td>Khách</td>
+<td>Free, Pro: email, giờ hành chính, phản hồi 1 ngày làm việc. Business: thêm chat, 4 giờ với sự cố nghiêm trọng trong giờ hành chính. Enterprise: điện thoại, 1 giờ, kênh riêng (<a href="#f-03-business-analysis-11-provider-operations--6-đã-quyết-duyệt-2026-11-17">OQ-89</a>)</td>
+<td><strong>Portal sập khi đang bị tấn công:</strong> hotline và email khẩn cho Business trở lên, xác minh bằng mã khẩn đặt trước và người liên hệ được uỷ quyền, NCC bật Under Attack thay (OQ-119)</td>
+<td><code>SupportTicket</code></td>
+</tr>
+<tr>
+<td>PO2 Phân loại</td>
+<td>Support</td>
+<td>Mức nghiêm trọng theo ảnh hưởng</td>
+<td></td>
+<td><code>Severity</code></td>
+</tr>
+<tr>
+<td>POG1, PO3</td>
+<td>NCC</td>
+<td>Sự cố nền tảng: <strong>trang trạng thái công khai</strong> (tổng thể và theo region, lịch sử 90 ngày, đăng ký nhận), báo owner, billing, liên hệ kỹ thuật qua email và portal; Enterprise kênh riêng (OQ-90)</td>
+<td></td>
+<td><code>StatusIncident</code></td>
+</tr>
+<tr>
+<td>PO4 Xử lý</td>
+<td>Đội vận hành</td>
+<td><strong>Không trực 24/7 ở MVP</strong>: lịch trực luân phiên ngoài giờ cho sự cố nghiêm trọng, chỉ cam kết cho Business trở lên; Enterprise 24/7 khi đội đủ (OQ-122)</td>
+<td>Không có người trực: leo thang theo lịch</td>
+<td><code>OnCallShift</code></td>
+</tr>
+<tr>
+<td>PO5 Báo cáo</td>
+<td>NCC</td>
+<td>Báo cáo sau sự cố (<a href="#f-03-business-analysis-03-attack-response">3.3</a>)</td>
+<td></td>
+<td><code>IncidentReport</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Các luồng riêng:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Việc</th>
+<th>Quyết định</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CVE nghiêm trọng đang bị khai thác (OQ-91)</td>
+<td><strong>Rule khẩn trong 24 giờ</strong>, SOC hai người duyệt; trang công bố theo CVE ở Mở rộng, MVP có trang cập nhật đơn giản</td>
+</tr>
+<tr>
+<td>POC cho Enterprise (OQ-92)</td>
+<td>30 ngày, miễn phí, kỹ sư pre-sales vận hành cùng khách, tiêu chí thành công thoả thuận trước bằng văn bản; NCC chịu chi phí hạ tầng</td>
+</tr>
+<tr>
+<td>On-prem (OQ-93)</td>
+<td>Khách tự vận hành; NCC cấp license, cập nhật ruleset (online hoặc gói offline), hỗ trợ; NCC vận hành hộ là dịch vụ trả phí ở Nâng cao (rủi ro ADR-0006)</td>
+</tr>
+<tr>
+<td>Chứng chỉ (OQ-120)</td>
+<td>ISO 27001 trước, SOC 2 Type II sau, PCI DSS nhà cung cấp dịch vụ khi bán cho ngân hàng và thương mại điện tử có thẻ</td>
+</tr>
+<tr>
+<td>Chia sẻ chỉ dấu tấn công (OQ-121)</td>
+<td>Chỉ dạng gộp (IP, ASN nguồn, chữ ký) cho CERT, VNCERT; không có dữ liệu request hay khách; Enterprise chọn không tham gia</td>
+</tr>
+<tr>
+<td>Báo cáo lỗ hổng (OQ-123)</td>
+<td>Chính sách công bố lỗ hổng (security.txt, email) từ MVP; bug bounty trả tiền ở Nâng cao, sau chứng chỉ</td>
+</tr>
+<tr>
+<td>Thao tác cần hai người duyệt trên portal NCC (OQ-118)</td>
+<td><strong>Vẫn hoãn</strong> (2026-11-07), làm cùng tính năng phân quyền</td>
+</tr>
+</tbody>
+</table>
 </section>
 <section class="doc" id="f-03-business-analysis-12-api-security"><div class="path">03-business-analysis/12-api-security.md</div><h1 id="f-03-business-analysis-12-api-security--312-api-security">3.12 API security</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở (2026-11-07). Đã quyết ở <a href="#f-03-business-analysis-13-configuration-surface--4-đã-quyết">3.13</a>: kiểm schema chạy trước managed ruleset, endpoint enforce schema được giảm paranoia (BR-35); rate limit theo API key, JWT ở MVP (FR-3-06).</strong> Tách ra từ trang bot cũ để 3.9 chỉ còn bot và
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt đề xuất cho các câu OQ của trang này</strong> (trừ OQ-118 của 3.11 vẫn hoãn). Luồng (bước 2) ở mục 6. Tách ra từ trang bot cũ để 3.9 chỉ còn bot và
 challenge. Trang này chỉ liệt kê kịch bản và câu hỏi. Thiết kế kỹ thuật ở kiến trúc 8.17.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-12-api-security--1-phạm-vi">1. Phạm vi</h2>
@@ -13440,6 +13925,113 @@ mà WAF thông thường không thấy. Liên quan: F3.7, F5.1.8 ở <a href="#f
 </table>
 <h2 id="f-03-business-analysis-12-api-security--4-phụ-thuộc">4. Phụ thuộc</h2>
 <p>FR-3-09, FR-5-19 ở <a href="#f-02-requirements">§2</a>; kiến trúc 8.17, ADR-0039; QS-22, QS-23.</p>
+<h2 id="f-03-business-analysis-12-api-security--5-đã-quyết-duyệt-2026-11-17">5. Đã quyết (duyệt 2026-11-17)</h2>
+<blockquote>
+<p>Chủ dự án duyệt tất cả đề xuất dưới đây ngày 2026-11-17. Đề xuất do Claude viết (trang gốc chưa có mục phân tích); con số là ước lượng đã được duyệt.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Câu</th>
+<th>Quyết định</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OQ-84</td>
+<td>(b): mặc định chỉ lưu cấu trúc (tên field, kiểu, độ dài) và cờ nhạy cảm. Lưu mẫu thật chỉ khi khách bật theo endpoint, che theo BR-44, giữ 7 ngày</td>
+</tr>
+<tr>
+<td>OQ-107</td>
+<td>(b): vào hàng đợi &quot;đề xuất&quot;; shadow API hiện ở danh mục chưa xác nhận kèm cảnh báo; zombie không tự chặn, khách chọn gỡ hoặc chặn</td>
+</tr>
+<tr>
+<td>OQ-108</td>
+<td>Tối thiểu 7 ngày log-only; chặn theo từng endpoint, không cả API; cho phép nhiều version schema song song cho client cũ</td>
+</tr>
+<tr>
+<td>OQ-109</td>
+<td>Không ở MVP; Nâng cao: phát hiện dữ liệu nhạy cảm (số thẻ, CMND) và kích thước bất thường theo lấy mẫu</td>
+</tr>
+<tr>
+<td>OQ-110</td>
+<td>Có ở Nâng cao, dạng cảnh báo theo baseline hành vi, không chặn; khách khai báo claim định danh và tham số ID</td>
+</tr>
+<tr>
+<td>OQ-111</td>
+<td>Thứ tự: API key trong header, rồi <code>sub</code> của JWT (khách khai báo claim), cuối cùng IP kèm dấu vân tay TLS</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-03-business-analysis-12-api-security--6-luồng-api-discovery-và-chặn-theo-schema-bước-2-2026-11-17">6. Luồng: API discovery và chặn theo schema (bước 2, 2026-11-17)</h2>
+<div class="diagram"><pre class="mermaid">flowchart TB
+    AS1[&quot;AS1 Discovery từ traffic&lt;br/&gt;chỉ lưu cấu trúc&quot;]
+    AS2[&quot;AS2 Hàng đợi đề xuất&lt;br/&gt;endpoint mới, shadow, zombie&quot;]
+    AS3[&quot;AS3 Khách xác nhận&lt;br/&gt;hoặc tải OpenAPI&quot;]
+    AS4[&quot;AS4 Log-only theo endpoint&lt;br/&gt;tối thiểu 7 ngày&quot;]
+    G1{{&quot;ASG1 Số liệu đủ, client cũ ổn?&quot;}}
+    AS5[&quot;AS5 Chặn theo schema&lt;br/&gt;từng endpoint&quot;]
+    AS6[&quot;AS6 Theo dõi, cảnh báo BOLA&lt;br/&gt;Nâng cao&quot;]
+    AS1 --&gt; AS2 --&gt; AS3 --&gt; AS4 --&gt; G1
+    G1 --&gt;|có| AS5 --&gt; AS6
+    G1 --&gt;|không| AS4
+</pre></div>
+<table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Ai</th>
+<th>Điều kiện hoặc cổng</th>
+<th>Hỏng thì xử lý</th>
+<th>Dữ liệu sinh ra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AS1 Discovery</td>
+<td>Hệ thống</td>
+<td><strong>Mặc định chỉ lưu cấu trúc</strong> (tên field, kiểu, độ dài) và cờ nhạy cảm; lưu mẫu thật chỉ khi khách bật theo endpoint, che theo BR-44, giữ 7 ngày (<a href="#f-03-business-analysis-12-api-security--5-đã-quyết-duyệt-2026-11-17">OQ-84</a>)</td>
+<td>Lộ dữ liệu cá nhân: tắt lưu mẫu, xoá</td>
+<td><code>ApiEndpointShape</code></td>
+</tr>
+<tr>
+<td>AS2 Đề xuất</td>
+<td>Hệ thống</td>
+<td>Endpoint mới <strong>vào hàng đợi &quot;đề xuất&quot;</strong>, không tự thêm (endpoint do kẻ tấn công dò cũng xuất hiện); shadow API hiện ở danh mục chưa xác nhận kèm cảnh báo; zombie không tự chặn (OQ-107)</td>
+<td></td>
+<td><code>ApiEndpointProposal</code></td>
+</tr>
+<tr>
+<td>AS3 Xác nhận</td>
+<td>Khách</td>
+<td>Xác nhận endpoint, hoặc tải OpenAPI; schema cũ không khớp thực tế thì báo khác biệt</td>
+<td></td>
+<td><code>ApiSchema</code></td>
+</tr>
+<tr>
+<td>AS4 Log-only</td>
+<td>Hệ thống</td>
+<td>Tối thiểu 7 ngày, <strong>theo từng endpoint, không cả API</strong>; hỗ trợ nhiều version schema song song cho client cũ (OQ-108)</td>
+<td>Client mobile cũ gửi sai schema: giữ version cũ, không chặn</td>
+<td><code>ApiSchemaEvent</code></td>
+</tr>
+<tr>
+<td>AS5 Chặn</td>
+<td>Khách, qua change request (<a href="#f-03-business-analysis-02-policy-change">3.2</a>)</td>
+<td>Kiểm schema chạy trước managed ruleset (BR-35)</td>
+<td></td>
+<td><code>ApiEnforce</code></td>
+</tr>
+<tr>
+<td>AS6 Theo dõi</td>
+<td>Khách, SOC</td>
+<td><strong>BOLA</strong> ở Nâng cao: cảnh báo theo baseline hành vi, không chặn; khách khai báo claim định danh và tham số ID (OQ-110). Edge <strong>không kiểm response</strong> ở MVP; Nâng cao: phát hiện dữ liệu nhạy cảm và kích thước bất thường theo lấy mẫu (OQ-109)</td>
+<td></td>
+<td><code>ApiAlert</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Consumer mặc định (OQ-111):</strong> theo thứ tự API key trong header, rồi <code>sub</code> của JWT (khách khai báo claim), cuối cùng IP kèm dấu vân tay TLS (IP là mức cuối vì NAT).</p>
 </section>
 <section class="doc" id="f-03-business-analysis-13-configuration-surface"><div class="path">03-business-analysis/13-configuration-surface.md</div><h1 id="f-03-business-analysis-13-configuration-surface--313-bề-mặt-cấu-hình-rule-và-setting-trên-portal">3.13 Bề mặt cấu hình: rule và setting trên portal</h1>
 <blockquote>
