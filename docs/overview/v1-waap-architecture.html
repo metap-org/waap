@@ -14420,7 +14420,7 @@ realtime gateway và notifier.</li>
 </section>
 <section class="doc" id="f-09-adr-0031-edge-l7-and-waf-engine-options"><div class="path">09-adr/0031-edge-l7-and-waf-engine-options.md</div><h1 id="f-09-adr-0031-edge-l7-and-waf-engine-options--adr-0031-lựa-chọn-nền-cho-tầng-l7-và-engine-cho-tầng-waf">ADR-0031: Lựa chọn nền cho tầng L7 và engine cho tầng WAF</h1>
 <ul>
-<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> sau spike (§7). Phương án cũ ở <a href="#f-09-adr-0013-edge-gateway-custom-go-with-coraza">ADR-0013</a> nằm trong các lựa chọn dưới đây.</li>
+<li>Trạng thái: <strong>Đề xuất, chờ chọn</strong> sau spike (§7). <strong>Hướng spike chốt 2026-11-17:</strong> Pingora làm L7 chính, NGINX chạy song song để đối chứng, Envoy hoặc NGINX là dự phòng (<a href="#f-09-adr-0031-edge-l7-and-waf-engine-options--61-hướng-spike-chốt-2026-11-17">§6.1</a>). Phương án cũ ở <a href="#f-09-adr-0013-edge-gateway-custom-go-with-coraza">ADR-0013</a> nằm trong các lựa chọn dưới đây.</li>
 <li>Ngày: 2026-11-06</li>
 </ul>
 <h2 id="f-09-adr-0031-edge-l7-and-waf-engine-options--1-bối-cảnh">1. Bối cảnh</h2>
@@ -14521,6 +14521,12 @@ có thể viết bằng ngôn ngữ khác.</p>
 <td>License phát hành on-prem</td>
 <td>Cả hai</td>
 <td>Điều kiện loại</td>
+</tr>
+<tr>
+<td>T14</td>
+<td><strong>Ít reload</strong>: cấu hình zone, cert, ruleset áp dụng không reload process, không rớt kết nối (<a href="#f-09-adr-0015-snapshot-format-and-distribution">ADR-0015</a>, <a href="#f-09-adr-0037-config-apply-classes">ADR-0037</a>)</td>
+<td>Cả hai</td>
+<td>Cao, điều kiện loại cho cấu hình của zone</td>
 </tr>
 </tbody>
 </table>
@@ -14792,10 +14798,69 @@ hoặc SPOE rồi chuyển sang I1, để tầng WAF chỉ có một giao diện
 </tr>
 </tbody>
 </table>
-<p><strong>Shortlist cho spike:</strong> K2, K3, K1. K5 chạy làm mốc cho phần cache, K4 làm mốc cho phần gọi WAF.
-Tầng WAF dùng E1 trong mọi tổ hợp; spike đo thêm E2 trên cùng tầng WAF để so CPU.</p>
+<p><strong>Shortlist ban đầu:</strong> K2, K3, K1; K5 làm mốc cache, K4 làm mốc gọi WAF. <strong>Đã thu hẹp ngày 2026-11-17 theo <a href="#f-09-adr-0031-edge-l7-and-waf-engine-options--61-hướng-spike-chốt-2026-11-17">§6.1</a>:</strong> chạy A1, A2 và B. K1 (Envoy) và K3 (Go) là dự phòng, không dựng trong spike trừ khi điều kiện bỏ Pingora xảy ra. K4 (HAProxy) bị loại khỏi ứng viên vì license cần xác minh theo ADR-0024, cache yếu và pre-filter phải viết bằng Lua.
+Tầng WAF dùng E1 ở A1; A2 đo E2 trên cùng giao diện I1 để so CPU.</p>
+<h3 id="f-09-adr-0031-edge-l7-and-waf-engine-options--61-hướng-spike-chốt-2026-11-17">6.1 Hướng spike (chốt 2026-11-17)</h3>
+<p>Chủ dự án chọn hướng thử nghiệm: <strong>Pingora làm L7 chính</strong>, tầng WAF thử <strong>Coraza và libmodsecurity</strong>, <strong>NGINX chạy song song để đối chứng</strong>; nếu Pingora không hiệu quả thì dùng <strong>NGINX hoặc Envoy</strong>. Tiêu chí hàng đầu của cấu hình là <strong>càng ít reload càng tốt</strong> (T14).</p>
+<table>
+<thead>
+<tr>
+<th>Nhánh</th>
+<th>L7</th>
+<th>WAF</th>
+<th>Mục đích</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A1</strong></td>
+<td>Pingora</td>
+<td>Coraza, qua I1</td>
+<td>Hướng chính</td>
+</tr>
+<tr>
+<td><strong>A2</strong></td>
+<td>Pingora</td>
+<td>libmodsecurity (wrapper gRPC), qua I1</td>
+<td>So CPU và độ khớp CRS trên cùng giao diện</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>NGINX + ModSecurity</td>
+<td>libmodsecurity trong NGINX</td>
+<td>Mốc đo cache, mốc đo reload</td>
+</tr>
+</tbody>
+</table>
+<p>Vì sao T14 nghiêng về Pingora: ADR-0015 đặt policy agent trong binary của từng tầng và swap con trỏ snapshot nguyên khối; ADR-0037 bắt mọi cấu hình của zone là lớp A. NGINX nạp cấu hình và quy tắc ModSecurity theo file và reload, nên chỉ đạt lớp A khi chuyển logic sang Lua và shared memory (tự viết lại policy agent bằng Lua); release CRS mới (lớp B) làm reload cả proxy. Envoy đổi nóng bằng xDS nhưng ADR-0015 đã loại dùng nguyên xDS vì tài nguyên khác hẳn, nên vẫn cần adapter hoặc filter đọc snapshot.</p>
+<p>Ở tầng WAF, T14 yêu cầu: build instance ruleset ở nền rồi swap con trỏ (lớp B); ngoại lệ theo zone bằng một lớp luật nhỏ chạy trước CRS phát lệnh bỏ rule (<code>ctl:ruleRemoveById</code>), không tạo instance riêng cho mỗi zone. Cần xác minh engine nào hỗ trợ tới đâu.</p>
+<p><strong>Điều kiện bỏ Pingora (đề xuất, chờ duyệt):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Điều kiện</th>
+<th>Chuyển sang</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Một điều kiện bắt buộc không làm được trong 3 tuần (cert theo SNI động, chọn upstream theo từng request, nâng binary không rớt kết nối); hoặc công sức hoàn thiện cache, purge, tầng đĩa quá 2 lần ước lượng; hoặc không tuyển được người Rust</td>
+<td>Envoy hoặc NGINX theo hai dòng dưới</td>
+</tr>
+<tr>
+<td>Lý do là tốn công viết L7 và nhu cầu cache nhẹ (<a href="#f-09-adr-0035-cdn-and-dns-strategy">ADR-0035</a> phương án B, C hoặc D)</td>
+<td><strong>Envoy</strong> (đổi nóng tốt hơn NGINX)</td>
+</tr>
+<tr>
+<td>Cache là yêu cầu bán hàng chính <strong>và</strong> tầng WAF đã tách process qua I1 (để ruleset không buộc reload)</td>
+<td><strong>NGINX</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Chưa xác minh, việc đầu tiên của tuần 1:</strong> Pingora hỗ trợ HTTP/3 chưa; chọn cert theo SNI trong lúc handshake; graceful upgrade; libmodsecurity chạy trong wrapper gRPC (tạo Rules mới, swap); Envoy cache filter tới đâu; license thật của HAProxy nếu còn dùng làm mốc (<a href="#f-09-adr-0024-licensing-policy-for-shipped-components">ADR-0024</a>).</p>
+<p><strong>Hệ quả với replay và <code>edge-verify</code>:</strong> theo <a href="#f-09-adr-0030-language-per-workload">ADR-0030</a>, nếu L7 là Pingora thì hai thành phần này viết bằng Rust, tầng WAF vẫn Go.</p>
 <h2 id="f-09-adr-0031-edge-l7-and-waf-engine-options--7-spike">7. Spike</h2>
-<p>Thời hạn 3 tuần, 2 người. Mỗi tổ hợp dựng tối thiểu:</p>
+<p>Thời hạn 3 tuần, 2 người. Mỗi nhánh (A1, A2, B) dựng tối thiểu:</p>
 <ul>
 <li>Ở L7: access list, rate limit, challenge, custom rule phần pre, cache cơ bản.</li>
 <li>Gọi WAF với CRS PL1/PL2 và custom rule phần inspect.</li>
@@ -14809,6 +14874,26 @@ Tầng WAF dùng E1 trong mọi tổ hợp; spike đo thêm E2 trên cùng tần
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><strong>Reload (T14):</strong> đổi một rule của một zone dưới tải</td>
+<td>Có hiệu lực ≤ 5 giây, 0 kết nối rớt, p99 tăng ≤ 10%</td>
+</tr>
+<tr>
+<td><strong>Reload:</strong> thêm 10.000 zone và cert dưới tải</td>
+<td>Không reload process; RAM tăng theo kế hoạch</td>
+</tr>
+<tr>
+<td><strong>Reload:</strong> release CRS mới (lớp B)</td>
+<td>Swap không lỗi request; ghi thời gian build và RAM đỉnh</td>
+</tr>
+<tr>
+<td><strong>Reload:</strong> số lần reload thật mỗi ngày với 100 thay đổi mỗi phút</td>
+<td>0 ở nhánh A; nhánh B đếm số lần reload và thời gian worker cũ thoát</td>
+</tr>
+<tr>
+<td><strong>Reload:</strong> nâng binary</td>
+<td>Không rớt kết nối trong thời gian drain</td>
+</tr>
 <tr>
 <td>Độ trễ thêm, request đi qua WAF, CRS PL1, tải 50%</td>
 <td>p99 ≤ 2 ms</td>
@@ -17125,7 +17210,7 @@ Elixir + Phoenix cho realtime gateway và notifier (<a href="#f-09-adr-0044-real
 </tr>
 <tr>
 <td><strong>Nền tầng L7 và engine tầng WAF</strong></td>
-<td>Chọn sau spike 3 tuần: shortlist K2 (Pingora + Coraza), K3 (Go + Coraza), K1 (Envoy + Coraza); mốc K5 (NGINX, cho cache) và K4 (HAProxy + SPOE); đo thêm libmodsecurity ở tầng WAF; kèm HTTP/3</td>
+<td>Hướng spike chốt 2026-11-17: Pingora làm L7 chính, NGINX đối chứng, Envoy hoặc NGINX dự phòng, tiêu chí &quot;ít reload&quot; (<a href="#f-09-adr-0031-edge-l7-and-waf-engine-options--61-hướng-spike-chốt-2026-11-17">ADR-0031 §6.1</a>). Chọn sau spike 3 tuần: shortlist K2 (Pingora + Coraza), K3 (Go + Coraza), K1 (Envoy + Coraza); mốc K5 (NGINX, cho cache) và K4 (HAProxy + SPOE); đo thêm libmodsecurity ở tầng WAF; kèm HTTP/3</td>
 <td><a href="#f-09-adr-0031-edge-l7-and-waf-engine-options">ADR-0031</a>; kéo theo ngôn ngữ L7, replay, <code>edge-verify</code>, <a href="#f-09-adr-0032-cel-checked-at-control-ir-at-edge">ADR-0032</a></td>
 </tr>
 <tr>
@@ -17304,7 +17389,7 @@ theo chính sách tài liệu (<a href="#f-02-constraints-00-index--24-conventio
 </tr>
 <tr>
 <td><strong>Management plane</strong></td>
-<td>Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Các thư mục <code>m-*</code> của repo demo (trước 2026-11-08 tên là <code>data-plane/</code>)</td>
+<td>Plane nghiệp vụ: portal, API, tenant, policy, case, billing. Các thư mục <code>m-*</code> của repo demo (từ 2026-11-14; trước đó thư mục <code>management-plane/</code>, trước 2026-11-08 tên là <code>data-plane/</code>)</td>
 </tr>
 <tr>
 <td><strong>Control plane</strong></td>

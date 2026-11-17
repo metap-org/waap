@@ -1,6 +1,6 @@
 # ADR-0031: Lựa chọn nền cho tầng L7 và engine cho tầng WAF
 
-- Trạng thái: **Đề xuất, chờ chọn** sau spike (§7). Phương án cũ ở [ADR-0013](0013-edge-gateway-custom-go-with-coraza.md) nằm trong các lựa chọn dưới đây.
+- Trạng thái: **Đề xuất, chờ chọn** sau spike (§7). **Hướng spike chốt 2026-11-17:** Pingora làm L7 chính, NGINX chạy song song để đối chứng, Envoy hoặc NGINX là dự phòng ([§6.1](#61-hướng-spike-chốt-2026-11-17)). Phương án cũ ở [ADR-0013](0013-edge-gateway-custom-go-with-coraza.md) nằm trong các lựa chọn dưới đây.
 - Ngày: 2026-11-06
 
 ## 1. Bối cảnh
@@ -32,6 +32,7 @@ có thể viết bằng ngôn ngữ khác.
 | T12 | Truy cập ClientHello và frame HTTP/2 thô (để tính JA4, fingerprint HTTP/2 cho bot management, [ADR-0038](0038-bot-management-layered-scoring.md)) | L7 | Trung bình |
 | T13 | Body processor: XML (tắt thực thể ngoài), multipart, JSON; khả năng gắn decoder riêng (GraphQL, protobuf theo descriptor cho gRPC) | WAF | Trung bình |
 | T11 | License phát hành on-prem | Cả hai | Điều kiện loại |
+| T14 | **Ít reload**: cấu hình zone, cert, ruleset áp dụng không reload process, không rớt kết nối ([ADR-0015](0015-snapshot-format-and-distribution.md), [ADR-0037](0037-config-apply-classes.md)) | Cả hai | Cao, điều kiện loại cho cấu hình của zone |
 
 ## 3. Nền cho tầng L7
 
@@ -105,12 +106,38 @@ hoặc SPOE rồi chuyển sang I1, để tầng WAF chỉ có một giao diện
 | **K4** | N4 HAProxy | E1 Coraza | I3 (`coraza-spoa`) | L7 rất nhanh và chín, tích hợp WAF có sẵn | Cache yếu; pre-filter phải viết bằng Lua/cấu hình |
 | **K5** | N3 NGINX | E1 Coraza | Module/njs tự viết → I1 | Cache mạnh nhất, phổ biến nhất | Gọi WAF kèm body không có sẵn; pre-filter bằng Lua |
 
-**Shortlist cho spike:** K2, K3, K1. K5 chạy làm mốc cho phần cache, K4 làm mốc cho phần gọi WAF.
-Tầng WAF dùng E1 trong mọi tổ hợp; spike đo thêm E2 trên cùng tầng WAF để so CPU.
+**Shortlist ban đầu:** K2, K3, K1; K5 làm mốc cache, K4 làm mốc gọi WAF. **Đã thu hẹp ngày 2026-11-17 theo [§6.1](#61-hướng-spike-chốt-2026-11-17):** chạy A1, A2 và B. K1 (Envoy) và K3 (Go) là dự phòng, không dựng trong spike trừ khi điều kiện bỏ Pingora xảy ra. K4 (HAProxy) bị loại khỏi ứng viên vì license cần xác minh theo ADR-0024, cache yếu và pre-filter phải viết bằng Lua.
+Tầng WAF dùng E1 ở A1; A2 đo E2 trên cùng giao diện I1 để so CPU.
+
+### 6.1 Hướng spike (chốt 2026-11-17)
+
+Chủ dự án chọn hướng thử nghiệm: **Pingora làm L7 chính**, tầng WAF thử **Coraza và libmodsecurity**, **NGINX chạy song song để đối chứng**; nếu Pingora không hiệu quả thì dùng **NGINX hoặc Envoy**. Tiêu chí hàng đầu của cấu hình là **càng ít reload càng tốt** (T14).
+
+| Nhánh | L7 | WAF | Mục đích |
+|---|---|---|---|
+| **A1** | Pingora | Coraza, qua I1 | Hướng chính |
+| **A2** | Pingora | libmodsecurity (wrapper gRPC), qua I1 | So CPU và độ khớp CRS trên cùng giao diện |
+| **B** | NGINX + ModSecurity | libmodsecurity trong NGINX | Mốc đo cache, mốc đo reload |
+
+Vì sao T14 nghiêng về Pingora: ADR-0015 đặt policy agent trong binary của từng tầng và swap con trỏ snapshot nguyên khối; ADR-0037 bắt mọi cấu hình của zone là lớp A. NGINX nạp cấu hình và quy tắc ModSecurity theo file và reload, nên chỉ đạt lớp A khi chuyển logic sang Lua và shared memory (tự viết lại policy agent bằng Lua); release CRS mới (lớp B) làm reload cả proxy. Envoy đổi nóng bằng xDS nhưng ADR-0015 đã loại dùng nguyên xDS vì tài nguyên khác hẳn, nên vẫn cần adapter hoặc filter đọc snapshot.
+
+Ở tầng WAF, T14 yêu cầu: build instance ruleset ở nền rồi swap con trỏ (lớp B); ngoại lệ theo zone bằng một lớp luật nhỏ chạy trước CRS phát lệnh bỏ rule (`ctl:ruleRemoveById`), không tạo instance riêng cho mỗi zone. Cần xác minh engine nào hỗ trợ tới đâu.
+
+**Điều kiện bỏ Pingora (đề xuất, chờ duyệt):**
+
+| Điều kiện | Chuyển sang |
+|---|---|
+| Một điều kiện bắt buộc không làm được trong 3 tuần (cert theo SNI động, chọn upstream theo từng request, nâng binary không rớt kết nối); hoặc công sức hoàn thiện cache, purge, tầng đĩa quá 2 lần ước lượng; hoặc không tuyển được người Rust | Envoy hoặc NGINX theo hai dòng dưới |
+| Lý do là tốn công viết L7 và nhu cầu cache nhẹ ([ADR-0035](0035-cdn-and-dns-strategy.md) phương án B, C hoặc D) | **Envoy** (đổi nóng tốt hơn NGINX) |
+| Cache là yêu cầu bán hàng chính **và** tầng WAF đã tách process qua I1 (để ruleset không buộc reload) | **NGINX** |
+
+**Chưa xác minh, việc đầu tiên của tuần 1:** Pingora hỗ trợ HTTP/3 chưa; chọn cert theo SNI trong lúc handshake; graceful upgrade; libmodsecurity chạy trong wrapper gRPC (tạo Rules mới, swap); Envoy cache filter tới đâu; license thật của HAProxy nếu còn dùng làm mốc ([ADR-0024](0024-licensing-policy-for-shipped-components.md)).
+
+**Hệ quả với replay và `edge-verify`:** theo [ADR-0030](0030-language-per-workload.md), nếu L7 là Pingora thì hai thành phần này viết bằng Rust, tầng WAF vẫn Go.
 
 ## 7. Spike
 
-Thời hạn 3 tuần, 2 người. Mỗi tổ hợp dựng tối thiểu:
+Thời hạn 3 tuần, 2 người. Mỗi nhánh (A1, A2, B) dựng tối thiểu:
 
 - Ở L7: access list, rate limit, challenge, custom rule phần pre, cache cơ bản.
 - Gọi WAF với CRS PL1/PL2 và custom rule phần inspect.
@@ -118,6 +145,11 @@ Thời hạn 3 tuần, 2 người. Mỗi tổ hợp dựng tối thiểu:
 
 | Đo | Ngưỡng để đạt |
 |---|---|
+| **Reload (T14):** đổi một rule của một zone dưới tải | Có hiệu lực ≤ 5 giây, 0 kết nối rớt, p99 tăng ≤ 10% |
+| **Reload:** thêm 10.000 zone và cert dưới tải | Không reload process; RAM tăng theo kế hoạch |
+| **Reload:** release CRS mới (lớp B) | Swap không lỗi request; ghi thời gian build và RAM đỉnh |
+| **Reload:** số lần reload thật mỗi ngày với 100 thay đổi mỗi phút | 0 ở nhánh A; nhánh B đếm số lần reload và thời gian worker cũ thoát |
+| **Reload:** nâng binary | Không rớt kết nối trong thời gian drain |
 | Độ trễ thêm, request đi qua WAF, CRS PL1, tải 50% | p99 ≤ 2 ms |
 | Độ trễ thêm, request bị chặn ở pre-filter hoặc cache hit được miễn WAF | p99 ≤ 0,5 ms |
 | Tỉ lệ request bị loại ở L7 trong kịch bản flood từ ít nguồn | ≥ 95%, CPU tầng WAF không tăng quá 20% |
