@@ -163,6 +163,54 @@ Thời hạn 3 tuần, 2 người. Mỗi nhánh (A1, A2, B) dựng tối thiểu
 
 Kết quả ghi thành bản sửa của ADR này, trạng thái chuyển sang "Chấp nhận".
 
+### 7.1 Kết quả spike sơ bộ (2026-11-17, AI chạy, chờ chủ dự án review)
+
+Phạm vi: 1 máy 4 core, loopback, Pingora 2 thread so với NGINX 1.24 hai worker, cùng origin Go, cùng CRS 4.25. Số đo mang tính **so sánh tương đối**, không phải benchmark production. Mã và dữ liệu thô ở `spike/adr-0031/` (`RESULTS.md`). Chưa chạy: A2 thật (chỉ xấp xỉ bằng NGINX + libmodsecurity), `go-ftw`, HTTP/3, JA4, fuzz 24 giờ, cô lập tenant.
+
+**Reload và nâng cấp (T14):**
+
+| Phép đo | A1 Pingora | B NGINX + ModSecurity |
+|---|---|---|
+| Đổi rule ACL/rps của một zone, 3000 rps | 0,35 ms, 0 lỗi, p99 ≤ 1,6 ms | cần reload |
+| 10.000 zone + 1.000 cert | swap 52 ms, RAM 15→27 MB, 0 lỗi | reload + drain 1,72 s, RAM đỉnh 610 MB, p99 tối đa 2,9 ms, 0 lỗi |
+| Reload cùng cấu hình (844 rule CRS) | không cần | 0,43 s, RAM 204→377 MB tạm thời |
+| Đổi ruleset WAF (lớp B), 800 rps | build 11–22 ms rồi swap, 0 lỗi, p99 không đổi | là một lần reload |
+| Nâng binary, 2000 rps | `-u` graceful, 0 lỗi; tiến trình cũ còn >10 s | USR2/WINCH/QUIT, bàn giao ~2 s, 0 lỗi |
+
+Cả hai không rớt request ở quy mô thử. Khác biệt là **chi phí**: NGINX reload tốn RAM tạm thời gấp 2–3 lần và thời gian tăng theo số server block và rule; Pingora không tạo tiến trình mới.
+
+**Tính năng L7 đã thử:**
+
+| Tính năng | Pingora | NGINX |
+|---|---|---|
+| Cert theo SNI động (1.000 cert) | được, `certificate_callback`, không reload | cần khai báo từng server block rồi reload |
+| Chọn upstream theo từng request từ snapshot | được | không; cần reload hoặc Lua |
+| HTTP/2 (TLS, ALPN) | được, phải bật `enable_h2()`; lần đầu **lỗi 404 do mã spike chỉ đọc header `Host`, H2 dùng `:authority`** (đã sửa) | có sẵn |
+| Upload 200 MB, streaming tải 200 MB | 0,4 s; 0,18 s | 0,41 s (sau khi đặt `client_max_body_size 0`, mặc định chặn 1 MB); 0,18 s |
+| WebSocket / Upgrade | tunnel sẵn | cần 3 dòng cấu hình (`Upgrade`, `Connection`, HTTP/1.1) |
+| LB nhiều origin + failover, tắt/bật 1 origin ở 1500 rps | **phải tự viết** (~40 dòng: round robin, health check TCP mỗi giây, retry khi lỗi connect): 0 lỗi, p99.9 tăng 12 ms lúc chuyển | có sẵn passive (`max_fails`): 0 lỗi, p99.9 3,4 ms; **health check chủ động không có trong bản OSS** |
+| Cache + purge theo URL | `pingora-cache` chạy được, purge 200 và lần GET sau lấy bản mới; **chỉ có `MemCache` (dùng cho test), không có tầng đĩa, phải tự viết eviction, lock, quyết định cacheable (mặc định không cache gì)** | `proxy_cache` có sẵn, tầng đĩa; **không có purge trong bản OSS** |
+| Cache hit, 6000 rps | p99 4,15 ms | p99 2,66 ms |
+| HTTP/3 | **không hỗ trợ** (0.9.1 không có phụ thuộc h3/quic) | có từ 1.25 (bản thử là 1.24, chưa đo) |
+
+**Hiệu năng đường nhanh và bộ nhớ (2 worker mỗi bên):**
+
+| Phép đo | Pingora | NGINX |
+|---|---|---|
+| Chặn ở pre-filter (403), 20.000 rps | 0,45 ms CPU/request, p99 26 ms | 0,18 ms CPU/request, p99 5,7 ms |
+| Chặn ở pre-filter, tải 40.000 rps | bão hòa ~32.000 rps, p50 1,5 s | giữ 40.000 rps, p99 34 ms |
+| RAM cho 10.000 kết nối rảnh | +303 MB (31 KB/kết nối) | +5 MB (0,5 KB/kết nối, sau khi tăng `worker_connections`) |
+
+Lần đo RAM NGINX đầu tiên cho +0 MB là sai (cấu hình `worker_connections` chỉ cho ~8.000 kết nối); số trong bảng là lần chạy lại. Hai kết quả này **ngược kỳ vọng** của §6.1 về RAM/hiệu năng: Pingora bản spike kém NGINX rõ rệt trên đường chặn đơn giản và tốn RAM mỗi kết nối. Chưa biết bao nhiêu do mã spike (mỗi request cấp phát, `respond_error`) và bao nhiêu do thiết kế; cần profile trước khi kết luận.
+
+**Đối chiếu điều kiện bỏ Pingora (§6.1):** cert theo SNI động, chọn upstream theo request và nâng binary không rớt kết nối đều làm được, nên điều kiện cứng thứ nhất **không kích hoạt**. Điều kiện thứ hai (công sức cache, purge, tầng đĩa) **có dấu hiệu kích hoạt**: LB/health check, cache đĩa, eviction và HTTP/3 đều phải tự viết hoặc chưa có.
+
+**Nhận định sơ bộ (chờ duyệt, chưa phải kết luận):**
+- Về T14, Pingora thắng ở chi phí đổi cấu hình nhưng NGINX **không rớt request** nên khoảng cách nhỏ hơn dự đoán.
+- Về tính năng và hiệu năng đường nhanh, NGINX hơn. Pingora đòi tự dev: LB/health check, cache đĩa + eviction + lock, HTTP/3 (hiện không có), và có thể cả tối ưu đường nhanh.
+- Nếu cache và HTTP/3 là yêu cầu bán hàng, nghiêng về **NGINX cho tầng cache/L7 phổ thông** và giữ hợp đồng I1 để sau này thay L7; Pingora hợp hơn nếu ưu tiên số một là policy agent trong binary và đổi nóng toàn bộ cấu hình zone.
+- Envoy **chưa được đo** trong spike này; mọi so sánh với Envoy trong ADR vẫn là suy luận.
+
 **Gợi ý nếu không làm spike:** **K3** (Go cả hai tầng) để ra MVP nhanh với đội hiện tại, giữ I1 làm
 hợp đồng để sau thay L7 bằng N1 mà không đụng tầng WAF; **K2** nếu độ trễ đuôi của L7 và hiệu quả
 RAM là cam kết bán hàng ngay từ đầu.

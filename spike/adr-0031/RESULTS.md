@@ -23,3 +23,10 @@ Kết luận tạm về tiêu chí "ít reload": cả hai đều **không rớt 
 - HTTP/3, JA4, go-ftw (độ tương thích CRS) chưa chạy.
 - A2 (Pingora + libmodsecurity) mới chỉ xấp xỉ bằng nginx + libmodsecurity, chưa có callout riêng.
 - So sánh CPU/request giữa A1 và B đã có số lẻ trong phiên làm việc nhưng chưa tổng hợp vào đây.
+
+
+## Bổ sung (cùng ngày): tính năng L7, flood, RAM kết nối
+
+Xem bảng đầy đủ và nhận định ở ADR-0031 §7.1. Mã thêm vào spike: LB + health check + retry, cache + PURGE (`pingora-cache`, `MemCache`), HTTP/2, đọc `:authority`.
+
+Cảnh báo khi đọc số: flood và RAM kết nối cho thấy Pingora bản spike kém NGINX; chưa profile nên không kết luận do thiết kế hay do mã spike. NGINX OSS thiếu purge và health check chủ động; Pingora thiếu HTTP/3 và tầng cache đĩa.

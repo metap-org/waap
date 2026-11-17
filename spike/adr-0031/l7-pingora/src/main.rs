@@ -5,7 +5,7 @@
 //! - SNI certificate selection from the same snapshot, no reload;
 //! - upstream chosen per request from the snapshot.
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -14,7 +14,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use pingora::listeners::tls::TlsSettings;
 use pingora::listeners::TlsAccept;
+use pingora::cache::cache_control::CacheControl;
+use pingora::cache::filters::resp_cacheable;
+use pingora::cache::{CacheKey, CacheMetaDefaults, MemCache, RespCacheable};
 use pingora::prelude::*;
+use std::sync::LazyLock;
 use pingora::tls::pkey::{PKey, Private};
 use pingora::tls::ssl::{NameType, SslRef};
 use pingora::tls::x509::X509;
@@ -32,9 +36,13 @@ struct ZoneCfg {
     id: String,
     origin: String,
     #[serde(default)]
+    origins: Vec<String>,
+    #[serde(default)]
     acl_deny: Vec<String>,
     #[serde(default)]
     rps: u64,
+    #[serde(default)]
+    cache: bool,
     #[serde(default)]
     waf: bool,
     #[serde(default)]
@@ -62,6 +70,9 @@ struct SnapshotFile {
 
 struct Zone {
     cfg: ZoneCfg,
+    origins: Vec<String>,
+    healthy: Vec<AtomicBool>,
+    pick: AtomicU64,
     window: AtomicU64, // unix second
     hits: AtomicU64,
 }
@@ -84,7 +95,11 @@ fn load(path: &str) -> Result<Snapshot, String> {
     let zones = f
         .zones
         .into_iter()
-        .map(|z| (z.host.clone(), Arc::new(Zone { cfg: z, window: AtomicU64::new(0), hits: AtomicU64::new(0) })))
+        .map(|z| {
+            let origins = if z.origins.is_empty() { vec![z.origin.clone()] } else { z.origins.clone() };
+            let healthy = origins.iter().map(|_| AtomicBool::new(true)).collect();
+            (z.host.clone(), Arc::new(Zone { cfg: z, origins, healthy, pick: AtomicU64::new(0), window: AtomicU64::new(0), hits: AtomicU64::new(0) }))
+        })
         .collect();
     Ok(Snapshot { version: f.version, zones, certs })
 }
@@ -104,9 +119,16 @@ struct Ctx {
     zone: Option<Arc<Zone>>,
     body: Vec<u8>,
     has_body: bool,
+    tries: u32,
 }
 
 const MAX_BODY: usize = 64 * 1024;
+static CACHE: LazyLock<MemCache> = LazyLock::new(MemCache::new);
+
+fn cache_key(req: &RequestHeader) -> CacheKey {
+    let host = req.headers.get("host").and_then(|h| h.to_str().ok()).unwrap_or("");
+    CacheKey::new(host.to_string(), req.uri.to_string())
+}
 
 impl L7 {
     async fn inspect(&self, zone: &Zone, req: &RequestHeader, client_ip: &str, version: u64, body: &[u8]) -> Result<Option<u16>, ()> {
@@ -165,7 +187,10 @@ impl ProxyHttp for L7 {
             .headers
             .get("host")
             .and_then(|h| h.to_str().ok())
-            .map(|h| h.split(':').next().unwrap_or(h).to_string())
+            .map(|h| h.to_string())
+            // HTTP/2 carries the host in :authority, not in a Host header.
+            .or_else(|| session.req_header().uri.authority().map(|a| a.to_string()))
+            .map(|h| h.split(':').next().unwrap_or(&h).to_string())
             .unwrap_or_default();
         let zone = match snap.zones.get(&host) {
             Some(z) => z.clone(),
@@ -192,6 +217,15 @@ impl ProxyHttp for L7 {
                 return Ok(true);
             }
         }
+        // Cache purge (class A in ADR-0037): exact URL, per zone.
+        if zone.cfg.cache && session.req_header().method.as_str() == "PURGE" {
+            let key = cache_key(session.req_header());
+            session.cache.enable(&*CACHE, None, None, None, None);
+            session.cache.set_cache_key(key);
+            let found = session.cache.purge().await.unwrap_or(false);
+            session.respond_error(if found { 200 } else { 404 }).await?;
+            return Ok(true);
+        }
         let has_body = session.req_header().headers.get("content-length").map(|v| v != "0").unwrap_or(false)
             || session.req_header().headers.get("transfer-encoding").is_some();
         let waf = zone.cfg.waf;
@@ -214,6 +248,25 @@ impl ProxyHttp for L7 {
             }
         }
         Ok(false)
+    }
+
+    fn request_cache_filter(&self, session: &mut Session, ctx: &mut Ctx) -> Result<()> {
+        if let Some(z) = ctx.zone.as_ref() {
+            if z.cfg.cache && session.req_header().method.as_str() == "GET" {
+                session.cache.enable(&*CACHE, None, None, None, None);
+            }
+        }
+        Ok(())
+    }
+
+    fn cache_key_callback(&self, session: &Session, _ctx: &mut Ctx) -> Result<CacheKey> {
+        Ok(cache_key(session.req_header()))
+    }
+
+    fn response_cache_filter(&self, _s: &Session, resp: &ResponseHeader, _ctx: &mut Ctx) -> Result<RespCacheable> {
+        static DEFAULTS: CacheMetaDefaults = CacheMetaDefaults::new(|_| Some(Duration::from_secs(60)), 0, 0);
+        let cc = CacheControl::from_resp_headers(resp);
+        Ok(resp_cacheable(cc.as_ref(), resp.clone(), false, &DEFAULTS))
     }
 
     async fn request_body_filter(&self, session: &mut Session, body: &mut Option<Bytes>, end: bool, ctx: &mut Ctx) -> Result<()> {
@@ -243,7 +296,35 @@ impl ProxyHttp for L7 {
 
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Ctx) -> Result<Box<HttpPeer>> {
         let z = ctx.zone.as_ref().expect("zone set in request_filter");
-        Ok(Box::new(HttpPeer::new(z.cfg.origin.as_str(), false, String::new())))
+        // Round robin over healthy origins; if none is healthy, try them anyway.
+        let n = z.origins.len();
+        let start = z.pick.fetch_add(1, Ordering::Relaxed) as usize;
+        let mut idx = start % n;
+        for k in 0..n {
+            let c = (start + k) % n;
+            if z.healthy[c].load(Ordering::Relaxed) {
+                idx = c;
+                break;
+            }
+        }
+        ctx.tries += 1;
+        Ok(Box::new(HttpPeer::new(z.origins[idx].as_str(), false, String::new())))
+    }
+
+    // Passive health + retry: a connect failure marks the origin down and asks the proxy to pick again.
+    fn fail_to_connect(&self, _s: &mut Session, peer: &HttpPeer, ctx: &mut Ctx, mut e: Box<Error>) -> Box<Error> {
+        if let Some(z) = ctx.zone.as_ref() {
+            let addr = peer._address.to_string();
+            for (i, o) in z.origins.iter().enumerate() {
+                if addr.ends_with(o.as_str()) {
+                    z.healthy[i].store(false, Ordering::Relaxed);
+                }
+            }
+        }
+        if ctx.tries < 3 {
+            e.set_retry(true);
+        }
+        e
     }
 }
 
@@ -300,6 +381,23 @@ fn main() {
             }
         });
     }
+    // Active health check: TCP connect to every origin of multi-origin zones once a second.
+    {
+        let sh = shared.clone();
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(1));
+            let snap = sh.snap.load();
+            for z in snap.zones.values().filter(|z| z.origins.len() > 1) {
+                for (i, o) in z.origins.iter().enumerate() {
+                    let ok = o
+                        .parse::<std::net::SocketAddr>()
+                        .map(|a| std::net::TcpStream::connect_timeout(&a, Duration::from_millis(300)).is_ok())
+                        .unwrap_or(false);
+                    z.healthy[i].store(ok, Ordering::Relaxed);
+                }
+            }
+        });
+    }
     // stats
     {
         let sh = shared.clone();
@@ -313,7 +411,8 @@ fn main() {
     server.bootstrap();
     let mut svc = http_proxy_service(&server.configuration, L7(shared.clone()));
     svc.add_tcp("127.0.0.1:8080");
-    let tls = TlsSettings::with_callbacks(Box::new(Certs(shared.clone()))).unwrap();
+    let mut tls = TlsSettings::with_callbacks(Box::new(Certs(shared.clone()))).unwrap();
+    tls.enable_h2();
     svc.add_tls_with_settings("127.0.0.1:8443", None, tls);
     server.add_service(svc);
     // keep the tonic runtime alive for the lifetime of the process
