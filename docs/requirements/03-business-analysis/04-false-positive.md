@@ -1,6 +1,6 @@
 # 3.4 Xử lý chặn nhầm
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định của chủ dự án ghi ở [§3](#3-đã-quyết); các
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Quyết định của chủ dự án ghi ở [§3](#3-đã-quyết); các
 > câu hỏi còn lại vẫn mở.
 
 ## 1. Phạm vi
@@ -105,7 +105,7 @@ Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đ
 
 FR-7-03, FR-7-07, FR-5-04, BR-21 ở [§2](../02-requirements.md).
 
-## 7. Luồng: xử lý chặn nhầm (bước 2, 2026-11-17)
+## 7. Luồng: xử lý chặn nhầm (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên [§3](#3-đã-quyết) (không có exception khẩn ngoài change request) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). OQ-52 (cam kết khi chặn nhầm do ruleset của NCC) đang **hoãn**, nên nhánh ruleset ở dưới chưa có cam kết.
 

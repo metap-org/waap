@@ -1,6 +1,6 @@
 # 3.2 Viết, duyệt, phát hành một thay đổi policy
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Trang này liệt kê kịch bản và câu hỏi; quyết định của
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Trang này liệt kê kịch bản và câu hỏi; quyết định của
 > chủ dự án ghi ở [§3](#3-đã-quyết). Cột "ghi chú ban đầu" là ý kiến lúc ghi, không phải quyết định.
 
 ## 1. Phạm vi
@@ -144,7 +144,7 @@ Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đ
 FR-5-01…FR-5-19, BR-4, BR-5, BR-6, BR-18, BR-21 ở [§2](../02-requirements.md) viết trước phân tích này;
 sẽ đối chiếu lại khi các câu hỏi trên có trả lời.
 
-## 7. Luồng: viết, duyệt, phát hành một thay đổi policy (bước 2, 2026-11-17)
+## 7. Luồng: viết, duyệt, phát hành một thay đổi policy (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên các quyết định ở [§3](#3-đã-quyết) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). Bước 2 của trang này.
 > Cơ chế kỹ thuật (workflow theo người gọi, `$ctx.approvalRequired`, người duyệt khác người gửi) đã có ở `metap` (Phase 104).

@@ -117,6 +117,7 @@ một hay nhiều chức năng lá `F…`. Requirement chất lượng không vi
 | FR-2-34 | Edge phải chuyển challenge ACME của origin về origin theo mặc định; khi kiểm thử phải tự phát hiện vòng chuyển hướng, origin chặn IP edge và nội dung hỗn hợp | F2.3.7, F2.6.4 | MVP |  |
 | FR-2-35 | Hệ thống không được cho hoàn tất onboarding khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin (BR-52) | F2.7.7 | MVP | Cảnh báo đỏ ở mọi bước |
 | FR-2-36 | Zone đã gỡ mà DNS còn trỏ phải được chuyển tiếp không bảo vệ 30 ngày rồi trả trang giải thích (BR-55); chuyển zone giữa org cần owner hai org xác nhận (BR-57); phải phát hiện domain hết hạn hoặc đổi chủ | F2.7.8, F2.1.12, F2.1.13 | MVP |  |
+| FR-2-37 | Hệ thống phải hỗ trợ đường "chỉ trỏ A/AAAA về dải IP dùng chung" cho khách không tạo được CNAME, ALIAS, TXT: xác minh bằng file HTTP đặt ở origin, cert tải lên hoặc cấp bằng HTTP-01 sau khi traffic tới kèm cảnh báo khoảng lỗi HTTPS | F2.1.11, F2.2.8 | MVP | Khách không có nhà DNS vẫn onboard được |
 
 ### F3 Bảo vệ runtime và F4 Hiệu năng
 

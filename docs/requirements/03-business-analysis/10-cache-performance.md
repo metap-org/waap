@@ -1,6 +1,6 @@
 # 3.10 Cache, hiệu năng, nội dung
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
 > cần phân tích riêng. Chiến lược CDN ở kiến trúc ADR-0035. Lần phân tích tiếp thêm trục J–N, mô hình quyết định ở
 > [§4](#4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt) và phân tích các câu còn mở ở
 > [§5](#5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt); tất cả là đề xuất, chưa phải quyết định.
@@ -232,7 +232,7 @@ hoá)`. Không đưa cookie, thiết bị, quốc gia vào key trừ khi khách 
 FR-4-01…FR-4-04 ở [§2](../02-requirements.md); kiến trúc ADR-0035, 8.18. Chính sách abuse và an toàn cache
 chưa có requirement nào.
 
-## 7. Luồng: cấu hình cache và hiệu năng của một zone (bước 2, 2026-11-17)
+## 7. Luồng: cấu hình cache và hiệu năng của một zone (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên mô hình [§4](#4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt) (luật an toàn đứng trên cấu hình; **§4 chưa duyệt riêng**, các OQ ở [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17) đã duyệt) và ADR-0035.
 

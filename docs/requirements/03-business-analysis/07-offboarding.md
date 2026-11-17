@@ -163,7 +163,7 @@ FR-1-03, FR-2-13, FR-9-03…FR-9-05, BR-12, BR-16, DT-7, OQ-6 ở [§2](../02-re
 | OQ-98 | NCC chuyển yêu cầu cho khách trong 72 giờ, không tự trả lời người dùng cuối. IP nằm trong nhiều tenant: xoá theo từng tenant yêu cầu, dữ liệu gộp ẩn danh không bị xoá. **Cần tư vấn pháp lý** |
 | OQ-99 | Đóng PoP hoặc rút region: báo trước tối thiểu 90 ngày (Enterprise 180 ngày) kèm dải IP mới. Ngừng kinh doanh: Enterprise được bảo đảm xuất cấu hình và 180 ngày chuyển đổi |
 
-## 6. Luồng: rời dịch vụ, chuyển zone, bỏ hoang (bước 2, 2026-11-17)
+## 6. Luồng: rời dịch vụ, chuyển zone, bỏ hoang (bước 2, đã duyệt 2026-11-17)
 
 ```mermaid
 flowchart TB

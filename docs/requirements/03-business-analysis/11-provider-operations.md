@@ -181,7 +181,7 @@ FR-11-01…FR-11-03, FR-12-01…FR-12-05 ở [§2](../02-requirements.md); runbo
 | OQ-123 | Chính sách công bố lỗ hổng (security.txt, email) từ MVP; bug bounty trả tiền ở Nâng cao, sau chứng chỉ |
 | OQ-118 | **Vẫn hoãn** (2026-11-07), làm cùng tính năng phân quyền |
 
-## 7. Luồng: hỗ trợ, sự cố nền tảng, vận hành của NCC (bước 2, 2026-11-17)
+## 7. Luồng: hỗ trợ, sự cố nền tảng, vận hành của NCC (bước 2, đã duyệt 2026-11-17)
 
 ```mermaid
 flowchart TB

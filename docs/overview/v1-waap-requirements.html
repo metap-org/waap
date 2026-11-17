@@ -4044,6 +4044,13 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>MVP</td>
 <td></td>
 </tr>
+<tr>
+<td>FR-2-37</td>
+<td>Hệ thống phải hỗ trợ đường &quot;chỉ trỏ A/AAAA về dải IP dùng chung&quot; cho khách không tạo được CNAME, ALIAS, TXT: xác minh bằng file HTTP đặt ở origin, cert tải lên hoặc cấp bằng HTTP-01 sau khi traffic tới kèm cảnh báo khoảng lỗi HTTPS</td>
+<td>F2.1.11, F2.2.8</td>
+<td>MVP</td>
+<td>Khách không có nhà DNS vẫn onboard được</td>
+</tr>
 </tbody>
 </table>
 <h3 id="f-02-requirements--f3-bảo-vệ-runtime-và-f4-hiệu-năng">F3 Bảo vệ runtime và F4 Hiệu năng</h3>
@@ -5802,7 +5809,7 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 </section>
 <section class="doc" id="f-03-business-analysis-00-index"><div class="path">03-business-analysis/00-index.md</div><h1 id="f-03-business-analysis-00-index--3-phân-tích-nghiệp-vụ">3. Phân tích nghiệp vụ</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-118, OQ-125); đợt hai duyệt 3.7, 3.11, 3.12 và 7 việc nhỏ.</strong> Luồng (bước 2) đã viết cho 3.1–3.7, 3.9–3.12 (2026-11-17); luồng chưa được chủ dự án duyệt, chỉ các OQ làm căn cứ đã duyệt.</p>
+<p><strong>Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-118, OQ-125); đợt hai duyệt 3.7, 3.11, 3.12 và 7 việc nhỏ.</strong> Luồng (bước 2) đã viết cho 3.1–3.7, 3.9–3.12 (2026-11-17); <strong>chủ dự án đã duyệt luồng 3.1–3.7, 3.9–3.12 ngày 2026-11-17</strong> (3.1 kèm đường &quot;chỉ trỏ A/AAAA&quot;).</p>
 </blockquote>
 <p>Bản đồ phân rã nói hệ thống <strong>có</strong> những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
 thật làm. Khi xong, mỗi nghiệp vụ trả lời được các câu hỏi sau:</p>
@@ -5955,7 +5962,7 @@ xuất chờ duyệt.</li>
 </section>
 <section class="doc" id="f-03-business-analysis-01-onboarding"><div class="path">03-business-analysis/01-onboarding.md</div><h1 id="f-03-business-analysis-01-onboarding--31-onboarding-một-website">3.1 Onboarding một website</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở Phụ lục A. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở Phụ lục A. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
 khi viết luồng onboarding. Cột &quot;ghi chú ban đầu&quot; chỉ là ý kiến lúc ghi, <strong>không phải quyết định</strong>. Lần phân
 tích tiếp (2026-11-07) thêm trục K–N, hồ sơ khách điển hình (<a href="#f-03-business-analysis-01-onboarding--6-hồ-sơ-khách-điển-hình-đề-xuất-chờ-duyệt">§6</a>),
 cây quyết định kết nối (<a href="#f-03-business-analysis-01-onboarding--7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt">§7</a>) và phân tích các câu ở
@@ -6981,10 +6988,10 @@ xếp khách vào hồ sơ, rồi chỉ hiện các bước của hồ sơ đó,
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-01-onboarding--phụ-lục-a-luồng-onboarding-bước-2-cập-nhật-2026-11-17">Phụ lục A. Luồng onboarding (bước 2, cập nhật 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-01-onboarding--phụ-lục-a-luồng-onboarding-bước-2-đã-duyệt-2026-11-17">Phụ lục A. Luồng onboarding (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Bản nháp đầu tiên đi theo một kịch bản (DNS đầy đủ, origin có IP public, cổng chuẩn). Sau khi chủ dự án duyệt OQ-21…OQ-32 và OQ-147…OQ-150
-(2026-11-17), luồng này là <strong>căn cứ cho kịch bản chính</strong>; các điều chỉnh theo quyết định nằm ở <a href="#f-03-business-analysis-01-onboarding--a10-điều-chỉnh-theo-quyết-định-2026-11-17">A.10</a>.
+(2026-11-17), luồng này là <strong>căn cứ cho kịch bản chính</strong> và <strong>chủ dự án đã duyệt luồng (2026-11-17)</strong>; các điều chỉnh theo quyết định nằm ở <a href="#f-03-business-analysis-01-onboarding--a10-điều-chỉnh-theo-quyết-định-2026-11-17">A.10</a>.
 A.6 (hồ sơ khách) và cây quyết định ở <a href="#f-03-business-analysis-01-onboarding--7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt">§7</a> <strong>chưa duyệt riêng</strong>. OQ-17…OQ-20 ở A.9 đã được duyệt theo đề xuất ngày 2026-11-17.</p>
 </blockquote>
 <h3 id="f-03-business-analysis-01-onboarding--a1-mục-tiêu-và-định-nghĩa-xong">A.1 Mục tiêu và định nghĩa &quot;xong&quot;</h3>
@@ -7854,6 +7861,11 @@ token ở đó và cấp, gia hạn cert <strong>trước khi</strong> traffic t
 <td>OQ-31</td>
 </tr>
 <tr>
+<td>OB3, OB5, OG2 Khách chỉ đổi được A/AAAA</td>
+<td>Khách không có nhà DNS cho tạo CNAME, ALIAS, TXT hoặc <code>_acme-challenge</code> (chỉ sửa được bản ghi A/AAAA hoặc nhà đăng ký chỉ cho trỏ IP): <strong>trỏ A/AAAA về dải IP dùng chung của NCC</strong> là đường tối thiểu. Xác minh sở hữu bằng <strong>file HTTP</strong> đặt ở origin (kiểm trước khi đổi DNS, từ edge tới origin); cert không dùng DNS-01 được, nên khách <strong>tải cert lên</strong> hoặc chấp nhận cấp bằng HTTP-01 <strong>sau khi</strong> traffic tới (có khoảng lỗi HTTPS ngắn, cảnh báo rõ ở OG2). Không có ALIAS ở apex thì dùng dải IP tĩnh v4 và v6 (như OQ-22). UI vẫn đề xuất CNAME hoặc ALIAS trước</td>
+<td>Chủ dự án duyệt luồng 2026-11-17 kèm yêu cầu đường &quot;chỉ trỏ IP&quot;</td>
+</tr>
+<tr>
 <td>OB7 Kiểm thử</td>
 <td>Edge gửi vài request về origin và phát hiện <strong>vòng chuyển hướng</strong>, <code>403</code>/<code>429</code> từ origin (origin chặn IP edge), nội dung hỗn hợp trên trang chủ</td>
 <td>OQ-148</td>
@@ -7880,7 +7892,7 @@ thường gặp trong OB7 và chặn OG4 khi còn họ IP trỏ thẳng origin; 
 </section>
 <section class="doc" id="f-03-business-analysis-02-policy-change"><div class="path">03-business-analysis/02-policy-change.md</div><h1 id="f-03-business-analysis-02-policy-change--32-viết-duyệt-phát-hành-một-thay-đổi-policy">3.2 Viết, duyệt, phát hành một thay đổi policy</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Trang này liệt kê kịch bản và câu hỏi; quyết định của
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Trang này liệt kê kịch bản và câu hỏi; quyết định của
 chủ dự án ghi ở <a href="#f-03-business-analysis-02-policy-change--3-đã-quyết">§3</a>. Cột &quot;ghi chú ban đầu&quot; là ý kiến lúc ghi, không phải quyết định.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-02-policy-change--1-phạm-vi">1. Phạm vi</h2>
@@ -8353,7 +8365,7 @@ trục I).</p>
 <h2 id="f-03-business-analysis-02-policy-change--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-5-01…FR-5-19, BR-4, BR-5, BR-6, BR-18, BR-21 ở <a href="#f-02-requirements">§2</a> viết trước phân tích này;
 sẽ đối chiếu lại khi các câu hỏi trên có trả lời.</p>
-<h2 id="f-03-business-analysis-02-policy-change--7-luồng-viết-duyệt-phát-hành-một-thay-đổi-policy-bước-2-2026-11-17">7. Luồng: viết, duyệt, phát hành một thay đổi policy (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-02-policy-change--7-luồng-viết-duyệt-phát-hành-một-thay-đổi-policy-bước-2-đã-duyệt-2026-11-17">7. Luồng: viết, duyệt, phát hành một thay đổi policy (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên các quyết định ở <a href="#f-03-business-analysis-02-policy-change--3-đã-quyết">§3</a> và <a href="#f-03-business-analysis-02-policy-change--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>. Bước 2 của trang này.
 Cơ chế kỹ thuật (workflow theo người gọi, <code>$ctx.approvalRequired</code>, người duyệt khác người gửi) đã có ở <code>metap</code> (Phase 104).</p>
@@ -8510,7 +8522,7 @@ phát hành theo phần trăm traffic (KB2-F5, để Nâng cao).</p>
 </section>
 <section class="doc" id="f-03-business-analysis-03-attack-response"><div class="path">03-business-analysis/03-attack-response.md</div><h1 id="f-03-business-analysis-03-attack-response--33-phản-ứng-khi-bị-tấn-công">3.3 Phản ứng khi bị tấn công</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định ở <a href="#f-03-business-analysis-03-attack-response--3-đã-quyết">§3</a>.</p>
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Quyết định ở <a href="#f-03-business-analysis-03-attack-response--3-đã-quyết">§3</a>.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-03-attack-response--1-phạm-vi">1. Phạm vi</h2>
 <p>Từ lúc một zone bắt đầu bị tấn công cho tới khi tấn công dừng, mitigation tạm được gỡ và khách có báo cáo.
@@ -8881,7 +8893,7 @@ chủ dự án duyệt.</p>
 <h2 id="f-03-business-analysis-03-attack-response--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-3-04, FR-3-05, FR-5-15, FR-8-05…FR-8-07, BR-6, BR-7, BR-10 ở <a href="#f-02-requirements">§2</a>; thứ tự hy sinh và
 cell cách ly ở kiến trúc 8.18, ADR-0041.</p>
-<h2 id="f-03-business-analysis-03-attack-response--7-luồng-phản-ứng-khi-bị-tấn-công-bước-2-2026-11-17">7. Luồng: phản ứng khi bị tấn công (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-03-attack-response--7-luồng-phản-ứng-khi-bị-tấn-công-bước-2-đã-duyệt-2026-11-17">7. Luồng: phản ứng khi bị tấn công (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên <a href="#f-03-business-analysis-03-attack-response--3-đã-quyết">§3</a> (NCC bật được mitigation, khách có portal riêng) và <a href="#f-03-business-analysis-03-attack-response--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>.</p>
 </blockquote>
@@ -9010,7 +9022,7 @@ báo cáo sau sự cố; BR cho &quot;không bao giờ trả DNS về origin&quo
 </section>
 <section class="doc" id="f-03-business-analysis-04-false-positive"><div class="path">03-business-analysis/04-false-positive.md</div><h1 id="f-03-business-analysis-04-false-positive--34-xử-lý-chặn-nhầm">3.4 Xử lý chặn nhầm</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định của chủ dự án ghi ở <a href="#f-03-business-analysis-04-false-positive--3-đã-quyết">§3</a>; các
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Quyết định của chủ dự án ghi ở <a href="#f-03-business-analysis-04-false-positive--3-đã-quyết">§3</a>; các
 câu hỏi còn lại vẫn mở.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-04-false-positive--1-phạm-vi">1. Phạm vi</h2>
@@ -9342,7 +9354,7 @@ F5.1.4 ở <a href="#f-01-functional-decomposition">§1</a>.</p>
 </table>
 <h2 id="f-03-business-analysis-04-false-positive--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-7-03, FR-7-07, FR-5-04, BR-21 ở <a href="#f-02-requirements">§2</a>.</p>
-<h2 id="f-03-business-analysis-04-false-positive--7-luồng-xử-lý-chặn-nhầm-bước-2-2026-11-17">7. Luồng: xử lý chặn nhầm (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-04-false-positive--7-luồng-xử-lý-chặn-nhầm-bước-2-đã-duyệt-2026-11-17">7. Luồng: xử lý chặn nhầm (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên <a href="#f-03-business-analysis-04-false-positive--3-đã-quyết">§3</a> (không có exception khẩn ngoài change request) và <a href="#f-03-business-analysis-04-false-positive--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>. OQ-52 (cam kết khi chặn nhầm do ruleset của NCC) đang <strong>hoãn</strong>, nên nhánh ruleset ở dưới chưa có cam kết.</p>
 </blockquote>
@@ -9424,7 +9436,7 @@ cảnh báo khi allowlist dải dùng chung; điều khoản về thống kê g�
 </section>
 <section class="doc" id="f-03-business-analysis-05-plans-billing"><div class="path">03-business-analysis/05-plans-billing.md</div><h1 id="f-03-business-analysis-05-plans-billing--35-mua-đổi-gói-vượt-hạn-mức-thanh-toán">3.5 Mua, đổi gói, vượt hạn mức, thanh toán</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-54, 57…61); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Giá
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-54, 57…61); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Giá
 và hạn mức tham chiếu ở kiến trúc 8.18; trang này hỏi về cách mua và tính tiền, không hỏi lại giá.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-05-plans-billing--1-phạm-vi">1. Phạm vi</h2>
@@ -9842,7 +9854,7 @@ chủ dự án duyệt.</p>
 </table>
 <h2 id="f-03-business-analysis-05-plans-billing--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-10-01…FR-10-13, BR-7…BR-11, DT-8, IR-2, IR-3, OQ-10, OQ-12, OQ-14 ở <a href="#f-02-requirements">§2</a>.</p>
-<h2 id="f-03-business-analysis-05-plans-billing--7-luồng-mua-đổi-gói-vượt-hạn-mức-thanh-toán-bước-2-2026-11-17">7. Luồng: mua, đổi gói, vượt hạn mức, thanh toán (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-05-plans-billing--7-luồng-mua-đổi-gói-vượt-hạn-mức-thanh-toán-bước-2-đã-duyệt-2026-11-17">7. Luồng: mua, đổi gói, vượt hạn mức, thanh toán (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên <a href="#f-03-business-analysis-05-plans-billing--3-đã-quyết">§3</a> (trần chi tiêu, OQ-55) và <a href="#f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>. Giá và hạn mức ở kiến trúc 8.18 / ADR-0043. Mức bonus đã chốt 10% (xem BL5); bảng giá do business chốt.</p>
 </blockquote>
@@ -9938,7 +9950,7 @@ chủ dự án duyệt.</p>
 </section>
 <section class="doc" id="f-03-business-analysis-06-members-access"><div class="path">03-business-analysis/06-members-access.md</div><h1 id="f-03-business-analysis-06-members-access--36-quản-lý-thành-viên-sso-api-key">3.6 Quản lý thành viên, SSO, API key</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định ở <a href="#f-03-business-analysis-06-members-access--3-đã-quyết">§3</a>.</p>
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Quyết định ở <a href="#f-03-business-analysis-06-members-access--3-đã-quyết">§3</a>.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-06-members-access--1-phạm-vi">1. Phạm vi</h2>
 <p>Ai vào được tổ chức của khách, làm được gì, bằng danh tính nào, và mất quyền khi nào. Gồm cả máy (API key,
@@ -10291,7 +10303,7 @@ chủ dự án duyệt.</p>
 </table>
 <h2 id="f-03-business-analysis-06-members-access--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-1-01…FR-1-17, BR-13…BR-15, BR-20, DT-1, OQ-1 ở <a href="#f-02-requirements">§2</a>.</p>
-<h2 id="f-03-business-analysis-06-members-access--7-luồng-thành-viên-sso-api-key-khôi-phục-bước-2-2026-11-17">7. Luồng: thành viên, SSO, API key, khôi phục (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-06-members-access--7-luồng-thành-viên-sso-api-key-khôi-phục-bước-2-đã-duyệt-2026-11-17">7. Luồng: thành viên, SSO, API key, khôi phục (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên <a href="#f-03-business-analysis-06-members-access--3-đã-quyết">§3</a> (một người thuộc nhiều org, OQ-62) và <a href="#f-03-business-analysis-06-members-access--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a>.</p>
 </blockquote>
@@ -10930,7 +10942,7 @@ dữ liệu. Liên quan: F2.4.3, F1.1.4, F9.3 ở <a href="#f-01-functional-deco
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-07-offboarding--6-luồng-rời-dịch-vụ-chuyển-zone-bỏ-hoang-bước-2-2026-11-17">6. Luồng: rời dịch vụ, chuyển zone, bỏ hoang (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-07-offboarding--6-luồng-rời-dịch-vụ-chuyển-zone-bỏ-hoang-bước-2-đã-duyệt-2026-11-17">6. Luồng: rời dịch vụ, chuyển zone, bỏ hoang (bước 2, đã duyệt 2026-11-17)</h2>
 <div class="diagram"><pre class="mermaid">flowchart TB
     OF1[&quot;OF1 Yêu cầu&lt;br/&gt;gỡ zone, chuyển zone, xoá org,&lt;br/&gt;huỷ gói, hết hợp đồng&quot;]
     OF2[&quot;OF2 Xuất dữ liệu&lt;br/&gt;cấu hình JSON, log CSV/JSON&quot;]
@@ -11265,7 +11277,7 @@ thống của khách, làm báo cáo cho lãnh đạo và kiểm toán. Liên qu
 </section>
 <section class="doc" id="f-03-business-analysis-09-bot-management"><div class="path">03-business-analysis/09-bot-management.md</div><h1 id="f-03-business-analysis-09-bot-management--39-bot-management-và-challenge">3.9 Bot management và challenge</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Theo chủ dự án, bot và challenge là một vùng
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Theo chủ dự án, bot và challenge là một vùng
 nghiệp vụ lớn, cần phân tích riêng; API security tách sang <a href="#f-03-business-analysis-12-api-security">3.12</a>. Thiết kế kỹ thuật ở kiến
 trúc 8.16. Lần phân tích tiếp (2026-11-07) thêm trục J–L, mô hình quyết định đề xuất ở <a href="#f-03-business-analysis-09-bot-management--4-mô-hình-quyết-định-đề-xuất-chờ-duyệt">§4</a>
 và phân tích các câu còn mở ở <a href="#f-03-business-analysis-09-bot-management--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">§5</a>; tất cả là đề xuất, chưa phải quyết định.</p>
@@ -12010,7 +12022,7 @@ request hoàn toàn sạch vẫn có thể là bot (đăng nhập bằng mật k
 </table>
 <h2 id="f-03-business-analysis-09-bot-management--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-3-08, FR-5-03, BR-7, BR-25 ở <a href="#f-02-requirements">§2</a>; kiến trúc 8.16, ADR-0038; QS-20, QS-21.</p>
-<h2 id="f-03-business-analysis-09-bot-management--7-luồng-bật-và-vận-hành-bot-management-bước-2-2026-11-17">7. Luồng: bật và vận hành bot management (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-09-bot-management--7-luồng-bật-và-vận-hành-bot-management-bước-2-đã-duyệt-2026-11-17">7. Luồng: bật và vận hành bot management (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên mô hình <a href="#f-03-business-analysis-09-bot-management--4-mô-hình-quyết-định-đề-xuất-chờ-duyệt">§4</a> (nhận diện tách khỏi chính sách; <strong>§4 chưa duyệt riêng</strong>, các câu OQ ở <a href="#f-03-business-analysis-09-bot-management--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a> đã duyệt)
 và kiến trúc 8.16. OQ-125 (lớp <code>agent</code> cho tác tử AI) đang <strong>hoãn</strong>, nên luồng dưới chưa có lớp <code>agent</code>.</p>
@@ -12098,7 +12110,7 @@ danh tính consumer (API key, JWT) và rate limit theo 8.17 (<a href="#f-03-busi
 </section>
 <section class="doc" id="f-03-business-analysis-10-cache-performance"><div class="path">03-business-analysis/10-cache-performance.md</div><h1 id="f-03-business-analysis-10-cache-performance--310-cache-hiệu-năng-nội-dung">3.10 Cache, hiệu năng, nội dung</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và <strong>đã duyệt 2026-11-17</strong> ở mục 7. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
 cần phân tích riêng. Chiến lược CDN ở kiến trúc ADR-0035. Lần phân tích tiếp thêm trục J–N, mô hình quyết định ở
 <a href="#f-03-business-analysis-10-cache-performance--4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt">§4</a> và phân tích các câu còn mở ở
 <a href="#f-03-business-analysis-10-cache-performance--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">§5</a>; tất cả là đề xuất, chưa phải quyết định.</p>
@@ -12847,7 +12859,7 @@ hình của khách. Khách có thể nới lỏng an toàn nhưng phải làm r�
 <h2 id="f-03-business-analysis-10-cache-performance--6-phụ-thuộc">6. Phụ thuộc</h2>
 <p>FR-4-01…FR-4-04 ở <a href="#f-02-requirements">§2</a>; kiến trúc ADR-0035, 8.18. Chính sách abuse và an toàn cache
 chưa có requirement nào.</p>
-<h2 id="f-03-business-analysis-10-cache-performance--7-luồng-cấu-hình-cache-và-hiệu-năng-của-một-zone-bước-2-2026-11-17">7. Luồng: cấu hình cache và hiệu năng của một zone (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-10-cache-performance--7-luồng-cấu-hình-cache-và-hiệu-năng-của-một-zone-bước-2-đã-duyệt-2026-11-17">7. Luồng: cấu hình cache và hiệu năng của một zone (bước 2, đã duyệt 2026-11-17)</h2>
 <blockquote>
 <p>Dựa trên mô hình <a href="#f-03-business-analysis-10-cache-performance--4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt">§4</a> (luật an toàn đứng trên cấu hình; <strong>§4 chưa duyệt riêng</strong>, các OQ ở <a href="#f-03-business-analysis-10-cache-performance--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">§5</a> đã duyệt) và ADR-0035.</p>
 </blockquote>
@@ -13552,7 +13564,7 @@ khỏi portal của khách; các trục dưới đây là những gì portal và
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-11-provider-operations--7-luồng-hỗ-trợ-sự-cố-nền-tảng-vận-hành-của-ncc-bước-2-2026-11-17">7. Luồng: hỗ trợ, sự cố nền tảng, vận hành của NCC (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-11-provider-operations--7-luồng-hỗ-trợ-sự-cố-nền-tảng-vận-hành-của-ncc-bước-2-đã-duyệt-2026-11-17">7. Luồng: hỗ trợ, sự cố nền tảng, vận hành của NCC (bước 2, đã duyệt 2026-11-17)</h2>
 <div class="diagram"><pre class="mermaid">flowchart TB
     PO1[&quot;PO1 Khách liên hệ&lt;br/&gt;kênh theo gói&quot;]
     PO2[&quot;PO2 Phân loại&lt;br/&gt;mức nghiêm trọng&quot;]
@@ -13963,7 +13975,7 @@ mà WAF thông thường không thấy. Liên quan: F3.7, F5.1.8 ở <a href="#f
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-12-api-security--6-luồng-api-discovery-và-chặn-theo-schema-bước-2-2026-11-17">6. Luồng: API discovery và chặn theo schema (bước 2, 2026-11-17)</h2>
+<h2 id="f-03-business-analysis-12-api-security--6-luồng-api-discovery-và-chặn-theo-schema-bước-2-đã-duyệt-2026-11-17">6. Luồng: API discovery và chặn theo schema (bước 2, đã duyệt 2026-11-17)</h2>
 <div class="diagram"><pre class="mermaid">flowchart TB
     AS1[&quot;AS1 Discovery từ traffic&lt;br/&gt;chỉ lưu cấu trúc&quot;]
     AS2[&quot;AS2 Hàng đợi đề xuất&lt;br/&gt;endpoint mới, shadow, zombie&quot;]
