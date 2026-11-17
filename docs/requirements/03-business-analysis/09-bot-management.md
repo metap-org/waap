@@ -1,6 +1,6 @@
 # 3.9 Bot management và challenge
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Theo chủ dự án, bot và challenge là một vùng
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Theo chủ dự án, bot và challenge là một vùng
 > nghiệp vụ lớn, cần phân tích riêng; API security tách sang [3.12](12-api-security.md). Thiết kế kỹ thuật ở kiến
 > trúc 8.16. Lần phân tích tiếp (2026-11-07) thêm trục J–L, mô hình quyết định đề xuất ở [§4](#4-mô-hình-quyết-định-đề-xuất-chờ-duyệt)
 > và phân tích các câu còn mở ở [§5](#5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt); tất cả là đề xuất, chưa phải quyết định.
@@ -217,7 +217,7 @@ flowchart LR
 
 FR-3-08, FR-5-03, BR-7, BR-25 ở [§2](../02-requirements.md); kiến trúc 8.16, ADR-0038; QS-20, QS-21.
 
-## 7. Luồng: bật và vận hành bot management (bước 2, 2026-11-17)
+## 7. Luồng: bật và vận hành bot management (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên mô hình [§4](#4-mô-hình-quyết-định-đề-xuất-chờ-duyệt) (nhận diện tách khỏi chính sách; **§4 chưa duyệt riêng**, các câu OQ ở [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17) đã duyệt)
 > và kiến trúc 8.16. OQ-125 (lớp `agent` cho tác tử AI) đang **hoãn**, nên luồng dưới chưa có lớp `agent`.

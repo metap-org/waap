@@ -1,6 +1,6 @@
 # 3.1 Onboarding một website
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở Phụ lục A. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở Phụ lục A. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
 > khi viết luồng onboarding. Cột "ghi chú ban đầu" chỉ là ý kiến lúc ghi, **không phải quyết định**. Lần phân
 > tích tiếp (2026-11-07) thêm trục K–N, hồ sơ khách điển hình ([§6](#6-hồ-sơ-khách-điển-hình-đề-xuất-chờ-duyệt)),
 > cây quyết định kết nối ([§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt)) và phân tích các câu ở
@@ -327,10 +327,10 @@ flowchart TB
 | OQ-149 | Nhập cấu hình từ nơi khác | | Mở rộng: nhập bản ghi DNS và IP allowlist; rule không chuyển tự động, chỉ có hướng dẫn tương đương |
 | OQ-150 | Từ chối lĩnh vực bị cấm từ đầu | Kiểm trước thì chậm, dễ sai | Điều khoản cấm, kiểm domain với danh sách đen đã biết lúc thêm zone, còn lại xử lý qua abuse (OQ-88) |
 
-## Phụ lục A. Luồng onboarding (bước 2, cập nhật 2026-11-17)
+## Phụ lục A. Luồng onboarding (bước 2, đã duyệt 2026-11-17)
 
 > Bản nháp đầu tiên đi theo một kịch bản (DNS đầy đủ, origin có IP public, cổng chuẩn). Sau khi chủ dự án duyệt OQ-21…OQ-32 và OQ-147…OQ-150
-> (2026-11-17), luồng này là **căn cứ cho kịch bản chính**; các điều chỉnh theo quyết định nằm ở [A.10](#a10-điều-chỉnh-theo-quyết-định-2026-11-17).
+> (2026-11-17), luồng này là **căn cứ cho kịch bản chính** và **chủ dự án đã duyệt luồng (2026-11-17)**; các điều chỉnh theo quyết định nằm ở [A.10](#a10-điều-chỉnh-theo-quyết-định-2026-11-17).
 > A.6 (hồ sơ khách) và cây quyết định ở [§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt) **chưa duyệt riêng**. OQ-17…OQ-20 ở A.9 đã được duyệt theo đề xuất ngày 2026-11-17.
 
 ### A.1 Mục tiêu và định nghĩa "xong"
@@ -663,6 +663,7 @@ Phương thức kết nối:
 | OB3 Xác minh sở hữu | Dự phòng khi không tạo được `_acme-challenge`: **TXT tên khác** và **file HTTP** ở MVP; thẻ meta ở Mở rộng; **không dùng email**. Có hướng dẫn riêng (kèm ảnh) cho 5–6 nhà DNS trong nước; khảo sát trước MVP nhà nào không cho `_` | OQ-147, OQ-26 |
 | OB4 Origin | Cổng phía client: danh sách nhỏ cổng HTTP/HTTPS hay dùng (8080, 8443…) cho mọi gói; cổng tuỳ ý chỉ Enterprise có IP riêng. Origin là nền tảng SaaS (Shopify, Haravan, Sapo…): không hỗ trợ chính thức ở MVP, có trang hướng dẫn chung. Tunnel cho origin không có IP public và định tuyến theo path / nhiều origin: **Mở rộng** (tunnel ưu tiên cao) | OQ-23, OQ-30, OQ-28, OQ-29 |
 | OB5 Cert | Edge **chuyển challenge ACME của origin (certbot) về origin** theo mặc định: token không phải của NCC thì chuyển về origin | OQ-31 |
+| OB3, OB5, OG2 Khách chỉ đổi được A/AAAA | Khách không có nhà DNS cho tạo CNAME, ALIAS, TXT hoặc `_acme-challenge` (chỉ sửa được bản ghi A/AAAA hoặc nhà đăng ký chỉ cho trỏ IP): **trỏ A/AAAA về dải IP dùng chung của NCC** là đường tối thiểu. Xác minh sở hữu bằng **file HTTP** đặt ở origin (kiểm trước khi đổi DNS, từ edge tới origin); cert không dùng DNS-01 được, nên khách **tải cert lên** hoặc chấp nhận cấp bằng HTTP-01 **sau khi** traffic tới (có khoảng lỗi HTTPS ngắn, cảnh báo rõ ở OG2). Không có ALIAS ở apex thì dùng dải IP tĩnh v4 và v6 (như OQ-22). UI vẫn đề xuất CNAME hoặc ALIAS trước | Chủ dự án duyệt luồng 2026-11-17 kèm yêu cầu đường "chỉ trỏ IP" |
 | OB7 Kiểm thử | Edge gửi vài request về origin và phát hiện **vòng chuyển hướng**, `403`/`429` từ origin (origin chặn IP edge), nội dung hỗn hợp trên trang chủ | OQ-148 |
 | OG2, OB8 Đổi DNS | Cấp **dải IP dùng chung theo region, có IPv4 và IPv6** từ MVP; UI luôn đề xuất CNAME hoặc ALIAS trước và nói rõ cái giá của A tĩnh; IP riêng theo zone cho Enterprise; anycast theo lộ trình hạ tầng. Thay đề xuất OQ-16 | OQ-22 |
 | OG4 Hoàn tất | **Cảnh báo đỏ ở mọi bước** và **không cho hoàn tất** khi còn một họ IP (A hoặc AAAA) trỏ thẳng origin; không chặn các bước khác | OQ-32 |

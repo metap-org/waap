@@ -1,6 +1,6 @@
 # 3.6 Quản lý thành viên, SSO, API key
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định ở [§3](#3-đã-quyết).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Quyết định ở [§3](#3-đã-quyết).
 
 ## 1. Phạm vi
 
@@ -107,7 +107,7 @@ chủ dự án duyệt.
 
 FR-1-01…FR-1-17, BR-13…BR-15, BR-20, DT-1, OQ-1 ở [§2](../02-requirements.md).
 
-## 7. Luồng: thành viên, SSO, API key, khôi phục (bước 2, 2026-11-17)
+## 7. Luồng: thành viên, SSO, API key, khôi phục (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên [§3](#3-đã-quyết) (một người thuộc nhiều org, OQ-62) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17).
 

@@ -1659,7 +1659,8 @@ và giữ trạng thái cũ, không đọc dở.</p>
 ra nhưng bảng trên chưa có. Tên và trường có thể đổi khi phân tích từng nghiệp vụ
 (<a href="v1-waap-requirements.html#f-03-business-analysis-00-index" target="_blank" rel="noopener">requirements §3</a>); quy tắc version N-1 ở đầu mục áp như mọi
 hợp đồng khác. Cột <strong>LK</strong> trỏ về liên kết trong bản đồ phân rã chức năng. Hai hợp đồng ghi <strong>chờ onboarding</strong> đến
-từ bản nháp onboarding chưa duyệt (<a href="v1-waap-requirements.html#f-03-business-analysis-01-onboarding" target="_blank" rel="noopener">requirements §3.1</a>).</p>
+từ bản nháp onboarding; luồng onboarding đã duyệt 2026-11-17 (<a href="v1-waap-requirements.html#f-03-business-analysis-01-onboarding" target="_blank" rel="noopener">requirements §3.1</a>),
+bổ sung ở <a href="#f-05-building-blocks-05-contracts--bổ-sung-theo-luồng-nghiệp-vụ-đã-duyệt-2026-11-17">bảng sau</a>.</p>
 </blockquote>
 <table>
 <thead>
@@ -2058,6 +2059,59 @@ message Verdict {
 <li>Đánh giá mô hình đe doạ cho IA10 cùng đội bảo mật.</li>
 <li>Chốt v1 bằng một ADR riêng; tới lúc đó các component 5.8.1, 5.8.2 coi phần gọi WAF là theo bản nháp.</li>
 </ol>
+<h3 id="f-05-building-blocks-05-contracts--bổ-sung-theo-luồng-nghiệp-vụ-đã-duyệt-2026-11-17">Bổ sung theo luồng nghiệp vụ đã duyệt (2026-11-17)</h3>
+<p>Các thay đổi dưới đây cộng vào hợp đồng đã có ở trên, vẫn theo quy tắc version N-1. Còn tạm cho tới khi chốt tên trường ở schema.</p>
+<table>
+<thead>
+<tr>
+<th>Hợp đồng</th>
+<th>Thay đổi</th>
+<th>Nguồn</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ZoneChanged</strong></td>
+<td>Thêm <code>scope</code> (<code>apex</code> hoặc <code>hostname</code>) và trạng thái <code>passthrough</code> (edge chuyển tiếp thẳng tới origin, không bảo vệ, không cache), <code>removed</code> (trang giải thích)</td>
+<td><a href="v1-waap-requirements.html#f-03-business-analysis-01-onboarding" target="_blank" rel="noopener">3.1</a> OQ-21, <a href="v1-waap-requirements.html#f-03-business-analysis-07-offboarding" target="_blank" rel="noopener">3.7</a> OQ-69</td>
+</tr>
+<tr>
+<td><strong>ZoneCheckResult</strong></td>
+<td>Thêm loại kiểm <code>denylist</code>, <code>nonhttp</code>, <code>origin_problem</code> (<code>redirect_loop</code>, <code>origin_blocks_edge</code>, <code>mixed_content</code>); <code>ownership</code> có <code>method</code> (<code>cname</code>, <code>txt</code>, <code>http_file</code>); <code>dns_routing</code> theo họ IP (<code>a</code>, <code>aaaa</code>)</td>
+<td>3.1 OQ-24, 32, 147, 148, 150</td>
+</tr>
+<tr>
+<td><strong>EntitlementsChanged</strong></td>
+<td>Thêm <code>effectiveAt</code> (ngay khi nâng, cuối kỳ khi hạ), <code>graceUntil</code> (ân hạn 3 ngày), <code>retentionApplyAfter</code> (báo trước 7 ngày)</td>
+<td><a href="v1-waap-requirements.html#f-03-business-analysis-05-plans-billing" target="_blank" rel="noopener">3.5</a> OQ-10, 56, 58</td>
+</tr>
+<tr>
+<td><strong>TelemetryRecord</strong></td>
+<td>Thêm loại <code>fp_report</code> (báo chặn nhầm từ end-user: request ID, mô tả ngắn); Analytics chuyển thành <code>FalsePositiveReported</code> vào hộp thư zone ở Management. Edge không gọi Management trực tiếp</td>
+<td><a href="v1-waap-requirements.html#f-03-business-analysis-04-false-positive" target="_blank" rel="noopener">3.4</a> OQ-48</td>
+</tr>
+<tr>
+<td><strong>FalsePositiveReported</strong> (mới)</td>
+<td>Analytics → Management: request ID, zone, mô tả, thời điểm</td>
+<td>3.4</td>
+</tr>
+<tr>
+<td><strong>ZoneTransferred</strong> (mới)</td>
+<td>Management → Control, Analytics: zone ID, org cũ, org mới, thời điểm; policy đi theo, log, audit, hoá đơn ở lại org cũ</td>
+<td>3.7 OQ-94</td>
+</tr>
+<tr>
+<td><strong>DataErasureRequested</strong></td>
+<td>Thêm <code>holdUntil</code> (giữ 30 ngày sau yêu cầu xoá org, huỷ được) và ghi chú: bản sao lưu giữ tối đa 35 ngày</td>
+<td>3.7 OQ-70, 71</td>
+</tr>
+<tr>
+<td><strong>IsolationRequested</strong></td>
+<td>Không đổi trường; ghi rõ bậc xử lý: cell cách ly, rồi challenge mọi request và trần rps cứng; không bao giờ trả DNS về origin</td>
+<td><a href="v1-waap-requirements.html#f-03-business-analysis-03-attack-response" target="_blank" rel="noopener">3.3</a> OQ-42</td>
+</tr>
+</tbody>
+</table>
 </section>
 <section class="doc" id="f-05-building-blocks-06-data-model"><div class="path">05-building-blocks/06-data-model.md</div><h1 id="f-05-building-blocks-06-data-model--56-mô-hình-dữ-liệu">5.6 Mô hình dữ liệu</h1>
 <h2 id="f-05-building-blocks-06-data-model--management-logic">Management (logic)</h2>
@@ -6853,6 +6907,41 @@ tốn CPU của tầng WAF.</p>
 </pre></div>
 <p>Gate hỏng ở bất kỳ đợt nào: orchestrator dừng, đưa các node đã nhận về version trước, báo trạng
 thái về Management.</p>
+<p><strong>Biến thể theo luồng <a href="v1-waap-requirements.html#f-03-business-analysis-02-policy-change" target="_blank" rel="noopener">3.2</a> (duyệt 2026-11-17):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Biến thể</th>
+<th>Khác với sequence trên</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Org một người</td>
+<td>Không có người duyệt thứ hai: người gửi tự xác nhận diff rồi phát hành, không có thời gian chờ; vẫn có diff, kiểm và rollback. 4-eyes chỉ bật được khi account có ít nhất hai người có quyền duyệt (BR-40)</td>
+</tr>
+<tr>
+<td>Rollback</td>
+<td>Về một version đã từng được duyệt thì không cần duyệt lại (BR-40)</td>
+</tr>
+<tr>
+<td>Support của NCC sửa policy</td>
+<td>Chỉ khi khách đã cấp quyền (BR-41); change request đứng tên support, cần một người của khách duyệt</td>
+</tr>
+<tr>
+<td>Template ảnh hưởng nhiều zone</td>
+<td>Một change request, duyệt một lần; Control phát theo đợt; zone biên dịch lỗi bị bỏ qua và báo ở <code>CompileResult</code>, không chặn cả nhóm</td>
+</tr>
+<tr>
+<td>Khách thấy tiến độ</td>
+<td><code>RolloutProgress</code> hiện canary đang ở đâu và bao nhiêu % node đã áp; phát theo phần trăm traffic để Nâng cao</td>
+</tr>
+<tr>
+<td>Thay đổi không ảnh hưởng traffic</td>
+<td>Đổi tên, mô tả, tag: không qua change request, vẫn ghi audit (BR-39)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="f-06-runtime-00-index--63-bật-under-attack-mode-rule-khẩn">6.3 Bật Under Attack mode, rule khẩn</h2>
 <div class="diagram"><pre class="mermaid">sequenceDiagram
     actor S as SOC / NCC
@@ -6870,13 +6959,16 @@ thái về Management.</p>
 </pre></div>
 <p>Rule khẩn của NCC (zero-day) đi cùng đường, bắt đầu từ console NCC thay vì Management của khách,
 và nằm trong bundle chung.</p>
+<p><strong>Theo luồng <a href="v1-waap-requirements.html#f-03-business-analysis-03-attack-response" target="_blank" rel="noopener">3.3</a> (duyệt 2026-11-17):</strong> NCC bật mitigation không cần hỏi khách ở mọi gói; khách được báo ngay và
+tắt được, trừ khi tấn công đang ảnh hưởng khách khác (BR-41). Zone vượt khả năng: Analytics gửi <code>IsolationRequested</code>, Control chuyển zone
+sang cell cách ly; nếu vẫn quá khả năng thì áp challenge cho mọi request và trần rps cứng cho zone. <strong>Không bao giờ trả DNS về origin</strong> (BR-42).
+Rule tạm hết hạn tối đa sau 72 giờ (OQ-5); mỗi bước đều gửi thông báo cho khách.</p>
 <h2 id="f-06-runtime-00-index--64-onboarding-một-zone">6.4 Onboarding một zone</h2>
 <blockquote>
-<p><strong>Chờ onboarding.</strong> Sequence này theo bản nháp chưa duyệt ở
-<a href="v1-waap-requirements.html#f-03-business-analysis-01-onboarding" target="_blank" rel="noopener">requirements §3.1</a>, chỉ cho một kịch bản (DNS đầy
-đủ, origin có IP public, cổng chuẩn). Onboarding đang được phân tích lại theo nhiều kịch bản.</p>
+<p>Luồng onboarding đã duyệt 2026-11-17 (<a href="v1-waap-requirements.html#f-03-business-analysis-01-onboarding" target="_blank" rel="noopener">requirements §3.1</a>, phụ lục A). Sequence dưới
+là <strong>đường chính</strong> (DNS đầy đủ, origin có IP public, cổng chuẩn); các biến thể ở bảng ngay sau sơ đồ.</p>
 </blockquote>
-<p>Đường chính của bản nháp: xác minh và cert xong
+<p>Đường chính: xác minh và cert xong
 <strong>trước</strong> khi khách đổi DNS, bật chặn chỉ sau giai đoạn log-only có số liệu.</p>
 <div class="diagram"><pre class="mermaid">sequenceDiagram
     actor K as Khách
@@ -6909,6 +7001,49 @@ và nằm trong bundle chung.</p>
     K-&gt;&gt;M: change request bật chặn (OB10)
     M-&gt;&gt;C: PolicyVersionPublished
 </pre></div>
+<p><strong>Biến thể theo luồng 3.1:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Biến thể</th>
+<th>Khác với đường chính</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zone chỉ một hostname (OQ-21)</td>
+<td><code>ZoneChanged.scope = hostname</code>; khách chứng minh quyền với chính hostname; zone này không giữ claim của apex (BR-53)</td>
+</tr>
+<tr>
+<td>Kiểm domain lúc thêm zone (OQ-150)</td>
+<td>Control đối chiếu danh sách đen đã biết, <code>ZoneCheckResult(denylist)</code>; phần còn lại xử lý qua abuse</td>
+</tr>
+<tr>
+<td>Xác minh dự phòng (OQ-147)</td>
+<td>Thay <code>_acme-challenge</code> bằng TXT tên khác hoặc file HTTP đặt ở origin; không dùng email</td>
+</tr>
+<tr>
+<td>Khách chỉ đổi được A/AAAA</td>
+<td>Trỏ A/AAAA về dải IP dùng chung (OQ-22); xác minh bằng file HTTP; cert tải lên hoặc cấp bằng HTTP-01 sau khi traffic tới (cảnh báo khoảng lỗi HTTPS)</td>
+</tr>
+<tr>
+<td>Cảnh báo traffic không phải HTTP (OQ-24)</td>
+<td><code>ZoneCheckResult(nonhttp)</code> từ DNS: MX, SRV, hostname khác cùng IP với apex; không quét cổng origin</td>
+</tr>
+<tr>
+<td>Kiểm thử OB7 (OQ-148)</td>
+<td>Edge gửi vài request về origin, <code>ZoneCheckResult(origin_problem)</code> báo vòng chuyển hướng, <code>403</code>/<code>429</code> từ origin, nội dung hỗn hợp</td>
+</tr>
+<tr>
+<td>Challenge ACME của origin (OQ-31)</td>
+<td>Edge chuyển <code>/.well-known/acme-challenge/</code> về origin khi token không phải của NCC</td>
+</tr>
+<tr>
+<td>Hoàn tất OG4 (OQ-32)</td>
+<td><code>ZoneCheckResult(dns_routing)</code> theo từng họ IP (<code>a</code>, <code>aaaa</code>); còn một họ trỏ thẳng origin thì không cho hoàn tất (BR-52)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="f-06-runtime-00-index--65-xử-lý-một-request-bị-chặn-nhầm">6.5 Xử lý một request bị chặn nhầm</h2>
 <div class="diagram"><pre class="mermaid">sequenceDiagram
     actor U as End-user
@@ -6926,6 +7061,12 @@ và nằm trong bundle chung.</p>
     An--&gt;&gt;M: mở thêm 310 request, 0 đáng ngờ
     Note over M: vào vòng đời policy như 6.2
 </pre></div>
+<p><strong>Theo luồng <a href="v1-waap-requirements.html#f-03-business-analysis-04-false-positive" target="_blank" rel="noopener">3.4</a> (duyệt 2026-11-17):</strong></p>
+<ul>
+<li>Trang chặn của mọi gói có request ID và thông tin liên hệ do chủ website cấu hình. Từ gói Pro có nút &quot;báo chặn nhầm&quot;: edge ghi một <code>TelemetryRecord</code> loại <code>fp_report</code> (chỉ request ID và mô tả ngắn, có giới hạn tần suất và challenge chống spam); Analytics chuyển thành <code>FalsePositiveReported</code> vào hộp thư zone ở Management. Edge không gọi Management trực tiếp.</li>
+<li><code>Query</code> theo request ID chỉ trả payload cho người có quyền riêng &quot;xem dữ liệu request&quot; (mặc định security admin); mật khẩu, <code>Authorization</code>, cookie phiên, token, số thẻ luôn bị che (BR-44).</li>
+<li>Exception luôn qua change request như 6.2; rollback về version đã duyệt hoặc mitigation tạm khi gấp. Nhãn chéo tenant chỉ dạng thống kê gộp (BR-45).</li>
+</ul>
 <h2 id="f-06-runtime-00-index--66-cảnh-báo-và-case">6.6 Cảnh báo và case</h2>
 <div class="diagram"><pre class="mermaid">sequenceDiagram
     participant E as Edge
@@ -6950,6 +7091,9 @@ ghi event, để so sánh tỉ lệ chặn trên traffic thật.</li>
 <li>Zone chọn &quot;tự nhận bản mới&quot; được chuyển sau khi gate qua; zone cố định version thấy thông báo
 và danh sách rule thay đổi.</li>
 </ol>
+<p><strong>Theo luồng <a href="v1-waap-requirements.html#f-03-business-analysis-02-policy-change" target="_blank" rel="noopener">3.2</a> (duyệt 2026-11-17, BR-54):</strong> rule mới của release vào zone ở log-only <strong>7 ngày</strong> có báo cáo, rồi tự chặn.
+Business trở lên chọn &quot;duyệt thủ công&quot;: release thành change request chờ duyệt. Enterprise ghim version tối đa 90 ngày. Rule khẩn cho CVE áp ngay
+ở chế độ chặn trong lớp rule khẩn chạy trước CRS; khách tắt bằng tuning rule (BR-25).</p>
 <h2 id="f-06-runtime-00-index--68-edge-node-khởi-động-mất-kết-nối-phục-hồi">6.8 Edge node khởi động, mất kết nối, phục hồi</h2>
 <ul>
 <li><strong>Khởi động:</strong> node xác thực với Control bằng danh tính đã cấp khi enrollment, kéo bundle chung
@@ -6967,6 +7111,37 @@ thứ tự thời gian.</li>
 kế tiếp; Analytics áp retention và giới hạn truy vấn mới.</li>
 <li>Hạ gói không xoá ngay dữ liệu cũ hơn retention mới: dữ liệu hết hạn theo lịch, khách được báo trước.</li>
 </ol>
+<p><strong>Theo luồng <a href="v1-waap-requirements.html#f-03-business-analysis-05-plans-billing" target="_blank" rel="noopener">3.5</a> (duyệt 2026-11-17):</strong></p>
+<ul>
+<li><strong>Nâng gói:</strong> <code>EntitlementsChanged</code> có hiệu lực ngay; Management tính phần còn lại của gói cũ vào gói mới kèm bonus 10% (BR-49).</li>
+<li><strong>Hạ gói:</strong> hiệu lực cuối kỳ (<code>effectiveAt</code>). Nếu khi đó khách vượt giới hạn mới: cảnh báo sau 6 giờ, 12 giờ, rồi mỗi ngày trong 3 ngày ân hạn (<code>graceUntil</code>), hết hạn thì không cho tạo thêm vượt giới hạn và phần vượt (mới nhất trước) ngừng áp; không khoá tài khoản.</li>
+<li><strong>Retention mới:</strong> báo trước 7 ngày rồi mới áp (<code>retentionApplyAfter</code>); khách xuất log trước nếu muốn giữ (BR-50).</li>
+<li><strong>Huỷ:</strong> gói tháng không hoàn; gói năm hoàn theo tháng chưa dùng trừ chiết khấu; không có gói tạm ngừng (BR-51).</li>
+</ul>
+<h2 id="f-06-runtime-00-index--611-gỡ-zone-rời-dịch-vụ-chuyển-zone">6.11 Gỡ zone, rời dịch vụ, chuyển zone</h2>
+<p>Theo luồng <a href="v1-waap-requirements.html#f-03-business-analysis-07-offboarding" target="_blank" rel="noopener">3.7</a> (duyệt 2026-11-17).</p>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+    actor K as Khách
+    participant M as Management
+    participant C as Control
+    participant E as Edge
+    participant A as Analytics
+    K-&gt;&gt;M: gỡ zone (đã xuất cấu hình, log)
+    M-&gt;&gt;C: ZoneChanged (state = passthrough)
+    C-&gt;&gt;E: Snapshot: chuyển tiếp thẳng tới origin, không bảo vệ, không cache
+    Note over E: 30 ngày, nhắc khách hằng tuần
+    C-&gt;&gt;M: hết 30 ngày
+    M-&gt;&gt;C: ZoneChanged (state = removed)
+    C-&gt;&gt;E: Snapshot: trang giải thích &quot;zone đã gỡ&quot;
+    M-&gt;&gt;A: DataErasureRequested (hold 30 ngày; log, audit theo retention)
+</pre></div>
+<ul>
+<li><strong>Zone gỡ mà DNS còn trỏ:</strong> <code>passthrough</code> 30 ngày, không lỗi im lặng (BR-55). Zone bỏ hoang đi theo BR-9, rồi 30 ngày tối giản và 30 ngày <code>passthrough</code>.</li>
+<li><strong>Xoá org:</strong> huỷ được trong 30 ngày (chỉ owner); zone gỡ nhầm khôi phục cấu hình trong 30 ngày; bản sao lưu giữ tối đa 35 ngày (BR-56).</li>
+<li><strong>Chuyển zone sang org khác:</strong> cần owner hai org xác nhận; <code>ZoneTransferred</code>: policy đi theo, log, audit, hoá đơn ở lại org cũ, bí mật bị xoá (BR-57).</li>
+<li><strong>Hết hợp đồng Enterprise:</strong> 30 ngày chuyển tiếp giữ nguyên dịch vụ; chuyển gói tự phục vụ hoặc như zone bỏ hoang; thu hồi cell và database riêng sau 30 ngày kèm xuất dữ liệu.</li>
+<li><strong>NCC đóng PoP, rút region:</strong> báo trước 90 ngày (Enterprise 180), kèm dải IP mới cho khách đã khoá firewall theo IP (BR-58).</li>
+</ul>
 </section>
 <section class="doc" id="f-06-runtime-10-analytics-flows"><div class="path">06-runtime/10-analytics-flows.md</div><h1 id="f-06-runtime-10-analytics-flows--610-luồng-analytics">6.10 Luồng Analytics</h1>
 <p>Toàn bộ đường đi của dữ liệu traffic: từ lúc gateway tạo bản ghi tới từng kiểu đọc. Thành phần chi

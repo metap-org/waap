@@ -96,7 +96,7 @@ FR-3-09, FR-5-19 ở [§2](../02-requirements.md); kiến trúc 8.17, ADR-0039; 
 | OQ-110 | Có ở Nâng cao, dạng cảnh báo theo baseline hành vi, không chặn; khách khai báo claim định danh và tham số ID |
 | OQ-111 | Thứ tự: API key trong header, rồi `sub` của JWT (khách khai báo claim), cuối cùng IP kèm dấu vân tay TLS |
 
-## 6. Luồng: API discovery và chặn theo schema (bước 2, 2026-11-17)
+## 6. Luồng: API discovery và chặn theo schema (bước 2, đã duyệt 2026-11-17)
 
 ```mermaid
 flowchart TB

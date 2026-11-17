@@ -1,6 +1,6 @@
 # 3.5 Mua, đổi gói, vượt hạn mức, thanh toán
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-54, 57…61); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Giá
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-54, 57…61); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Giá
 > và hạn mức tham chiếu ở kiến trúc 8.18; trang này hỏi về cách mua và tính tiền, không hỏi lại giá.
 
 ## 1. Phạm vi
@@ -126,7 +126,7 @@ chủ dự án duyệt.
 
 FR-10-01…FR-10-13, BR-7…BR-11, DT-8, IR-2, IR-3, OQ-10, OQ-12, OQ-14 ở [§2](../02-requirements.md).
 
-## 7. Luồng: mua, đổi gói, vượt hạn mức, thanh toán (bước 2, 2026-11-17)
+## 7. Luồng: mua, đổi gói, vượt hạn mức, thanh toán (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên [§3](#3-đã-quyết) (trần chi tiêu, OQ-55) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). Giá và hạn mức ở kiến trúc 8.18 / ADR-0043. Mức bonus đã chốt 10% (xem BL5); bảng giá do business chốt.
 

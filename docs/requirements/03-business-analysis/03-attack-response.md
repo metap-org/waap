@@ -1,6 +1,6 @@
 # 3.3 Phản ứng khi bị tấn công
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định ở [§3](#3-đã-quyết).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết và **đã duyệt 2026-11-17** ở mục 7. Quyết định ở [§3](#3-đã-quyết).
 
 ## 1. Phạm vi
 
@@ -112,7 +112,7 @@ chủ dự án duyệt.
 FR-3-04, FR-3-05, FR-5-15, FR-8-05…FR-8-07, BR-6, BR-7, BR-10 ở [§2](../02-requirements.md); thứ tự hy sinh và
 cell cách ly ở kiến trúc 8.18, ADR-0041.
 
-## 7. Luồng: phản ứng khi bị tấn công (bước 2, 2026-11-17)
+## 7. Luồng: phản ứng khi bị tấn công (bước 2, đã duyệt 2026-11-17)
 
 > Dựa trên [§3](#3-đã-quyết) (NCC bật được mitigation, khách có portal riêng) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17).
 
