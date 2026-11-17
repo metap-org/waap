@@ -165,7 +165,7 @@ Kết quả ghi thành bản sửa của ADR này, trạng thái chuyển sang "
 
 ### 7.1 Kết quả spike sơ bộ (2026-11-17, AI chạy, chờ chủ dự án review)
 
-Phạm vi: 1 máy 4 core, loopback, Pingora 2 thread so với NGINX 1.24 hai worker, cùng origin Go, cùng CRS 4.25. Số đo mang tính **so sánh tương đối**, không phải benchmark production. Mã và dữ liệu thô ở `spike/adr-0031/` (`RESULTS.md`). Chưa chạy: A2 thật (chỉ xấp xỉ bằng NGINX + libmodsecurity), `go-ftw`, HTTP/3, JA4, fuzz 24 giờ, cô lập tenant.
+Phạm vi: 1 máy 4 core, loopback, Pingora 2 thread so với NGINX 1.24 hai worker, cùng origin Go, cùng CRS 4.25. Số đo mang tính **so sánh tương đối**, không phải benchmark production. Mã và dữ liệu thô ở `spike/adr-0031/` (`RESULTS.md`). Bộ script tái lập ở `spike/adr-0031/README.md`; chạy lại một số bài cho số hơi khác lần đầu (ghi chú ở từng dòng). Chưa chạy: A2 thật (chỉ xấp xỉ bằng NGINX + libmodsecurity), `go-ftw`, HTTP/3, JA4, fuzz 24 giờ, cô lập tenant.
 
 **Reload và nâng cấp (T14):**
 
@@ -188,9 +188,9 @@ Cả hai không rớt request ở quy mô thử. Khác biệt là **chi phí**: 
 | HTTP/2 (TLS, ALPN) | được, phải bật `enable_h2()`; lần đầu **lỗi 404 do mã spike chỉ đọc header `Host`, H2 dùng `:authority`** (đã sửa) | có sẵn |
 | Upload 200 MB, streaming tải 200 MB | 0,4 s; 0,18 s | 0,41 s (sau khi đặt `client_max_body_size 0`, mặc định chặn 1 MB); 0,18 s |
 | WebSocket / Upgrade | tunnel sẵn | cần 3 dòng cấu hình (`Upgrade`, `Connection`, HTTP/1.1) |
-| LB nhiều origin + failover, tắt/bật 1 origin ở 1500 rps | **phải tự viết** (~40 dòng: round robin, health check TCP mỗi giây, retry khi lỗi connect): 0 lỗi, p99.9 tăng 12 ms lúc chuyển | có sẵn passive (`max_fails`): 0 lỗi, p99.9 3,4 ms; **health check chủ động không có trong bản OSS** |
+| LB nhiều origin + failover, tắt/bật 1 origin ở 1500 rps | **phải tự viết** (~40 dòng: round robin, health check TCP mỗi giây, retry khi lỗi connect): 0 lỗi ở lần chạy đầu, **1 phản hồi 502 trên 24.000 ở lần chạy lại** (request đang bay tới origin vừa tắt), p99.9 tăng 5–12 ms lúc chuyển | có sẵn passive (`max_fails`): 0 lỗi, p99.9 3,4 ms; **health check chủ động không có trong bản OSS** |
 | Cache + purge theo URL | `pingora-cache` chạy được, purge 200 và lần GET sau lấy bản mới; **chỉ có `MemCache` (dùng cho test), không có tầng đĩa, phải tự viết eviction, lock, quyết định cacheable (mặc định không cache gì)** | `proxy_cache` có sẵn, tầng đĩa; **không có purge trong bản OSS** |
-| Cache hit, 6000 rps | p99 4,15 ms | p99 2,66 ms |
+| Cache hit, 6000 rps | p99 1,46 ms | p99 1,40 ms (tương đương; lần đo đầu 4,15 vs 2,66 ms bị nhiễu, chạy lại không tái lập) |
 | HTTP/3 | **không hỗ trợ** (0.9.1 không có phụ thuộc h3/quic) | có từ 1.25 (bản thử là 1.24, chưa đo) |
 
 **Hiệu năng đường nhanh và bộ nhớ (2 worker mỗi bên):**
@@ -199,6 +199,8 @@ Cả hai không rớt request ở quy mô thử. Khác biệt là **chi phí**: 
 |---|---|---|
 | Chặn ở pre-filter (403, keep-alive), 20.000 / 40.000 / 60.000 rps | giữ đủ tải, 0,028 / 0,021 / 0,017 ms CPU/request | giữ đủ tải, 0,017 / 0,013 / 0,011 ms CPU/request |
 | RAM cho 10.000 kết nối rảnh | +303 MB (31 KB/kết nối); với jemalloc +194 MB (20 KB/kết nối) | +5 MB (0,5 KB/kết nối, sau khi tăng `worker_connections`) |
+
+**CPU mỗi request qua WAF (CRS PL1, độ chặn đúng đã kiểm: bình thường 200, SQLi/XSS 403, zone không WAF 200):** Pingora+Coraza 1,44 ms/request ở 500 rps và 1,24 ms ở 1500 rps (WAF 0,81–0,89 + L7 0,43–0,55, gồm chi phí callout gRPC), NGINX+ModSecurity 1,29 và 1,14 ms. Tức tương đương, NGINX ít hơn ~10%. Ở 1500 rps NGINX (2 worker, WAF chung tiến trình) hết CPU nên p99 vọt lên 57 ms, còn WAF tách tiến trình của Pingora dùng thêm core nên p99 5,4 ms: đây là hệ quả của việc tách WAF khỏi L7 (I1), không phải ModSecurity kém hơn Coraza theo CPU/request.
 
 **Đính chính:** lần đo đầu cho Pingora 0,45 ms CPU/request và bão hòa ~32.000 rps **là lỗi của mã spike**, không phải giới hạn của Pingora: `Session::respond_error` luôn đóng kết nối downstream (có ghi chú trong source pingora-core), nên mỗi 403 buộc client mở kết nối TCP mới. Sau khi trả lời bằng `write_response_header` giữ keep-alive, chi phí giảm 15–30 lần và Pingora chênh NGINX khoảng 1,5 lần. Phần chênh còn lại **không phải do mã spike**: thêm chế độ `BASELINE` (từ chối ngay đầu `request_filter`, không chạm logic L7) cho 0,0234 và 0,0131 ms CPU/request ở 20.000 và 60.000 rps (jemalloc), so với 0,0257 và 0,0134 của bản đầy đủ. Logic L7 của spike (tra zone, ACL, rps) chỉ thêm ~1–10%; chi phí còn lại là của framework, tức chênh NGINX khoảng 1,2 lần ở 60.000 rps. Không có `perf` trong sandbox nên chưa tách thêm bên trong framework. Lần đo RAM NGINX đầu cho +0 MB cũng sai (cấu hình `worker_connections` chỉ cho ~8.000 kết nối); số trong bảng là lần chạy lại. RAM mỗi kết nối rảnh của Pingora cao gấp 40 lần NGINX và **là đặc tính của framework**, không phải của mã spike: bản `BASELINE` không có logic L7 vẫn tốn 19,3 KB/kết nối (jemalloc). Chưa tách được thành phần bên trong (không có `perf`/heap profiler); cần xét khi mục tiêu là hàng trăm nghìn kết nối giữ mở trên mỗi node (1 triệu kết nối rảnh ≈ 19 GB so với ≈ 0,5 GB của NGINX). Đo bằng RSS nên nhiễu giữa các lần chạy liên tiếp.
 

@@ -32,3 +32,5 @@ Xem bảng đầy đủ và nhận định ở ADR-0031 §7.1. Mã thêm vào sp
 Đính chính: số flood ban đầu của Pingora sai do mã spike dùng `respond_error` (đóng kết nối); sau khi sửa, Pingora ~1,5 lần CPU của NGINX ở pre-filter. RAM kết nối rảnh của Pingora (31 KB; 20 KB với jemalloc) cao hơn nhiều so với NGINX (0,5 KB), chưa giải thích được. NGINX OSS thiếu purge và health check chủ động; Pingora thiếu HTTP/3 và tầng cache đĩa.
 
 Profile (đợt 3): chế độ BASELINE cho thấy logic L7 của spike chỉ thêm 1–10% CPU; chênh NGINX (~1,2x ở 60k rps) và RAM 19 KB/kết nối rảnh là của framework Pingora. Envoy chưa đo (tải binary bị chặn).
+
+Tái lập: xem `README.md` (cách chạy, bảng bài đo, cách khoanh vùng). Bộ script ở `run/`.
