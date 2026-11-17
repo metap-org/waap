@@ -28,7 +28,8 @@ và giữ trạng thái cũ, không đọc dở.
 > ra nhưng bảng trên chưa có. Tên và trường có thể đổi khi phân tích từng nghiệp vụ
 > ([requirements §3](../../requirements/03-business-analysis/00-index.md)); quy tắc version N-1 ở đầu mục áp như mọi
 > hợp đồng khác. Cột **LK** trỏ về liên kết trong bản đồ phân rã chức năng. Hai hợp đồng ghi **chờ onboarding** đến
-> từ bản nháp onboarding chưa duyệt ([requirements §3.1](../../requirements/03-business-analysis/01-onboarding.md)).
+> từ bản nháp onboarding; luồng onboarding đã duyệt 2026-11-17 ([requirements §3.1](../../requirements/03-business-analysis/01-onboarding.md)),
+> bổ sung ở [bảng sau](#bổ-sung-theo-luồng-nghiệp-vụ-đã-duyệt-2026-11-17).
 
 | Hợp đồng | Từ → Tới | LK | Nội dung | Giao nhận |
 |---|---|---|---|---|
@@ -240,3 +241,18 @@ Gắn vào spike của [ADR-0031](../09-adr/0031-edge-l7-and-waf-engine-options.
 3. Mô phỏng rollout để đo IA3; mô phỏng một profile rất nóng để đo IA4.
 4. Đánh giá mô hình đe doạ cho IA10 cùng đội bảo mật.
 5. Chốt v1 bằng một ADR riêng; tới lúc đó các component 5.8.1, 5.8.2 coi phần gọi WAF là theo bản nháp.
+
+### Bổ sung theo luồng nghiệp vụ đã duyệt (2026-11-17)
+
+Các thay đổi dưới đây cộng vào hợp đồng đã có ở trên, vẫn theo quy tắc version N-1. Còn tạm cho tới khi chốt tên trường ở schema.
+
+| Hợp đồng | Thay đổi | Nguồn |
+|---|---|---|
+| **ZoneChanged** | Thêm `scope` (`apex` hoặc `hostname`) và trạng thái `passthrough` (edge chuyển tiếp thẳng tới origin, không bảo vệ, không cache), `removed` (trang giải thích) | [3.1](../../requirements/03-business-analysis/01-onboarding.md) OQ-21, [3.7](../../requirements/03-business-analysis/07-offboarding.md) OQ-69 |
+| **ZoneCheckResult** | Thêm loại kiểm `denylist`, `nonhttp`, `origin_problem` (`redirect_loop`, `origin_blocks_edge`, `mixed_content`); `ownership` có `method` (`cname`, `txt`, `http_file`); `dns_routing` theo họ IP (`a`, `aaaa`) | 3.1 OQ-24, 32, 147, 148, 150 |
+| **EntitlementsChanged** | Thêm `effectiveAt` (ngay khi nâng, cuối kỳ khi hạ), `graceUntil` (ân hạn 3 ngày), `retentionApplyAfter` (báo trước 7 ngày) | [3.5](../../requirements/03-business-analysis/05-plans-billing.md) OQ-10, 56, 58 |
+| **TelemetryRecord** | Thêm loại `fp_report` (báo chặn nhầm từ end-user: request ID, mô tả ngắn); Analytics chuyển thành `FalsePositiveReported` vào hộp thư zone ở Management. Edge không gọi Management trực tiếp | [3.4](../../requirements/03-business-analysis/04-false-positive.md) OQ-48 |
+| **FalsePositiveReported** (mới) | Analytics → Management: request ID, zone, mô tả, thời điểm | 3.4 |
+| **ZoneTransferred** (mới) | Management → Control, Analytics: zone ID, org cũ, org mới, thời điểm; policy đi theo, log, audit, hoá đơn ở lại org cũ | 3.7 OQ-94 |
+| **DataErasureRequested** | Thêm `holdUntil` (giữ 30 ngày sau yêu cầu xoá org, huỷ được) và ghi chú: bản sao lưu giữ tối đa 35 ngày | 3.7 OQ-70, 71 |
+| **IsolationRequested** | Không đổi trường; ghi rõ bậc xử lý: cell cách ly, rồi challenge mọi request và trần rps cứng; không bao giờ trả DNS về origin | [3.3](../../requirements/03-business-analysis/03-attack-response.md) OQ-42 |
