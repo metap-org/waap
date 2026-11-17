@@ -1,6 +1,6 @@
 # 2. Requirements
 
-> **Trạng thái: bản nháp chờ review (2026-11-06).** Mọi dòng ở đây là **đề xuất**. Các điểm cần quyết
+> **Trạng thái: OQ-1…OQ-15 đã duyệt 2026-11-17 (OQ-1 hoãn; OQ-9, OQ-10 sửa); phần còn lại vẫn là bản nháp chờ review (2026-11-06).** Mọi dòng ở đây là **đề xuất**. Các điểm cần quyết
 > nằm ở [§9](#9-câu-hỏi-mở-cho-review). Khi chốt xong, requirements là căn cứ để đối chiếu lại module
 > ([5.8.12](../architecture/05-building-blocks/08-components/12-management.md)) và database
 > ([5.8.14](../architecture/05-building-blocks/08-components/14-management-database.md)).
@@ -188,7 +188,7 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-7-01 | Analytics phải nhận đủ security event, access log lấy mẫu theo gói, và đối soát số bản ghi | F7.1.1, F7.1.2, F7.1.4 | MVP | QS-10 |
 | FR-7-02 | Portal phải hiện luồng security event trực tiếp của zone đang xem | F7.2.1 | MVP | QS-37, QS-38 |
 | FR-7-03 | Người dùng phải tra một request ID và thấy rule, bước pipeline, policy version, người duyệt | F7.3.1 | MVP | QS-11, QS-12 |
-| FR-7-04 | Người dùng phải lọc, nhóm event theo trường và thời gian trong retention của gói | F7.3.2 | MVP | Truy vấn 24 giờ của một zone ≤ 3 s p95 ([OQ-9](#9-câu-hỏi-mở-cho-review)) |
+| FR-7-04 | Người dùng phải lọc, nhóm event theo trường và thời gian trong retention của gói | F7.3.2 | MVP | Truy vấn 24 giờ của một zone ≤ 3 s p95, 30 ngày ≤ 30 s p95 ([OQ-9](#9-câu-hỏi-mở-cho-review)) |
 | FR-7-05 | Người dùng phải lưu truy vấn và chia sẻ trong account | F7.3.3 | MVP | |
 | FR-7-06 | Portal phải có dashboard traffic, bảo mật, cache, origin, hiệu quả rule | F7.4.1, F7.4.2 | MVP | |
 | FR-7-07 | Người dùng phải đánh dấu event là chặn nhầm, thấy tỉ lệ chặn nhầm theo rule, và tạo nháp exception từ event | F7.5.1–F7.5.3 | MVP | Exception nháp điền sẵn rule, đường dẫn, trường |
@@ -234,7 +234,7 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | FR-10-01 | NCC phải định nghĩa gói, giá (VND, USD), hạn mức, đơn giá vượt, entitlements; thay đổi gói tạo version mới, subscription cũ giữ version cũ tới khi gia hạn | F10.1.1 | MVP | Hoá đơn của kỳ luôn tính theo version gói của kỳ đó |
 | FR-10-02 | Sales phải tạo gói riêng cho một hợp đồng Enterprise | F10.1.2 | MVP | Gói riêng không hiện cho tenant khác |
 | FR-10-03 | Khách phải dùng thử 14 ngày tính năng Business trên một zone có trần ([BR-8](#4-quy-tắc-nghiệp-vụ)) | F10.2.1 | MVP | |
-| FR-10-04 | Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay, hạ có hiệu lực cuối kỳ ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.2.2 | MVP | QS-14, QS-34 |
+| FR-10-04 | Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay và tính phần còn lại của gói cũ vào gói mới kèm bonus ([OQ-56](03-business-analysis/05-plans-billing.md), mức bonus chưa định), hạ có hiệu lực cuối kỳ ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.2.2 | MVP | QS-14, QS-34 |
 | FR-10-05 | Quá hạn thanh toán phải chuyển zone sang chuyển tiếp tối giản 30 ngày rồi tạm dừng ([BR-9](#4-quy-tắc-nghiệp-vụ)) | F10.2.3 | MVP | Có thông báo ở mỗi bước |
 | FR-10-06 | Management phải tính entitlements của zone từ gói, add-on, hợp đồng và phát sang Control khi đổi | F10.3.1, F10.3.2 | MVP | QS-14 |
 | FR-10-07 | Management phải từ chối tạo đối tượng vượt giới hạn gói (số rule, đích export, kênh…) | F10.3.3 | MVP | Lỗi nêu giới hạn và gói cần nâng |
@@ -272,7 +272,7 @@ Phần lớn là hành vi của edge; requirement đo được đã có ở 10.3
 | BR-8 | Mỗi org dùng thử một lần; định danh dùng thử gồm org, domain email của owner, phương thức thanh toán, domain zone | F10.2.1 |
 | BR-9 | Không cắt traffic đột ngột: hết dùng thử, quá hạn, bị khoá đều qua chuyển tiếp tối giản 30 ngày rồi mới tạm dừng | F10.2.3, F12.4.1 |
 | BR-10 | Gói trả phí không bị cắt traffic vì vượt hạn mức, chỉ tính phí vượt. Gói có trần bị áp trần | F10.5 |
-| BR-11 | Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói khi đang vượt giới hạn mới thì bị từ chối tới khi giảm bớt ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.3.3 |
+| BR-11 | Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói có hiệu lực cuối kỳ; nếu khi đó khách vượt giới hạn mới thì được cảnh báo sau 6 giờ, 12 giờ rồi mỗi ngày trong 3 ngày ân hạn, hết hạn thì chặn phần vượt ([OQ-10](#9-câu-hỏi-mở-cho-review)) | F10.3.3 |
 | BR-12 | Audit không xoá, không sửa. Dữ liệu cá nhân trong audit xử lý theo [OQ-6](#9-câu-hỏi-mở-cho-review) | F1.5, F9.3.2 |
 | BR-13 | Org luôn có ít nhất một owner; không gỡ hay hạ quyền được owner cuối cùng | F1.2.4 |
 | BR-14 | Secret của API key chỉ hiện lúc tạo; hệ thống chỉ lưu hash và tiền tố để nhận diện | F1.4.1 |
@@ -377,21 +377,21 @@ Phân rã theo plane, thành phần và các liên kết `LK-…` giữa plane �
 
 ## 9. Câu hỏi mở cho review
 
-| ID | Câu hỏi | Đề xuất hiện tại | Ảnh hưởng |
+| ID | Câu hỏi | Quyết định (2026-11-17) | Ảnh hưởng |
 |---|---|---|---|
-| OQ-1 | Phân cấp org → account → zone có đủ không, hay cần thêm cấp (đơn vị, dự án) cho khách lớn? | Đủ cho MVP; nhóm zone thay cho cấp thứ tư | DT-1, quyền |
-| OQ-2 | Tenant B muốn bảo vệ `shop.example.com` khi tenant A giữ `example.com`: từ chối, hay cho phép khi A đồng ý? | Từ chối ở MVP | BR-1, DT-2 |
-| OQ-3 | Mất bản ghi xác minh thì làm gì, sau bao lâu? | Cảnh báo ở ngày 7, tạm dừng ở ngày 14 | FR-2-02 |
-| OQ-4 | Hết 7 ngày log-only: tự chuyển sang chặn, hay chờ khách bấm? | Chờ khách bấm, nhắc mỗi tuần | FR-2-11 |
-| OQ-5 | Hạn tối đa của rule tạm qua kênh khẩn | 72 giờ | BR-6 |
-| OQ-6 | Xoá org và xoá dữ liệu cá nhân khi audit không được xoá: ẩn danh danh tính trong audit, hay giữ nguyên vì nghĩa vụ pháp lý? Thời hạn giữ sau khi xoá org? | Ẩn danh trường danh tính (thay bằng mã), giữ bản ghi; giữ 30 ngày sau yêu cầu xoá org | BR-12, FR-1-03, FR-9-05, DT-7 |
-| OQ-7 | Giữ bao nhiêu PolicyVersion mỗi zone? | Tất cả trong 13 tháng, sau đó 50 bản gần nhất + bản đang chạy | DT-5, dung lượng |
-| OQ-8 | Sai lệch cho phép của rate limit toàn fleet | ≤ 10% | FR-3-06 |
-| OQ-9 | Mục tiêu độ trễ truy vấn event cho khoảng dài (30 ngày, 365 ngày) | 24 giờ ≤ 3 s; 30 ngày ≤ 15 s | FR-7-04 |
-| OQ-10 | Hạ gói: hiệu lực ngay hay cuối kỳ; xử lý phần vượt giới hạn gói mới thế nào? | Cuối kỳ; chặn hạ gói tới khi khách giảm bớt | FR-10-04, BR-11 |
-| OQ-11 | WCAG có bắt buộc cho khách khu vực công không? | AA cho luồng chính | NFR-11 |
-| OQ-12 | Cổng thanh toán cụ thể và tính phí theo kỳ trả trước hay trả sau? | Phí nền trả trước, phí vượt trả sau | IR-2, FR-10-11 |
-| OQ-13 | Developer có được tạo exception không cần duyệt trong zone được giao không? | Không, luôn qua change request | FR-1-06, F5.1.4 |
-| OQ-14 | Billing theo account hay theo org (một hoá đơn cho cả org)? | Theo account, gộp được ở cấp org | DT-8 |
-| OQ-15 | Chốt các hợp đồng tạm ở [5.5](../architecture/05-building-blocks/05-contracts.md#hợp-đồng-bổ-sung-tạm-2026-11-06) (purge, kết quả biên dịch, rollout, cert, kiểm zone, kiểm origin, `PopState`, `PermissionsChanged`, cấu hình alert/export, nhãn chặn nhầm, replay, xoá dữ liệu, cách ly, reputation) | Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3 | 5.5, outbox của Management |
+| OQ-1 | Phân cấp org → account → zone có đủ không, hay cần thêm cấp (đơn vị, dự án) cho khách lớn? | **Hoãn**; đề xuất để lại: Đủ cho MVP; nhóm zone thay cho cấp thứ tư | DT-1, quyền |
+| OQ-2 | Tenant B muốn bảo vệ `shop.example.com` khi tenant A giữ `example.com`: từ chối, hay cho phép khi A đồng ý? | **Duyệt.** Từ chối ở MVP | BR-1, DT-2 |
+| OQ-3 | Mất bản ghi xác minh thì làm gì, sau bao lâu? | **Duyệt.** Cảnh báo ở ngày 7, tạm dừng ở ngày 14 | FR-2-02 |
+| OQ-4 | Hết 7 ngày log-only: tự chuyển sang chặn, hay chờ khách bấm? | **Duyệt.** Chờ khách bấm, nhắc mỗi tuần | FR-2-11 |
+| OQ-5 | Hạn tối đa của rule tạm qua kênh khẩn | **Duyệt.** 72 giờ | BR-6 |
+| OQ-6 | Xoá org và xoá dữ liệu cá nhân khi audit không được xoá: ẩn danh danh tính trong audit, hay giữ nguyên vì nghĩa vụ pháp lý? Thời hạn giữ sau khi xoá org? | **Duyệt.** Ẩn danh trường danh tính (thay bằng mã), giữ bản ghi; giữ 30 ngày sau yêu cầu xoá org | BR-12, FR-1-03, FR-9-05, DT-7 |
+| OQ-7 | Giữ bao nhiêu PolicyVersion mỗi zone? | **Duyệt.** Tất cả trong 13 tháng, sau đó 50 bản gần nhất + bản đang chạy | DT-5, dung lượng |
+| OQ-8 | Sai lệch cho phép của rate limit toàn fleet | **Duyệt.** ≤ 10% | FR-3-06 |
+| OQ-9 | Mục tiêu độ trễ truy vấn event cho khoảng dài (30 ngày, 365 ngày) | **Sửa.** 24 giờ ≤ 3 s; 30 ngày ≤ 30 s | FR-7-04 |
+| OQ-10 | Hạ gói: hiệu lực ngay hay cuối kỳ; xử lý phần vượt giới hạn gói mới thế nào? | **Sửa.** Cuối kỳ; cảnh báo vượt giới hạn mới sau 6 giờ, 12 giờ, 1 ngày cho tới hết 3 ngày; khách được quá hạn tối đa 3 ngày, sau đó chặn phần vượt | FR-10-04, BR-11 |
+| OQ-11 | WCAG có bắt buộc cho khách khu vực công không? | **Duyệt.** AA cho luồng chính | NFR-11 |
+| OQ-12 | Cổng thanh toán cụ thể và tính phí theo kỳ trả trước hay trả sau? | **Duyệt.** Phí nền trả trước, phí vượt trả sau | IR-2, FR-10-11 |
+| OQ-13 | Developer có được tạo exception không cần duyệt trong zone được giao không? | **Duyệt.** Không, luôn qua change request | FR-1-06, F5.1.4 |
+| OQ-14 | Billing theo account hay theo org (một hoá đơn cho cả org)? | **Duyệt.** Theo account, gộp được ở cấp org | DT-8 |
+| OQ-15 | Chốt các hợp đồng tạm ở [5.5](../architecture/05-building-blocks/05-contracts.md#hợp-đồng-bổ-sung-tạm-2026-11-06) (purge, kết quả biên dịch, rollout, cert, kiểm zone, kiểm origin, `PopState`, `PermissionsChanged`, cấu hình alert/export, nhãn chặn nhầm, replay, xoá dữ liệu, cách ly, reputation) | **Duyệt.** Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3 | 5.5, outbox của Management |
 | OQ-16…OQ-165 | OQ-16…OQ-20 thuộc bản nháp onboarding cũ; OQ-21…OQ-126 và OQ-143…OQ-165 theo từng nghiệp vụ ([§3](03-business-analysis/00-index.md)); OQ-127…OQ-142 về định hướng sản phẩm ([§4](04-product-direction/00-index.md)) | Một số đã quyết hoặc có đề xuất chờ duyệt | Theo trang |

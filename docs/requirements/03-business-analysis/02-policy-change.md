@@ -1,6 +1,6 @@
 # 3.2 Viết, duyệt, phát hành một thay đổi policy
 
-> **Trạng thái: đang mở, đã quyết OQ-35 và cách phân quyền duyệt; các câu còn lại có đề xuất chờ duyệt (2026-11-07).** Trang này liệt kê kịch bản và câu hỏi; quyết định của
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Trang này liệt kê kịch bản và câu hỏi; quyết định của
 > chủ dự án ghi ở [§3](#3-đã-quyết). Cột "ghi chú ban đầu" là ý kiến lúc ghi, không phải quyết định.
 
 ## 1. Phạm vi
@@ -121,7 +121,10 @@ Liên quan: F5 ở [§1](../01-functional-decomposition.md#f5-vòng-đời-polic
 | OQ-39 | Khách có thấy và điều khiển được tốc độ phát hành (canary, phần trăm traffic) không? | KB2-F1, KB2-F5 | |
 | OQ-40 | Support của NCC có được sửa policy thay khách không, có cần khách duyệt không? | KB2-A4 | |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định
+
 
 Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đề xuất có phương án và đánh đổi; **chưa câu nào
 được coi là quyết định** cho tới khi chủ dự án duyệt.

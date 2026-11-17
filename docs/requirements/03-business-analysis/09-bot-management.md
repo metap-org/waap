@@ -1,6 +1,6 @@
 # 3.9 Bot management và challenge
 
-> **Trạng thái: đang mở, chưa có quyết định nào (2026-11-07).** Theo chủ dự án, bot và challenge là một vùng
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Theo chủ dự án, bot và challenge là một vùng
 > nghiệp vụ lớn, cần phân tích riêng; API security tách sang [3.12](12-api-security.md). Thiết kế kỹ thuật ở kiến
 > trúc 8.16. Lần phân tích tiếp (2026-11-07) thêm trục J–L, mô hình quyết định đề xuất ở [§4](#4-mô-hình-quyết-định-đề-xuất-chờ-duyệt)
 > và phân tích các câu còn mở ở [§5](#5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt); tất cả là đề xuất, chưa phải quyết định.
@@ -190,7 +190,11 @@ flowchart LR
 | Bảo vệ khỏi thích nghi | Không trả lý do trong phản hồi; ngưỡng có độ ngẫu nhiên nhỏ; dữ liệu bot cập nhật hằng ngày qua pipeline phát hành (KB9-J1, KB9-J4) |
 | Đo | Mỗi ô của ma trận có số request, tỉ lệ challenge, tỉ lệ qua challenge, nhãn chặn nhầm; khách thấy ngay ô nào đang làm phiền người thật |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:
+> - **OQ-125**: hoãn (chưa quyết, để sau).
+
 
 | Câu | Phương án | Đánh đổi | Đề xuất |
 |---|---|---|---|
@@ -206,7 +210,7 @@ flowchart LR
 | OQ-105 | Tín hiệu chéo tenant | | Có, chỉ ở dạng reputation gộp (IP, ASN, dấu vân tay), không chia sẻ request; là lợi thế lớn nhất của một nền tảng nhiều khách (xem [§4.4](../04-product-direction/04-data-strategy.md)) |
 | OQ-106 | Bán lẻ tính năng bot | Làm rối bảng giá | Có add-on "bảo vệ đăng nhập và OTP" cho Pro, vì đây là bài toán mất tiền trực tiếp; phần còn lại theo gói |
 | OQ-124 | Playbook theo ngành | Phải duy trì nhiều preset | Có, 4 preset ở MVP: thương mại điện tử, ngân hàng/ví, vé/đặt chỗ, báo chí |
-| OQ-125 | Tác tử AI | Chuẩn kiểm chứng còn đang hình thành | Xếp lớp `agent` riêng từ Mở rộng; kiểm dải IP công bố và chữ ký request khi hãng AI có; chính sách theo hành động (đọc, mua) ở Nâng cao |
+| OQ-125 | Tác tử AI | Chuẩn kiểm chứng còn đang hình thành | Xếp lớp `agent` riêng từ Mở rộng; kiểm dải IP công bố và chữ ký request khi hãng AI có; chính sách theo hành động (đọc, mua) ở Nâng cao **Hoãn 2026-11-17.** |
 | OQ-126 | Hàng đợi ảo | Là sản phẩm riêng | Không ở MVP; ghi vào lộ trình Mở rộng vì khách thương mại điện tử, vé sẽ hỏi ngay |
 
 ## 6. Phụ thuộc

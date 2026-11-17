@@ -1,6 +1,6 @@
 # 3.3 Phản ứng khi bị tấn công
 
-> **Trạng thái: đã quyết OQ-41 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.** Quyết định ở [§3](#3-đã-quyết).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định ở [§3](#3-đã-quyết).
 
 ## 1. Phạm vi
 
@@ -89,7 +89,10 @@ Gồm cả tấn công làm ảnh hưởng khách khác hoặc chính nền tả
 | OQ-46 | Có hỗ trợ khách bị tống tiền DDoS không (tư vấn, liên hệ cơ quan chức năng)? | KB3-A10 | |
 | OQ-47 | Tấn công vào endpoint đắt mà không vượt ngưỡng DDoS: có sản phẩm cho việc này không (rate limit theo endpoint mặc định, bảo vệ origin theo độ trễ)? | KB3-A4 | |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định
+
 
 Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). **Chưa câu nào được coi là quyết định** cho tới khi
 chủ dự án duyệt.

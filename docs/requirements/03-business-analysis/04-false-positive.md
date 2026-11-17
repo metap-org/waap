@@ -1,6 +1,6 @@
 # 3.4 Xử lý chặn nhầm
 
-> **Trạng thái: đã quyết cách xử lý (2026-11-06); các câu còn lại có đề xuất chờ duyệt (2026-11-07).** Quyết định của chủ dự án ghi ở [§3](#3-đã-quyết); các
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định của chủ dự án ghi ở [§3](#3-đã-quyết); các
 > câu hỏi còn lại vẫn mở.
 
 ## 1. Phạm vi
@@ -84,7 +84,11 @@ F5.1.4 ở [§1](../01-functional-decomposition.md).
 | OQ-52 | NCC cam kết gì khi chặn nhầm do ruleset của NCC (thời gian rollback, thông báo, credit)? | KB4-E1, KB4-E2 | |
 | OQ-53 | Allowlist IP có cảnh báo khi IP thuộc dải NAT dùng chung của nhà mạng không? | KB4-D3 | |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:
+> - **OQ-52**: hoãn (chưa quyết, để sau).
+
 
 Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đề xuất có phương án và đánh đổi; **chưa câu nào
 được coi là quyết định** cho tới khi chủ dự án duyệt.
@@ -94,7 +98,7 @@ Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đ
 | OQ-48 | (a) Chỉ request ID trên trang chặn; (b) thêm nút "báo chặn nhầm" | (b) bị dùng để spam, end-user gửi dữ liệu cá nhân | Mọi gói: trang chặn có request ID và thông tin liên hệ do chủ website cấu hình. Từ Pro: nút "báo chặn nhầm" gửi vào hộp thư của zone trong portal (không gửi email trực tiếp), chỉ kèm request ID và mô tả ngắn, có giới hạn tần suất và challenge chống spam |
 | OQ-50 | (a) Ai có quyền xem event cũng xem payload; (b) quyền riêng | (a) lộ mật khẩu, token cho người chỉ cần xem thống kê | (b): quyền riêng "xem dữ liệu request", mặc định chỉ security admin có. Luôn che: mật khẩu, header `Authorization`, cookie phiên, token, số thẻ; khách thêm được trường cần che |
 | OQ-51 | (a) Không dùng chéo tenant; (b) dùng dạng gộp ẩn danh | (a) chậm cải thiện ruleset; (b) cần điều khoản | (b): chỉ dùng thống kê gộp (rule ID, đặc điểm request đã bỏ payload), ghi trong điều khoản dịch vụ; Enterprise được chọn không tham gia |
-| OQ-52 | Cam kết khi ruleset của NCC gây chặn nhầm | Cam kết cao cần quy trình trực 24/7 | Rollback release ở toàn fleet trong ≤ 15 phút sau khi xác nhận; báo cho khách bị ảnh hưởng kèm danh sách request; không có credit riêng ngoài SLA của gói |
+| OQ-52 | Cam kết khi ruleset của NCC gây chặn nhầm | Cam kết cao cần quy trình trực 24/7 | Rollback release ở toàn fleet trong ≤ 15 phút sau khi xác nhận; báo cho khách bị ảnh hưởng kèm danh sách request; không có credit riêng ngoài SLA của gói **Hoãn 2026-11-17.** |
 | OQ-53 | (a) Không cảnh báo; (b) cảnh báo; (c) chặn | (c) chặn cả trường hợp hợp lệ | (b): cảnh báo khi IP hoặc dải thuộc CGNAT, dải di động của nhà mạng hoặc dải lớn hơn /24, ghi rõ số người có thể dùng chung; không chặn |
 
 ## 6. Phụ thuộc

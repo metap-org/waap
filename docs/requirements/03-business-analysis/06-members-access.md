@@ -1,6 +1,6 @@
 # 3.6 Quản lý thành viên, SSO, API key
 
-> **Trạng thái: đã quyết OQ-62 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.** Quyết định ở [§3](#3-đã-quyết).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định ở [§3](#3-đã-quyết).
 
 ## 1. Phạm vi
 
@@ -86,7 +86,10 @@ service account) và người của NCC. Liên quan: F1 ở [§1](../01-function
 | OQ-67 | Đăng nhập Google, Microsoft cho khách nhỏ có ở MVP không? | KB6-C6 | |
 | OQ-68 | Quyền xem dữ liệu request có tách thành quyền riêng không? | KB6-D3 | Gộp với OQ-50 |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định
+
 
 Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). **Chưa câu nào được coi là quyết định** cho tới khi
 chủ dự án duyệt.

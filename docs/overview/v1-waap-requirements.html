@@ -3123,7 +3123,7 @@ phẩm riêng nếu làm), edge compute, tối ưu ảnh, video, client-side pro
 </section>
 <section class="doc" id="f-02-requirements"><div class="path">02-requirements.md</div><h1 id="f-02-requirements--2-requirements">2. Requirements</h1>
 <blockquote>
-<p><strong>Trạng thái: bản nháp chờ review (2026-11-06).</strong> Mọi dòng ở đây là <strong>đề xuất</strong>. Các điểm cần quyết
+<p><strong>Trạng thái: OQ-1…OQ-15 đã duyệt 2026-11-17 (OQ-1 hoãn; OQ-9, OQ-10 sửa); phần còn lại vẫn là bản nháp chờ review (2026-11-06).</strong> Mọi dòng ở đây là <strong>đề xuất</strong>. Các điểm cần quyết
 nằm ở <a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">§9</a>. Khi chốt xong, requirements là căn cứ để đối chiếu lại module
 (<a href="v1-waap-architecture.html#f-05-building-blocks-08-components-12-management" target="_blank" rel="noopener">5.8.12</a>) và database
 (<a href="v1-waap-architecture.html#f-05-building-blocks-08-components-14-management-database" target="_blank" rel="noopener">5.8.14</a>).</p>
@@ -4106,7 +4106,7 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 <td>Người dùng phải lọc, nhóm event theo trường và thời gian trong retention của gói</td>
 <td>F7.3.2</td>
 <td>MVP</td>
-<td>Truy vấn 24 giờ của một zone ≤ 3 s p95 (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-9</a>)</td>
+<td>Truy vấn 24 giờ của một zone ≤ 3 s p95, 30 ngày ≤ 30 s p95 (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-9</a>)</td>
 </tr>
 <tr>
 <td>FR-7-05</td>
@@ -4362,7 +4362,7 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 </tr>
 <tr>
 <td>FR-10-04</td>
-<td>Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay, hạ có hiệu lực cuối kỳ (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
+<td>Owner, billing phải mua, nâng, hạ gói theo zone; nâng có hiệu lực ngay và tính phần còn lại của gói cũ vào gói mới kèm bonus (<a href="#f-03-business-analysis-05-plans-billing">OQ-56</a>, mức bonus chưa định), hạ có hiệu lực cuối kỳ (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
 <td>F10.2.2</td>
 <td>MVP</td>
 <td>QS-14, QS-34</td>
@@ -4564,7 +4564,7 @@ onboarding chưa duyệt; sẽ viết lại sau khi phân tích ở <a href="#f-
 </tr>
 <tr>
 <td>BR-11</td>
-<td>Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói khi đang vượt giới hạn mới thì bị từ chối tới khi giảm bớt (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
+<td>Giới hạn gói kiểm khi tạo và khi phát hành. Hạ gói có hiệu lực cuối kỳ; nếu khi đó khách vượt giới hạn mới thì được cảnh báo sau 6 giờ, 12 giờ rồi mỗi ngày trong 3 ngày ân hạn, hết hạn thì chặn phần vượt (<a href="#f-02-requirements--9-câu-hỏi-mở-cho-review">OQ-10</a>)</td>
 <td>F10.3.3</td>
 </tr>
 <tr>
@@ -5063,7 +5063,7 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 <tr>
 <th>ID</th>
 <th>Câu hỏi</th>
-<th>Đề xuất hiện tại</th>
+<th>Quyết định (2026-11-17)</th>
 <th>Ảnh hưởng</th>
 </tr>
 </thead>
@@ -5071,91 +5071,91 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 <tr>
 <td>OQ-1</td>
 <td>Phân cấp org → account → zone có đủ không, hay cần thêm cấp (đơn vị, dự án) cho khách lớn?</td>
-<td>Đủ cho MVP; nhóm zone thay cho cấp thứ tư</td>
+<td><strong>Hoãn</strong>; đề xuất để lại: Đủ cho MVP; nhóm zone thay cho cấp thứ tư</td>
 <td>DT-1, quyền</td>
 </tr>
 <tr>
 <td>OQ-2</td>
 <td>Tenant B muốn bảo vệ <code>shop.example.com</code> khi tenant A giữ <code>example.com</code>: từ chối, hay cho phép khi A đồng ý?</td>
-<td>Từ chối ở MVP</td>
+<td><strong>Duyệt.</strong> Từ chối ở MVP</td>
 <td>BR-1, DT-2</td>
 </tr>
 <tr>
 <td>OQ-3</td>
 <td>Mất bản ghi xác minh thì làm gì, sau bao lâu?</td>
-<td>Cảnh báo ở ngày 7, tạm dừng ở ngày 14</td>
+<td><strong>Duyệt.</strong> Cảnh báo ở ngày 7, tạm dừng ở ngày 14</td>
 <td>FR-2-02</td>
 </tr>
 <tr>
 <td>OQ-4</td>
 <td>Hết 7 ngày log-only: tự chuyển sang chặn, hay chờ khách bấm?</td>
-<td>Chờ khách bấm, nhắc mỗi tuần</td>
+<td><strong>Duyệt.</strong> Chờ khách bấm, nhắc mỗi tuần</td>
 <td>FR-2-11</td>
 </tr>
 <tr>
 <td>OQ-5</td>
 <td>Hạn tối đa của rule tạm qua kênh khẩn</td>
-<td>72 giờ</td>
+<td><strong>Duyệt.</strong> 72 giờ</td>
 <td>BR-6</td>
 </tr>
 <tr>
 <td>OQ-6</td>
 <td>Xoá org và xoá dữ liệu cá nhân khi audit không được xoá: ẩn danh danh tính trong audit, hay giữ nguyên vì nghĩa vụ pháp lý? Thời hạn giữ sau khi xoá org?</td>
-<td>Ẩn danh trường danh tính (thay bằng mã), giữ bản ghi; giữ 30 ngày sau yêu cầu xoá org</td>
+<td><strong>Duyệt.</strong> Ẩn danh trường danh tính (thay bằng mã), giữ bản ghi; giữ 30 ngày sau yêu cầu xoá org</td>
 <td>BR-12, FR-1-03, FR-9-05, DT-7</td>
 </tr>
 <tr>
 <td>OQ-7</td>
 <td>Giữ bao nhiêu PolicyVersion mỗi zone?</td>
-<td>Tất cả trong 13 tháng, sau đó 50 bản gần nhất + bản đang chạy</td>
+<td><strong>Duyệt.</strong> Tất cả trong 13 tháng, sau đó 50 bản gần nhất + bản đang chạy</td>
 <td>DT-5, dung lượng</td>
 </tr>
 <tr>
 <td>OQ-8</td>
 <td>Sai lệch cho phép của rate limit toàn fleet</td>
-<td>≤ 10%</td>
+<td><strong>Duyệt.</strong> ≤ 10%</td>
 <td>FR-3-06</td>
 </tr>
 <tr>
 <td>OQ-9</td>
 <td>Mục tiêu độ trễ truy vấn event cho khoảng dài (30 ngày, 365 ngày)</td>
-<td>24 giờ ≤ 3 s; 30 ngày ≤ 15 s</td>
+<td><strong>Sửa.</strong> 24 giờ ≤ 3 s; 30 ngày ≤ 30 s</td>
 <td>FR-7-04</td>
 </tr>
 <tr>
 <td>OQ-10</td>
 <td>Hạ gói: hiệu lực ngay hay cuối kỳ; xử lý phần vượt giới hạn gói mới thế nào?</td>
-<td>Cuối kỳ; chặn hạ gói tới khi khách giảm bớt</td>
+<td><strong>Sửa.</strong> Cuối kỳ; cảnh báo vượt giới hạn mới sau 6 giờ, 12 giờ, 1 ngày cho tới hết 3 ngày; khách được quá hạn tối đa 3 ngày, sau đó chặn phần vượt</td>
 <td>FR-10-04, BR-11</td>
 </tr>
 <tr>
 <td>OQ-11</td>
 <td>WCAG có bắt buộc cho khách khu vực công không?</td>
-<td>AA cho luồng chính</td>
+<td><strong>Duyệt.</strong> AA cho luồng chính</td>
 <td>NFR-11</td>
 </tr>
 <tr>
 <td>OQ-12</td>
 <td>Cổng thanh toán cụ thể và tính phí theo kỳ trả trước hay trả sau?</td>
-<td>Phí nền trả trước, phí vượt trả sau</td>
+<td><strong>Duyệt.</strong> Phí nền trả trước, phí vượt trả sau</td>
 <td>IR-2, FR-10-11</td>
 </tr>
 <tr>
 <td>OQ-13</td>
 <td>Developer có được tạo exception không cần duyệt trong zone được giao không?</td>
-<td>Không, luôn qua change request</td>
+<td><strong>Duyệt.</strong> Không, luôn qua change request</td>
 <td>FR-1-06, F5.1.4</td>
 </tr>
 <tr>
 <td>OQ-14</td>
 <td>Billing theo account hay theo org (một hoá đơn cho cả org)?</td>
-<td>Theo account, gộp được ở cấp org</td>
+<td><strong>Duyệt.</strong> Theo account, gộp được ở cấp org</td>
 <td>DT-8</td>
 </tr>
 <tr>
 <td>OQ-15</td>
 <td>Chốt các hợp đồng tạm ở <a href="v1-waap-architecture.html#f-05-building-blocks-05-contracts--hợp-đồng-bổ-sung-tạm-2026-11-06" target="_blank" rel="noopener">5.5</a> (purge, kết quả biên dịch, rollout, cert, kiểm zone, kiểm origin, <code>PopState</code>, <code>PermissionsChanged</code>, cấu hình alert/export, nhãn chặn nhầm, replay, xoá dữ liệu, cách ly, reputation)</td>
-<td>Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3</td>
+<td><strong>Duyệt.</strong> Đã thêm tạm; chốt dần theo từng nghiệp vụ ở §3</td>
 <td>5.5, outbox của Management</td>
 </tr>
 <tr>
@@ -5169,7 +5169,7 @@ chính. Dưới đây chỉ là những điểm 10.3 chưa có, chủ yếu cho 
 </section>
 <section class="doc" id="f-03-business-analysis-00-index"><div class="path">03-business-analysis/00-index.md</div><h1 id="f-03-business-analysis-00-index--3-phân-tích-nghiệp-vụ">3. Phân tích nghiệp vụ</h1>
 <blockquote>
-<p><strong>Trạng thái (2026-11-07): 14 nghiệp vụ ở bước 1.</strong> Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
+<p><strong>Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-125).</strong> Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
 còn lại của 3.2–3.6 có đề xuất của Claude chờ duyệt. Chưa nghiệp vụ nào có luồng được duyệt.</p>
 </blockquote>
 <p>Bản đồ phân rã nói hệ thống <strong>có</strong> những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
@@ -5206,37 +5206,37 @@ xuất chờ duyệt.</li>
 <td><a href="#f-03-business-analysis-01-onboarding">3.1</a></td>
 <td>Onboarding một website</td>
 <td>OQ-21…OQ-32, OQ-147…OQ-150</td>
-<td>Bước 1 mở rộng (trục K–N), có hồ sơ khách, cây quyết định kết nối và phân tích mọi câu, đề xuất chờ duyệt (bản nháp luồng cũ vẫn ở phụ lục)</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Bước 1 mở rộng (trục K–N), có hồ sơ khách, cây quyết định kết nối và phân tích mọi câu, đề xuất chờ duyệt (bản nháp luồng cũ vẫn ở phụ lục)</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-02-policy-change">3.2</a></td>
 <td>Viết, duyệt, phát hành một thay đổi policy</td>
 <td>OQ-33…OQ-40</td>
-<td>Đã quyết OQ-35; các câu còn lại có đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Đã quyết OQ-35; các câu còn lại có đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-03-attack-response">3.3</a></td>
 <td>Phản ứng khi bị tấn công</td>
 <td>OQ-41…OQ-47</td>
-<td>Đã quyết OQ-41 (NCC bật được mitigation); các câu còn lại có đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Đã quyết OQ-41 (NCC bật được mitigation); các câu còn lại có đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-04-false-positive">3.4</a></td>
 <td>Xử lý chặn nhầm</td>
 <td>OQ-48…OQ-53</td>
-<td>Đã quyết cách xử lý và OQ-49; các câu còn lại có đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Đã quyết cách xử lý và OQ-49; các câu còn lại có đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-05-plans-billing">3.5</a></td>
 <td>Mua, đổi gói, vượt hạn mức, thanh toán</td>
 <td>OQ-54…OQ-61</td>
-<td>Đã quyết một phần OQ-55 (có trần chi tiêu); trừ phần vượt quota để sau; các câu còn lại có đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Đã quyết một phần OQ-55 (có trần chi tiêu); trừ phần vượt quota để sau; các câu còn lại có đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-06-members-access">3.6</a></td>
 <td>Quản lý thành viên, SSO, API key</td>
 <td>OQ-62…OQ-68</td>
-<td>Đã quyết OQ-62 (một người nhiều org); các câu còn lại có đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Đã quyết OQ-62 (một người nhiều org); các câu còn lại có đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-07-offboarding">3.7</a></td>
@@ -5254,13 +5254,13 @@ xuất chờ duyệt.</li>
 <td><a href="#f-03-business-analysis-09-bot-management">3.9</a></td>
 <td>Bot management và challenge</td>
 <td>OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124…OQ-126</td>
-<td>Bước 1 mở rộng (trục J–L), có mô hình quyết định và phân tích mọi câu, đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Bước 1 mở rộng (trục J–L), có mô hình quyết định và phân tích mọi câu, đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-10-cache-performance">3.10</a></td>
 <td>Cache, hiệu năng, nội dung (gồm chính sách abuse)</td>
 <td>OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146</td>
-<td>Bước 1 mở rộng (trục J–N), có mô hình quyết định và phân tích mọi câu, đề xuất chờ duyệt</td>
+<td><strong>Đã duyệt 2026-11-17</strong> (xem trang). Bước 1 mở rộng (trục J–N), có mô hình quyết định và phân tích mọi câu, đề xuất chờ duyệt</td>
 </tr>
 <tr>
 <td><a href="#f-03-business-analysis-11-provider-operations">3.11</a></td>
@@ -5323,7 +5323,7 @@ xuất chờ duyệt.</li>
 </section>
 <section class="doc" id="f-03-business-analysis-01-onboarding"><div class="path">03-business-analysis/01-onboarding.md</div><h1 id="f-03-business-analysis-01-onboarding--31-onboarding-một-website">3.1 Onboarding một website</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở, chưa có quyết định nào.</strong> Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
 khi viết luồng onboarding. Cột &quot;ghi chú ban đầu&quot; chỉ là ý kiến lúc ghi, <strong>không phải quyết định</strong>. Lần phân
 tích tiếp (2026-11-07) thêm trục K–N, hồ sơ khách điển hình (<a href="#f-03-business-analysis-01-onboarding--6-hồ-sơ-khách-điển-hình-đề-xuất-chờ-duyệt">§6</a>),
 cây quyết định kết nối (<a href="#f-03-business-analysis-01-onboarding--7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt">§7</a>) và phân tích các câu ở
@@ -6237,7 +6237,10 @@ xếp khách vào hồ sơ, rồi chỉ hiện các bước của hồ sơ đó,
     port --&gt;|có| pl --&gt; ok
     port --&gt;|không| ok
 </pre></div>
-<h2 id="f-03-business-analysis-01-onboarding--8-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">8. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-01-onboarding--8-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">8. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định</p>
+</blockquote>
 <table>
 <thead>
 <tr>
@@ -7185,7 +7188,7 @@ token ở đó và cấp, gia hạn cert <strong>trước khi</strong> traffic t
 </section>
 <section class="doc" id="f-03-business-analysis-02-policy-change"><div class="path">03-business-analysis/02-policy-change.md</div><h1 id="f-03-business-analysis-02-policy-change--32-viết-duyệt-phát-hành-một-thay-đổi-policy">3.2 Viết, duyệt, phát hành một thay đổi policy</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở, đã quyết OQ-35 và cách phân quyền duyệt; các câu còn lại có đề xuất chờ duyệt (2026-11-07).</strong> Trang này liệt kê kịch bản và câu hỏi; quyết định của
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Trang này liệt kê kịch bản và câu hỏi; quyết định của
 chủ dự án ghi ở <a href="#f-03-business-analysis-02-policy-change--3-đã-quyết">§3</a>. Cột &quot;ghi chú ban đầu&quot; là ý kiến lúc ghi, không phải quyết định.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-02-policy-change--1-phạm-vi">1. Phạm vi</h2>
@@ -7595,7 +7598,10 @@ trục I).</p>
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-02-policy-change--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-02-policy-change--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định</p>
+</blockquote>
 <p>Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đề xuất có phương án và đánh đổi; <strong>chưa câu nào
 được coi là quyết định</strong> cho tới khi chủ dự án duyệt.</p>
 <table>
@@ -7658,7 +7664,7 @@ sẽ đối chiếu lại khi các câu hỏi trên có trả lời.</p>
 </section>
 <section class="doc" id="f-03-business-analysis-03-attack-response"><div class="path">03-business-analysis/03-attack-response.md</div><h1 id="f-03-business-analysis-03-attack-response--33-phản-ứng-khi-bị-tấn-công">3.3 Phản ứng khi bị tấn công</h1>
 <blockquote>
-<p><strong>Trạng thái: đã quyết OQ-41 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.</strong> Quyết định ở <a href="#f-03-business-analysis-03-attack-response--3-đã-quyết">§3</a>.</p>
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định ở <a href="#f-03-business-analysis-03-attack-response--3-đã-quyết">§3</a>.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-03-attack-response--1-phạm-vi">1. Phạm vi</h2>
 <p>Từ lúc một zone bắt đầu bị tấn công cho tới khi tấn công dừng, mitigation tạm được gỡ và khách có báo cáo.
@@ -7966,7 +7972,10 @@ Gồm cả tấn công làm ảnh hưởng khách khác hoặc chính nền tả
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-03-attack-response--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-03-attack-response--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định</p>
+</blockquote>
 <p>Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). <strong>Chưa câu nào được coi là quyết định</strong> cho tới khi
 chủ dự án duyệt.</p>
 <table>
@@ -8029,7 +8038,7 @@ cell cách ly ở kiến trúc 8.18, ADR-0041.</p>
 </section>
 <section class="doc" id="f-03-business-analysis-04-false-positive"><div class="path">03-business-analysis/04-false-positive.md</div><h1 id="f-03-business-analysis-04-false-positive--34-xử-lý-chặn-nhầm">3.4 Xử lý chặn nhầm</h1>
 <blockquote>
-<p><strong>Trạng thái: đã quyết cách xử lý (2026-11-06); các câu còn lại có đề xuất chờ duyệt (2026-11-07).</strong> Quyết định của chủ dự án ghi ở <a href="#f-03-business-analysis-04-false-positive--3-đã-quyết">§3</a>; các
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định của chủ dự án ghi ở <a href="#f-03-business-analysis-04-false-positive--3-đã-quyết">§3</a>; các
 câu hỏi còn lại vẫn mở.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-04-false-positive--1-phạm-vi">1. Phạm vi</h2>
@@ -8308,7 +8317,13 @@ F5.1.4 ở <a href="#f-01-functional-decomposition">§1</a>.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-04-false-positive--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-04-false-positive--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:</p>
+<ul>
+<li><strong>OQ-52</strong>: hoãn (chưa quyết, để sau).</li>
+</ul>
+</blockquote>
 <p>Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đề xuất có phương án và đánh đổi; <strong>chưa câu nào
 được coi là quyết định</strong> cho tới khi chủ dự án duyệt.</p>
 <table>
@@ -8343,7 +8358,7 @@ F5.1.4 ở <a href="#f-01-functional-decomposition">§1</a>.</p>
 <td>OQ-52</td>
 <td>Cam kết khi ruleset của NCC gây chặn nhầm</td>
 <td>Cam kết cao cần quy trình trực 24/7</td>
-<td>Rollback release ở toàn fleet trong ≤ 15 phút sau khi xác nhận; báo cho khách bị ảnh hưởng kèm danh sách request; không có credit riêng ngoài SLA của gói</td>
+<td>Rollback release ở toàn fleet trong ≤ 15 phút sau khi xác nhận; báo cho khách bị ảnh hưởng kèm danh sách request; không có credit riêng ngoài SLA của gói <strong>Hoãn 2026-11-17.</strong></td>
 </tr>
 <tr>
 <td>OQ-53</td>
@@ -8358,7 +8373,7 @@ F5.1.4 ở <a href="#f-01-functional-decomposition">§1</a>.</p>
 </section>
 <section class="doc" id="f-03-business-analysis-05-plans-billing"><div class="path">03-business-analysis/05-plans-billing.md</div><h1 id="f-03-business-analysis-05-plans-billing--35-mua-đổi-gói-vượt-hạn-mức-thanh-toán">3.5 Mua, đổi gói, vượt hạn mức, thanh toán</h1>
 <blockquote>
-<p><strong>Trạng thái: đã quyết một phần OQ-55 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.</strong> Giá
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-54, 57…61); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Giá
 và hạn mức tham chiếu ở kiến trúc 8.18; trang này hỏi về cách mua và tính tiền, không hỏi lại giá.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-05-plans-billing--1-phạm-vi">1. Phạm vi</h2>
@@ -8711,7 +8726,13 @@ F10 ở <a href="#f-01-functional-decomposition--f10-gói-và-billing">§1</a>.<
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-05-plans-billing--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:</p>
+<ul>
+<li><strong>OQ-56</strong>: sửa, xem dòng của câu đó.</li>
+</ul>
+</blockquote>
 <p>Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). <strong>Chưa câu nào được coi là quyết định</strong> cho tới khi
 chủ dự án duyệt.</p>
 <table>
@@ -8734,7 +8755,7 @@ chủ dự án duyệt.</p>
 <td>OQ-56</td>
 <td>(a) Tính theo ngày còn lại; (b) từ kỳ sau</td>
 <td>(b) khách nâng gói khi bị tấn công sẽ chờ tới kỳ sau</td>
-<td>Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hạ: có hiệu lực cuối kỳ</td>
+<td><strong>Đã sửa 2026-11-17:</strong> Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hệ thống tự tính phần giá trị còn lại của gói cũ kể từ ngày nâng, trừ vào gói mới, và cộng thêm một khoản bonus vào gói mới (<strong>mức bonus chưa định</strong>, cần chốt cùng bảng giá ADR-0043). Hạ: có hiệu lực cuối kỳ</td>
 </tr>
 <tr>
 <td>OQ-57</td>
@@ -8773,7 +8794,7 @@ chủ dự án duyệt.</p>
 </section>
 <section class="doc" id="f-03-business-analysis-06-members-access"><div class="path">03-business-analysis/06-members-access.md</div><h1 id="f-03-business-analysis-06-members-access--36-quản-lý-thành-viên-sso-api-key">3.6 Quản lý thành viên, SSO, API key</h1>
 <blockquote>
-<p><strong>Trạng thái: đã quyết OQ-62 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.</strong> Quyết định ở <a href="#f-03-business-analysis-06-members-access--3-đã-quyết">§3</a>.</p>
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-63…OQ-68); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định ở <a href="#f-03-business-analysis-06-members-access--3-đã-quyết">§3</a>.</p>
 </blockquote>
 <h2 id="f-03-business-analysis-06-members-access--1-phạm-vi">1. Phạm vi</h2>
 <p>Ai vào được tổ chức của khách, làm được gì, bằng danh tính nào, và mất quyền khi nào. Gồm cả máy (API key,
@@ -9070,7 +9091,10 @@ service account) và người của NCC. Liên quan: F1 ở <a href="#f-01-funct
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-06-members-access--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-06-members-access--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định</p>
+</blockquote>
 <p>Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). <strong>Chưa câu nào được coi là quyết định</strong> cho tới khi
 chủ dự án duyệt.</p>
 <table>
@@ -9847,7 +9871,7 @@ thống của khách, làm báo cáo cho lãnh đạo và kiểm toán. Liên qu
 </section>
 <section class="doc" id="f-03-business-analysis-09-bot-management"><div class="path">03-business-analysis/09-bot-management.md</div><h1 id="f-03-business-analysis-09-bot-management--39-bot-management-và-challenge">3.9 Bot management và challenge</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở, chưa có quyết định nào (2026-11-07).</strong> Theo chủ dự án, bot và challenge là một vùng
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Theo chủ dự án, bot và challenge là một vùng
 nghiệp vụ lớn, cần phân tích riêng; API security tách sang <a href="#f-03-business-analysis-12-api-security">3.12</a>. Thiết kế kỹ thuật ở kiến
 trúc 8.16. Lần phân tích tiếp (2026-11-07) thêm trục J–L, mô hình quyết định đề xuất ở <a href="#f-03-business-analysis-09-bot-management--4-mô-hình-quyết-định-đề-xuất-chờ-duyệt">§4</a>
 và phân tích các câu còn mở ở <a href="#f-03-business-analysis-09-bot-management--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">§5</a>; tất cả là đề xuất, chưa phải quyết định.</p>
@@ -10487,7 +10511,13 @@ request hoàn toàn sạch vẫn có thể là bot (đăng nhập bằng mật k
 </tr>
 </tbody>
 </table>
-<h2 id="f-03-business-analysis-09-bot-management--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-09-bot-management--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:</p>
+<ul>
+<li><strong>OQ-125</strong>: hoãn (chưa quyết, để sau).</li>
+</ul>
+</blockquote>
 <table>
 <thead>
 <tr>
@@ -10574,7 +10604,7 @@ request hoàn toàn sạch vẫn có thể là bot (đăng nhập bằng mật k
 <td>OQ-125</td>
 <td>Tác tử AI</td>
 <td>Chuẩn kiểm chứng còn đang hình thành</td>
-<td>Xếp lớp <code>agent</code> riêng từ Mở rộng; kiểm dải IP công bố và chữ ký request khi hãng AI có; chính sách theo hành động (đọc, mua) ở Nâng cao</td>
+<td>Xếp lớp <code>agent</code> riêng từ Mở rộng; kiểm dải IP công bố và chữ ký request khi hãng AI có; chính sách theo hành động (đọc, mua) ở Nâng cao <strong>Hoãn 2026-11-17.</strong></td>
 </tr>
 <tr>
 <td>OQ-126</td>
@@ -10589,7 +10619,7 @@ request hoàn toàn sạch vẫn có thể là bot (đăng nhập bằng mật k
 </section>
 <section class="doc" id="f-03-business-analysis-10-cache-performance"><div class="path">03-business-analysis/10-cache-performance.md</div><h1 id="f-03-business-analysis-10-cache-performance--310-cache-hiệu-năng-nội-dung">3.10 Cache, hiệu năng, nội dung</h1>
 <blockquote>
-<p><strong>Trạng thái: đang mở, chưa có quyết định nào (2026-11-07).</strong> Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
+<p><strong>Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude</strong> (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
 cần phân tích riêng. Chiến lược CDN ở kiến trúc ADR-0035. Lần phân tích tiếp thêm trục J–N, mô hình quyết định ở
 <a href="#f-03-business-analysis-10-cache-performance--4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt">§4</a> và phân tích các câu còn mở ở
 <a href="#f-03-business-analysis-10-cache-performance--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">§5</a>; tất cả là đề xuất, chưa phải quyết định.</p>
@@ -11238,7 +11268,13 @@ hình của khách. Khách có thể nới lỏng an toàn nhưng phải làm r�
 </tbody>
 </table>
 <p>Cache key mặc định: <code>(zone, host, path, query đã sắp xếp và bỏ tham số marketing, header theo Vary đã chuẩn hoá)</code>. Không đưa cookie, thiết bị, quốc gia vào key trừ khi khách cấu hình.</p>
-<h2 id="f-03-business-analysis-10-cache-performance--5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt">5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)</h2>
+<h2 id="f-03-business-analysis-10-cache-performance--5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17">5. Phân tích các câu còn mở (đã duyệt 2026-11-17)</h2>
+<blockquote>
+<p><strong>Chủ dự án duyệt 2026-11-17:</strong> mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:</p>
+<ul>
+<li><strong>OQ-87</strong>: sửa, xem dòng của câu đó.</li>
+</ul>
+</blockquote>
 <table>
 <thead>
 <tr>
@@ -11259,7 +11295,7 @@ hình của khách. Khách có thể nới lỏng an toàn nhưng phải làm r�
 <td>OQ-87</td>
 <td>Plugin cho CMS</td>
 <td>Phải duy trì plugin</td>
-<td>Có plugin WordPress ở Mở rộng (xoá cache khi sửa bài, gợi ý cache rule); trước đó có hướng dẫn gọi API</td>
+<td><strong>Đã sửa 2026-11-17:</strong> Plugin theo từng framework và client (không chỉ một CMS); MVP làm plugin WordPress trước. Trước đó có hướng dẫn gọi API</td>
 </tr>
 <tr>
 <td>OQ-88</td>

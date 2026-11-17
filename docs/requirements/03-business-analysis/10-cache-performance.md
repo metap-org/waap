@@ -1,6 +1,6 @@
 # 3.10 Cache, hiệu năng, nội dung
 
-> **Trạng thái: đang mở, chưa có quyết định nào (2026-11-07).** Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
 > cần phân tích riêng. Chiến lược CDN ở kiến trúc ADR-0035. Lần phân tích tiếp thêm trục J–N, mô hình quyết định ở
 > [§4](#4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt) và phân tích các câu còn mở ở
 > [§5](#5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt); tất cả là đề xuất, chưa phải quyết định.
@@ -205,12 +205,16 @@ flowchart TB
 Cache key mặc định: `(zone, host, path, query đã sắp xếp và bỏ tham số marketing, header theo Vary đã chuẩn
 hoá)`. Không đưa cookie, thiết bị, quốc gia vào key trừ khi khách cấu hình.
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:
+> - **OQ-87**: sửa, xem dòng của câu đó.
+
 
 | Câu | Phương án | Đánh đổi | Đề xuất |
 |---|---|---|---|
 | OQ-86 | Mặc định khi origin không nói gì | Cache HTML mặc định làm lộ trang riêng tư; không cache gì thì mất giá trị CDN | Chỉ tài nguyên tĩnh theo đuôi file (ảnh, CSS, JS, font, file tải xuống), TTL 4 giờ. HTML chỉ cache khi khách chọn preset hoặc viết cache rule |
-| OQ-87 | Plugin cho CMS | Phải duy trì plugin | Có plugin WordPress ở Mở rộng (xoá cache khi sửa bài, gợi ý cache rule); trước đó có hướng dẫn gọi API |
+| OQ-87 | Plugin cho CMS | Phải duy trì plugin | **Đã sửa 2026-11-17:** Plugin theo từng framework và client (không chỉ một CMS); MVP làm plugin WordPress trước. Trước đó có hướng dẫn gọi API |
 | OQ-88 | Chính sách abuse | | Đầu mối abuse riêng, email và form công khai; xác minh trong 24 giờ; phishing và mã độc đã xác minh thì khoá zone ngay, báo khách; không tiết lộ origin trừ khi có văn bản của cơ quan có thẩm quyền; cần tư vấn pháp lý |
 | OQ-112 | Luật an toàn có ghi đè được không | Không cho ghi đè thì một số site hợp lệ không cache được | Mặc định luôn áp; khách ghi đè được từng luật theo path, phải xác nhận cảnh báo và có audit (§4 bậc 1) |
 | OQ-113 | Chống cache deception | Một số site trả `Content-Type` sai | Có, mặc định bật; khách tắt được theo path |

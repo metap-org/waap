@@ -1,6 +1,6 @@
 # 3.1 Onboarding một website
 
-> **Trạng thái: đang mở, chưa có quyết định nào.** Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-21…OQ-32, OQ-147…OQ-150); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Trang này ghi lại các kịch bản và câu hỏi cần trả lời trước
 > khi viết luồng onboarding. Cột "ghi chú ban đầu" chỉ là ý kiến lúc ghi, **không phải quyết định**. Lần phân
 > tích tiếp (2026-11-07) thêm trục K–N, hồ sơ khách điển hình ([§6](#6-hồ-sơ-khách-điển-hình-đề-xuất-chờ-duyệt)),
 > cây quyết định kết nối ([§7](#7-cây-quyết-định-cách-kết-nối-đề-xuất-chờ-duyệt)) và phân tích các câu ở
@@ -303,7 +303,10 @@ flowchart TB
     port -->|không| ok
 ```
 
-## 8. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 8. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định
+
 
 | Câu | Phương án | Đánh đổi | Đề xuất |
 |---|---|---|---|

@@ -1,6 +1,6 @@
 # 3.5 Mua, đổi gói, vượt hạn mức, thanh toán
 
-> **Trạng thái: đã quyết một phần OQ-55 (2026-11-07); các câu còn lại có đề xuất chờ duyệt.** Giá
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-54, 57…61); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Giá
 > và hạn mức tham chiếu ở kiến trúc 8.18; trang này hỏi về cách mua và tính tiền, không hỏi lại giá.
 
 ## 1. Phạm vi
@@ -103,7 +103,11 @@ F10 ở [§1](../01-functional-decomposition.md#f10-gói-và-billing).
 | OQ-60 | Cổng thanh toán và phương thức nào ở MVP (thẻ quốc tế, thẻ nội địa, QR, ví)? | KB5-A1 | Trùng OQ-12 |
 | OQ-61 | Huỷ giữa kỳ có hoàn tiền không? Có gói tạm ngừng không? | KB5-E3, KB5-E4 | |
 
-## 5. Phân tích các câu còn mở (đề xuất của Claude, chờ duyệt)
+## 5. Phân tích các câu còn mở (đã duyệt 2026-11-17)
+
+> **Chủ dự án duyệt 2026-11-17:** mọi đề xuất ở bảng dưới được chốt thành quyết định, trừ:
+> - **OQ-56**: sửa, xem dòng của câu đó.
+
 
 Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). **Chưa câu nào được coi là quyết định** cho tới khi
 chủ dự án duyệt.
@@ -111,7 +115,7 @@ chủ dự án duyệt.
 | Câu | Phương án | Đánh đổi | Đề xuất |
 |---|---|---|---|
 | OQ-54 | (a) Theo zone; (b) theo account; (c) gói nhóm cho khách nhỏ | (a) đắt cho người có nhiều site nhỏ; (b) khó so với chi phí phục vụ từng zone | Gói vẫn tính theo zone (như 8.18) để giá bám chi phí; thêm gói nhóm "nhiều site nhỏ" dùng chung một hạn mức cho N zone ít traffic. Subscription gắn với account; hoá đơn gộp theo account, gộp được ở cấp org |
-| OQ-56 | (a) Tính theo ngày còn lại; (b) từ kỳ sau | (b) khách nâng gói khi bị tấn công sẽ chờ tới kỳ sau | Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hạ: có hiệu lực cuối kỳ |
+| OQ-56 | (a) Tính theo ngày còn lại; (b) từ kỳ sau | (b) khách nâng gói khi bị tấn công sẽ chờ tới kỳ sau | **Đã sửa 2026-11-17:** Nâng: có hiệu lực ngay, tính theo ngày còn lại. Hệ thống tự tính phần giá trị còn lại của gói cũ kể từ ngày nâng, trừ vào gói mới, và cộng thêm một khoản bonus vào gói mới (**mức bonus chưa định**, cần chốt cùng bảng giá ADR-0043). Hạ: có hiệu lực cuối kỳ |
 | OQ-57 | Trả sau bằng chuyển khoản ở MVP | Cấp dịch vụ trước khi thu tiền | Có, cho doanh nghiệp có hợp đồng (Business, Enterprise); hạn mức nợ theo hợp đồng; quy trình nhắc nợ riêng, quá hạn thì áp BR-9 |
 | OQ-58 | (a) Xoá log ngay; (b) giữ tới hết hạn cũ | (b) tốn chi phí lưu trữ không được trả | Báo trước 7 ngày, sau đó áp retention mới; khách muốn giữ thì xuất trước |
 | OQ-59 | Reseller ở MVP | | Không ở MVP. Một người thuộc nhiều org (đã quyết ở 3.6) đủ cho agency quản lý hộ; mô hình reseller, nhãn trắng để sau |
