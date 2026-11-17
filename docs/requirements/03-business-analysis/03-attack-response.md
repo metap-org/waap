@@ -1,6 +1,6 @@
 # 3.3 Phản ứng khi bị tấn công
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định ở [§3](#3-đã-quyết).
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-41 (phần còn lại), OQ-42…OQ-47); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định ở [§3](#3-đã-quyết).
 
 ## 1. Phạm vi
 
@@ -111,3 +111,54 @@ chủ dự án duyệt.
 
 FR-3-04, FR-3-05, FR-5-15, FR-8-05…FR-8-07, BR-6, BR-7, BR-10 ở [§2](../02-requirements.md); thứ tự hy sinh và
 cell cách ly ở kiến trúc 8.18, ADR-0041.
+
+## 7. Luồng: phản ứng khi bị tấn công (bước 2, 2026-11-17)
+
+> Dựa trên [§3](#3-đã-quyết) (NCC bật được mitigation, khách có portal riêng) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17).
+
+**Định nghĩa "xong":** tấn công đã dừng hoặc được giữ dưới mức khách chịu được, mitigation tạm đã gỡ hoặc chuyển thành rule có chủ, và khách
+nhận báo cáo sau sự cố.
+
+```mermaid
+flowchart TB
+    AR1["AR1 Phát hiện<br/>cảnh báo, detection, khách báo"]
+    AR2["AR2 Phân loại<br/>ảnh hưởng zone hay nền tảng"]
+    AR3["AR3 Mitigation mặc định<br/>DDoS L7, rate limit, Under Attack"]
+    G1{{"ARG1 Vượt khả năng zone?"}}
+    AR4["AR4 Chuyển zone sang cell cách ly"]
+    G2{{"ARG2 Vẫn quá khả năng?"}}
+    AR5["AR5 Challenge mọi request<br/>cộng trần rps cứng"]
+    AR6["AR6 Báo khách mỗi bước"]
+    AR7["AR7 Gỡ mitigation, rule có hạn"]
+    AR8["AR8 Báo cáo sau sự cố"]
+    AR1 --> AR2 --> AR3 --> G1
+    G1 -->|không| AR6
+    G1 -->|có| AR4 --> G2
+    G2 -->|không| AR6
+    G2 -->|có| AR5 --> AR6
+    AR6 --> AR7 --> AR8
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| AR1 Phát hiện | Detection ở Analytics, hoặc khách báo | Cảnh báo theo ngưỡng của zone | Báo trễ: khách gọi support, vào AR2 thủ công | `AlertRaised`, `Case` |
+| AR2 Phân loại | NCC hoặc khách | Tấn công ảnh hưởng **zone** hay **nền tảng** | Không rõ thì coi là ảnh hưởng nền tảng | `Case.scope` |
+| AR3 Mitigation | **NCC bật được không cần hỏi** ([OQ-41](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)), mọi gói; khách cũng bật được trên portal riêng | Điều khoản dịch vụ cho phép; khách được báo ngay và tắt được, **trừ khi** tấn công đang ảnh hưởng khách khác (khi đó chỉ NCC tắt) | Bật rule tạm lỗi: tự gỡ theo hạn tối đa 72 giờ ([OQ-5](../02-requirements.md#9-câu-hỏi-mở-cho-review)) | `Mitigation`, rule tạm có hạn |
+| ARG1, AR4 | Hệ thống | Zone gói thấp vượt khả năng ([OQ-42](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Cell cách ly không đủ: sang AR5 | `ZonePlacementChanged` |
+| AR5 | Hệ thống | Vẫn quá khả năng: challenge mọi request và trần rps cứng cho zone. **Không bao giờ trả DNS về origin** | | `Mitigation` mức cao nhất |
+| AR6 Báo khách | Hệ thống | Mỗi bước đổi trạng thái đều thông báo | Kênh gửi lỗi: thử kênh khác, hiện trên portal | `Notification` |
+| AR7 Gỡ | NCC, khách | Tấn công dừng; rule còn giữ thì chuyển thành rule có chủ qua change request ([3.2](02-policy-change.md)) | | `Mitigation.endedAt` |
+| AR8 Báo cáo | Hệ thống; Enterprise do NCC viết ([OQ-44](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Thời gian, khối lượng, nguồn, đã chặn, mitigation đã bật | | `IncidentReport`, SLA credit nếu gói có SLA |
+
+**Sau sự cố, nhánh thương mại và pháp lý:**
+
+| Tình huống | Xử lý |
+|---|---|
+| Tấn công lọt và bị tính phí vượt ([OQ-43](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Khách gửi yêu cầu trong **30 ngày**; NCC đối chiếu với detection hậu kiểm; phần xác nhận là tấn công thì ghi có. Gói có trần cứng: traffic gắn cờ "nghi tấn công" trong sự cố **không tính vào trần** |
+| SLA credit | Chỉ gói có SLA; tính theo thời gian edge không phục vụ được, **không tính lỗi do origin** |
+| Cơ quan chức năng yêu cầu log ([OQ-45](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Chỉ nhận văn bản chính thức qua đầu mối pháp chế; ghi sổ; báo khách trừ khi văn bản cấm; chỉ đưa dữ liệu còn trong retention. **Cần tư vấn pháp lý trước khi bán** |
+| Khách bị tống tiền DDoS ([OQ-46](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | NCC không đàm phán thay; bật bảo vệ cao, cung cấp log để khách trình báo; Enterprise có kỹ sư hỗ trợ trực tiếp |
+| Endpoint đắt bị đánh dưới ngưỡng DDoS ([OQ-47](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | MVP: preset có rate limit mặc định cho đăng nhập, tìm kiếm. Mở rộng: edge giới hạn rps vào path đắt khi origin chậm hoặc lỗi tăng |
+
+**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F8 thêm bước phân loại phạm vi (zone hay nền tảng), chuyển cell cách ly,
+báo cáo sau sự cố; BR cho "không bao giờ trả DNS về origin", cờ "nghi tấn công" không tính vào trần chi tiêu, thời hạn yêu cầu hoàn tiền 30 ngày.

@@ -1,6 +1,6 @@
 # 3.9 Bot management và challenge
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Theo chủ dự án, bot và challenge là một vùng
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-81…OQ-83, OQ-85, OQ-100…OQ-106, OQ-124, OQ-126); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Theo chủ dự án, bot và challenge là một vùng
 > nghiệp vụ lớn, cần phân tích riêng; API security tách sang [3.12](12-api-security.md). Thiết kế kỹ thuật ở kiến
 > trúc 8.16. Lần phân tích tiếp (2026-11-07) thêm trục J–L, mô hình quyết định đề xuất ở [§4](#4-mô-hình-quyết-định-đề-xuất-chờ-duyệt)
 > và phân tích các câu còn mở ở [§5](#5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt); tất cả là đề xuất, chưa phải quyết định.
@@ -216,3 +216,41 @@ flowchart LR
 ## 6. Phụ thuộc
 
 FR-3-08, FR-5-03, BR-7, BR-25 ở [§2](../02-requirements.md); kiến trúc 8.16, ADR-0038; QS-20, QS-21.
+
+## 7. Luồng: bật và vận hành bot management (bước 2, 2026-11-17)
+
+> Dựa trên mô hình [§4](#4-mô-hình-quyết-định-đề-xuất-chờ-duyệt) (nhận diện tách khỏi chính sách; **§4 chưa duyệt riêng**, các câu OQ ở [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17) đã duyệt)
+> và kiến trúc 8.16. OQ-125 (lớp `agent` cho tác tử AI) đang **hoãn**, nên luồng dưới chưa có lớp `agent`.
+
+**Định nghĩa "xong":** zone có ma trận chính sách (lớp × nhóm path) đang chạy, bot hợp lệ không bị chặn, người thật không bị challenge tương tác trên request không phải trang,
+và khách thấy ô nào của ma trận đang làm phiền người dùng.
+
+```mermaid
+flowchart TB
+    BT1["BT1 Bật bot management<br/>hỏi một câu về crawler AI"]
+    BT2["BT2 Chọn preset ngành<br/>thương mại điện tử, ngân hàng/ví, vé, báo chí"]
+    BT3["BT3 Gắn nhãn nhóm path<br/>login, otp, checkout, search, api, content, static"]
+    BT4["BT4 Chạy ở chế độ log<br/>đo từng ô của ma trận"]
+    G1{"BTG1 Số liệu đủ, khách xem báo cáo?"}
+    BT5["BT5 Bật hành động<br/>challenge ẩn, tương tác, giới hạn, chặn"]
+    BT6["BT6 Theo dõi, chỉnh ma trận,<br/>nhãn chặn nhầm"]
+    BT1 --> BT2 --> BT3 --> BT4 --> G1
+    G1 -->|có| BT5 --> BT6
+    G1 -->|không| BT4
+    BT6 --> BT4
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| BT1 Bật | Khách | Hỏi một câu "cho crawler AI không": preset báo chí mặc định **chặn crawler huấn luyện**, **cho crawler trả lời câu hỏi có trích nguồn** ([OQ-82](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Khách bỏ qua: dùng mặc định của preset | `BotSettings` |
+| BT2 Preset | Khách | **4 preset ở MVP**: thương mại điện tử, ngân hàng/ví, vé/đặt chỗ, báo chí ([OQ-124](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)); preset gắn sẵn nhãn path | Không có preset hợp: tự dựng ma trận | `BotPolicy` |
+| BT3 Nhãn path | Khách | Mặc định chỉ chặt ở `login`, `otp`, `checkout`; `static` và `content` gần như không challenge | Path chưa gắn nhãn: coi là `content` | `PathLabel` |
+| BT4 Log | Hệ thống | Bot đã xác minh (kể cả Cốc Cốc, bot xem trước link của Zalo, Facebook, Telegram, Slack) vào danh sách từ MVP ([OQ-85](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)); app của khách khai báo là `declared`. Ưu tiên bài toán **credential stuffing và SMS pumping**, rồi flash sale; scraping để Mở rộng ([OQ-100](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Chặn nhầm bot hợp lệ: thêm vào danh sách cho qua, ghi nhãn | `BotEvent` theo ô |
+| BTG1 | Khách | Đã xem số request, tỉ lệ challenge, tỉ lệ qua challenge | Chưa đủ số liệu: ở lại BT4 | |
+| BT5 Hành động | Hệ thống | **Không challenge tương tác** trên request không phải điều hướng trang: trả `403` hoặc `429` có mã lỗi JSON và header gợi ý để ứng dụng tự mở challenge ([OQ-101](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Clearance mặc định **30 phút**, chỉnh 5 phút đến 24 giờ, gắn dấu vân tay TLS và zone, **không gắn cứng IP**, dùng chung giữa subdomain ([OQ-103](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Tarpit ở Mở rộng, **không** trả dữ liệu giả ([OQ-102](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Người thật bị challenge nhiều: giảm mức ở ô đó, xem nhãn chặn nhầm | `Clearance`, `BotAction` |
+| BT6 Theo dõi | Khách, SOC | Tín hiệu hành vi (chuột, bàn phím) **mặc định tắt**; bật thì có văn bản mẫu cho chính sách quyền riêng tư ([OQ-104](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Reputation gộp chéo tenant (IP, ASN, dấu vân tay), **không chia sẻ request** ([OQ-105](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `BotMetric`, nhãn chặn nhầm |
+
+**Tuỳ chọn và lộ trình:** challenge tương tác tự làm là mặc định, captcha bên thứ ba là tuỳ chọn khách tự bật ([OQ-81](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Add-on "bảo vệ đăng nhập và OTP" cho gói Pro ([OQ-106](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Nhận diện app mobile thật (SDK, attestation) ở Nâng cao; trước đó app dùng
+danh tính consumer (API key, JWT) và rate limit theo 8.17 ([OQ-83](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Hàng đợi ảo (waiting room) không có ở MVP, ghi vào Mở rộng ([OQ-126](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)).
+
+**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F4/F5 thêm câu hỏi crawler AI khi bật, 4 preset ngành, danh sách bot trong nước, quy tắc không challenge tương tác trên AJAX/API, clearance 30 phút; add-on đăng nhập/OTP ở 8.18.

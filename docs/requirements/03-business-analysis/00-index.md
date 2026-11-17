@@ -1,7 +1,6 @@
 # 3. Phân tích nghiệp vụ
 
-> **Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-125).** Đã có một số quyết định của chủ dự án (3.2–3.6); các câu
-> còn lại của 3.2–3.6 có đề xuất của Claude chờ duyệt. Chưa nghiệp vụ nào có luồng được duyệt.
+> **Trạng thái (2026-11-17): 14 nghiệp vụ ở bước 1; chủ dự án đã duyệt đề xuất của 3.1–3.6, 3.9, 3.10 (ngoại lệ ở từng trang; hoãn OQ-52, OQ-125).** Luồng (bước 2) đã viết cho 3.1–3.6, 3.9, 3.10 (2026-11-17); luồng chưa được chủ dự án duyệt, chỉ các OQ làm căn cứ đã duyệt.
 
 Bản đồ phân rã nói hệ thống **có** những chức năng gì. Mục này đi qua từng nghiệp vụ theo trình tự khách
 thật làm. Khi xong, mỗi nghiệp vụ trả lời được các câu hỏi sau:

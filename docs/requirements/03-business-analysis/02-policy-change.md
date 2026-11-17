@@ -1,6 +1,6 @@
 # 3.2 Viết, duyệt, phát hành một thay đổi policy
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Trang này liệt kê kịch bản và câu hỏi; quyết định của
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-33, 34, 36…40); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Trang này liệt kê kịch bản và câu hỏi; quyết định của
 > chủ dự án ghi ở [§3](#3-đã-quyết). Cột "ghi chú ban đầu" là ý kiến lúc ghi, không phải quyết định.
 
 ## 1. Phạm vi
@@ -143,3 +143,71 @@ Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đ
 
 FR-5-01…FR-5-19, BR-4, BR-5, BR-6, BR-18, BR-21 ở [§2](../02-requirements.md) viết trước phân tích này;
 sẽ đối chiếu lại khi các câu hỏi trên có trả lời.
+
+## 7. Luồng: viết, duyệt, phát hành một thay đổi policy (bước 2, 2026-11-17)
+
+> Dựa trên các quyết định ở [§3](#3-đã-quyết) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). Bước 2 của trang này.
+> Cơ chế kỹ thuật (workflow theo người gọi, `$ctx.approvalRequired`, người duyệt khác người gửi) đã có ở `metap` (Phase 104).
+
+**Định nghĩa "xong":** thay đổi đã nằm trong `PolicyVersion` đang chạy của zone, mọi node báo đã áp (hoặc zone biên dịch lỗi
+được báo rõ), và có dòng audit ghi ai gửi, ai duyệt, diff.
+
+```mermaid
+flowchart TB
+    PC1["PC1 Soạn thay đổi<br/>UI, API, Terraform, GitOps"]
+    D{{"Thay đổi có ảnh hưởng traffic?"}}
+    PC2["PC2 Change request + diff<br/>kiểm tra tự động"]
+    G1{{"PCG1 Kiểm đạt?"}}
+    A{{"Account bật 4-eyes?"}}
+    PC3["PC3 Người khác duyệt"]
+    PC4["PC4 Tự xác nhận diff"]
+    PC5["PC5 Phát hành theo đợt<br/>canary rồi phần còn lại"]
+    G2{{"PCG2 Biên dịch và áp được?"}}
+    PC6["PC6 Theo dõi, rollback nếu cần"]
+    N["Áp thẳng, ghi audit<br/>tên, mô tả, tag"]
+    PC1 --> D
+    D -->|không| N
+    D -->|có| PC2 --> G1
+    G1 -->|không| PC1
+    G1 -->|có| A
+    A -->|có| PC3 --> PC5
+    A -->|không| PC4 --> PC5
+    PC5 --> G2
+    G2 -->|có| PC6
+    G2 -->|không, bỏ qua zone lỗi và báo| PC6
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| PC1 Soạn | Người có quyền sửa zone; support của NCC chỉ khi khách đã cấp quyền ([BR-20](../02-requirements.md#4-quy-tắc-nghiệp-vụ), OQ-40) | Thay đổi **ảnh hưởng traffic** (rule, origin, TLS, fail mode, cache rule) bắt buộc qua change request; đổi tên, mô tả, tag thì không ([OQ-33](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Công cụ ngoài (Terraform, GitOps) đụng bản UI mới hơn: UI thắng, báo drift, không ghi đè ([OQ-35](#3-đã-quyết)) | `Draft` |
+| PC2 Gửi | Người soạn | Bản nháp biên dịch được; diff hiện rõ rule nào đổi | Biên dịch lỗi: trả lỗi theo dòng, giữ nháp | `ChangeRequest`, diff, kết quả kiểm |
+| PCG1 Kiểm | Hệ thống | Cú pháp, rule đè nhau, rule không bao giờ khớp, ước lượng chi phí | Không đạt thì quay về PC1, không cho gửi duyệt | `CheckResult` |
+| PC3 Duyệt | Người khác người gửi, có quyền `transition:approve` | 4-eyes chỉ bật được khi account có từ hai người có quyền duyệt ([OQ-34](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)); khi bật, **mọi** change request cần duyệt ([OQ-37](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Người duyệt từ chối: về PC1 kèm lý do | `Approval` (actor, thời điểm) |
+| PC4 Tự xác nhận | Người gửi, org một người | Vẫn có diff, kiểm và rollback; không có thời gian chờ | | `Approval` loại self |
+| PC5 Phát hành | Hệ thống | Theo đợt: vài zone trước, rồi phần còn lại; khách thấy canary đang ở đâu và bao nhiêu % node đã áp ([OQ-39](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Node không áp được: giữ phiên bản cũ ở node đó, báo ở PC6 | `RolloutState`, `PolicyVersion` mới |
+| PCG2 Áp | Hệ thống | Zone biên dịch lỗi bị **bỏ qua và báo, không chặn cả nhóm** ([OQ-38](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Danh sách zone lỗi gửi người gửi và quản trị | `RolloutReport` |
+| PC6 Theo dõi, rollback | Người có quyền | Rollback về một version **đã từng được duyệt** không cần duyệt lại ([OQ-37](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Rollback không áp được: giữ cờ sự cố, báo NCC | `PolicyVersion` trỏ về bản cũ, audit |
+
+**Ba biến thể theo người gọi (cùng một luồng, thấy nút khác nhau):**
+
+| Người | Thấy gì |
+|---|---|
+| Khách self-service | Soạn rồi tự xác nhận diff (PC4); không có bước duyệt |
+| Khách doanh nghiệp | Bật 4-eyes; người gửi khác người duyệt; có thể có template dùng chung ([OQ-38](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)): một change request, duyệt một lần, phát theo đợt |
+| Support hoặc admin của NCC | Chỉ sửa khi khách cấp quyền; thay đổi là change request đứng tên support, cần **một người của khách** duyệt ([OQ-40](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Mitigation khi bị tấn công thì bật không cần duyệt ([3.3](03-attack-response.md)) |
+
+**Thay đổi do NCC phát hành (ruleset, CRS):** không đi qua PC1–PC3 của khách.
+
+| Loại | Hành vi ([OQ-36](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) |
+|---|---|
+| Rule mới của một release | Vào zone ở **log-only 7 ngày**, có báo cáo, rồi tự chặn |
+| Gói Business trở lên chọn "duyệt thủ công" | Release thành change request chờ khách duyệt |
+| Enterprise | Ghim version tối đa 90 ngày; bản vá bảo mật vẫn phải áp sau hạn |
+| Rule khẩn cho CVE | Áp ngay ở chế độ chặn; khách tắt bằng tuning rule ([BR-25](../02-requirements.md#4-quy-tắc-nghiệp-vụ)); hiện trong lịch sử thay đổi của zone |
+
+**Mở ra cho bước 2 tiếp theo:** drift được phát hiện lúc nào và báo cho ai (KB2-G2); ai bật chế độ doanh nghiệp cho một account;
+phát hành theo phần trăm traffic (KB2-F5, để Nâng cao).
+
+**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F5 (change request, template, rollout) thêm
+"tự xác nhận diff" và "rollback về version đã duyệt"; BR mới: 4-eyes chỉ bật khi có ít nhất hai người duyệt, thay đổi
+ảnh hưởng traffic luôn qua change request; FR cho phát hành theo đợt và báo zone biên dịch lỗi.

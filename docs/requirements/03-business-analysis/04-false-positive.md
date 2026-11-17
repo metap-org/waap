@@ -1,6 +1,6 @@
 # 3.4 Xử lý chặn nhầm
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Quyết định của chủ dự án ghi ở [§3](#3-đã-quyết); các
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-48, 50, 51, 53); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Quyết định của chủ dự án ghi ở [§3](#3-đã-quyết); các
 > câu hỏi còn lại vẫn mở.
 
 ## 1. Phạm vi
@@ -104,3 +104,41 @@ Chủ dự án giao tự phân tích các câu còn lại (2026-11-07). Mỗi đ
 ## 6. Phụ thuộc
 
 FR-7-03, FR-7-07, FR-5-04, BR-21 ở [§2](../02-requirements.md).
+
+## 7. Luồng: xử lý chặn nhầm (bước 2, 2026-11-17)
+
+> Dựa trên [§3](#3-đã-quyết) (không có exception khẩn ngoài change request) và [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17). OQ-52 (cam kết khi chặn nhầm do ruleset của NCC) đang **hoãn**, nên nhánh ruleset ở dưới chưa có cam kết.
+
+**Định nghĩa "xong":** người dùng bị chặn nhầm truy cập lại được, nguyên nhân (rule nào, vì sao) đã rõ, có exception hoặc chỉnh rule
+đã qua change request, và nhãn "chặn nhầm" đã ghi để cải thiện detection.
+
+```mermaid
+flowchart TB
+    FP1["FP1 End-user thấy trang chặn<br/>request ID, liên hệ chủ website"]
+    FP2["FP2 Báo chặn nhầm<br/>nút từ gói Pro, vào hộp thư zone"]
+    FP3["FP3 Chủ website tra request ID<br/>xem rule khớp, dữ liệu đã che"]
+    D{{"Chặn nhầm thật?"}}
+    FP4["FP4 Tạo exception hoặc chỉnh rule<br/>qua change request"]
+    FP5["FP5 Gắn nhãn chặn nhầm"]
+    FP6["FP6 Theo dõi, có đo lại"]
+    X["Đóng, ghi lý do"]
+    FP1 --> FP2 --> FP3 --> D
+    D -->|có| FP4 --> FP5 --> FP6
+    D -->|không| X
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| FP1 Trang chặn | Hệ thống | Mọi gói: có **request ID** và thông tin liên hệ do chủ website cấu hình ([OQ-48](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Chủ website chưa cấu hình liên hệ: nhắc ở onboarding | `SecurityEvent` có request ID |
+| FP2 Báo | End-user | Từ **Pro**: nút "báo chặn nhầm" vào hộp thư zone trong portal, **không gửi email trực tiếp**; chỉ kèm request ID và mô tả ngắn; có giới hạn tần suất và challenge chống spam | Spam: giới hạn tần suất, challenge | `FalsePositiveReport` |
+| FP3 Tra cứu | Chủ website, SOC | Cần quyền riêng "xem dữ liệu request", **mặc định chỉ security admin** ([OQ-50](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), OQ-68). Luôn che mật khẩu, `Authorization`, cookie phiên, token, số thẻ; khách thêm được trường cần che | Người không có quyền chỉ thấy rule ID và hành động | Audit "đã xem payload" |
+| FP4 Exception | Người có quyền sửa rule | **Luôn qua change request**, không có kênh khẩn riêng kể cả khi đang mất tiền ([OQ-49](#3-đã-quyết)); allowlist IP: cảnh báo khi IP thuộc CGNAT, dải di động của nhà mạng hoặc dải lớn hơn /24, ghi rõ số người có thể dùng chung, **không chặn** ([OQ-53](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Đang gấp: dùng mitigation tạm có hạn ([3.3](03-attack-response.md)) hoặc rollback về version đã duyệt ([3.2](02-policy-change.md)) | `ChangeRequest`, `Exception` |
+| FP5 Nhãn | Hệ thống, SOC | Chỉ **thống kê gộp** (rule ID, đặc điểm request đã bỏ payload) dùng chéo tenant, ghi trong điều khoản; Enterprise chọn không tham gia ([OQ-51](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `FalsePositiveLabel` |
+| FP6 Theo dõi | Hệ thống | Đo lại tỉ lệ chặn của rule sau exception | Còn chặn nhầm: quay về FP3 | `RuleMetric` |
+
+**Nhánh chặn nhầm do ruleset của NCC:** khi nhiều khách cùng báo chặn nhầm một rule của release, SOC của NCC rollback release (cơ chế ở
+[3.2](02-policy-change.md)). Thời hạn rollback, cách báo khách và credit **chưa quyết** (OQ-52 hoãn); đề xuất cũ để lại: rollback toàn fleet ≤ 15 phút
+sau xác nhận, báo khách kèm danh sách request, không credit riêng ngoài SLA.
+
+**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F5/F6 thêm nút báo chặn nhầm từ Pro và hộp thư zone; quyền riêng "xem dữ liệu request"; danh sách trường luôn che;
+cảnh báo khi allowlist dải dùng chung; điều khoản về thống kê gộp chéo tenant.

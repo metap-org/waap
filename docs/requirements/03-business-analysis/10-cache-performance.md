@@ -1,6 +1,6 @@
 # 3.10 Cache, hiệu năng, nội dung
 
-> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Các luồng (bước 2) chưa viết. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
+> **Trạng thái (2026-11-17): chủ dự án đã duyệt các đề xuất của Claude** (OQ-86…OQ-88, OQ-112…OQ-117, OQ-143…OQ-146); ngoại lệ ghi ở mục phân tích bên dưới. Luồng (bước 2) đã viết ở mục 7. Theo chủ dự án, cache là một vùng nghiệp vụ lớn,
 > cần phân tích riêng. Chiến lược CDN ở kiến trúc ADR-0035. Lần phân tích tiếp thêm trục J–N, mô hình quyết định ở
 > [§4](#4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt) và phân tích các câu còn mở ở
 > [§5](#5-phân-tích-các-câu-còn-mở-đề-xuất-của-claude-chờ-duyệt); tất cả là đề xuất, chưa phải quyết định.
@@ -231,3 +231,45 @@ hoá)`. Không đưa cookie, thiết bị, quốc gia vào key trừ khi khách 
 
 FR-4-01…FR-4-04 ở [§2](../02-requirements.md); kiến trúc ADR-0035, 8.18. Chính sách abuse và an toàn cache
 chưa có requirement nào.
+
+## 7. Luồng: cấu hình cache và hiệu năng của một zone (bước 2, 2026-11-17)
+
+> Dựa trên mô hình [§4](#4-mô-hình-quyết-định-cache-đề-xuất-chờ-duyệt) (luật an toàn đứng trên cấu hình; **§4 chưa duyệt riêng**, các OQ ở [§5](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17) đã duyệt) và ADR-0035.
+
+**Định nghĩa "xong":** zone phục vụ đúng nội dung từ cache hoặc origin, không lưu nhầm nội dung riêng tư, hit ratio đo được, và khách xoá cache được khi cần.
+
+```mermaid
+flowchart TB
+    CH1["CH1 Chọn chế độ<br/>cache hoặc chỉ WAF"]
+    CH2["CH2 Chọn preset ngành<br/>thương mại điện tử, báo chí, API công khai"]
+    CH3["CH3 Cache rule của khách<br/>theo path, đuôi file, header"]
+    G1{"CHG1 Luật an toàn cho phép?"}
+    CH4["CH4 Phục vụ, đo hit ratio"]
+    CH5["CH5 Xoá cache<br/>theo URL, tag, toàn zone"]
+    CH6["CH6 Theo dõi, rollback cache rule"]
+    CH1 --> CH2 --> CH3 --> G1
+    G1 -->|có| CH4 --> CH5
+    G1 -->|không, khách ghi đè có xác nhận| CH4
+    CH4 --> CH6
+```
+
+| Bước | Ai | Điều kiện hoặc cổng | Hỏng thì xử lý | Dữ liệu sinh ra |
+|---|---|---|---|---|
+| CH1 Chế độ | Khách | Có công tắc **"chỉ WAF, không cache"** ở mọi gói, cho khách đã có CDN ([OQ-145](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). **WAF trước cache** là mặc định; preset báo chí, game, file tải xuống bật sẵn "miễn WAF cho tài nguyên tĩnh" ([OQ-143](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `CacheMode` |
+| CH2 Preset | Khách | Preset cache đi chung preset bot: thương mại điện tử, báo chí, API công khai ở MVP; game ở Mở rộng ([OQ-144](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Không có preset: **chỉ tài nguyên tĩnh theo đuôi file, TTL 4 giờ**, HTML chỉ cache khi chọn preset hoặc viết rule ([OQ-86](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | | `CachePreset` |
+| CH3 Rule | Khách, qua change request ([3.2](02-policy-change.md)) | Cache key mặc định bỏ `utm_*`, `fbclid`, `gclid`, `zalo_*`; khách sửa danh sách ([OQ-114](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Rule lỗi: biên dịch báo lỗi, không phát hành | `CacheRule` |
+| CHG1 An toàn | Hệ thống | Luôn áp: không lưu response có `Set-Cookie` hoặc request có `Authorization`; **chống cache deception** (kiểm `Content-Type` khớp đuôi file), mặc định bật ([OQ-112](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), [OQ-113](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Khách ghi đè từng luật theo path, **phải xác nhận cảnh báo, có audit** | Ghi đè gây lộ dữ liệu riêng tư: gỡ rule, xoá cache, báo | `SafetyOverride`, audit |
+| CH4 Phục vụ | Edge | Nén **gzip và brotli** ở MVP; **HTTP/3** ở MVP nếu nền L7 chọn ở ADR-0031 có sẵn, nếu không thì Mở rộng ([OQ-117](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Băng thông từ cache **tính như băng thông sạch** ([OQ-116](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) | Origin lỗi: phục vụ bản cũ theo luật stale | `CacheMetric` |
+| CH5 Xoá | Khách | Xoá toàn zone: cho phép nhưng **xác nhận lại và hiện ước lượng tải dồn về origin**; gói thấp có giới hạn tần suất ([OQ-115](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)). Purge là lệnh, không qua change request | Purge chậm: kiểm fast lane và node | `PurgeJob` |
+| CH6 Theo dõi | Khách, SOC | Hit ratio giảm sau thay đổi: so sánh theo version, rollback cache rule | | `CacheMetric` theo version |
+
+**Ngoài luồng cấu hình:**
+
+| Việc | Quyết định |
+|---|---|
+| Làm ấm cache | Không tự động cho PoP mới ở MVP; Enterprise nhờ support làm ấm trước sự kiện lớn ([OQ-146](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) |
+| Plugin cho nền tảng | **Plugin theo từng framework và client** (xoá cache khi sửa bài, gợi ý cache rule); **MVP làm plugin WordPress trước**; trước đó có hướng dẫn gọi API ([OQ-87](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17), đã sửa) |
+| Chính sách abuse | Đầu mối abuse riêng (email và form công khai); xác minh trong **24 giờ**; phishing và mã độc đã xác minh thì **khoá zone ngay** và báo khách; không tiết lộ origin trừ khi có văn bản của cơ quan có thẩm quyền; cần tư vấn pháp lý ([OQ-88](#5-phân-tích-các-câu-còn-mở-đã-duyệt-2026-11-17)) |
+
+**Cần cập nhật ở [§1](../01-functional-decomposition.md) và [§2](../02-requirements.md):** F3 thêm công tắc chỉ WAF, luật an toàn cache ghi đè có xác nhận và audit, danh sách tham số marketing bỏ khỏi cache key,
+xác nhận khi xoá toàn zone, nén gzip/brotli; mục plugin theo framework và mục abuse ở F9 hoặc 8.x.
