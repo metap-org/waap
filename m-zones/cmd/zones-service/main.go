@@ -29,14 +29,13 @@ import (
 
 func main() {
 	app.Main(app.Options{
-		Name:     "zones-service",
-		GRPCPort: 3001,
-		// The gRPC API (what waf-graphql-gateway calls) goes through the zone/firewall/IP-list
-		// guards and the cross-service zone-delete check.
+		Name: "zones-service",
+		// The REST record routes (what the portal calls through the API gateway) go through the
+		// zone/firewall/IP-list guards and the cross-service zone-delete check.
 		WrapBackend: func(state *httpserver.AppState) (crud.RecordBackend, error) {
 			return zonesservice.NewGuardedZonesBackend(state.Crud,
-				env.String("SCANNING_GRPC_ADDR", "localhost:3011"),
-				env.String("ALERTING_GRPC_ADDR", "localhost:3021"),
+				env.String("SCANNING_URL", "http://localhost:3010"),
+				env.String("ALERTING_URL", "http://localhost:3020"),
 			), nil
 		},
 		Routes:  zonesservice.MountRoutes,

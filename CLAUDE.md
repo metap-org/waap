@@ -26,6 +26,17 @@ than deleted, not a path/command that still works in this repo — read it as "t
 Rust version used to do/be called," the same way `../metap/CLAUDE.md` treats its own
 `crates/`→`go/` references after its Rust removal.
 
+**Update 2026-11-21: REST only — GraphQL and gRPC removed (roadmap 116, `../metap-docs/docs/roadmap/116-*`).**
+`m-gateway` is now `api-gateway` (`m-gateway/cmd/api-gateway` = `metap`'s `pkg/apigateway`, no WAF code): it routes
+`/api/{entity}*` to the service that lists the entity in its `/metadata/entities`, merges the product-wide metadata,
+resolves `?expand=` across services and sends other routes by prefix (`UPSTREAMS` env). It holds no credential and
+authenticates nobody. The portal (`m-web`, dev proxy and nginx) talks only to it. Declared actions are `POST
+/api/{entity}[/{id}]/actions/{action}`; no service has a gRPC port (`GRPCPort` and `GRPC_ENABLED` are gone).
+`GuardedZonesBackend` reaches scanning/alerting over REST (`metap`'s `recordclient`, `SCANNING_URL`/`ALERTING_URL`);
+control-plane reads zones over REST (`ZONES_URL` = zones-service or the gateway); alerting-service serves the
+`waf.security_events` read model (`app.Options.ExternalEntities` over `m-analytics.Backend`). Every gateway/gRPC/
+GraphQL description below is history.
+
 **Update 2026-11-14: the plane folders were flattened into one directory per service, named by plane
 prefix** — `m-` management, `c-` control, `e-` edge, `a-` analytics (ADR-0001's four planes stay the
 architecture; they are no longer directories). Read every older `<plane>/...` path in this file, in
@@ -103,10 +114,10 @@ carries the plane prefix (`m-`, `c-`, `e-`, `a-`):
 
 | Directory | Role | Status |
 |---|---|---|
-| `m-zones/` `m-scanning/` `m-alerting/` `m-gateway/` `m-analytics/` `m-web/` `m-deploy/` | Business portal (source of truth): Zone, DDoS policy, firewall rule, vulnerability scan, incident, alert — built on `metap`, full CRUD/workflow/permission UI | 3 services (`zones`/`scanning`/`alerting`) + `waf-graphql-gateway` (own binary, `management-plane/graphql-gateway/`, not just config — 7 custom mutations, wraps `metap`'s generic gateway library via `build_with_extensions`) + Customer Portal frontend (10-module IA, zone-centric). Custom non-CRUD endpoints live in each service's `src/routes.rs`. **Both compose files must build/run `waf-graphql-gateway`, not `metap/crates/metap-graphql-gateway`'s generic binary** — found live, 2026-09-04: they'd been pointed at the generic one, silently dropping every custom field (`docs/roadmap/76-waf-portal-live-bugfixes.md`) |
+| `m-zones/` `m-scanning/` `m-alerting/` `m-gateway/` `m-analytics/` `m-web/` `m-deploy/` | Business portal (source of truth): Zone, DDoS policy, firewall rule, vulnerability scan, incident, alert — built on `metap`, full CRUD/workflow/permission UI | 3 services (`zones`/`scanning`/`alerting`) + `api-gateway` (`m-gateway/cmd/api-gateway`, metap's generic `pkg/apigateway`, since 2026-11-21 — it replaced `waf-graphql-gateway`) + Customer Portal frontend (10-module IA, zone-centric). Non-CRUD operations are declared entity actions (`RegisterActions` in each service's `routes.go`) |
 | `m-bootstrap/` | One-shot first-run bootstrap (2026-11-14, `../metap-docs/docs/roadmap/108-*.md`): the role personas (`security_analyst`, `developer`, `viewer`; Tenant Admin is the built-in `admin`, Platform Admin is `dev-tools bootstrap-platform-admin`) as `bootstrap.Submit` grants, plus `cmd/waf-bootstrap`, which blank-imports every service's entities and runs `app.BootstrapMain`. Additive and re-runnable; initial users go in a `BOOTSTRAP_FILE` JSON overlay with passwords from env vars named by `secretRef` (production aborts if one is missing). Env: `BOOTSTRAP_TENANT_IDS` (ids or `all`) | Done |
 | `c-config-distributor/` | Headless worker: pulls config changes from `management-plane` (RabbitMQ outbox subscribe), compiles them into an edge-ready rule-set, writes to Redis/DragonflyDB. No UI, not CRUD | `waf-config-distributor` — 3 jobs in one process: subscribe (fast path), periodic full resync (**the convergence guarantee**), telemetry ingest. The Redis contract is `waf-config-distributor/src/ruleset.rs` |
-| `a-api/` | Telemetry: security events (later access logs, usage) — ingest, storage, query. **Not** built on `metap` (ADR-0009): only `pkg/kit/*`, depguard-enforced like `edge-plane` | `analytics-api` (2026-11-08, first cut): batch ingest from `control-plane` (`POST /v1/security-events/ingest`, ingest secret + platform token, tenant from the token), ClickHouse MergeTree with TTL retention (30 days), structured query API (allowlisted equality filters, keyset cursor, metap-shaped aggregate). Verifies platform tokens itself against zones-service's JWKS. Management reads it two ways, both with the caller's own token: the gateway serves `waf.security_events` as a read-only read model (`management-plane/analytics`, no mutations, metadata served by the gateway itself), and alerting-service's correlate/evaluate sweeps read a time window. Not yet: Kafka/Vector/enricher/archiver/detection/exporter, zone/role-level read filtering |
+| `a-api/` | Telemetry: security events (later access logs, usage) — ingest, storage, query. **Not** built on `metap` (ADR-0009): only `pkg/kit/*`, depguard-enforced like `edge-plane` | `analytics-api` (2026-11-08, first cut): batch ingest from `control-plane` (`POST /v1/security-events/ingest`, ingest secret + platform token, tenant from the token), ClickHouse MergeTree with TTL retention (30 days), structured query API (allowlisted equality filters, keyset cursor, metap-shaped aggregate). Verifies platform tokens itself against zones-service's JWKS. Management reads it two ways, both with the caller's own token: alerting-service serves `waf.security_events` as a read-only read model (`m-analytics.Backend` as an `app.Options.ExternalEntities` entry, since 2026-11-21; before that the GraphQL gateway did), and alerting-service's correlate/evaluate sweeps read a time window. Not yet: Kafka/Vector/enricher/archiver/detection/exporter, zone/role-level read filtering |
 | `e-edge/` | High-performance, low-latency mitigation engine: evaluates rules against real traffic, blocks/challenges/logs. Deliberately **not** built on `metap`/metadata-driven approach | `waf-edge` — hyper 1.x (now Go `net/http`), **no `metap` platform dependency** — only `metap`'s stdlib-only `pkg/kit/*` since 2026-11-07, depguard-enforced. `ArcSwap` rule snapshot (a request never touches Redis), DDoS budget → priority-ordered rules → block/challenge/log → proxy to origin |
 
 **`devtools/` is not a plane** (2026-11-08): dev/staging stand-ins for the outside world, each its
@@ -145,7 +156,7 @@ route. That is the option `04-architecture-boundary.md` already leaned toward, a
 the project owner, so it is flagged in `../metap-docs/docs/roadmap/72-control-edge-planes.md` and
 in that PR, and is cheap to reverse (the edge knows exactly one ingest URL).
 
-**Custom (non-CRUD) endpoints are gRPC actions first (2026-11-14, `../metap-docs/docs/roadmap/109-grpc-first-actions.md`).**
+**Custom (non-CRUD) endpoints are declared entity actions (2026-11-14, `../metap-docs/docs/roadmap/109-grpc-first-actions.md`; served over REST since 2026-11-21, roadmap 116 — the gateway/gRPC part of this paragraph is history).**
 `verifyDns`/`testOrigin`/`syncConfigState` (waf.zones), `verifyDns` (waf.domains), `run` (waf.scan_jobs), `test`/`evaluate`
 (waf.alert_policies) and `correlate` (waf.incidents) are declared in each entity's `Actions` and registered by the service's
 `RegisterActions`; each handler is a core function that the old REST route (kept, same behavior) also calls. `waf-graphql-gateway`
@@ -608,12 +619,11 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
 - **Current state (2026-11-08): single JWKS issuer.** `zones-service` is the only service holding a
   signing key (`JWKS_KEYS_DIR` → `metap`'s `jwks.LoadKeyDir`: `<kid>.key` files + `signing-kid`);
   it signs every token (EdDSA, `kid` header) and publishes `/.well-known/jwks.json`.
-  `scanning-service`, `alerting-service` and `waf-graphql-gateway` verify via `JWKS_URL` and hold
+  `scanning-service` and `alerting-service` verify via `JWKS_URL` and hold
   no private key — their `/auth/login` answers `501 not_token_issuer` (checked before the
-  password), so every login (portal, gateway service accounts, control-plane) goes to `:3000`.
-  The gateway therefore takes `UPSTREAM_N_REST_URL` explicitly (it used to derive each upstream's
-  REST base from its login URL). Cross-service calls forward the caller's own token
-  (`RequestContext.ForwardedBearerToken`, now set by `metap`'s HTTP and gRPC auth) —
+  password), so every login (portal, control-plane) goes to `:3000` (the api-gateway routes
+  `/auth/` there). Cross-service calls forward the caller's own token
+  (`RequestContext.ForwardedBearerToken`, set by `metap`'s HTTP auth) —
   `GuardedZonesBackend` no longer mints a token, and refuses a zone delete (503) when there is no
   caller token to forward. Rotation is live, no restart (issuer re-reads the key dir; verifiers
   refetch on an unknown kid and on a timer) — verified end to end on the compose stack: publish,

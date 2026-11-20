@@ -1,45 +1,41 @@
 // GuardedZonesBackend wraps this service's own CrudService so the create/update/delete-time
 // guards that used to be axum/chi middleware (zoneDomainGuard/firewallRuleMatchConditionGuard/
 // ipAccessListValueGuard/zoneDeleteGuard) still run for the mutation path that reaches this
-// service: gRPC, called by waf-graphql-gateway's CompositeBackend on behalf of the real Customer
-// Portal.
+// service: metap's REST record routes (/api/{entity}, roadmap 116), which the Customer Portal
+// reaches through the API gateway.
 //
-// This wraps crud.RecordBackend (the same seam metap-grpc's GrpcRecordService accepts instead of
-// a hardcoded *crud.CrudService) rather than reaching back into chi, so the fix lives at the one
-// layer every real mutation path actually goes through.
+// This wraps crud.RecordBackend (app.Options.WrapBackend: what the REST routes serve) rather than
+// reaching back into chi, so the fix lives at the one layer every real mutation path goes through.
 //
-// zoneDeleteGuard's cross-service reference check dials each sibling's own gRPC port directly
-// (SCANNING_GRPC_ADDR/ALERTING_GRPC_ADDR), with no service-account credential of its own —
+// zoneDeleteGuard's cross-service reference check calls each sibling's own REST API directly
+// (SCANNING_URL/ALERTING_URL, metap's recordclient), with no service-account credential of its own —
 // instead of logging in as a fixed user (which would only ever see one tenant's rows in this
 // Schema-strategy shared table, wrong for every other tenant), it forwards the caller's own token
-// — metap's HTTP/gRPC auth puts it on RequestContext.ForwardedBearerToken, which GrpcBackend
-// prefers over any stored credential. The sibling's GrpcRecordService resolves that token's real
+// — metap's HTTP auth puts it on RequestContext.ForwardedBearerToken, which recordclient
+// prefers over any stored credential. The sibling resolves that token's real
 // roles independently, so the check runs with the caller's own permissions, not a blanket service
 // identity. (This used to mint a fresh 30s token with the shared RSA key; with a single JWKS
 // issuer no service but the issuer holds a signing key, so forwarding is the only option — and
 // also keeps the caller's functionId/scope, which the minted token dropped.)
-//
-// Lazy, cached connection (crossServiceLink): grpc.NewClient never actually dials eagerly in Go
-// (unlike Rust's tonic Endpoint::connect), so unlike the Rust original there is no real
-// connect-time failure to leave uncached — the constructed *grpcapi.GrpcBackend is always
-// cached, and an unreachable sibling surfaces as an error from the real List call instead, which
-// zoneReferencedBy already maps to the same 503 reference_check_unavailable response.
+
+// An unreachable sibling answers 502 upstream_unavailable from recordclient, which
+// zoneReferencedBy turns into 503 reference_check_unavailable.
 package zonesservice
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/metap-org/metap/pkg/kit/errcode"
-	"github.com/metap-org/metap/pkg/kit/httpx"
-	"sync"
 
 	"github.com/google/uuid"
 
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/grpcapi"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/metap/pkg/recordclient"
 	"github.com/metap-org/waap/model"
 )
 
@@ -67,48 +63,18 @@ func cloneJsonObject(data crud.JsonObject) crud.JsonObject {
 	return out
 }
 
-// crossServiceLink is one sibling service's gRPC connection, built lazily and cached — see this
-// file's own doc comment for why Go's cache-on-success semantics differ from the Rust original's.
-type crossServiceLink struct {
-	addr string
-
-	mu     sync.Mutex
-	cached crud.RecordBackend
-}
-
-func newCrossServiceLink(addr string) *crossServiceLink {
-	return &crossServiceLink{addr: addr}
-}
-
-func (l *crossServiceLink) get() crud.RecordBackend {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.cached != nil {
-		return l.cached
-	}
-	// The token this placeholder carries is never actually sent — every real call below always
-	// sets RequestContext.ForwardedBearerToken, which GrpcBackend prefers unconditionally over
-	// this source. It exists only because ConnectGrpcBackend requires a *ServiceTokenSource to
-	// construct one at all.
-	placeholder := httpx.NewStaticServiceTokenSource("unused-forwarded-token-always-wins")
-	backend, err := grpcapi.ConnectGrpcBackend(l.addr, placeholder)
-	if err != nil {
-		return nil
-	}
-	l.cached = backend
-	return l.cached
-}
-
 type GuardedZonesBackend struct {
 	inner    crud.RecordBackend
-	scanning *crossServiceLink
-	alerting *crossServiceLink
+	scanning crud.RecordBackend
+	alerting crud.RecordBackend
 }
 
-func NewGuardedZonesBackend(inner crud.RecordBackend, scanningGRPCAddr, alertingGRPCAddr string) *GuardedZonesBackend {
+// NewGuardedZonesBackend guards inner; scanningURL/alertingURL are the siblings' REST base URLs
+// ("http://scanning-service:3010").
+func NewGuardedZonesBackend(inner crud.RecordBackend, scanningURL, alertingURL string) *GuardedZonesBackend {
 	return &GuardedZonesBackend{
 		inner:    inner,
-		scanning: newCrossServiceLink(scanningGRPCAddr), alerting: newCrossServiceLink(alertingGRPCAddr),
+		scanning: recordclient.New(scanningURL, nil), alerting: recordclient.New(alertingURL, nil),
 	}
 }
 
@@ -164,7 +130,7 @@ func validateIPAccessList(data crud.JsonObject) error {
 // clear to delete; a non-nil error is one the caller should return as-is.
 func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.UUID, rc *permission.RequestContext) (string, error) {
 	// The sibling services run the check as the caller, with the caller's own token (set on
-	// rc by metap's HTTP/gRPC auth). No token means we cannot ask on the caller's behalf, and an
+	// rc by metap's HTTP auth). No token means we cannot ask on the caller's behalf, and an
 	// unchecked delete could orphan scan jobs/incidents — refuse rather than guess.
 	if rc.ForwardedBearerToken == "" {
 		return "", crud.NewServiceErrorMsg(503, model.ErrReferenceCheckUnavailable,
@@ -173,8 +139,8 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 	forwardedRC := *rc
 
 	checks := []struct {
-		link   *crossServiceLink
-		entity string
+		backend crud.RecordBackend
+		entity  string
 	}{
 		{b.scanning, model.ScanJobs},
 		{b.alerting, model.Incidents},
@@ -183,12 +149,11 @@ func (b *GuardedZonesBackend) zoneReferencedBy(ctx context.Context, zoneID uuid.
 		// orphan to block on.
 	}
 	for _, check := range checks {
-		backend := check.link.get()
-		if backend == nil {
+		result, err := check.backend.List(ctx, check.entity, query.ListInput{Limit: existenceCheckLimit, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, &forwardedRC)
+		if se, ok := crud.AsServiceError(err); ok && se.Status == http.StatusBadGateway {
 			return "", crud.NewServiceErrorMsg(503, model.ErrReferenceCheckUnavailable,
 				fmt.Sprintf("Could not verify cross-service references (%s unreachable); refusing to delete.", check.entity))
 		}
-		result, err := backend.List(ctx, check.entity, query.ListInput{Limit: existenceCheckLimit, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, &forwardedRC)
 		if err != nil {
 			return "", err
 		}

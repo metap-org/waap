@@ -7,13 +7,13 @@ require (
 	github.com/stretchr/testify v1.12.1
 )
 
-require go.yaml.in/yaml/v3 v3.0.5 // indirect
+require go.yaml.in/yaml/v3 v3.0.6 // indirect
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/metap-org/metap v0.0.0
 	go.uber.org/atomic v1.12.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )
 
 // Only github.com/metap-org/metap/pkg/kit/* may be imported from metap (standard-library-only

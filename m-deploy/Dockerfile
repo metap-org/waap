@@ -1,6 +1,6 @@
 # One image recipe for every Go binary of the root module (the m-* and c-* services) — pick it with
 # --build-arg SERVICE=<package dir>, e.g. m-zones/cmd/zones-service, m-scanning/cmd/scanning-service,
-# m-alerting/cmd/alerting-service, m-gateway/cmd/waf-graphql-gateway.
+# m-alerting/cmd/alerting-service, m-gateway/cmd/api-gateway.
 #
 # Build context must be the metap-org ROOT (docker-compose.yml uses `context: ../../`): go.mod
 # has `replace github.com/metap-org/metap => ../metap`, so ../metap has to be inside the

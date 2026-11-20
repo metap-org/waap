@@ -13,6 +13,8 @@
 // the target EntityDefinition registered in the SAME MetadataRegistry — registering ZoneEntity
 // here just to satisfy that would also expose full CRUD for waf.zones on this service's generic
 // /api/:entity* route.
+// It is declared RefersTo(waf.zones) (roadmap 116): still a plain string column, but the API
+// gateway can expand it across services (`?expand=zoneId`).
 package entities
 
 import (
@@ -27,7 +29,7 @@ func ScanJobEntity() metadata.EntityDefinition {
 		Label:     "Scan Job",
 		TableName: reconciler.QualifiedTableNameIn(model.ScanJobs, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index().RefersTo(model.Zones),
 			metadata.EnumField(model.FieldScanType, "Scan Type", "quickScan", "fullScan", "apiScan").Require().Index(),
 			metadata.NewField(model.FieldSchedule, "Schedule (cron)", metadata.KindString),
 			metadata.EnumField(model.FieldStatus, "Status", "idle", "queued", "running", "completed", "failed").Index(),

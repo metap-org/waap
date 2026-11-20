@@ -10,7 +10,7 @@
  * - `../pages/zone/ZoneAccessListTab.tsx` — one zone's own entries (`zoneId` set).
  * - `../pages/GlobalAccessListPage.tsx` — tenant-wide entries that apply to every zone (`zoneId`
  *   omitted). Same client-side-filter workaround as `FirewallRulesPanel` for the same
- *   `useGraphQLRecords` empty-string-filter-stripping reason — see that component's file header.
+ *   `useRecords` empty-string-filter-stripping reason — see that component's file header.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";

@@ -1,12 +1,12 @@
 // Package analytics is Management's side of the Analytics plane boundary (ADR-0001): a client
-// for its query API, and a read-only crud.RecordBackend that lets the GraphQL gateway serve
+// for its query API, and a read-only crud.RecordBackend that lets alerting-service serve
 // waf.security_events from it exactly as it serves any other entity — so the portal's existing
 // list/aggregate calls keep working with the data living in ClickHouse instead of Postgres.
 //
 // waf.security_events is a READ MODEL here, not a stored entity: no service reconciles a table
 // for it and nothing in Management can write one. Events are written by control-plane straight
 // into the Analytics plane. This definition only describes the shape (fields, labels, list view,
-// filters) for the gateway's schema and the portal's metadata endpoint.
+// filters) for alerting-service's metadata (app.ExternalEntities) and the portal.
 //
 // Every call forwards the caller's own token; Analytics re-verifies it and scopes by its tenant.
 package analytics
@@ -21,7 +21,7 @@ import (
 const SecurityEvents = model.SecurityEvents
 
 // SecurityEventEntity: same fields and list view the Postgres-backed entity had, so the portal
-// and the GraphQL schema see no change. zoneId/triggeredById stay plain strings (no reference
+// and the REST API see no change. zoneId/triggeredById stay plain strings (no reference
 // field), as before: zones live in another service and a rule id points at one of two entities.
 func SecurityEventEntity() metadata.EntityDefinition {
 	name := metadata.NewField(model.FieldTriggeredByName, "Triggered By Name", metadata.KindString)
@@ -32,7 +32,7 @@ func SecurityEventEntity() metadata.EntityDefinition {
 		// reconciles this entity, so no such Postgres table exists — the data is in ClickHouse.
 		TableName: "analytics.security_events",
 		Fields: []metadata.EntityField{
-			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index().RefersTo(model.Zones),
 			metadata.EnumField(model.FieldTriggeredBy, "Triggered By", "ddosPolicy", "firewallRule").Require().Index(),
 			metadata.NewField(model.FieldTriggeredByID, "Triggered By Id", metadata.KindString).Require(),
 			name,
