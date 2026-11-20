@@ -33,9 +33,13 @@ func ZoneEntity() metadata.EntityDefinition {
 	hostname.UniqueScope = &globalScope
 	hostname.Searchable = metadata.Ptr(true)
 
+	// Each check says what is missing and where to fix it; the first one that fails is reported
+	// (and shown on the disabled Activate action before anyone clicks it).
 	activateGuard := permission.AllCondition(
-		permission.AttributeCondition("hasConfig", permission.OpEq, permission.LiteralValue(json.RawMessage("true"))),
-		permission.AttributeCondition(model.FieldVerificationStatus, permission.OpEq, permission.LiteralValue(json.RawMessage(`"verified"`))),
+		permission.AttributeCondition(model.FieldVerificationStatus, permission.OpEq, permission.LiteralValue(json.RawMessage(`"verified"`))).
+			WithMessage("The zone's domain is not verified yet. Verify it on the Domains page first."),
+		permission.AttributeCondition(model.FieldHasConfig, permission.OpEq, permission.LiteralValue(json.RawMessage("true"))).
+			WithMessage("The zone has no protection config yet. Add a DDoS policy or a firewall rule first."),
 	)
 
 	return metadata.EntityDefinition{
