@@ -2,3 +2,4 @@
 # Binaries built in place (e.g. `go build -o waf-edge ./cmd/waf-edge` per e-edge/README.md).
 /e-edge/waf-edge
 /c-config-distributor/waf-config-distributor
+target

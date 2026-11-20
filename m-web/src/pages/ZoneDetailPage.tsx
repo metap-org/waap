@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  Alert,
   Button,
   PageHeader,
   Tabs,
@@ -18,6 +19,9 @@ import {
   TabsList,
   TabsTrigger,
   toast,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@metap/ui";
 import {
   ApiErrorMessage,
@@ -98,17 +102,24 @@ export function ZoneDetailPage() {
   const availableTransitions = workflow
     ? workflow.transitions.filter((t) => t.from === status)
     : [];
-  // No real per-transition capability data reaches this page (the GraphQL `get` field this app
-  // uses doesn't expose `RecordCapabilities` — only REST/the generic `RecordDetail` do) — every
-  // transition `TRANSITIONS` already decided to offer is marked `available: true` here too, same
-  // "backend is still the authority, this only decides which buttons are worth showing" posture
-  // this file's own top doc comment states for the plain buttons below.
+  // What the server says about each transition of this record (permission + guard), so a blocked
+  // action is disabled with its reason before anyone clicks it; an action the server doesn't list
+  // stays enabled and the server still has the last word when it is clicked.
+  const serverInfo = new Map(
+    (record.capabilities?.transitions ?? []).map((info) => [info.action, info]),
+  );
   const transitionInfo = new Map<string, TransitionAvailability>(
     (TRANSITIONS[status] ?? []).map((t) => [
       t.action,
-      { action: t.action, available: true },
+      serverInfo.get(t.action) ?? { action: t.action, available: true },
     ]),
   );
+  const blockedReasons = (TRANSITIONS[status] ?? [])
+    .map((t) => transitionInfo.get(t.action))
+    .filter(
+      (info): info is TransitionAvailability =>
+        !!info && !info.available && !!info.reason,
+    );
 
   async function act(action: string) {
     if (!zoneId || !zone.data) return;
@@ -179,16 +190,31 @@ export function ZoneDetailPage() {
                 {t("waf.zoneDetail.recheckDns")}
               </Button>
             ) : null}
-            {(TRANSITIONS[status] ?? []).map((transition) => (
-              <Button
-                key={transition.action}
-                size="sm"
-                onClick={() => act(transition.action)}
-                disabled={busy}
-              >
-                {t(`waf.actions.${transition.action}`)}
-              </Button>
-            ))}
+            {(TRANSITIONS[status] ?? []).map((transition) => {
+              const info = transitionInfo.get(transition.action);
+              const blocked = info ? !info.available : false;
+              const button = (
+                <Button
+                  size="sm"
+                  onClick={() => act(transition.action)}
+                  disabled={busy || blocked}
+                >
+                  {t(`waf.actions.${transition.action}`)}
+                </Button>
+              );
+              return blocked && info?.reason ? (
+                <Tooltip key={transition.action}>
+                  <TooltipTrigger asChild>
+                    <span>{button}</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    {info.reason}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <span key={transition.action}>{button}</span>
+              );
+            })}
             {workflow ? (
               <WorkflowVisualizeDialog
                 label={t("workflow.visualize")}
@@ -204,6 +230,20 @@ export function ZoneDetailPage() {
           </>
         }
       />
+
+      {/* Why an action is blocked, said once where it is seen (the button's tooltip repeats it). */}
+      {blockedReasons.length > 0 ? (
+        <Alert className="mb-4">
+          {blockedReasons.map((info) => (
+            <div key={info.action} className="text-sm">
+              <span className="font-medium">
+                {t(`waf.actions.${info.action}`)}:
+              </span>{" "}
+              {info.reason}
+            </div>
+          ))}
+        </Alert>
+      ) : null}
 
       <Tabs defaultValue="overview">
         <TabsList>
