@@ -32,7 +32,7 @@ func SecurityEventEntity() metadata.EntityDefinition {
 		// reconciles this entity, so no such Postgres table exists — the data is in ClickHouse.
 		TableName: "analytics.security_events",
 		Fields: []metadata.EntityField{
-			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index().RefersTo(model.Zones),
 			metadata.EnumField(model.FieldTriggeredBy, "Triggered By", "ddosPolicy", "firewallRule").Require().Index(),
 			metadata.NewField(model.FieldTriggeredByID, "Triggered By Id", metadata.KindString).Require(),
 			name,

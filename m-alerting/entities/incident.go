@@ -25,7 +25,7 @@ func IncidentEntity() metadata.EntityDefinition {
 		Label:     "Incident",
 		TableName: reconciler.QualifiedTableNameIn(model.Incidents, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index(),
+			metadata.NewField(model.FieldZoneID, "Zone", metadata.KindString).Require().Index().RefersTo(model.Zones),
 			metadata.NewField(model.FieldTitle, "Title", metadata.KindString).Require().Sort(),
 			metadata.EnumField(model.FieldSeverity, "Severity", "low", "medium", "high", "critical").Require().Index(),
 			metadata.EnumField(model.FieldStatus, "Status", "open", "acknowledged", "mitigating", "resolved").Index(),
