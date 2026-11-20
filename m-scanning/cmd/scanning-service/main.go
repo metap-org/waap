@@ -21,9 +21,8 @@ import (
 
 func main() {
 	app.Main(app.Options{
-		Name:     "scanning-service",
-		GRPCPort: 3011,
-		Routes:   scanningservice.MountRoutes,
-		Actions:  scanningservice.RegisterActions,
+		Name:    "scanning-service",
+		Routes:  scanningservice.MountRoutes,
+		Actions: scanningservice.RegisterActions,
 	})
 }

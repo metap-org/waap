@@ -370,7 +370,7 @@ func jsonBool(b bool) json.RawMessage {
 }
 
 // MountRoutes registers this service's custom (non-generic-CRUD) endpoints onto r. REST stays
-// available next to the gRPC actions (RegisterActions) for any caller that wants it.
+// available next to the declared actions (RegisterActions) for any caller that wants it.
 func MountRoutes(r chi.Router, state *httpserver.AppState) {
 	r.Post("/api/waf.zones/{id}/verify-dns", httpserver.RecordActionRoute(state, "zone", func(ctx context.Context, rc *permission.RequestContext, id uuid.UUID) (map[string]any, error) {
 		return verifyDNS(ctx, state, rc, id)
@@ -405,7 +405,7 @@ func MountRoutes(r chi.Router, state *httpserver.AppState) {
 	r.Get("/internal/health/deep", DeepHealth)
 }
 
-// RegisterActions registers the gRPC handlers for the actions declared on this service's
+// RegisterActions registers the handlers for the actions declared on this service's
 // entities (see entities: Actions). Same cores as the REST routes above.
 func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
 	for _, a := range []struct {

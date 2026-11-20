@@ -1,13 +1,10 @@
 /**
  * Module 10 — tenant settings. Reads and writes `metap`'s tiered config surface
- * (`tenantConfig`/`setTenantConfig`/`resetTenantConfig` GraphQL fields — `GET /admin/config`,
- * `PUT/DELETE /admin/config/{key}`'s replacement since 2026-09-26,
- * `metap-graphql-http::platform_fields`, see
- * `../../../../metap-docs/docs/roadmap/95-platform-graphql-fields.md`), which already carries
+ * (`GET /admin/config`, `PUT/DELETE /admin/config/{key}`), which already carries
  * branding and session policy, so this screen is a thin editor over it rather than a new settings
  * store.
  *
- * What a key *is* stays declared in Rust (`metap-config`'s key registry): tier, default and
+ * What a key *is* stays declared in metap (`pkg/config`'s key registry): tier, default and
  * validator. This screen therefore renders whatever the backend says exists — adding a key there
  * makes it appear here with no frontend change — and only writes keys the backend marks as
  * tenant-writable, since anything else comes back as a rejection by design.
@@ -15,7 +12,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { graphqlFetch, useAsyncAction, useAuth } from "@metap/platform-ui";
+import { apiFetch, useAsyncAction, useAuth } from "@metap/platform-ui";
 import {
   Button,
   Input,
@@ -47,12 +44,8 @@ export function SettingsPage() {
 
   const config = useQuery({
     queryKey: ["waf-tenant-config"],
-    queryFn: () =>
-      graphqlFetch<{ tenantConfig: ConfigItem[] }>(
-        "/graphql",
-        "{ tenantConfig { key value level overridden public } }",
-      ),
-    select: (response) => response.tenantConfig,
+    queryFn: () => apiFetch<{ data: ConfigItem[] }>("/admin/config"),
+    select: (response) => response.data,
     enabled: status === "authenticated",
   });
 
@@ -61,15 +54,14 @@ export function SettingsPage() {
     if (raw === undefined) return;
     await run(async () => {
       // Numbers and booleans must go over the wire as their real JSON types — the key's validator
-      // in Rust type-checks the value, so sending "30" where a number is expected is a 400.
+      // in metap type-checks the value, so sending "30" where a number is expected is a 400.
       let value: unknown = raw;
       if (typeof item.value === "number") value = Number(raw);
       else if (typeof item.value === "boolean") value = raw === "true";
-      await graphqlFetch(
-        "/graphql",
-        "mutation($key: String!, $value: Json!) { setTenantConfig(key: $key, value: $value) { key } }",
-        { key: item.key, value },
-      );
+      await apiFetch(`/admin/config/${encodeURIComponent(item.key)}`, {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+      });
       await config.refetch();
       setDrafts((current) => {
         const next = { ...current };
@@ -84,11 +76,9 @@ export function SettingsPage() {
 
   async function reset(item: ConfigItem) {
     await run(async () => {
-      await graphqlFetch(
-        "/graphql",
-        "mutation($key: String!) { resetTenantConfig(key: $key) { key } }",
-        { key: item.key },
-      );
+      await apiFetch(`/admin/config/${encodeURIComponent(item.key)}`, {
+        method: "DELETE",
+      });
       await config.refetch();
       toast(t("waf.settings.toastReset", { key: item.key }), {
         variant: "default",

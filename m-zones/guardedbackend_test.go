@@ -17,14 +17,14 @@ import (
 )
 
 // Unit tests for GuardedZonesBackend's create/update guards against metap's generated
-// crudmock.RecordBackend — no database, no gRPC. The real end-to-end behavior (real CrudService,
+// crudmock.RecordBackend — no database, no sibling service. The real end-to-end behavior (real CrudService,
 // reconciled tables, signed JWT) stays in zonesservice_postgres_test.go.
 
 func newGuarded(t *testing.T) (*GuardedZonesBackend, *crudmock.RecordBackend) {
 	t.Helper()
 	inner := crudmock.NewRecordBackend(t)
 	// Cross-service addresses are never dialled by these tests (only Delete uses them).
-	return NewGuardedZonesBackend(inner, "127.0.0.1:1", "127.0.0.1:1"), inner
+	return NewGuardedZonesBackend(inner, "http://127.0.0.1:1", "http://127.0.0.1:1"), inner
 }
 
 func testRC() *permission.RequestContext {

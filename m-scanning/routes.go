@@ -66,7 +66,7 @@ func loadJob(ctx context.Context, w http.ResponseWriter, state *httpserver.AppSt
 	return result.Record, true
 }
 
-// runScanJob is the "Run scan now" button — both POST /api/waf.scan_jobs/{id}/run and the gRPC
+// runScanJob is the "Run scan now" button — both POST /api/waf.scan_jobs/{id}/run and the declared
 // action waf.scan_jobs.run call it.
 func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, jobID uuid.UUID) (map[string]any, error) {
 	got, err := state.Crud.Get(ctx, model.ScanJobs, jobID, rc)
@@ -125,7 +125,7 @@ func runScanJob(ctx context.Context, state *httpserver.AppState, rc *permission.
 	return map[string]any{"job": failed, "dispatched": false, "detail": detail}, nil
 }
 
-// RegisterActions registers the gRPC handlers for the actions declared on this service's entities.
+// RegisterActions registers the handlers for the actions declared on this service's entities.
 func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
 	return reg.Register(model.ScanJobs, model.ActionRun, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		return crud.ToObject(runScanJob(ctx, state, c.RC, c.ID))

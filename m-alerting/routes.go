@@ -63,8 +63,8 @@ const recordScanLimit = 50
 
 func httpClient() *http.Client { return &http.Client{Timeout: deliveryTimeout} }
 
-// analyticsClient: where security events are read from (the Analytics plane's query API).
-func analyticsClient() *analytics.Client {
+// AnalyticsClient: where security events are read from (the Analytics plane's query API).
+func AnalyticsClient() *analytics.Client {
 	v, _ := env.Lookup("ANALYTICS_URL")
 	if v == "" {
 		v = "http://localhost:3030"
@@ -75,7 +75,7 @@ func analyticsClient() *analytics.Client {
 // recentEvents reads events since cutoff (newest first, at most eventScanLimit). An Analytics
 // error keeps its own status (401 stays 401, 503 stays 503) instead of turning into a generic 500.
 func recentEvents(ctx context.Context, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, error) {
-	events, err := analyticsClient().Window(ctx, rc.ForwardedBearerToken, filters, cutoff, eventScanLimit)
+	events, err := AnalyticsClient().Window(ctx, rc.ForwardedBearerToken, filters, cutoff, eventScanLimit)
 	if err != nil {
 		var apiErr *analytics.APIError
 		if errors.As(err, &apiErr) {
@@ -413,7 +413,7 @@ func testAlertPolicy(ctx context.Context, state *httpserver.AppState, rc *permis
 }
 
 // MountRoutes registers this service's custom (non-generic-CRUD) endpoints onto r. REST stays
-// available next to the gRPC actions (RegisterActions).
+// available next to the declared actions (RegisterActions).
 func MountRoutes(r chi.Router, state *httpserver.AppState) {
 	r.Post("/internal/incidents/correlate", func(w http.ResponseWriter, req *http.Request) {
 		rc, ok := httpserver.RequireAuth(w, req, state)
@@ -448,7 +448,7 @@ func writeResult(w http.ResponseWriter) func(map[string]any, error) {
 	}
 }
 
-// RegisterActions registers the gRPC handlers for the actions declared on this service's entities.
+// RegisterActions registers the handlers for the actions declared on this service's entities.
 func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
 	if err := reg.Register(model.Incidents, model.ActionCorrelate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		raw, err := json.Marshal(c.Input)

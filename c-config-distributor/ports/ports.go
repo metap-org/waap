@@ -1,7 +1,7 @@
 // Package ports declares the two seams of the control-plane pipeline, so the compile/sync/resync
 // logic is unit-testable without a live management-plane or Redis:
 //
-//	ConfigSource (management-plane GraphQL, management.Client) -> compile -> RuleSink (Redis, distribute.Distributor)
+//	ConfigSource (management-plane REST, management.Client) -> compile -> RuleSink (Redis, distribute.Distributor)
 //
 // Mocks: ports/portsmock (mockery, `go generate ./ports/...`).
 package ports

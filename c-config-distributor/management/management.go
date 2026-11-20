@@ -1,35 +1,39 @@
 // Package management is the only place this worker talks to management-plane.
 //
-// Over management-plane's own GraphQL API, not its database. That is a deliberate boundary choice: a
-// direct Postgres read would couple this process to metap's dedicated-table/JSONB layout and
-// would bypass permission and validation entirely. Going through the API means this worker sees
-// exactly what a portal user with its service account's role sees, and management-plane stays free to
-// change how it stores things.
+// Over management-plane's own REST API (/api/{entity}, metap's recordclient), not its database.
+// That is a deliberate boundary choice: a direct Postgres read would couple this process to
+// metap's dedicated-table layout and would bypass permission and validation entirely. Going
+// through the API means this worker sees exactly what a portal user with its service account's
+// role sees, and management-plane stays free to change how it stores things.
 //
 // Authentication is httpx.ServiceTokenSource — a real user this process logs in as, refreshed
 // in the background. metap already learned the alternative the hard way: a hand-minted static
 // JWT expired inside a running deployment and crashed the caller at boot.
 //
-// zonesURL must point at the GraphQL gateway, not at zones-service's own port — no service mounts
-// a GraphQL router itself (each only exposes gRPC for the gateway to aggregate). Telemetry no
-// longer goes through here at all: it is written to the Analytics plane (package analytics). loginURL (auth only) is unaffected — it still points at zones-service's
-// own /auth/login, since the gateway has no login endpoint of its own and only decode-verifies
-// the bearer token this process already minted.
+// zonesURL is zones-service itself (every entity read here is one of its own) or the API gateway
+// in front of it. Telemetry does not go through here: it is written to the Analytics plane
+// (package analytics).
 package management
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/metap-org/metap/pkg/kit/httpx"
-	"github.com/metap-org/metap/pkg/kit/standard"
-	"github.com/metap-org/waap/model"
 	"net/http"
-	"strings"
+
+	"github.com/google/uuid"
+
+	"github.com/metap-org/metap/pkg/crud"
+	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/metap/pkg/recordclient"
+	"github.com/metap-org/waap/model"
 )
 
-// Record is a record as reshaped from the GraphQL response — the fixed envelope's id/status plus
+// tenantWide is the zoneId filter value of a rule or list that applies to every zone.
+var tenantWide = ""
+
+// Record is a record as reshaped from the REST response — the fixed envelope's id/status plus
 // whichever data fields this package actually reads.
 type Record struct {
 	ID     string
@@ -73,29 +77,15 @@ func (r Record) Bool(field string) (bool, bool) {
 	return b, true
 }
 
-// recordFromJSON builds a Record from one GraphQL result object: id/status pulled off the
-// envelope, everything in fields copied into Data under its own name (already flat — none of
-// the fields this package selects are Reference-typed, so no nested-object unwrapping is
-// needed).
-func recordFromJSON(raw map[string]json.RawMessage, fields []string) Record {
-	var id string
-	if idRaw, ok := raw["id"]; ok {
-		_ = json.Unmarshal(idRaw, &id)
-	}
-	var status *string
-	if statusRaw, ok := raw["status"]; ok && string(statusRaw) != "null" {
-		var s string
-		if json.Unmarshal(statusRaw, &s) == nil {
-			status = &s
-		}
-	}
-	data := make(map[string]json.RawMessage)
+// recordFrom keeps id/status and the fields this package reads.
+func recordFrom(dto crud.RecordDto, fields []string) Record {
+	data := make(map[string]json.RawMessage, len(fields))
 	for _, field := range fields {
-		if v, ok := raw[field]; ok {
+		if v, ok := dto.Data[field]; ok {
 			data[field] = v
 		}
 	}
-	return Record{ID: id, Status: status, Data: data}
+	return Record{ID: dto.ID.String(), Status: dto.Status, Data: data}
 }
 
 var (
@@ -106,132 +96,52 @@ var (
 )
 
 type Client struct {
-	http     *http.Client
-	zonesURL string
-	token    *httpx.ServiceTokenSource
+	records *recordclient.Client
 }
 
-func New(httpClient *http.Client, zonesURL string, token *httpx.ServiceTokenSource) *Client {
-	return &Client{http: httpClient, zonesURL: zonesURL, token: token}
+// New is a Client for the service at zonesURL; token signs every call. httpClient is unused
+// (recordclient keeps its own, with a timeout).
+func New(_ *http.Client, zonesURL string, token *httpx.ServiceTokenSource) *Client {
+	return &Client{records: recordclient.New(zonesURL, token)}
 }
 
-type graphqlRequest struct {
-	Query     string `json:"query"`
-	Variables any    `json:"variables"`
-}
-
-type graphqlError struct {
-	Message    string `json:"message"`
-	Extensions struct {
-		Status *int64 `json:"status"`
-	} `json:"extensions"`
-}
-
-type graphqlResponse struct {
-	Data   map[string]json.RawMessage `json:"data"`
-	Errors []graphqlError             `json:"errors"`
-}
-
-// graphql POSTs one GraphQL query/mutation, returns the parsed data object on success. A nil
-// map with no error means the request succeeded but every error present was a 404-shaped
-// not-found (the only error shape a caller here treats as a normal "gone" answer, matching
-// REST's old 404 -> Ok(None) behavior) — any other error bails.
-func (d *Client) graphql(ctx context.Context, base, query string, variables any) (map[string]json.RawMessage, error) {
-	url := base + "/graphql"
-	body, err := json.Marshal(graphqlRequest{Query: query, Variables: variables})
-	if err != nil {
-		return nil, err
+func (d *Client) list(ctx context.Context, entity string, fields []string, zoneID *string, limit int64) ([]Record, error) {
+	input := query.ListInput{Limit: limit}
+	if zoneID != nil {
+		input.Filters = [][2]string{{model.FieldZoneID, *zoneID}}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(standard.HeaderContentType, standard.MediaTypeJSON)
-	req.Header.Set(standard.HeaderAuthorization, standard.BearerPrefix+d.token.Current())
-	resp, err := d.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("POST %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("POST %s returned %d", url, resp.StatusCode)
-	}
-	var parsed graphqlResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", url, err)
-	}
-	if len(parsed.Errors) > 0 {
-		allNotFound := true
-		for _, e := range parsed.Errors {
-			if e.Extensions.Status == nil || *e.Extensions.Status != 404 {
-				allNotFound = false
-				break
-			}
-		}
-		if allNotFound {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("POST %s returned GraphQL errors: %+v", url, parsed.Errors)
-	}
-	return parsed.Data, nil
-}
-
-func (d *Client) list(ctx context.Context, base, listField string, fields []string, filter any, limit int64) ([]Record, error) {
-	selection := strings.Join(fields, " ")
-	query := fmt.Sprintf(
-		"query($filter: Json, $limit: Int) { result: %s(filter: $filter, limit: $limit) { records { id status %s } } }",
-		listField, selection,
-	)
-	data, err := d.graphql(ctx, base, query, map[string]any{"filter": filter, "limit": limit})
-	if err != nil {
-		return nil, err
-	}
-	if data == nil {
+	res, err := d.records.List(ctx, entity, input, nil)
+	if se, ok := crud.AsServiceError(err); ok && se.Status == http.StatusNotFound {
 		return nil, nil
 	}
-	resultRaw, ok := data["result"]
-	if !ok {
-		return nil, nil
+	if err != nil {
+		return nil, fmt.Errorf("listing %s: %w", entity, err)
 	}
-	var result struct {
-		Records []map[string]json.RawMessage `json:"records"`
-	}
-	if err := json.Unmarshal(resultRaw, &result); err != nil {
-		return nil, fmt.Errorf("parsing %s result: %w", listField, err)
-	}
-	records := make([]Record, 0, len(result.Records))
-	for _, r := range result.Records {
-		records = append(records, recordFromJSON(r, fields))
+	records := make([]Record, 0, len(res.Data))
+	for _, r := range res.Data {
+		records = append(records, recordFrom(r, fields))
 	}
 	return records, nil
 }
 
-func (d *Client) get(ctx context.Context, base, getField string, fields []string, id string) (*Record, error) {
-	selection := strings.Join(fields, " ")
-	query := fmt.Sprintf("query($id: ID!) { result: %s(id: $id) { id status %s } }", getField, selection)
-	data, err := d.graphql(ctx, base, query, map[string]any{"id": id})
+func (d *Client) get(ctx context.Context, entity string, fields []string, id string) (*Record, error) {
+	parsed, err := uuid.Parse(id)
 	if err != nil {
-		return nil, err
-	}
-	if data == nil {
-		// A deleted zone is the normal way this happens — the delete event and this fetch race,
-		// and "gone" is a valid answer the caller turns into an unpublish.
 		return nil, nil
 	}
-	resultRaw, ok := data["result"]
-	if !ok || string(resultRaw) == "null" {
+	res, err := d.records.Get(ctx, entity, parsed, nil)
+	if se, ok := crud.AsServiceError(err); ok && se.Status == http.StatusNotFound {
 		return nil, nil
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(resultRaw, &raw); err != nil {
-		return nil, fmt.Errorf("parsing %s result: %w", getField, err)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s %s: %w", entity, id, err)
 	}
-	record := recordFromJSON(raw, fields)
+	record := recordFrom(res.Record, fields)
 	return &record, nil
 }
 
 func (d *Client) Zone(ctx context.Context, zoneID string) (*Record, error) {
-	return d.get(ctx, d.zonesURL, "wafZones", zoneFields, zoneID)
+	return d.get(ctx, model.Zones, zoneFields, zoneID)
 }
 
 // AllZones fetches every zone, however many pages that takes.
@@ -240,31 +150,31 @@ func (d *Client) Zone(ctx context.Context, zoneID string) (*Record, error) {
 // fetched — a tenant with more than 50 zones would need this to actually follow nextCursor,
 // which the original client doesn't either.
 func (d *Client) AllZones(ctx context.Context) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafZonesList", zoneFields, map[string]any{}, 50)
+	return d.list(ctx, model.Zones, zoneFields, nil, 50)
 }
 
 // DdosPoliciesFor returns every DDoS policy on this zone — a zone can carry more than one,
 // scoped by path/method.
 func (d *Client) DdosPoliciesFor(ctx context.Context, zoneID string) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafDdosPoliciesList", ddosFields, map[string]any{model.FieldZoneID: zoneID}, 50)
+	return d.list(ctx, model.DdosPolicies, ddosFields, &zoneID, 50)
 }
 
 func (d *Client) RulesFor(ctx context.Context, zoneID string) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafFirewallRulesList", ruleFields, map[string]any{model.FieldZoneID: zoneID}, 50)
+	return d.list(ctx, model.FirewallRules, ruleFields, &zoneID, 50)
 }
 
 // TenantWideRulesFor returns tenant-wide ("global") FirewallRules — zoneId unset applies to
 // every zone. zoneId: "" (empty value) is metap-query's own "field is unset" convention.
 func (d *Client) TenantWideRulesFor(ctx context.Context) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafFirewallRulesList", ruleFields, map[string]any{model.FieldZoneID: ""}, 50)
+	return d.list(ctx, model.FirewallRules, ruleFields, &tenantWide, 50)
 }
 
 func (d *Client) IPAccessListsFor(ctx context.Context, zoneID string) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafIpAccessListsList", ipAccessListFields, map[string]any{model.FieldZoneID: zoneID}, 100)
+	return d.list(ctx, model.IPAccessLists, ipAccessListFields, &zoneID, 100)
 }
 
 // TenantWideIPAccessListsFor returns tenant-wide ("global") IpAccessList entries — same
 // zoneId: "" (empty) convention as TenantWideRulesFor.
 func (d *Client) TenantWideIPAccessListsFor(ctx context.Context) ([]Record, error) {
-	return d.list(ctx, d.zonesURL, "wafIpAccessListsList", ipAccessListFields, map[string]any{model.FieldZoneID: ""}, 100)
+	return d.list(ctx, model.IPAccessLists, ipAccessListFields, &tenantWide, 100)
 }

@@ -11,14 +11,14 @@
  * Shared by two contexts, distinguished only by whether `zoneId` is passed:
  * - `../pages/zone/ZoneRulesTab.tsx` — one zone's own rules (`zoneId` set).
  * - `../pages/GlobalRulesPage.tsx` — tenant-wide ("global") rules that apply to every zone
- *   (`zoneId` omitted). See `../../../c-config-distributor/src/dataplane.rs`'s
- *   `tenant_wide_rules_for` for how a `zoneId: null` row gets merged into every zone at compile
+ *   (`zoneId` omitted). See `../../../c-config-distributor/management`'s
+ *   `TenantWideRulesFor` for how a `zoneId: null` row gets merged into every zone at compile
  *   time.
  *
  * The global fetch can't ask the server to filter `zoneId IS NULL` through this hook:
- * `@metap/platform-ui`'s `useGraphQLRecords` strips any filter value that is `""`/`undefined`
- * before building the GraphQL variables, so the backend's own `?zoneId=` (empty string) → `IS
- * NULL` convention (`metap-query`'s `query_planner.rs`) is unreachable through it. Fetching all
+ * `@metap/platform-ui`'s `useRecords` strips any filter value that is `""`/`undefined`
+ * before building the query string, so the backend's own `?zoneId=` (empty string) → `IS
+ * NULL` convention (metap's `pkg/query`) is unreachable through it. Fetching all
  * rows unfiltered and filtering client-side for `!rule.data.zoneId` is the workaround — changing
  * the shared hook is out of scope here (it would affect every other consumer app).
  */

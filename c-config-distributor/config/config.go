@@ -9,10 +9,8 @@ import (
 )
 
 type Config struct {
-	// ZonesURL is where the wafZones/wafDdosPolicies/wafFirewallRules/wafIpAccessLists GraphQL
-	// fields live — the GATEWAY, not zones-service's own port. Neither zones-service nor
-	// alerting-service mounts /graphql itself — only the gateway aggregates all 3 management-plane
-	// services' entities into one reachable schema.
+	// ZonesURL serves waf.zones/ddos_policies/firewall_rules/ip_access_lists over REST
+	// (/api/{entity}): zones-service itself, or the API gateway in front of it.
 	ZonesURL string
 	// AnalyticsURL is the Analytics plane's analytics-api — edge telemetry is written there in
 	// batches. AnalyticsIngestToken is its ingest secret (ANALYTICS_INGEST_TOKEN on both sides).
@@ -60,7 +58,7 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		ZonesURL:               env.String("ZONES_URL", "http://localhost:4000"),
+		ZonesURL:               env.String("ZONES_URL", "http://localhost:3000"),
 		AnalyticsURL:           env.String("ANALYTICS_URL", "http://localhost:3030"),
 		AnalyticsIngestToken:   env.String("ANALYTICS_INGEST_TOKEN", ""),
 		LoginURL:               env.String("CONTROL_LOGIN_URL", "http://localhost:3000/auth/login"),

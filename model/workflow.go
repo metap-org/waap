@@ -2,7 +2,7 @@ package model
 
 // Workflow states and transition actions. A state is the value of the entity's StateField; an
 // action is what CrudService.Transition takes. Two different things share some words ("run" is both
-// the scan job's workflow transition and its gRPC action) — the entity-prefixed names keep them apart.
+// the scan job's workflow transition and its declared action) — the entity-prefixed names keep them apart.
 
 // waf.zones (StateField "status").
 const (

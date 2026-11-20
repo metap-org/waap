@@ -1,4 +1,4 @@
-# Dev loop for the WAF Customer Portal: the 3 Go services + graphql-gateway via `go run` from the
+# Dev loop for the WAF Customer Portal: the 3 Go services + api-gateway via `go run` from the
 # mounted source, plus the Vite dev server. Same prerequisites as docker-compose.yml (shared
 # Postgres/RabbitMQ from ../../metap, ./keys/jwks, ./.env — see README.md "Chạy local").
 #
@@ -22,7 +22,6 @@ x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
   CORS_ORIGINS: http://localhost:5173
-  GRPC_ENABLED: "true"
 
 x-health: &health
   interval: 30s
@@ -34,14 +33,14 @@ services:
   zones-service:
     <<: *go
     command: go run ./m-zones/cmd/zones-service
-    ports: ["3000:3000", "3001:3001"]
+    ports: ["3000:3000"]
     environment:
       <<: *service-env
       PORT: "3000"
       # The token issuer: signs every token and publishes /.well-known/jwks.json.
       JWKS_KEYS_DIR: /workspace/waap/m-deploy/keys/jwks
-      SCANNING_GRPC_ADDR: scanning-service:3011
-      ALERTING_GRPC_ADDR: alerting-service:3021
+      SCANNING_URL: http://scanning-service:3010
+      ALERTING_URL: http://alerting-service:3020
       # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
       # dns.google — set records at http://localhost:8053.
       DOH_RESOLVER_URL: http://dns-mock:8053/resolve
@@ -86,7 +85,7 @@ services:
   scanning-service:
     <<: *go
     command: go run ./m-scanning/cmd/scanning-service
-    ports: ["3010:3010", "3011:3011"]
+    ports: ["3010:3010"]
     environment:
       <<: *service-env
       PORT: "3010"
@@ -98,7 +97,7 @@ services:
   alerting-service:
     <<: *go
     command: go run ./m-alerting/cmd/alerting-service
-    ports: ["3020:3020", "3021:3021"]
+    ports: ["3020:3020"]
     environment:
       <<: *service-env
       PORT: "3020"
@@ -108,34 +107,15 @@ services:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3020/health"]
 
-  graphql-gateway:
+  api-gateway:
     <<: *go
-    command: go run ./m-gateway/cmd/waf-graphql-gateway
+    command: go run ./m-gateway/cmd/api-gateway
     ports: ["4000:4000"]
     environment:
-      PORT: "4000"
-      CORS_ORIGINS: http://localhost:5173
-      ANALYTICS_URL: http://analytics-api:3030
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      # Every service account logs in at the issuer; REST_URL says where each upstream really is.
-      UPSTREAM_1_NAME: zones
-      UPSTREAM_1_GRPC_ADDR: zones-service:3001
-      UPSTREAM_1_LOGIN_URL: http://zones-service:3000/auth/login
-      UPSTREAM_1_REST_URL: http://zones-service:3000
-      UPSTREAM_1_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL:?set WAF_SERVICE_EMAIL in .env}
-      UPSTREAM_1_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD:?set WAF_SERVICE_PASSWORD in .env}
-      UPSTREAM_2_NAME: scanning
-      UPSTREAM_2_GRPC_ADDR: scanning-service:3011
-      UPSTREAM_2_LOGIN_URL: http://zones-service:3000/auth/login
-      UPSTREAM_2_REST_URL: http://scanning-service:3010
-      UPSTREAM_2_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
-      UPSTREAM_2_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
-      UPSTREAM_3_NAME: alerting
-      UPSTREAM_3_GRPC_ADDR: alerting-service:3021
-      UPSTREAM_3_LOGIN_URL: http://zones-service:3000/auth/login
-      UPSTREAM_3_REST_URL: http://alerting-service:3020
-      UPSTREAM_3_SERVICE_EMAIL: ${WAF_SERVICE_EMAIL}
-      UPSTREAM_3_SERVICE_PASSWORD: ${WAF_SERVICE_PASSWORD}
+      LISTEN_ADDR: 0.0.0.0:4000
+      # Entity routes go to whichever service serves the entity (each one's /metadata/entities);
+      # these prefixes say who answers the rest. Every service verifies the caller's token itself.
+      UPSTREAMS: "zones=http://zones-service:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://scanning-service:3010;alerting=http://alerting-service:3020"
     depends_on:
       zones-service: { condition: service_healthy }
       scanning-service: { condition: service_healthy }
@@ -184,16 +164,11 @@ services:
       service: web-dev
     working_dir: /workspace/waap/m-web
     environment:
-      ZONES_URL: http://zones-service:3000
-      SCANNING_URL: http://scanning-service:3010
-      ALERTING_URL: http://alerting-service:3020
-      GATEWAY_URL: http://graphql-gateway:4000
+      GATEWAY_URL: http://api-gateway:4000
       VITE_USE_POLLING: "true"
     ports: ["5173:5173"]
     depends_on:
-      zones-service: { condition: service_healthy }
-      scanning-service: { condition: service_healthy }
-      alerting-service: { condition: service_healthy }
+      api-gateway: { condition: service_started }
     command: >
       sh -c '
         cd /workspace/design-system && pnpm install --frozen-lockfile && pnpm build &&

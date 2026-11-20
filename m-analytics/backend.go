@@ -25,9 +25,6 @@ type Backend struct {
 
 var _ crud.RecordBackend = (*Backend)(nil)
 
-// ReadOnly tells the gateway not to generate create/update/delete mutations for this entity.
-func (b *Backend) ReadOnly() bool { return true }
-
 func token(rc *permission.RequestContext) string {
 	if rc == nil {
 		return ""

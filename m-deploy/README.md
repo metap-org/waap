@@ -17,11 +17,12 @@ Các service `m-*` tách theo pillar, mỗi pillar 1
 binary/deploy cycle riêng (chung 1 Go module ở gốc repo), cùng trỏ **1 database chung theo tenant** (`Router::pool_for`, không
 tách theo data layer — xem lý do kỹ thuật ở doc-comment mỗi service's `main.rs`):
 
-| Service | Sở hữu | Port (HTTP / gRPC opt-in) |
+| Service | Sở hữu | Port HTTP |
 |---|---|---|
-| `zones-service` (`m-zones/`, `m-zones/cmd/zones-service`) | `waf.domains`, `waf.zones`, `waf.ddos_policies`, `waf.firewall_rules`, `waf.ip_access_lists` | 3000 / 3001 |
-| `scanning-service` (`m-scanning/`) | `waf.scan_jobs`, `waf.scan_findings` | 3010 / 3011 |
-| `alerting-service` (`m-alerting/`) | `waf.security_events`, `waf.incidents`, `waf.alert_policies`, `waf.alert_notifications` | 3020 / 3021 |
+| `zones-service` (`m-zones/`, `m-zones/cmd/zones-service`) | `waf.domains`, `waf.zones`, `waf.ddos_policies`, `waf.firewall_rules`, `waf.ip_access_lists` | 3000 |
+| `scanning-service` (`m-scanning/`) | `waf.scan_jobs`, `waf.scan_findings` | 3010 |
+| `alerting-service` (`m-alerting/`) | `waf.security_events` (read model trên Analytics plane), `waf.incidents`, `waf.alert_policies`, `waf.alert_notifications` | 3020 |
+| `api-gateway` (`m-gateway/cmd/api-gateway`) | không sở hữu entity nào: cửa HTTP duy nhất của portal | 4000 |
 
 `zoneId` ở `scanning-service`/`alerting-service` là **`String` thuần, không phải `Reference`**
 (cùng workaround `waf.security_events.triggeredById` đã dùng cho case polymorphic) — đăng ký
@@ -29,24 +30,16 @@ tách theo data layer — xem lý do kỹ thuật ở doc-comment mỗi service'
 `waf.zones` qua route generic `/api/:entity*` của chính chúng, phá nguyên tắc "1 service sở hữu
 Zone". Chi tiết đầy đủ ở từng service's `main.rs` doc comment.
 
-**GraphQL gateway (`m-gateway/`)** (cho FE gộp query cross-service) — đã dựng, chạy
-thật, tái dùng nguyên trạng `metap/crates/metap-graphql-gateway` (không code mới, chỉ cấu hình ở
-`m-deploy/.env`) — 1 instance riêng cho WAF (không gộp chung upstream với
-`metap-demo-crm`/`metap-demo-jira`), 3 `UPSTREAM_<N>_*` trỏ vào 3 service trên, port 4000. **Dùng
-được cho cả mutation** (2026-09-02, đã verify sống: mutation qua `/graphql` phản ánh đúng
-`updated_by` của user thật gọi, và bị 403 đúng khi user không có quyền) — token của caller được
-forward nguyên vẹn xuống upstream khi hợp lệ (`RequestContext::forwarded_bearer_token`), enforce
-đúng permission/audit trail của người gọi thật, không phải danh nghĩa service account; điều này
-chạy được vì gateway verify qua cùng 1 trust root với 3 service (2026-09-04: chuyển từ share 1
-file RSA private key sang `metap-jwks` — Ed25519, `zones-service` publish `/.well-known/
-jwks.json`, mọi nơi (kể cả `zones-service` tự nó) verify qua `JWKS_URL`; gateway giờ chỉ cần
-`JWKS_URL`, không cần giữ bản PEM riêng nữa. Cả 3 service vẫn cùng giữ 1 private key để mint —
-chưa chuyển sang mô hình 1-issuer-duy-nhất, đó là bước tiếp theo nếu cần giảm blast radius thật
-sự; xem `../CLAUDE.md`'s mục JWKS/rotation cho chi tiết. RSA vẫn còn làm fallback nếu
-`JWKS_PRIVATE_KEY_PATH`/`JWKS_KID_PATH` chưa được set). Khi không có token forward (vd
-lúc gateway tự fetch schema lúc boot), gateway tự login bằng service-account riêng
-(`UPSTREAM_<N>_SERVICE_EMAIL`/`SERVICE_PASSWORD`, xem `m-gateway`'s Auth section) —
-không còn JWT tĩnh mint tay phải refresh thủ công nữa.
+**Chỉ còn REST (2026-11-21, roadmap 116 trong `../../metap-docs`)** — GraphQL và gRPC đã bị gỡ khỏi `metap` lẫn
+waap. `m-gateway/` giờ là **API gateway** (`metap`'s `pkg/apigateway`, không chứa gì riêng của WAF): route
+`/api/{entity}*` (CRUD, `?ids=`, aggregate, transition, action khai báo `POST /api/{entity}[/{id}]/actions/{action}`)
+tới service đang phục vụ entity đó (học từ `/metadata/entities` của từng service), gộp `/metadata/entities` và
+`/metadata/entity-access` của cả 3 service, tự resolve `?expand=` xuyên service (vd. `waf.scan_jobs.zoneId` →
+`waf.zones`), và gửi các route còn lại theo tiền tố (`UPSTREAMS`: `/auth/`, `/me`, `/admin/`, `/platform/`, ... →
+zones-service). Gateway **không xác thực ai và không giữ credential nào** — mỗi service tự verify token của người
+gọi qua JWKS, nên không còn service account cho gateway. Gọi chéo giữa service (zones-service hỏi
+scanning/alerting trước khi xoá Zone) đi qua REST (`metap`'s `recordclient`, `SCANNING_URL`/`ALERTING_URL`) và chuyển
+tiếp token gốc của người gọi.
 
 **Ngoài phạm vi 3 service này** (Customer Portal backend) — Admin Portal backend
 (`Plan`/`Subscription`/billing, `docs/12-billing-plans.md`, chưa xây) là 1 trục tách khác hẳn
@@ -54,12 +47,8 @@ không còn JWT tĩnh mint tay phải refresh thủ công nữa.
 `metap-control`/`metap-lowcode`'s platform-level service khi build, không phải pillar service
 nào ở trên — xem `docs/09-access-control.md`'s mô hình 2-portal.
 
-**`web/`'s dev server route đúng cả 3 service** (`vite.config.ts`, verify qua `curl` thật) —
-middleware tự forward theo tiền tố tên entity (không dùng `server.proxy`'s `router` option của
-Vite — tìm ra Vite 8 không tôn trọng option đó, xem `docs/61-*` cho chi tiết), cộng 1 middleware
-gộp `GET /metadata/entities` từ cả 3 service (không có entity trong path — không thuộc về đúng
-1 service nào). Production thật (không phải Vite dev server) sẽ cần Traefik hoặc reverse-proxy
-tương đương làm việc này, chưa dựng.
+**`m-web/`'s dev server và nginx production đều chỉ proxy sang `api-gateway`** (`vite.config.ts`, `nginx.conf`) —
+không còn middleware tự định tuyến theo tên entity hay tự gộp metadata ở phía FE; việc đó là của gateway.
 
 Bắt đầu đọc nghiệp vụ từ `docs/01-product-vision.md`; `docs/05-metap-technical-mapping.md` là
 bản ánh xạ kỹ thuật (entity/workflow/permission cụ thể trên `metap`) mà code dưới đây bám theo.
@@ -114,7 +103,7 @@ list Zone, tạo/xem/sửa record, workflow diagram + nút transition tự sinh.
 service đã verify sống (2026-09-01) bằng `curl` qua dev server thật** — xem ghi chú "Cấu trúc" ở
 trên; chưa re-test qua browser thật sau khi tách (chỉ verify tầng HTTP, chưa click qua UI).
 
-**Zone overview** (`src/demo/ZoneOverviewPage.tsx`, `/zones/:zoneId/overview`, link từ trang chủ
+**(Lịch sử, trước roadmap 116 — trang này đã bị xoá, GraphQL đã bị gỡ) Zone overview** (`src/demo/ZoneOverviewPage.tsx`, `/zones/:zoneId/overview`, link từ trang chủ
 "/") — màn đầu tiên gọi [GraphQL gateway](graphql-gateway/README.md) thật từ FE thay vì REST, gộp
 DDoS policy + firewall rules + scan gần nhất + incident gần nhất của 1 zone trong 1 query. Dùng
 `useGraphQLQuery` mới thêm vào `@metap/platform-ui` (cùng vai trò `useApiQuery` bên REST). Verify
@@ -147,38 +136,32 @@ cd ../../metap
 go run ./cmd/db-migrate                                            # migrations nhúng sẵn trong binary
 go run ./cmd/dev-tools gen-jwks-key ../waap/m-deploy/keys/jwks   # key Ed25519 của issuer (gitignored)
 go run ./cmd/dev-tools provision-tenant <tenantId> schema admin@waap.local <password>   # user đăng nhập portal
-go run ./cmd/dev-tools create-user <tenantId> gateway@waap.local <password>             # service account cho gateway
-go run ./cmd/dev-tools seed-admin <tenantId> <userId-vừa-tạo>
 cd ../waap/m-deploy
-cp .env.example .env    # điền WAF_SERVICE_EMAIL/WAF_SERVICE_PASSWORD = service account ở trên
+cp .env.example .env    # tuỳ chọn: SMTP/PUBLIC_APP_URL
 
 # 2a. Cả stack bằng Docker: image production (Dockerfile Go dùng chung, chọn binary bằng SERVICE)
-docker compose up -d --build                 # 3 service + graphql-gateway + web (nginx, :8081)
+docker compose up -d --build                 # 3 service + api-gateway + web (nginx, :8081)
 
 # 2b. Hoặc dev loop: `go run` từ source mount vào container + Vite dev server (:5173)
 docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml restart zones-service   # sau khi sửa code Go
 
 # 2c. Hoặc chạy thẳng trên host (mỗi lệnh 1 terminal)
-export RABBITMQ_URL=amqp://metap:metap@localhost:5672 GRPC_ENABLED=true
+export RABBITMQ_URL=amqp://metap:metap@localhost:5672
 JWKS=http://localhost:3000/.well-known/jwks.json
-PORT=3000 JWKS_KEYS_DIR=m-deploy/keys/jwks go run ./m-zones/cmd/zones-service    # issuer — HTTP :3000, gRPC :3001
-PORT=3010 JWKS_URL=$JWKS go run ./m-scanning/cmd/scanning-service           # HTTP :3010, gRPC :3011
-PORT=3020 JWKS_URL=$JWKS go run ./m-alerting/cmd/alerting-service           # HTTP :3020, gRPC :3021
-JWKS_URL=$JWKS \
-UPSTREAM_1_NAME=zones    UPSTREAM_1_GRPC_ADDR=localhost:3001 UPSTREAM_1_REST_URL=http://localhost:3000 \
-UPSTREAM_2_NAME=scanning UPSTREAM_2_GRPC_ADDR=localhost:3011 UPSTREAM_2_REST_URL=http://localhost:3010 \
-UPSTREAM_3_NAME=alerting UPSTREAM_3_GRPC_ADDR=localhost:3021 UPSTREAM_3_REST_URL=http://localhost:3020 \
-UPSTREAM_1_LOGIN_URL=http://localhost:3000/auth/login UPSTREAM_1_SERVICE_EMAIL=... UPSTREAM_1_SERVICE_PASSWORD=... \
-  go run ./m-gateway/cmd/waf-graphql-gateway       # :4000 (lặp LOGIN_URL/EMAIL/PASSWORD cho upstream 2, 3 — cùng trỏ về :3000)
+PORT=3000 JWKS_KEYS_DIR=m-deploy/keys/jwks go run ./m-zones/cmd/zones-service    # issuer, :3000
+PORT=3010 JWKS_URL=$JWKS go run ./m-scanning/cmd/scanning-service           # :3010
+PORT=3020 JWKS_URL=$JWKS go run ./m-alerting/cmd/alerting-service           # :3020
+UPSTREAMS="zones=http://localhost:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://localhost:3010;alerting=http://localhost:3020" \
+  go run ./m-gateway/cmd/api-gateway               # :4000
 # 2c cần DNS mock riêng: (cd ../devtools/dns-mock && DNS_MOCK_SEED_FILE=seed.dev.json go run .)
 # rồi chạy zones-service với DOH_RESOLVER_URL=http://localhost:8053/resolve
 ```
 
 **Analytics plane**: cả 2 compose chạy kèm `clickhouse` (:9000/:8123) và `analytics-api` (:3030,
-`../a-api`). Security event nằm ở đó; gateway và alerting-service đọc qua
-`ANALYTICS_URL`. Chạy 2c trên host thì đặt `ANALYTICS_URL=http://localhost:3030` cho
-alerting-service và gateway.
+`../a-api`). Security event nằm ở đó; alerting-service đọc qua `ANALYTICS_URL` (cho correlate/evaluate)
+và phục vụ chúng cho portal thành entity chỉ-đọc `waf.security_events` (`app.Options.ExternalEntities`). Chạy 2c
+trên host thì đặt `ANALYTICS_URL=http://localhost:3030` cho alerting-service.
 
 **DNS khi dev/staging**: cả 2 compose chạy kèm `dns-mock` (`../devtools/dns-mock`, xem README
 của nó). zones-service tra mọi bản ghi xác minh domain (TXT) và định tuyến (CNAME) qua đó thay cho
@@ -188,10 +171,10 @@ của nó). zones-service tra mọi bản ghi xác minh domain (TXT) và định
 ### Token: một issuer duy nhất (JWKS)
 
 `zones-service` là **issuer duy nhất**: giữ key Ed25519 (`JWKS_KEYS_DIR`), ký mọi token (login,
-refresh, OAuth2) và publish `/.well-known/jwks.json`. `scanning-service`, `alerting-service`,
-`waf-graphql-gateway` chỉ verify qua `JWKS_URL`, không giữ private key nào — `/auth/login` ở đó
-trả `501 not_token_issuer`, nên mọi login (portal, gateway service account, control-plane) đều
-trỏ về `:3000`. Gọi chéo giữa service (vd. `zones-service` hỏi `scanning-service` trước khi xoá
+refresh, OAuth2) và publish `/.well-known/jwks.json`. `scanning-service`, `alerting-service`
+chỉ verify qua `JWKS_URL`, không giữ private key nào — `/auth/login` ở đó
+trả `501 not_token_issuer`, nên mọi login (portal, control-plane) đều
+trỏ về `:3000` (qua gateway thì `/auth/` cũng được route về đó). Gọi chéo giữa service (vd. `zones-service` hỏi `scanning-service` trước khi xoá
 Zone) chuyển tiếp token gốc của người gọi, không tự ký token mới.
 
 Xoay key, không cần restart (issuer đọc lại thư mục mỗi `JWKS_KEY_DIR_RELOAD_SECONDS`, mặc định
@@ -207,7 +190,7 @@ rm ../waap/m-deploy/keys/jwks/<kid-cũ>.key                                     
 ```
 
 Chuyển từ cặp RSA dùng chung cũ sang JWKS mà không đăng xuất ai: giữ thêm
-`AUTH_JWT_PUBLIC_KEY_PATH` trên mọi service (và gateway) trong 1 vòng TTL session — token RSA
+`AUTH_JWT_PUBLIC_KEY_PATH` trên mọi service trong 1 vòng TTL session — token RSA
 cũ (không có `kid`) vẫn verify được — rồi bỏ biến đó đi.
 
 Login portal bằng user tạo ở `provision-tenant`. Tài khoản đó là `admin` của tenant (deny-by-default
@@ -219,27 +202,21 @@ Test: `go test ./...` (unit, không cần hạ tầng) và `go test -tags integr
 ### Frontend (`web/`) chạy trên host
 
 ```bash
-cd web
+cd m-web
 pnpm install   # link:../../platform-ui + link:../../design-system — 2 repo sibling này
                # phải tồn tại ở đúng vị trí, xem package.json
-pnpm dev       # http://localhost:5173, proxy /graphql /metadata /auth /admin /health sang backend
+pnpm dev       # http://localhost:5173, proxy /api /metadata /auth /me /admin /platform ... sang api-gateway (GATEWAY_URL, mặc định :4000)
 ```
 
-## `SettingsPage` moved off `/admin/config*` onto GraphQL (2026-09-26)
+## `SettingsPage` (2026-09-26 → 2026-11-21)
 
-`metap` core migrated its remaining pre-Phase-90 REST backlog to GraphQL
-(`../../metap-docs/docs/roadmap/95-platform-graphql-fields.md`) — `web/src/pages/SettingsPage.tsx`
-(the tenant config editor) now calls `tenantConfig`/`setTenantConfig`/`resetTenantConfig`
-(`metap-graphql-http::platform_fields`) via `@metap/platform-ui`'s `graphqlFetch`, instead of
-`GET/PUT/DELETE /admin/config*`. This page never called `/platform/config*`, so there was nothing
-else to migrate here. `/graphql` was already proxied in `vite.config.ts` (this portal's generated
-UI has used GraphQL since Phase 93). `tsc -b`/`oxlint`/`prettier --check` clean; not yet verified
-through a real browser.
+Từng chuyển sang GraphQL (`tenantConfig`/`setTenantConfig`/`resetTenantConfig`, 2026-09-26); từ roadmap 116 lại gọi
+thẳng `GET /admin/config` và `PUT/DELETE /admin/config/{key}` (`m-web/src/pages/SettingsPage.tsx`).
 
 ## Docker
 
 - `Dockerfile` (thư mục này) là recipe Go dùng chung cho cả 4 binary — `--build-arg
-  SERVICE=zones-service|scanning-service|alerting-service|waf-graphql-gateway`; image runtime là
+  SERVICE=m-zones/cmd/zones-service|m-scanning/cmd/scanning-service|m-alerting/cmd/alerting-service|m-gateway/cmd/api-gateway`; image runtime là
   `alpine:3` + 1 binary tĩnh (~75MB). `web/Dockerfile` build production frontend (nginx).
 - **Mọi build dùng `context: ../../` (root `metap-org`)**: `go.mod` có `replace
   github.com/metap-org/metap => ../metap`, nên `metap/` phải nằm trong context (vẫn lấy code
