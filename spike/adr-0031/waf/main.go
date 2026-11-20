@@ -151,7 +151,9 @@ func main() {
 		json.NewEncoder(rw).Encode(map[string]any{"requests": s.requests.Load(), "blocked": s.blocked.Load(),
 			"cpu_seconds": cpuSeconds(), "heap_mb": m.HeapAlloc >> 20, "sys_mb": m.Sys >> 20, "gc_pause_total_ms": m.PauseTotalNs / 1e6, "ruleset_version": s.cur.Load().version})
 	})
-	go func() { log.Fatal(http.ListenAndServe(*admin, mux)) }()
+	// Benchmark-only control port on the bench host's loopback/private network; this spike is
+	// never deployed, and TLS here would only skew the reload timings it exists to measure.
+	go func() { log.Fatal(http.ListenAndServe(*admin, mux)) }() // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 
 	lis, err := net.Listen("tcp", *addr)
 	if err != nil {
