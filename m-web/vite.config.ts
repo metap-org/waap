@@ -186,13 +186,15 @@ const PROXIED_PREFIXES = [
 /** A browser opening (or reloading) a page under one of PROXIED_PREFIXES, as opposed to the app's
  *  own API calls: GET with `Accept: text/html`, which `fetch` never sends by default. Those get the
  *  SPA, so a hard refresh of `/admin/users` no longer lands on the backend's 404. Kept on the
- *  backend: the SSO buttons' `/auth/{oidc,oauth2}/<tenant>/login`, which redirect to the IdP.
+ *  backend: the browser legs of single sign-on, which redirect to or come back from the IdP —
+ *  `/auth/{oidc,oauth2}/<tenant>/login`, and `/auth/sso/{start,callback}` (roadmap 115 M7).
  *  `nginx.conf` applies the same rule in production. */
 function isSpaNavigation(req: IncomingMessage): boolean {
   if (req.method !== "GET" && req.method !== "HEAD") return false;
   if (!(req.headers.accept ?? "").includes("text/html")) return false;
   const path = (req.url ?? "").split("?")[0] ?? "";
   if (/^\/auth\/(oidc|oauth2)\/[^/]+\/login\/?$/.test(path)) return false;
+  if (/^\/auth\/sso\/(start|callback)\/?$/.test(path)) return false;
   return PROXIED_PREFIXES.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`),
   );

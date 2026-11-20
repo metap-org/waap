@@ -20,6 +20,7 @@ import {
 } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  AccountSecurityPage,
   AppShellLayout,
   AuthProvider,
   Can,
@@ -295,6 +296,7 @@ export default function App() {
             <Route path="/findings" element={<FindingsPage />} />
             <Route path="/alerting" element={<AlertingPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/account/security" element={<AccountSecurityPage />} />
 
             {/* Generic record screens, reached from a list row's "view" action and the generic
                 create/edit forms. No longer in the nav, and no entity picker at `/records`: the
