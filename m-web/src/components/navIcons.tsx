@@ -81,6 +81,13 @@ export const navIcons = {
       <path d="M2 21a7 7 0 0 1 14 0M17 11a3 3 0 1 0 0-6M22 21a6 6 0 0 0-4-5.6" />
     </Icon>
   ),
+  workspace: (
+    <Icon>
+      <path d="M3 21h18" />
+      <path d="M5 21V7l7-4 7 4v14" />
+      <path d="M9 21v-6h6v6" />
+    </Icon>
+  ),
   roles: (
     <Icon>
       <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z" />

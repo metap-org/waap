@@ -32,6 +32,7 @@ import {
   PoliciesAdminPage,
   RecordDetail,
   UsersAdminPage,
+  WorkspaceAdminPage,
   AcceptInvitePage,
   ForgotPasswordPage,
   ResetPasswordPage,
@@ -148,6 +149,13 @@ function RequireAuth() {
       label: t("waf.nav.settings"),
       group: admin,
       icon: navIcons.settings,
+      roles: ["admin"],
+    },
+    {
+      to: "/admin/workspace",
+      label: t("shell.navWorkspace"),
+      group: admin,
+      icon: navIcons.workspace,
       roles: ["admin"],
     },
     {
@@ -317,6 +325,7 @@ export default function App() {
 
             <Route element={<RequireAdmin />}>
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/admin/workspace" element={<WorkspaceAdminPage />} />
               <Route path="/admin/users" element={<UsersAdminPage />} />
               <Route path="/admin/roles" element={<RolesRoute />} />
               <Route path="/admin/policies" element={<PoliciesRoute />} />
