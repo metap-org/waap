@@ -150,7 +150,7 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 | S5 UC-80 Xuất dữ liệu | Chưa |
 | S5 UC-81 Xoá org | Một phần: phía platform admin xong (trang Tenants, lên lịch và huỷ xoá, job chuyển `deleted` sau thời gian lưu giữ); Owner tự yêu cầu chưa có; chưa xoá dữ liệu vật lý |
 | S5 UC-82 Chuyển zone sang org khác | Chưa |
-| S6 UC-90 SSO | Một phần: OIDC theo domain email, bắt buộc SSO (kể cả khi nhận lời mời), chỉ tin email IdP đã xác minh (`email_verified`), ánh xạ nhóm IdP sang role (không bao giờ admin); chưa có SAML và xác minh sở hữu domain |
+| S6 UC-90 SSO | Có (OIDC và SAML 2.0): domain email phải được chứng minh sở hữu bằng bản ghi TXT mới định tuyến đăng nhập hay tạo thành viên, bắt buộc SSO (kể cả khi nhận lời mời), chỉ tin email IdP đã xác minh (OIDC), ánh xạ nhóm IdP sang role (không bao giờ admin); chưa có đăng xuất một lần (SLO) và assertion mã hoá |
 | S6 UC-91 Khôi phục Owner | Có: yêu cầu, chờ, báo admin, hoàn tất (trang Tenants, hộp thoại Truy cập) |
 | S6 UC-92 NCC hỗ trợ | Một phần: tenant cấp quyền, platform admin mở phiên hỗ trợ; chưa duyệt từng phiên hay thông báo từng phiên |
 
