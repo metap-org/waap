@@ -17,9 +17,11 @@ package management
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -77,15 +79,42 @@ func (r Record) Bool(field string) (bool, bool) {
 	return b, true
 }
 
-// recordFrom keeps id/status and the fields this package reads.
-func recordFrom(dto crud.RecordDto, fields []string) Record {
-	data := make(map[string]json.RawMessage, len(fields))
+// recordFrom keeps id/status and the fields this package reads, plus the tenant the records
+// belong to as a synthetic "tenantId" entry: the REST record carries no tenant of its own, and
+// every record this client reads is the logged-in tenant's, so the caller's tenant is the right
+// answer. Without it a rule-set compiled by a resync had an empty tenantId while one compiled
+// from an event had the real one.
+func recordFrom(dto crud.RecordDto, fields []string, tenantID string) Record {
+	data := make(map[string]json.RawMessage, len(fields)+1)
 	for _, field := range fields {
 		if v, ok := dto.Data[field]; ok {
 			data[field] = v
 		}
 	}
+	if tenantID != "" {
+		data["tenantId"], _ = json.Marshal(tenantID)
+	}
 	return Record{ID: dto.ID.String(), Status: dto.Status, Data: data}
+}
+
+// tenantFromToken reads the tenantId claim of a JWT without verifying it: the token is the one this
+// process just logged in with, so there is nothing to verify, only to read.
+func tenantFromToken(token string) string {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return ""
+	}
+	var claims struct {
+		TenantID string `json:"tenantId"`
+	}
+	if json.Unmarshal(payload, &claims) != nil {
+		return ""
+	}
+	return claims.TenantID
 }
 
 var (
@@ -97,12 +126,13 @@ var (
 
 type Client struct {
 	records *recordclient.Client
+	token   *httpx.ServiceTokenSource
 }
 
 // New is a Client for the service at zonesURL; token signs every call. httpClient is unused
 // (recordclient keeps its own, with a timeout).
 func New(_ *http.Client, zonesURL string, token *httpx.ServiceTokenSource) *Client {
-	return &Client{records: recordclient.New(zonesURL, token)}
+	return &Client{records: recordclient.New(zonesURL, token), token: token}
 }
 
 func (d *Client) list(ctx context.Context, entity string, fields []string, zoneID *string, limit int64) ([]Record, error) {
@@ -119,7 +149,7 @@ func (d *Client) list(ctx context.Context, entity string, fields []string, zoneI
 	}
 	records := make([]Record, 0, len(res.Data))
 	for _, r := range res.Data {
-		records = append(records, recordFrom(r, fields))
+		records = append(records, recordFrom(r, fields, tenantFromToken(d.token.Current())))
 	}
 	return records, nil
 }
@@ -136,7 +166,7 @@ func (d *Client) get(ctx context.Context, entity string, fields []string, id str
 	if err != nil {
 		return nil, fmt.Errorf("reading %s %s: %w", entity, id, err)
 	}
-	record := recordFrom(res.Record, fields)
+	record := recordFrom(res.Record, fields, tenantFromToken(d.token.Current()))
 	return &record, nil
 }
 

@@ -35,7 +35,7 @@ Bản đầy đủ (bao gồm bước xác minh sở hữu domain, đã phát hi
 ### 2. Viết 1 Firewall Rule mới
 1. Security Analyst tạo `FirewallRule` (matchCondition + action), đặt `priority` phù hợp thứ tự
    evaluate với rule khác.
-2. Rule mới nghiễm nhiên tăng `Zone.configVersion` (side-effect tự động, không phải bước tay).
+2. Rule mới tự tới edge ở lần resync/sự kiện kế tiếp (control-plane tính lại version theo nội dung, không phải bước tay).
 3. Xem `SecurityEvent` lọc theo `triggeredById = rule này` để xác nhận rule hoạt động đúng ý.
 
 ### 3. Chạy Vulnerability Scan & xử lý Finding

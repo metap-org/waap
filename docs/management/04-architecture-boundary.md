@@ -35,9 +35,14 @@ Zone/DdosPolicy/FirewallRule đổi (qua portal, management-plane)
     management-plane)
 ```
 
-`Zone.configVersion` (định nghĩa ở `management-plane`) tăng mỗi lần có thay đổi — `control-plane` và
-`edge-plane` đều so `configVersion` để biết cache có đang stale không, không cần đoán qua
-timestamp.
+**Phiên bản config là phiên bản nội dung, do `control-plane` tính (cập nhật 2026-11-21).** Thiết kế gốc
+là `management-plane` tăng `Zone.configVersion` mỗi khi policy/rule con đổi; trên thực tế không có gì
+làm việc đó, và edge bỏ qua mọi zone có version không đổi — nên rule thêm sau lần nạp đầu không bao giờ
+tới edge (lộ ra khi chạy thật 2026-11-21, xem roadmap 116). Thay vì thêm bộ đếm ở management (bỏ sót
+rule áp cho cả tenant, sửa trực tiếp DB, và hai thay đổi cùng lúc), `control-plane` gắn cho mỗi rule-set
+một `configVersion` = hash của nội dung (trừ `compiledAt`, `ruleset.ContentVersion`); `edge-plane` so
+số đó để biết cache có stale không. Cùng nội dung thì cùng version nên republish mỗi lần resync không
+tốn gì ở edge. `Zone.configVersion` của management không còn được dùng để quyết định gì.
 
 **SLA đồng bộ config xuống edge: 10-30 giây** — từ lúc khách bấm bật/tắt 1 rule/policy (hoặc đổi
 `protectionMode`) ở `management-plane` tới lúc `edge-plane` thực sự áp dụng thay đổi đó. Vì có độ trễ

@@ -17,6 +17,8 @@
 package ruleset
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 )
@@ -182,6 +184,22 @@ type CompiledDdos struct {
 // CompiledZone is one zone, fully resolved. Disabled rules and disabled policies are dropped
 // during compilation rather than carried with a flag — the edge should never hold a rule it must
 // remember not to apply.
+// ContentVersion is the version the edge compares to decide whether a zone's rule-set changed: a
+// hash of everything in it except when it was compiled. It is derived here, from the content,
+// because nothing else can know: a counter kept by management would miss a rule that applies to
+// every zone of a tenant, a row edited in the database directly, and (kept naively) two changes
+// racing each other. Equal content is always the same version, so republishing every resync costs
+// the edge nothing. The value is positive and below 2^53 so any JSON consumer reads it exactly.
+func ContentVersion(zone CompiledZone) int64 {
+	zone.CompiledAt = ""
+	raw, err := json.Marshal(zone)
+	if err != nil {
+		return 0
+	}
+	sum := sha256.Sum256(raw)
+	return int64(binary.BigEndian.Uint64(sum[:8]) & (1<<52 - 1))
+}
+
 type CompiledZone struct {
 	SchemaVersion uint32 `json:"schemaVersion"`
 	ZoneID        string `json:"zoneId"`

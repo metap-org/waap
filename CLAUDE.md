@@ -37,7 +37,9 @@ control-plane reads zones over REST (`ZONES_URL` = zones-service or the gateway)
 `waf.security_events` read model (`app.Options.ExternalEntities` over `m-analytics.Backend`). Every gateway/gRPC/
 GraphQL description below is history. Rate limiting and caller identity: nginx overwrites `X-Forwarded-For`, the api-gateway and every
 service list the compose network in `TRUSTED_PROXIES` (production: the exact gateway/LB addresses), so limits count callers, not
-the gateway (`../metap/CLAUDE.md`, "Who is calling").
+the gateway (`../metap/CLAUDE.md`, "Who is calling"). The `configVersion` the edge compares is a hash of the compiled rule-set computed by the
+distributor at publish time (`ruleset.ContentVersion`); `Zone.configVersion` in management is unused (nothing ever bumped it, so
+rules added after the edge's first load never arrived — found by the live run in roadmap 116).
 
 **Update 2026-11-14: the plane folders were flattened into one directory per service, named by plane
 prefix** — `m-` management, `c-` control, `e-` edge, `a-` analytics (ADR-0001's four planes stay the
