@@ -37,9 +37,11 @@ func ZoneEntity() metadata.EntityDefinition {
 	// (and shown on the disabled Activate action before anyone clicks it).
 	activateGuard := permission.AllCondition(
 		permission.AttributeCondition(model.FieldVerificationStatus, permission.OpEq, permission.LiteralValue(json.RawMessage(`"verified"`))).
-			WithMessage("The zone's domain is not verified yet. Verify it on the Domains page first."),
+			WithMessage("The zone's domain is not verified yet. Verify it on the Domains page first.").
+			WithMessageKey("waf.guards.zoneDomainNotVerified"),
 		permission.AttributeCondition(model.FieldHasConfig, permission.OpEq, permission.LiteralValue(json.RawMessage("true"))).
-			WithMessage("The zone has no protection config yet. Add a DDoS policy or a firewall rule first."),
+			WithMessage("The zone has no protection config yet. Add a DDoS policy or a firewall rule first.").
+			WithMessageKey("waf.guards.zoneNoProtectionConfig"),
 	)
 
 	return metadata.EntityDefinition{
