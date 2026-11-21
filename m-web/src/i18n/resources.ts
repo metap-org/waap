@@ -530,7 +530,8 @@ export const wafEn = {
     settings: {
       title: "Tenant settings",
       description: "Branding and platform behaviour for this tenant.",
-      secretManaged: "Credential — not shown or editable here",
+      secretManaged:
+        "Credential — not shown here; manage credentials in Workspace → Credentials",
       languageTitle: "Language",
       languageDescription:
         "The language of this portal for your account. It does not change what other people see.",
@@ -1105,7 +1106,8 @@ export const wafVi = {
     settings: {
       title: "Cài đặt tenant",
       description: "Thương hiệu và hành vi nền tảng cho tenant này.",
-      secretManaged: "Thông tin xác thực — không hiển thị và không chỉnh ở đây",
+      secretManaged:
+        "Thông tin xác thực — không hiển thị ở đây; quản lý ở Workspace → Thông tin xác thực",
       languageTitle: "Ngôn ngữ",
       languageDescription:
         "Ngôn ngữ của portal cho tài khoản của bạn. Không ảnh hưởng tới người khác.",
