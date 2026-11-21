@@ -190,7 +190,12 @@ function RequireAuth() {
   ];
 
   return (
-    <AppShellLayout brand={<Brand />} brandLabel="WAAP" navItems={navItems}>
+    <AppShellLayout
+      brand={<Brand />}
+      brandLabel="WAAP"
+      navItems={navItems}
+      localeSwitcher={false}
+    >
       <Outlet />
     </AppShellLayout>
   );

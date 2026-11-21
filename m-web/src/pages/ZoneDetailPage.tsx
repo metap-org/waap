@@ -29,6 +29,9 @@ import {
   useEntityLabels,
   WorkflowVisualizeDialog,
   type TransitionAvailability,
+  ApiError,
+  guardErrorMessage,
+  guardReason,
 } from "@metap/platform-ui";
 import {
   ENTITIES,
@@ -133,9 +136,14 @@ export function ZoneDetailPage() {
       // The `activate` guard failing is the common case here, and its message names the missing
       // precondition (unverified hostname / no protection configured) — surfacing it verbatim is
       // more useful than a generic "could not activate".
-      toast(e instanceof Error ? e.message : String(e), {
-        variant: "destructive",
-      });
+      toast(
+        e instanceof ApiError
+          ? guardErrorMessage(t, e)
+          : e instanceof Error
+            ? e.message
+            : String(e),
+        { variant: "destructive" },
+      );
     } finally {
       setPendingAction(null);
     }
@@ -208,7 +216,7 @@ export function ZoneDetailPage() {
                     <span>{button}</span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    {info.reason}
+                    {guardReason(t, info)}
                   </TooltipContent>
                 </Tooltip>
               ) : (
@@ -239,7 +247,7 @@ export function ZoneDetailPage() {
               <span className="font-medium">
                 {t(`waf.actions.${info.action}`)}:
               </span>{" "}
-              {info.reason}
+              {guardReason(t, info)}
             </div>
           ))}
         </Alert>
