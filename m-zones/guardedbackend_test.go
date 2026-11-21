@@ -58,6 +58,40 @@ func TestCreateZoneReusesTheExistingDomainForItsApex(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// A zone added under a domain that is already verified starts verified: the verify action only
+// cascades onto zones that exist when it runs, so without this the new zone could never activate.
+func TestCreateZoneUnderAVerifiedDomainStartsVerified(t *testing.T) {
+	g, inner := newGuarded(t)
+	rc := testRC()
+	domainID := uuid.New()
+
+	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ListResult{Data: []crud.RecordDto{{
+		ID: domainID, Data: obj(t, map[string]any{"verificationStatus": "verified"}),
+	}}}, nil)
+	inner.EXPECT().Create(mock.Anything, "waf.zones", mock.MatchedBy(func(data crud.JsonObject) bool {
+		return string(data["verificationStatus"]) == `"verified"`
+	}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
+
+	_, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "www.example.com"}), rc, nil)
+	require.NoError(t, err)
+}
+
+func TestCreateZoneUnderAnUnverifiedDomainDoesNotMarkItVerified(t *testing.T) {
+	g, inner := newGuarded(t)
+	rc := testRC()
+
+	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ListResult{Data: []crud.RecordDto{{
+		ID: uuid.New(), Data: obj(t, map[string]any{"verificationStatus": "unverified"}),
+	}}}, nil)
+	inner.EXPECT().Create(mock.Anything, "waf.zones", mock.MatchedBy(func(data crud.JsonObject) bool {
+		_, set := data["verificationStatus"]
+		return !set
+	}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
+
+	_, err := g.Create(context.Background(), "waf.zones", obj(t, map[string]any{"hostname": "www.example.com"}), rc, nil)
+	require.NoError(t, err)
+}
+
 func TestCreateZoneCreatesAnUnverifiedDomainWhenNoneExists(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
