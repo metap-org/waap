@@ -8,6 +8,7 @@
  * and the generic per-entity CRUD screens stay reachable under `/records/*` as an admin/debug
  * escape hatch rather than as the product.
  */
+import { lazy, Suspense } from "react";
 import { ENTITIES } from "./api/waf";
 import { navIcons } from "./components/navIcons";
 import {
@@ -42,18 +43,51 @@ import {
 import type { ShellNavItem } from "@metap/platform-ui";
 import { Brand } from "./brand/Logo";
 import { LoginPage } from "./demo/LoginPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { OnboardingPage } from "./pages/OnboardingPage";
-import { ZonesPage } from "./pages/ZonesPage";
-import { ZoneDetailPage } from "./pages/ZoneDetailPage";
-import { IncidentsPage } from "./pages/IncidentsPage";
-import { IncidentDetailPage } from "./pages/IncidentDetailPage";
-import { FindingsPage } from "./pages/FindingsPage";
-import { AlertingPage } from "./pages/AlertingPage";
-import { AnalyticsPage } from "./pages/AnalyticsPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { GlobalRulesPage } from "./pages/GlobalRulesPage";
-import { GlobalAccessListPage } from "./pages/GlobalAccessListPage";
+
+// Each product page is its own chunk: the sign-in screen and the shell load without the code of
+// every page (analytics, zone detail with its tabs, ...), which are fetched on first visit.
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const OnboardingPage = lazy(() =>
+  import("./pages/OnboardingPage").then((m) => ({ default: m.OnboardingPage })),
+);
+const ZonesPage = lazy(() =>
+  import("./pages/ZonesPage").then((m) => ({ default: m.ZonesPage })),
+);
+const ZoneDetailPage = lazy(() =>
+  import("./pages/ZoneDetailPage").then((m) => ({ default: m.ZoneDetailPage })),
+);
+const IncidentsPage = lazy(() =>
+  import("./pages/IncidentsPage").then((m) => ({ default: m.IncidentsPage })),
+);
+const IncidentDetailPage = lazy(() =>
+  import("./pages/IncidentDetailPage").then((m) => ({
+    default: m.IncidentDetailPage,
+  })),
+);
+const FindingsPage = lazy(() =>
+  import("./pages/FindingsPage").then((m) => ({ default: m.FindingsPage })),
+);
+const AlertingPage = lazy(() =>
+  import("./pages/AlertingPage").then((m) => ({ default: m.AlertingPage })),
+);
+const AnalyticsPage = lazy(() =>
+  import("./pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
+const GlobalRulesPage = lazy(() =>
+  import("./pages/GlobalRulesPage").then((m) => ({
+    default: m.GlobalRulesPage,
+  })),
+);
+const GlobalAccessListPage = lazy(() =>
+  import("./pages/GlobalAccessListPage").then((m) => ({
+    default: m.GlobalAccessListPage,
+  })),
+);
 
 /** A layout route (rendered once via `<Route element={<RequireAuth />}>`, `<Outlet/>` swapping
  *  only the matched child) — not a per-route wrapper called from the route table anymore
@@ -196,7 +230,10 @@ function RequireAuth() {
       navItems={navItems}
       localeSwitcher={false}
     >
-      <Outlet />
+      {/* The shell stays on screen while a page's chunk loads; only the content area waits. */}
+      <Suspense fallback={null}>
+        <Outlet />
+      </Suspense>
     </AppShellLayout>
   );
 }
