@@ -24,6 +24,12 @@ x-service-env: &service-env
   # so the rate limit counts callers, not one shared gateway. The compose network range here;
   # in production list the gateway's own addresses, never a range a client could be in.
   TRUSTED_PROXIES: 172.16.0.0/12
+  # Workspace > Credentials. SECRETS_ENCRYPTION_KEYS ("id:base64key[,old...]", 32-byte keys; first
+  # is active) enables "stored in metap, encrypted"; VAULT_ADDR+VAULT_TOKEN (or AWS_SECRETS_* /
+  # GCP_SECRETS_PROJECT_ID) enable "secret manager". Set either or both in .env.
+  SECRETS_ENCRYPTION_KEYS: ${SECRETS_ENCRYPTION_KEYS:-}
+  VAULT_ADDR: ${VAULT_ADDR:-}
+  VAULT_TOKEN: ${VAULT_TOKEN:-}
 
 services:
   zones-service:

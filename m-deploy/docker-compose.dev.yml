@@ -23,6 +23,12 @@ x-service-env: &service-env
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
   CORS_ORIGINS: http://localhost:5173
   TRUSTED_PROXIES: 172.16.0.0/12 # the api-gateway in front; see docker-compose.yml
+  # Workspace > Credentials, both homes. "In metap (encrypted)": a DEV-ONLY key (never reuse it).
+  # "Secret manager": the dev Vault (OpenBao) from ../../metap's compose, `docker compose up -d
+  # vault` there; without it that option just fails when used.
+  SECRETS_ENCRYPTION_KEYS: dev1:XHYTjt+vXQl69Vkh7AXpZo1DbhLMrPz4Vh+YSXwzqTs=
+  VAULT_ADDR: http://host.docker.internal:8200
+  VAULT_TOKEN: metap-dev-root-token
 
 x-health: &health
   interval: 30s
