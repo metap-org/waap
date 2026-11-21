@@ -10,6 +10,16 @@
  *  it's the same `i18n` instance, not a separate one. */
 export const wafEn = {
   waf: {
+    brand: {
+      name: "WAAP",
+      tagline: "Web & API protection",
+      headline: "Every request, inspected at the edge.",
+      pillarDdos: "L7 DDoS protection",
+      pillarWaf: "Firewall rules, one engine",
+      pillarScan: "Vulnerability scanning",
+      pillarAlert: "Incidents and alerting",
+      footnote: "Rules reach the edge in seconds.",
+    },
     nav: {
       dashboard: "Dashboard",
       zones: "Zones",
@@ -567,6 +577,16 @@ export const wafEn = {
 
 export const wafVi = {
   waf: {
+    brand: {
+      name: "WAAP",
+      tagline: "Bảo vệ web và API",
+      headline: "Mọi request đều được kiểm tra ngay tại edge.",
+      pillarDdos: "Chống DDoS tầng 7",
+      pillarWaf: "Firewall rule, một engine",
+      pillarScan: "Quét lỗ hổng",
+      pillarAlert: "Sự cố và cảnh báo",
+      footnote: "Rule tới edge trong vài giây.",
+    },
     nav: {
       dashboard: "Tổng quan",
       zones: "Zone",

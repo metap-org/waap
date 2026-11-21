@@ -33,7 +33,7 @@ trò là bản domain model đầy đủ, chi tiết field xem entity riêng bê
 | `originAddress` | String, required | backend thật đứng sau, edge-plane forward traffic hợp lệ tới đây |
 | `status` | Enum (`pending`/`active`/`paused`/`suspended`) | workflow — xem bên dưới |
 | `protectionMode` | Enum (`monitor`/`enforce`) | `monitor` = chỉ log, không block — bắt buộc có để khách test rule mới không sợ block nhầm traffic thật (Cloudflare gọi là "Log only") |
-| `configVersion` | Number | tăng mỗi lần bất kỳ policy/rule con nào đổi — edge-plane dùng để biết cần re-pull config (xem `04-architecture-boundary.md`) |
+| `configVersion` | Number | **không còn được dùng** từ 2026-11-21: version edge so là hash nội dung rule-set do control-plane tính (xem `04-architecture-boundary.md`); field giữ lại, không ai tăng |
 | `verificationToken`/`verificationMethod`/`verificationStatus` | String/Enum/Enum | chứng minh khách sở hữu domain trước khi activate — chi tiết ở `06-onboarding-rules-lists.md` mục 2 |
 | `dnsRoutingStatus`/`lastDnsCheckAt` | Enum/DateTime | domain đã thực sự trỏ traffic về hệ thống chưa — thuần hiển thị, không chặn activate, xem `11-onboarding-dns-resolution.md` |
 | `sizingTier` | Enum (`small`/`medium`/`large`) | chọn lúc onboard theo traffic dự kiến — gợi ý default cho `DdosPolicy.requestRateThreshold`, cộng dồn tính RPS tổng so với gói dịch vụ, xem `12-billing-plans.md` |

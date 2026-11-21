@@ -40,6 +40,7 @@ import {
   useAuth,
 } from "@metap/platform-ui";
 import type { ShellNavItem } from "@metap/platform-ui";
+import { Brand } from "./brand/Logo";
 import { LoginPage } from "./demo/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
@@ -189,7 +190,7 @@ function RequireAuth() {
   ];
 
   return (
-    <AppShellLayout brand="WAF Portal" navItems={navItems}>
+    <AppShellLayout brand={<Brand />} brandLabel="WAAP" navItems={navItems}>
       <Outlet />
     </AppShellLayout>
   );

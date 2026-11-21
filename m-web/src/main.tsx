@@ -6,14 +6,14 @@ import { BrowserRouter } from "react-router-dom";
 import "@metap/ui/style.css";
 
 // Order matters — the theme's overrides must load after the base stylesheet so its
-// `[data-theme="enterprise"]` rules win the cascade over @metap/ui's `:root` defaults (see
-// ../../../../metap-themes/packages/enterprise/src/theme.css's own doc comment). Trying this
-// theme out for the WAF portal (2026-09-03) — a fixed choice for now, not a switcher; swap the
+// `[data-theme="waap"]` rules win the cascade over @metap/ui's `:root` defaults (see
+// ../../../../metap-themes/packages/enterprise/src/theme.css's own doc comment). The WAAP
+// "control room" theme is this product's identity (2026-11-21), a fixed choice, not a switcher; swap the
 // import + the `data-theme` value below to try a different one from `../../../../metap-themes/packages/*`.
-import "@metap/theme-enterprise/theme.css";
+import "@metap/theme-waap/theme.css";
 import "./index.css";
 
-document.documentElement.setAttribute("data-theme", "enterprise");
+document.documentElement.setAttribute("data-theme", "waap");
 import { ApiError, ReactRouterNavigationProvider } from "@metap/platform-ui";
 // Side-effect only — merges this app's `waf.*` translation keys into `platform-ui`'s shared
 // `i18n` instance. Must run before anything calls `useTranslation()`/`t("waf....")`.

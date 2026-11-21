@@ -40,6 +40,9 @@ func Connect(redisURL string) (*Distributor, error) {
 // hostname, so an edge that reads the index mid-write always finds a complete rule-set behind
 // it.
 func (d *Distributor) Publish(ctx context.Context, zone ruleset.CompiledZone) error {
+	// The edge skips a zone whose version it already holds, so the version must change whenever
+	// the content does (see ruleset.ContentVersion).
+	zone.ConfigVersion = ruleset.ContentVersion(zone)
 	payload, err := json.Marshal(zone)
 	if err != nil {
 		return fmt.Errorf("serializing compiled zone: %w", err)

@@ -15,9 +15,9 @@ importers:
       '@metap/platform-ui':
         specifier: link:../../platform-ui
         version: link:../../platform-ui
-      '@metap/theme-enterprise':
-        specifier: link:../../metap-themes/packages/enterprise
-        version: link:../../metap-themes/packages/enterprise
+      '@metap/theme-waap':
+        specifier: link:../../metap-themes/packages/waap
+        version: link:../../metap-themes/packages/waap
       '@metap/ui':
         specifier: link:../../design-system
         version: link:../../design-system

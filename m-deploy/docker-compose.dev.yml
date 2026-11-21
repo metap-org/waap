@@ -22,6 +22,7 @@ x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
   CORS_ORIGINS: http://localhost:5173
+  TRUSTED_PROXIES: 172.16.0.0/12 # the api-gateway in front; see docker-compose.yml
 
 x-health: &health
   interval: 30s
@@ -113,6 +114,7 @@ services:
     ports: ["4000:4000"]
     environment:
       LISTEN_ADDR: 0.0.0.0:4000
+      TRUSTED_PROXIES: 172.16.0.0/12
       # Entity routes go to whichever service serves the entity (each one's /metadata/entities);
       # these prefixes say who answers the rest. Every service verifies the caller's token itself.
       UPSTREAMS: "zones=http://zones-service:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://scanning-service:3010;alerting=http://alerting-service:3020"
