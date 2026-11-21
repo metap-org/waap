@@ -1,4 +1,4 @@
-import { LoginForm } from "@metap/platform-ui";
+import { LocaleSwitcher, LoginForm } from "@metap/platform-ui";
 import { useTranslation } from "react-i18next";
 import { LogoMark } from "../brand/Logo";
 
@@ -75,7 +75,12 @@ export function LoginPage() {
         </p>
       </aside>
 
-      <main className="flex items-center justify-center px-6 py-10">
+      <main className="relative flex items-center justify-center px-6 py-10">
+        {/* Signed out, so the choice applies to this browser only; once signed in the saved
+            preference (Settings) takes over. */}
+        <div className="absolute right-4 top-4 w-36">
+          <LocaleSwitcher compact />
+        </div>
         <div className="w-full max-w-sm">
           <div className="mb-6 flex items-center gap-2 lg:hidden">
             <span className="text-primary">
