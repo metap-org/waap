@@ -30,6 +30,9 @@ import {
   GeneratedList,
   LocaleProvider,
   OidcCallbackPage,
+  PlatformTenantsPage,
+  SignupPage,
+  SignupVerifyPage,
   PoliciesAdminPage,
   RecordDetail,
   UsersAdminPage,
@@ -187,6 +190,13 @@ function RequireAuth() {
       roles: ["admin"],
     },
     {
+      to: "/platform/tenants",
+      label: t("platform.tenantsTitle"),
+      group: admin,
+      icon: navIcons.workspace,
+      roles: ["platform_admin"],
+    },
+    {
       to: "/admin/workspace",
       label: t("shell.navWorkspace"),
       group: admin,
@@ -321,6 +331,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           {/* Public account pages the invitation and password-reset emails link to. */}
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/signup/verify" element={<SignupVerifyPage />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -365,6 +377,9 @@ export default function App() {
               path="/records/:entityName/:id/edit"
               element={<EditRecordRoute />}
             />
+
+            {/* Cross-tenant, platform admin only: the page gates itself (`PlatformAdminOnly`). */}
+            <Route path="/platform/tenants" element={<PlatformTenantsPage />} />
 
             <Route element={<RequireAdmin />}>
               <Route path="/settings" element={<SettingsPage />} />
