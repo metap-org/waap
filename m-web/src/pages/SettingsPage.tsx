@@ -12,7 +12,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch, useAsyncAction, useAuth } from "@metap/platform-ui";
+import {
+  apiFetch,
+  LocaleSwitcher,
+  useAsyncAction,
+  useAuth,
+} from "@metap/platform-ui";
 import {
   Button,
   Input,
@@ -34,7 +39,17 @@ type ConfigItem = {
   level: string;
   overridden: boolean;
   public: boolean;
+  /** A credential: the server never sends its value (`value` is only a marker) and refuses to set
+   *  it here (403 `config_key_not_writable`), so it is shown read-only without Save/Reset. */
+  secret?: boolean;
 };
+
+/** What an editable cell shows for a value: text for a scalar, JSON for anything else (an object
+ *  must never reach `String()`, which prints "[object Object]"). */
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -58,6 +73,8 @@ export function SettingsPage() {
       let value: unknown = raw;
       if (typeof item.value === "number") value = Number(raw);
       else if (typeof item.value === "boolean") value = raw === "true";
+      else if (typeof item.value === "object" && item.value !== null)
+        value = JSON.parse(raw);
       await apiFetch(`/admin/config/${encodeURIComponent(item.key)}`, {
         method: "PUT",
         body: JSON.stringify({ value }),
@@ -93,10 +110,7 @@ export function SettingsPage() {
   function renderRows(rows: ConfigItem[]) {
     return rows.map((item) => {
       const current =
-        drafts[item.key] ??
-        (item.value === null || item.value === undefined
-          ? ""
-          : String(item.value));
+        drafts[item.key] ?? (item.secret ? "" : displayValue(item.value));
       return (
         <TableRow key={item.key}>
           <TableCell>
@@ -111,12 +125,18 @@ export function SettingsPage() {
             </div>
           </TableCell>
           <TableCell>
-            <Input
-              value={current}
-              onChange={(e) =>
-                setDrafts({ ...drafts, [item.key]: e.target.value })
-              }
-            />
+            {item.secret ? (
+              <span className="text-sm text-muted-foreground">
+                {t("waf.settings.secretManaged")}
+              </span>
+            ) : (
+              <Input
+                value={current}
+                onChange={(e) =>
+                  setDrafts({ ...drafts, [item.key]: e.target.value })
+                }
+              />
+            )}
           </TableCell>
           <TableCell>
             {item.overridden
@@ -124,24 +144,28 @@ export function SettingsPage() {
               : t("waf.settings.sourceInherited")}
           </TableCell>
           <TableCell className="text-right">
-            <Button
-              size="sm"
-              onClick={() => save(item)}
-              disabled={busy || drafts[item.key] === undefined}
-            >
-              {t("waf.common.save")}
-            </Button>
-            {item.overridden ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-1"
-                onClick={() => reset(item)}
-                disabled={busy}
-              >
-                {t("waf.settings.reset")}
-              </Button>
-            ) : null}
+            {item.secret ? null : (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => save(item)}
+                  disabled={busy || drafts[item.key] === undefined}
+                >
+                  {t("waf.common.save")}
+                </Button>
+                {item.overridden ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-1"
+                    onClick={() => reset(item)}
+                    disabled={busy}
+                  >
+                    {t("waf.settings.reset")}
+                  </Button>
+                ) : null}
+              </>
+            )}
           </TableCell>
         </TableRow>
       );
@@ -156,6 +180,15 @@ export function SettingsPage() {
       />
 
       <div className="grid gap-4">
+        <SectionCard
+          title={t("waf.settings.languageTitle")}
+          description={t("waf.settings.languageDescription")}
+        >
+          <div className="max-w-xs">
+            <LocaleSwitcher />
+          </div>
+        </SectionCard>
+
         <SectionCard
           title={t("waf.settings.brandingTitle")}
           description={t("waf.settings.brandingDescription")}

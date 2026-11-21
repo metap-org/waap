@@ -89,6 +89,15 @@ export const wafEn = {
       notRouted: "Not routed",
       sent: "Sent",
     },
+    // Guard messages: the server sends a stable key with each blocked-action reason (`reasonKey`,
+    // or `details.messageKey` on a rejected transition); the English text it also sends is the
+    // fallback. Keep the keys in sync with `WithMessageKey` in the services' entity definitions.
+    guards: {
+      zoneDomainNotVerified:
+        "The zone's domain is not verified yet. Verify it on the Domains page first.",
+      zoneNoProtectionConfig:
+        "The zone has no protection config yet. Add a DDoS policy or a firewall rule first.",
+    },
     // Verb-form action labels — the buttons that fire a workflow transition. Kept separate from
     // `status` (noun form: "Active") since a few actions and states share a root ("resolve" the
     // action vs. "resolved" the status) but must never share a translation.
@@ -521,6 +530,11 @@ export const wafEn = {
     settings: {
       title: "Tenant settings",
       description: "Branding and platform behaviour for this tenant.",
+      secretManaged:
+        "Credential — not shown here; manage credentials in Workspace → Credentials",
+      languageTitle: "Language",
+      languageDescription:
+        "The language of this portal for your account. It does not change what other people see.",
       brandingTitle: "Branding",
       brandingDescription:
         "Shown on the sign-in screen before anyone has a session — served by the public config endpoint.",
@@ -653,6 +667,12 @@ export const wafVi = {
       routed: "Đã định tuyến",
       notRouted: "Chưa định tuyến",
       sent: "Đã gửi",
+    },
+    guards: {
+      zoneDomainNotVerified:
+        "Tên miền của zone chưa được xác minh. Hãy xác minh ở trang Tên miền trước.",
+      zoneNoProtectionConfig:
+        "Zone chưa có cấu hình bảo vệ. Hãy thêm chính sách DDoS hoặc quy tắc tường lửa trước.",
     },
     actions: {
       activate: "Kích hoạt",
@@ -1086,6 +1106,11 @@ export const wafVi = {
     settings: {
       title: "Cài đặt tenant",
       description: "Thương hiệu và hành vi nền tảng cho tenant này.",
+      secretManaged:
+        "Thông tin xác thực — không hiển thị ở đây; quản lý ở Workspace → Thông tin xác thực",
+      languageTitle: "Ngôn ngữ",
+      languageDescription:
+        "Ngôn ngữ của portal cho tài khoản của bạn. Không ảnh hưởng tới người khác.",
       brandingTitle: "Thương hiệu",
       brandingDescription:
         "Hiển thị ở màn hình đăng nhập trước khi có phiên đăng nhập — phục vụ bởi endpoint config công khai.",
