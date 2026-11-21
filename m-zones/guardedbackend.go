@@ -81,15 +81,18 @@ func NewGuardedZonesBackend(inner crud.RecordBackend, scanningURL, alertingURL s
 var _ crud.RecordBackend = (*GuardedZonesBackend)(nil)
 
 // resolveDomainID ports zoneDomainGuard's logic verbatim — looks up (or lazily creates) the
-// Domain row for hostname's apex and returns its id to inject into the create payload.
-func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, error) {
+// Domain row for hostname's apex and returns its id to inject into the create payload, plus
+// whether that domain is already verified (a new zone under it must start verified too: the
+// verify action only cascades onto zones that exist at the time).
+func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname string, rc *permission.RequestContext) (uuid.UUID, bool, error) {
 	apex := ApexDomain(hostname)
 	existing, err := b.inner.List(ctx, model.Domains, query.ListInput{Limit: existenceCheckLimit, Filters: [][2]string{{model.FieldApexDomain, apex}}}, rc)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, false, err
 	}
 	if len(existing.Data) > 0 {
-		return existing.Data[0].ID, nil
+		status, _ := jsonAsString(existing.Data[0].Data[model.FieldVerificationStatus])
+		return existing.Data[0].ID, status == model.VerificationVerified, nil
 	}
 
 	newDomain := crud.JsonObject{
@@ -100,9 +103,9 @@ func (b *GuardedZonesBackend) resolveDomainID(ctx context.Context, hostname stri
 	}
 	created, err := b.inner.Create(ctx, model.Domains, newDomain, rc, nil)
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, false, err
 	}
-	return created.ID, nil
+	return created.ID, false, nil
 }
 
 // validateFirewallRule ports firewallRuleMatchConditionGuard's validation verbatim.
@@ -185,12 +188,15 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 			// validation error rather than this wrapper inventing a different one.
 			return b.inner.Create(ctx, entity, data, rc, reason)
 		}
-		domainID, err := b.resolveDomainID(ctx, hostname, rc)
+		domainID, verified, err := b.resolveDomainID(ctx, hostname, rc)
 		if err != nil {
 			return crud.RecordDto{}, err
 		}
 		withDomain := cloneJsonObject(data)
 		withDomain[model.FieldDomainID] = jsonString(domainID.String())
+		if verified {
+			withDomain[model.FieldVerificationStatus] = jsonString(model.VerificationVerified)
+		}
 		return b.inner.Create(ctx, entity, withDomain, rc, reason)
 	case model.FirewallRules:
 		if err := validateFirewallRule(data); err != nil {
