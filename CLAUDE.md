@@ -35,7 +35,9 @@ authenticates nobody. The portal (`m-web`, dev proxy and nginx) talks only to it
 `GuardedZonesBackend` reaches scanning/alerting over REST (`metap`'s `recordclient`, `SCANNING_URL`/`ALERTING_URL`);
 control-plane reads zones over REST (`ZONES_URL` = zones-service or the gateway); alerting-service serves the
 `waf.security_events` read model (`app.Options.ExternalEntities` over `m-analytics.Backend`). Every gateway/gRPC/
-GraphQL description below is history.
+GraphQL description below is history. Rate limiting and caller identity: nginx overwrites `X-Forwarded-For`, the api-gateway and every
+service list the compose network in `TRUSTED_PROXIES` (production: the exact gateway/LB addresses), so limits count callers, not
+the gateway (`../metap/CLAUDE.md`, "Who is calling").
 
 **Update 2026-11-14: the plane folders were flattened into one directory per service, named by plane
 prefix** — `m-` management, `c-` control, `e-` edge, `a-` analytics (ADR-0001's four planes stay the
