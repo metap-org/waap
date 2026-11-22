@@ -147,7 +147,7 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 
 | Lát | Trạng thái |
 |---|---|
-| S4 Gói và thanh toán (UC-70 đến 75) | Một phần. Có: danh mục gói trong mã (free, starter, business, enterprise) gắn với `tier` của tenant, tier lạ hoặc `trial` nhận gói free; trang Gói với mức dùng và cảnh báo từ 80% (UC-70, 74); chặn tạo zone và rule vượt hạn mức (`plan_limit_reached`), không xoá gì của tenant đang vượt. Gói do platform admin đặt trên trang Tenants. Chưa có: Subscription, chọn và đổi gói tự phục vụ, thanh toán, hoá đơn, trần chi tiêu, RPS (UC-71, 72, 73, 75) |
+| S4 Gói và thanh toán (UC-70 đến 75) | Một phần. Có: service riêng `billing-service` (`m-billing`) sở hữu `waf.plans` và `waf.subscriptions`, nằm trong tenant vận hành (`OPERATOR_TENANT_ID`), admin của tenant đó định nghĩa gói (số zone, số rule mỗi zone, gói mặc định) và gán subscription cho từng tenant khách; trang Gói cho khách xem mức dùng và cảnh báo từ 80% (UC-70, 74); `zones-service` hỏi billing-service qua REST (`/internal/plans/resolve`, bí mật dùng chung) rồi chặn tạo zone và rule vượt hạn mức (`plan_limit_reached`; billing không trả lời thì cho qua), không xoá gì của khách đang vượt; tenant vận hành không bị giới hạn; chưa đặt tenant vận hành thì không giới hạn gì. Không dùng `tier` của metap. Chưa có: chọn và đổi gói tự phục vụ, trạng thái và kỳ hạn subscription, thanh toán, hoá đơn, trần chi tiêu, RPS (UC-71, 72, 73, 75) |
 | S5 UC-80 Xuất dữ liệu | Chưa |
 | S5 UC-81 Xoá org | Một phần: phía platform admin xong (trang Tenants, lên lịch và huỷ xoá, job chuyển `deleted` sau thời gian lưu giữ); Owner tự yêu cầu chưa có; chưa xoá dữ liệu vật lý |
 | S5 UC-82 Chuyển zone sang org khác | Chưa |
@@ -159,4 +159,4 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 
 1. **S2 đang làm ngược đặc tả.** Version và rollback (UC-48, 49) đã làm; draft tách khỏi bản chạy, duyệt (UC-43 đến 45) và theo dõi phát hành (UC-47) vẫn chưa. "Ghi thẳng" vẫn là MVP.
 2. **Account (UC-02)**: xong ở waap, không đổi `metap`.
-3. **S4**: chỉ làm danh mục gói và hạn mức (chủ dự án chọn bỏ thanh toán, hoá đơn; có gói Free). Làm tiếp khi có khách trả tiền và chốt cổng thanh toán.
+3. **S4**: chỉ làm gói, subscription và hạn mức (chủ dự án chọn bỏ thanh toán, hoá đơn). Làm tiếp khi có khách trả tiền và chốt cổng thanh toán.

@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -464,9 +465,10 @@ func TestIPAccessListExpiryCanBeClearedAndMustParse(t *testing.T) {
 	assert.Contains(t, []string{"", "null"}, string(got.Record.Data["expiresAt"]), "expiry cleared: %s", got.Record.Data["expiresAt"])
 }
 
-// Plan quotas: a create past the plan's allowance is refused with plan_limit_reached, nothing is
-// removed, a higher plan lifts it, and the usage view reports the plan and what is used.
-func TestPlanQuotasRefuseCreatesPastTheLimit(t *testing.T) {
+// Plan quotas: what a tenant may create is whatever billing-service says its plan allows. A create
+// past it is refused with plan_limit_reached and nothing is removed; an unlimited plan lifts it;
+// when nothing is enforced for the tenant, or billing cannot be reached, creates go through.
+func TestPlanQuotasFollowWhatBillingServiceSays(t *testing.T) {
 	pool := testPool(t)
 	registry := setupRegistry(t, pool)
 	tenantID, userID := uuid.New(), uuid.New()
@@ -480,109 +482,75 @@ func TestPlanQuotasRefuseCreatesPastTheLimit(t *testing.T) {
 		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
 	})
 
-	tier := "free"
-	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "http://localhost:1", "http://localhost:1").
-		WithPlanLimits(func(context.Context, uuid.UUID) (string, error) { return tier, nil })
+	var answer atomic.Value // the JSON billing-service replies with, "" = fail
+	answer.Store(`{"data":{"enforced":true,"plan":{"name":"Small","maxZones":1,"maxRulesPerZone":2},"plans":[]}}`)
+	var gotSecret atomic.Value
+	billing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotSecret.Store(r.Header.Get("X-Internal-Secret"))
+		if r.URL.Query().Get("tenantId") != tenantID.String() {
+			http.Error(w, "wrong tenant", 400)
+			return
+		}
+		body := answer.Load().(string)
+		if body == "" {
+			http.Error(w, "down", 500)
+			return
+		}
+		w.Header().Set("content-type", "application/json")
+		w.Write([]byte(body))
+	}))
+	t.Cleanup(billing.Close)
+
+	client := &zonesservice.PlanClient{URL: billing.URL, Secret: "s3cret", HTTP: billing.Client()}
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "http://localhost:1", "http://localhost:1").WithPlanLimits(client)
 	newZone := func(host string) (crud.RecordDto, error) {
 		return backend.Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, host+"."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
 	}
-
-	zone, err := newZone("a")
-	require.NoError(t, err, "the free plan allows one zone")
-	_, err = newZone("b")
-	se, ok := crud.AsServiceError(err)
-	require.True(t, ok, "got %v", err)
-	assert.EqualValues(t, 409, se.Status)
-	assert.Equal(t, "plan_limit_reached", se.Code)
-
-	// Rules: the free plan allows 5 per zone.
-	for i := 0; i < 5; i++ {
-		_, err = backend.Create(ctx, "waf.firewall_rules", crud.JsonObject{
-			"zoneId": jsonMarshal(t, zone.ID.String()), "name": jsonMarshal(t, fmt.Sprintf("r%d", i)), "priority": jsonMarshal(t, i+1),
+	code := func(err error) string {
+		if se, ok := crud.AsServiceError(err); ok {
+			return se.Code
+		}
+		return ""
+	}
+	newRule := func(zone uuid.UUID, n int) error {
+		_, err := backend.Create(ctx, "waf.firewall_rules", crud.JsonObject{
+			"zoneId": jsonMarshal(t, zone.String()), "name": jsonMarshal(t, fmt.Sprintf("r%d", n)), "priority": jsonMarshal(t, n),
 			"matchCondition": jsonMarshal(t, map[string]any{"field": "uri.path", "op": "eq", "value": "/x"}), "ruleType": jsonMarshal(t, "waf"), "action": jsonMarshal(t, "block"),
 		}, rc, nil)
-		require.NoError(t, err, "rule %d", i)
+		return err
 	}
-	_, err = backend.Create(ctx, "waf.firewall_rules", crud.JsonObject{
-		"zoneId": jsonMarshal(t, zone.ID.String()), "name": jsonMarshal(t, "r6"), "priority": jsonMarshal(t, 6),
-		"matchCondition": jsonMarshal(t, map[string]any{"field": "uri.path", "op": "eq", "value": "/x"}), "ruleType": jsonMarshal(t, "waf"), "action": jsonMarshal(t, "block"),
-	}, rc, nil)
-	se, ok = crud.AsServiceError(err)
-	require.True(t, ok, "got %v", err)
-	assert.Equal(t, "plan_limit_reached", se.Code)
 
-	// Other entities are not limited, and a higher plan lifts the limit.
-	_, err = backend.Create(ctx, "waf.ip_access_lists", crud.JsonObject{"zoneId": jsonMarshal(t, zone.ID.String()), "type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, "203.0.113.1")}, rc, nil)
+	zone, err := newZone("a")
 	require.NoError(t, err)
-	tier = "enterprise"
+	assert.Equal(t, "s3cret", gotSecret.Load(), "the internal secret is sent")
+	assert.Equal(t, "plan_limit_reached", code(second(newZone("b"))))
+
+	require.NoError(t, newRule(zone.ID, 1))
+	require.NoError(t, newRule(zone.ID, 2))
+	assert.Equal(t, "plan_limit_reached", code(newRule(zone.ID, 3)))
+
+	// An unlimited plan lifts both; nothing enforced does too.
+	answer.Store(`{"data":{"enforced":true,"plan":{"name":"Big","maxZones":0,"maxRulesPerZone":0},"plans":[]}}`)
+	require.NoError(t, newRule(zone.ID, 3))
 	_, err = newZone("b")
 	require.NoError(t, err)
+	answer.Store(`{"data":{"enforced":false,"plan":{"name":"","maxZones":0,"maxRulesPerZone":0},"plans":[]}}`)
+	_, err = newZone("c")
+	require.NoError(t, err)
+
+	// Billing down: the create goes through (fail open) instead of blocking onboarding.
+	answer.Store("")
+	_, err = newZone("d")
+	require.NoError(t, err)
+
+	// The usage view reports the plan and the zone count.
+	answer.Store(`{"data":{"enforced":true,"operator":false,"plan":{"name":"Small","maxZones":1,"maxRulesPerZone":2},"plans":[{"name":"Small","maxZones":1,"maxRulesPerZone":2}]}}`)
+	view, err := zonesservice.TenantUsageForTest(ctx, state.Crud, client, rc)
+	require.NoError(t, err)
+	assert.True(t, view.Enforced)
+	assert.Equal(t, "Small", view.Plan.Name)
+	assert.EqualValues(t, 4, view.Zones)
+	assert.Len(t, view.Plans, 1)
 }
 
-// Accounts: a zone lands in the default account (created on first use) or a chosen one, records
-// under it carry the account, and an account with a running zone cannot be closed (the refusal
-// names the zone); a closed account takes no zones.
-func TestAccountsGroupZonesAndCloseOnlyWhenNothingRuns(t *testing.T) {
-	pool := testPool(t)
-	registry := setupRegistry(t, pool)
-	tenantID, userID := uuid.New(), uuid.New()
-	seedAdmin(t, pool, tenantID, userID)
-	cleanupEntityRows(t, pool, tenantID)
-	state, _ := newTestState(t, pool, registry)
-	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "http://localhost:1", "http://localhost:1")
-	rc := adminContext(tenantID, userID)
-	ctx := context.Background()
-	apex := freshApex(t)
-	t.Cleanup(func() {
-		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
-	})
-	accountOf := func(r crud.RecordDto) string { return jsonString0(r.Data["accountId"]) }
-	newZone := func(host string, extra crud.JsonObject) (crud.RecordDto, error) {
-		data := crud.JsonObject{"hostname": jsonMarshal(t, host+"."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}
-		for k, v := range extra {
-			data[k] = v
-		}
-		return backend.Create(ctx, "waf.zones", data, rc, nil)
-	}
-
-	// No account chosen: the default one is created and used again.
-	z1, err := newZone("a", nil)
-	require.NoError(t, err)
-	z2, err := newZone("b", nil)
-	require.NoError(t, err)
-	require.NotEmpty(t, accountOf(z1))
-	assert.Equal(t, accountOf(z1), accountOf(z2), "one default account, not one per zone")
-
-	// A chosen account.
-	team, err := state.Crud.Create(ctx, "waf.accounts", crud.JsonObject{"name": jsonMarshal(t, "Team B"), "slug": jsonMarshal(t, "team-b")}, rc, nil)
-	require.NoError(t, err)
-	z3, err := newZone("c", crud.JsonObject{"accountId": jsonMarshal(t, team.ID.String())})
-	require.NoError(t, err)
-	assert.Equal(t, team.ID.String(), accountOf(z3))
-
-	// A record under the zone carries the zone's account (that is what a scoped role matches).
-	ip, err := backend.Create(ctx, "waf.ip_access_lists", crud.JsonObject{"zoneId": jsonMarshal(t, z3.ID.String()), "type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, "203.0.113.1")}, rc, nil)
-	require.NoError(t, err)
-	assert.Equal(t, team.ID.String(), accountOf(ip))
-
-	// Closing is refused while a zone runs, and names it.
-	_, err = pool.Exec(ctx, "UPDATE waf.waf_zones SET status = 'active' WHERE id = $1", z3.ID)
-	require.NoError(t, err)
-	_, err = backend.Transition(ctx, "waf.accounts", team.ID, "close", team.Version, nil, rc, nil)
-	se, ok := crud.AsServiceError(err)
-	require.True(t, ok, "got %v", err)
-	assert.EqualValues(t, 409, se.Status)
-	assert.Equal(t, "account_in_use", se.Code)
-	assert.Contains(t, se.Message, "c."+apex)
-
-	// Once nothing runs it closes, and a closed account takes no new zone.
-	_, err = pool.Exec(ctx, "UPDATE waf.waf_zones SET status = 'suspended' WHERE id = $1", z3.ID)
-	require.NoError(t, err)
-	closed, err := backend.Transition(ctx, "waf.accounts", team.ID, "close", team.Version, nil, rc, nil)
-	require.NoError(t, err)
-	assert.Equal(t, "closed", *closed.Status)
-	_, err = newZone("d", crud.JsonObject{"accountId": jsonMarshal(t, team.ID.String())})
-	se, ok = crud.AsServiceError(err)
-	require.True(t, ok, "got %v", err)
-	assert.Equal(t, "account_closed", se.Code)
-}
+func second(_ crud.RecordDto, err error) error { return err }

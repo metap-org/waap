@@ -34,6 +34,8 @@ export const ENTITIES = {
   zones: "waf.zones",
   domains: "waf.domains",
   accounts: "waf.accounts",
+  plans: "waf.plans",
+  subscriptions: "waf.subscriptions",
   ddosPolicies: "waf.ddos_policies",
   firewallRules: "waf.firewall_rules",
   ipAccessLists: "waf.ip_access_lists",
@@ -238,16 +240,30 @@ export function useInvalidateWaf() {
 /* ------------------------------------------------------------------ plan and usage */
 
 export type PlanLimits = {
+  id?: string;
   name: string;
   maxZones: number;
   maxRulesPerZone: number;
 };
 export type PlanUsage = {
-  tier: string;
+  /** False when no limit applies to this workspace (the service provider's own, or none set up). */
+  enforced: boolean;
+  /** True for the service provider's workspace, which manages plans and subscriptions. */
+  operator: boolean;
   plan: PlanLimits;
   zones: number;
   plans: PlanLimits[];
 };
+
+export type CustomerTenant = { id: string; name: string };
+
+/** The tenants a subscription can be given to (service provider's admin only). */
+export function listCustomerTenants() {
+  return act<{ tenants: CustomerTenant[] }>(
+    ENTITIES.subscriptions,
+    "listTenants",
+  );
+}
 
 /** The tenant's plan, what it allows and what is used (0 in a limit means no limit). */
 export function usePlanUsage() {

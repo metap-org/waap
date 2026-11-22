@@ -9,6 +9,8 @@ const (
 	Zones              = "waf.zones"
 	Domains            = "waf.domains"
 	Accounts           = "waf.accounts"
+	Plans              = "waf.plans"
+	Subscriptions      = "waf.subscriptions"
 	DdosPolicies       = "waf.ddos_policies"
 	FirewallRules      = "waf.firewall_rules"
 	IPAccessLists      = "waf.ip_access_lists"
@@ -38,6 +40,7 @@ const (
 	ActionSyncConfigState = "syncConfigState" // zones
 	ActionRollback        = "rollback"        // policy_versions
 	ActionPlanUsage       = "planUsage"       // zones (entity scope): the tenant's plan and what it uses
+	ActionListTenants     = "listTenants"     // subscriptions (entity scope): the customers a plan can be given to
 	ActionRun             = "run"             // scan_jobs
 	ActionTest            = "test"            // alert_policies
 	ActionEvaluate        = "evaluate"        // alert_policies

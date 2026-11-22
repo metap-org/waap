@@ -425,7 +425,6 @@ export const wafEn = {
       description:
         "What this workspace's plan allows and how much of it is used.",
       current: "{{name}} plan",
-      tierNote: "Workspace tier: {{tier}}",
       zonesUsed: "Websites (zones)",
       usedOf: "{{used}} of {{limit}}",
       usedUnlimited: "{{used}} (no limit)",
@@ -437,17 +436,34 @@ export const wafEn = {
         "The zone limit of this plan is reached: no new zone can be added until the plan is upgraded. Existing zones keep working.",
       compare: "Plans",
       changeHint:
-        "The plan is set by your platform administrator; ask them to change it.",
+        "The plan is set by your service provider; ask them to change it.",
+      noLimits: "No plan limits",
+      noLimitsNote:
+        "No limits apply to this workspace. {{zones}} zones in use.",
+      operatorNote:
+        "This is the service provider's workspace: it is never limited. {{zones}} zones in use. Define plans and give customers a subscription below.",
+      manage: {
+        plansTitle: "Plans",
+        plansDescription:
+          "What each plan allows. A customer without a subscription gets the plan marked as default.",
+        newPlan: "New plan",
+        edit: "Edit",
+        default: "default",
+        off: "off",
+        zeroHint: "0 means unlimited.",
+        defaultHint: "Default plan for customers without a subscription",
+        enabled: "Enabled",
+        subsTitle: "Customers",
+        subsDescription:
+          "Give each customer workspace a plan. Changes apply at its next zone or rule.",
+        customer: "Customer",
+        assign: "Assign plan",
+        remove: "Remove",
+      },
       colPlan: "Plan",
       colZones: "Zones",
       colRules: "Rules per zone",
       yours: "Current",
-      names: {
-        free: "Free",
-        starter: "Starter",
-        business: "Business",
-        enterprise: "Enterprise",
-      },
     },
     falsePositives: {
       title: "False positives",
@@ -1145,7 +1161,6 @@ export const wafVi = {
       title: "Gói và mức dùng",
       description: "Gói của workspace cho phép những gì và đã dùng bao nhiêu.",
       current: "Gói {{name}}",
-      tierNote: "Tier của workspace: {{tier}}",
       zonesUsed: "Website (zone)",
       usedOf: "{{used}} trên {{limit}}",
       usedUnlimited: "{{used}} (không giới hạn)",
@@ -1161,12 +1176,6 @@ export const wafVi = {
       colZones: "Zone",
       colRules: "Rule mỗi zone",
       yours: "Đang dùng",
-      names: {
-        free: "Miễn phí",
-        starter: "Starter",
-        business: "Business",
-        enterprise: "Enterprise",
-      },
     },
     falsePositives: {
       title: "Chặn nhầm",

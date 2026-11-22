@@ -59,7 +59,6 @@ func TestCreateZoneReusesTheExistingDomainForItsApex(t *testing.T) {
 	require.NoError(t, err)
 }
 
-
 // A zone always lands in an account; these tests are about something else, so the tenant already
 // has its default one.
 func expectDefaultAccount(inner *crudmock.RecordBackend, rc *permission.RequestContext) {

@@ -1,7 +1,10 @@
 /**
- * Plan and usage (UC-70, UC-74): which plan the workspace is on, how much of it is used, and what
- * the other plans allow. A plan is assigned by a platform administrator (there is no payment
- * gateway), so this page explains rather than sells: it warns as a limit nears and says whom to ask.
+ * Plan and usage (UC-70, UC-74). A workspace sees which plan it is on, how much of it is used, and
+ * what the other plans allow; the plan is the service provider's to change, so this page explains
+ * rather than sells and warns as a limit nears.
+ *
+ * The service provider's own workspace (the one set as OPERATOR_TENANT_ID) also manages the plans
+ * and gives each customer a subscription; see `PlanManager`.
  */
 import { useTranslation } from "react-i18next";
 import {
@@ -20,6 +23,7 @@ import {
 } from "@metap/ui";
 import { ApiErrorMessage } from "@metap/platform-ui";
 import { usePlanUsage, type PlanLimits } from "../api/waf";
+import { PlanManager } from "../components/PlanManager";
 
 /** Share of a limit used at which the page starts warning (UC-74). */
 const WARN_AT = 0.8;
@@ -34,7 +38,7 @@ export function PlanPage() {
   }
   if (usage.error) return <ApiErrorMessage error={usage.error} />;
   if (!usage.data) return null;
-  const { plan, plans, zones, tier } = usage.data;
+  const { plan, plans, zones, enforced, operator } = usage.data;
   const limit = plan.maxZones;
   const ratio = limit === 0 ? 0 : zones / limit;
 
@@ -45,78 +49,87 @@ export function PlanPage() {
         description={t("waf.plan.description")}
       />
       <div className="grid gap-4">
-        <SectionCard
-          title={t("waf.plan.current", {
-            name: t(`waf.plan.names.${plan.name}`),
-          })}
-          description={t("waf.plan.tierNote", { tier })}
-        >
-          <div className="grid gap-4">
-            <div>
-              <div className="mb-1 flex justify-between text-sm">
-                <span>{t("waf.plan.zonesUsed")}</span>
-                <span className="tabular-nums">
-                  {limit === 0
-                    ? t("waf.plan.usedUnlimited", { used: zones })
-                    : t("waf.plan.usedOf", { used: zones, limit })}
-                </span>
+        {enforced ? (
+          <SectionCard
+            title={t("waf.plan.current", { name: plan.name })}
+            description={t("waf.plan.changeHint")}
+          >
+            <div className="grid gap-4">
+              <div>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span>{t("waf.plan.zonesUsed")}</span>
+                  <span className="tabular-nums">
+                    {limit === 0
+                      ? t("waf.plan.usedUnlimited", { used: zones })
+                      : t("waf.plan.usedOf", { used: zones, limit })}
+                  </span>
+                </div>
+                {limit !== 0 ? <Progress value={zones} max={limit} /> : null}
               </div>
-              {limit !== 0 ? <Progress value={zones} max={limit} /> : null}
+              <p className="text-sm text-muted-foreground">
+                {t("waf.plan.rulesLimit", {
+                  limit:
+                    plan.maxRulesPerZone === 0
+                      ? t("waf.plan.unlimited")
+                      : plan.maxRulesPerZone,
+                })}
+              </p>
+              {limit !== 0 && ratio >= 1 ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{t("waf.plan.atLimit")}</AlertDescription>
+                </Alert>
+              ) : limit !== 0 && ratio >= WARN_AT ? (
+                <Alert>
+                  <AlertDescription>{t("waf.plan.nearLimit")}</AlertDescription>
+                </Alert>
+              ) : null}
             </div>
+          </SectionCard>
+        ) : (
+          <SectionCard title={t("waf.plan.noLimits")}>
             <p className="text-sm text-muted-foreground">
-              {t("waf.plan.rulesLimit", {
-                limit:
-                  plan.maxRulesPerZone === 0
-                    ? t("waf.plan.unlimited")
-                    : plan.maxRulesPerZone,
-              })}
+              {operator
+                ? t("waf.plan.operatorNote", { zones })
+                : t("waf.plan.noLimitsNote", { zones })}
             </p>
-            {limit !== 0 && ratio >= 1 ? (
-              <Alert variant="destructive">
-                <AlertDescription>{t("waf.plan.atLimit")}</AlertDescription>
-              </Alert>
-            ) : limit !== 0 && ratio >= WARN_AT ? (
-              <Alert>
-                <AlertDescription>{t("waf.plan.nearLimit")}</AlertDescription>
-              </Alert>
-            ) : null}
-          </div>
-        </SectionCard>
+          </SectionCard>
+        )}
 
-        <SectionCard
-          title={t("waf.plan.compare")}
-          description={t("waf.plan.changeHint")}
-        >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("waf.plan.colPlan")}</TableHead>
-                <TableHead>{t("waf.plan.colZones")}</TableHead>
-                <TableHead>{t("waf.plan.colRules")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {plans.map((p) => (
-                <TableRow key={p.name}>
-                  <TableCell className="font-medium">
-                    {t(`waf.plan.names.${p.name}`)}
-                    {p.name === plan.name ? (
-                      <Badge variant="outline" className="ml-2">
-                        {t("waf.plan.yours")}
-                      </Badge>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    {limitText(p, "maxZones", t("waf.plan.unlimited"))}
-                  </TableCell>
-                  <TableCell>
-                    {limitText(p, "maxRulesPerZone", t("waf.plan.unlimited"))}
-                  </TableCell>
+        {plans.length > 0 && !operator ? (
+          <SectionCard title={t("waf.plan.compare")}>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("waf.plan.colPlan")}</TableHead>
+                  <TableHead>{t("waf.plan.colZones")}</TableHead>
+                  <TableHead>{t("waf.plan.colRules")}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </SectionCard>
+              </TableHeader>
+              <TableBody>
+                {plans.map((p) => (
+                  <TableRow key={p.id ?? p.name}>
+                    <TableCell className="font-medium">
+                      {p.name}
+                      {p.id === plan.id ? (
+                        <Badge variant="outline" className="ml-2">
+                          {t("waf.plan.yours")}
+                        </Badge>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      {limitText(p, "maxZones", t("waf.plan.unlimited"))}
+                    </TableCell>
+                    <TableCell>
+                      {limitText(p, "maxRulesPerZone", t("waf.plan.unlimited"))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </SectionCard>
+        ) : null}
+
+        {operator ? <PlanManager /> : null}
       </div>
     </div>
   );

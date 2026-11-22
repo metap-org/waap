@@ -68,8 +68,8 @@ type GuardedZonesBackend struct {
 	inner    crud.RecordBackend
 	scanning crud.RecordBackend
 	alerting crud.RecordBackend
-	// tierOf resolves a tenant's plan tier; nil means no quotas (see WithPlanLimits).
-	tierOf TierLookup
+	// plans resolves what a tenant may use; nil means no quotas (see WithPlanLimits).
+	plans *PlanClient
 }
 
 // NewGuardedZonesBackend guards inner; scanningURL/alertingURL are the siblings' REST base URLs

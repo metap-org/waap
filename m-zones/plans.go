@@ -1,26 +1,28 @@
-// Plans and quotas (UC-70, UC-74). A tenant's plan is its `tier` (the platform admin sets it on the
-// Tenants page); what each tier allows is this catalog. It is code, not data, on purpose: there is
-// no payment gateway yet, so a plan is only ever assigned by a person, and a catalog change is a
-// reviewed deploy rather than an edit anyone could make in a table.
+// Plan limits (UC-70, UC-74), enforced here and decided by billing-service: before a zone or a
+// firewall rule is created this service asks billing-service what the tenant's plan allows
+// (m-billing/plans.go has the rules for which plan that is).
 //
-// What is enforced here is what management can count: zones per tenant and firewall rules per
-// zone. Requests per second cannot be, since management never sees traffic (docs/management/12).
-// Unknown tiers, including metap's default "trial", get the free plan's limits.
+// What is enforced is what management can count: zones per tenant and firewall rules per zone.
+// Requests per second cannot be, since management never sees traffic (docs/management/12).
 //
-// A limit stops a create; it never removes anything. A tenant that is over its limit (moved to a
-// lower plan, or created before the limit) keeps what it has and cannot add more.
+// A limit stops a create; it never removes anything. A tenant over its limit (moved to a smaller
+// plan) keeps what it has and cannot add more. If billing-service cannot be reached the create is
+// allowed and a warning logged: a billing outage must not stop customers onboarding, and the cost
+// is a limit briefly not applied.
 package zonesservice
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"strings"
+	"net/url"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/metap-org/metap/pkg/crud"
+	"github.com/metap-org/metap/pkg/kit/env"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/waap/model"
@@ -29,66 +31,68 @@ import (
 // Unlimited is the limit value that means "no limit".
 const Unlimited = 0
 
-// Plan is one tier's allowance.
+// Plan is one plan's allowance, as billing-service reports it.
 type Plan struct {
+	ID              string `json:"id,omitempty"`
 	Name            string `json:"name"`
 	MaxZones        int    `json:"maxZones"`
 	MaxRulesPerZone int    `json:"maxRulesPerZone"`
 }
 
-// PlanFree is the plan an unrecognised tier falls back to.
-const PlanFree = "free"
-
-var planCatalog = []Plan{
-	{Name: PlanFree, MaxZones: 1, MaxRulesPerZone: 5},
-	{Name: "starter", MaxZones: 5, MaxRulesPerZone: 25},
-	{Name: "business", MaxZones: 25, MaxRulesPerZone: 100},
-	{Name: "enterprise", MaxZones: Unlimited, MaxRulesPerZone: Unlimited},
+// Resolution is billing-service's answer for one tenant.
+type Resolution struct {
+	Enforced bool   `json:"enforced"`
+	Operator bool   `json:"operator"`
+	Plan     Plan   `json:"plan"`
+	Plans    []Plan `json:"plans"`
 }
 
-// PlanCatalog is every plan, cheapest first, for the pricing table.
-func PlanCatalog() []Plan { return append([]Plan(nil), planCatalog...) }
+// PlanClient asks billing-service about a tenant's plan.
+type PlanClient struct {
+	URL    string
+	Secret string
+	HTTP   *http.Client
+}
 
-// PlanForTier resolves a tenant tier to its plan (case-insensitive).
-func PlanForTier(tier string) Plan {
-	tier = strings.ToLower(strings.TrimSpace(tier))
-	for _, p := range planCatalog {
-		if p.Name == tier {
-			return p
-		}
+// PlanClientFromEnv reads BILLING_URL and BILLING_INTERNAL_SECRET. Without a URL there is no
+// billing service and no limits (nil).
+func PlanClientFromEnv() *PlanClient {
+	base := env.String("BILLING_URL", "")
+	if base == "" {
+		return nil
 	}
-	return planCatalog[0]
+	return &PlanClient{URL: base, Secret: env.String("BILLING_INTERNAL_SECRET", ""), HTTP: &http.Client{Timeout: probeTimeout}}
 }
 
-// TierLookup returns a tenant's tier.
-type TierLookup func(ctx context.Context, tenantID uuid.UUID) (string, error)
-
-// SharedPoolTier reads the tier from control.tenants.
-func SharedPoolTier(pool *pgxpool.Pool) TierLookup {
-	return func(ctx context.Context, tenantID uuid.UUID) (string, error) {
-		var tier string
-		err := pool.QueryRow(ctx, "SELECT tier FROM control.tenants WHERE id = $1", tenantID).Scan(&tier)
-		return tier, err
+// Resolve asks what the tenant may use.
+func (c *PlanClient) Resolve(ctx context.Context, tenant uuid.UUID) (Resolution, error) {
+	var out Resolution
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.URL+"/internal/plans/resolve?tenantId="+url.QueryEscape(tenant.String()), nil)
+	if err != nil {
+		return out, err
 	}
+	req.Header.Set("X-Internal-Secret", c.Secret)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return out, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return out, fmt.Errorf("billing-service answered %d", resp.StatusCode)
+	}
+	var body struct {
+		Data Resolution `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return out, err
+	}
+	return body.Data, nil
 }
 
-// WithPlanLimits turns quota enforcement on, resolving tiers with lookup. Without it a backend
-// enforces nothing (the verify-only and test paths).
-func (b *GuardedZonesBackend) WithPlanLimits(lookup TierLookup) *GuardedZonesBackend {
-	b.tierOf = lookup
+// WithPlanLimits turns quota enforcement on. Without it (nil client) a backend enforces nothing.
+func (b *GuardedZonesBackend) WithPlanLimits(c *PlanClient) *GuardedZonesBackend {
+	b.plans = c
 	return b
-}
-
-func (b *GuardedZonesBackend) planFor(ctx context.Context, rc *permission.RequestContext) (Plan, error) {
-	id, err := uuid.Parse(rc.TenantID)
-	if err != nil {
-		return Plan{}, err
-	}
-	tier, err := b.tierOf(ctx, id)
-	if err != nil {
-		return Plan{}, err
-	}
-	return PlanForTier(tier), nil
 }
 
 // countRecords counts a tenant's records of entity matching filters (the caller's own view).
@@ -106,13 +110,22 @@ func countRecords(ctx context.Context, backend crud.RecordBackend, entity string
 // checkQuota refuses a create that would take the tenant past its plan. Zones are counted across
 // the tenant, firewall rules within the zone they are created for.
 func (b *GuardedZonesBackend) checkQuota(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext) error {
-	if b.tierOf == nil || (entity != model.Zones && entity != model.FirewallRules) {
+	if b.plans == nil || (entity != model.Zones && entity != model.FirewallRules) {
 		return nil
 	}
-	plan, err := b.planFor(ctx, rc)
+	tenant, err := uuid.Parse(rc.TenantID)
 	if err != nil {
 		return err
 	}
+	res, err := b.plans.Resolve(ctx, tenant)
+	if err != nil {
+		slog.Warn("plan limit not checked: billing-service unreachable", "tenant", tenant, "error", err)
+		return nil
+	}
+	if !res.Enforced {
+		return nil
+	}
+	plan := res.Plan
 	var limit int
 	var filters [][2]string
 	var what string
@@ -136,25 +149,25 @@ func (b *GuardedZonesBackend) checkQuota(ctx context.Context, entity string, dat
 	}
 	if used >= int64(limit) {
 		return crud.NewServiceErrorMsg(http.StatusConflict, model.ErrPlanLimitReached,
-			fmt.Sprintf("The %s plan allows %d %s and this tenant already has %d. Ask your administrator to upgrade the plan.", plan.Name, limit, what, used))
+			fmt.Sprintf("The %s plan allows %d %s and this tenant already has %d. Ask your service provider to upgrade the plan.", plan.Name, limit, what, used))
 	}
 	return nil
 }
 
-// usageView is GET /api/waf.plan: the tenant's plan, what it allows and what is used.
+// usageView is what the Plan page shows.
 type usageView struct {
-	Tier  string `json:"tier"`
-	Plan  Plan   `json:"plan"`
-	Zones int64  `json:"zones"`
-	Plans []Plan `json:"plans"`
+	Enforced bool   `json:"enforced"`
+	Operator bool   `json:"operator"`
+	Plan     Plan   `json:"plan"`
+	Zones    int64  `json:"zones"`
+	Plans    []Plan `json:"plans"`
 }
 
-func tenantUsage(ctx context.Context, backend crud.RecordBackend, lookup TierLookup, rc *permission.RequestContext) (usageView, error) {
-	id, err := uuid.Parse(rc.TenantID)
-	if err != nil {
-		return usageView{}, err
-	}
-	tier, err := lookup(ctx, id)
+// tenantUsage is the plan billing-service resolves for the caller's tenant plus its zone count.
+// With no billing service, or when it cannot be reached, the plan part is empty (nothing enforced)
+// and the page says so.
+func tenantUsage(ctx context.Context, backend crud.RecordBackend, plans *PlanClient, rc *permission.RequestContext) (usageView, error) {
+	tenant, err := uuid.Parse(rc.TenantID)
 	if err != nil {
 		return usageView{}, err
 	}
@@ -162,5 +175,18 @@ func tenantUsage(ctx context.Context, backend crud.RecordBackend, lookup TierLoo
 	if err != nil {
 		return usageView{}, err
 	}
-	return usageView{Tier: tier, Plan: PlanForTier(tier), Zones: zones, Plans: PlanCatalog()}, nil
+	view := usageView{Zones: zones, Plans: []Plan{}}
+	if plans == nil {
+		return view, nil
+	}
+	res, err := plans.Resolve(ctx, tenant)
+	if err != nil {
+		slog.Warn("plan usage without a plan: billing-service unreachable", "tenant", tenant, "error", err)
+		return view, nil
+	}
+	view.Enforced, view.Operator, view.Plan = res.Enforced, res.Operator, res.Plan
+	if res.Plans != nil {
+		view.Plans = res.Plans
+	}
+	return view, nil
 }

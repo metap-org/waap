@@ -422,7 +422,7 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 			return crud.ToObject(syncConfigState(ctx, state, c.RC, c.ID))
 		}},
 		{model.Zones, model.ActionPlanUsage, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			return crud.ToObject(tenantUsage(ctx, state.Crud, SharedPoolTier(state.Router.SharedPool()), c.RC))
+			return crud.ToObject(tenantUsage(ctx, state.Crud, PlanClientFromEnv(), c.RC))
 		}},
 		{model.PolicyVersions, model.ActionRollback, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			// state.Crud, not the guarded wrapper: the rollback records its own single version.
