@@ -56,6 +56,11 @@ jobs:
         run: go test ./...
       - working-directory: waap
         run: go vet -tags integration ./...
+      # depguard (waap/.golangci.yml): rules/ is standard-library only, entities/ only declare.
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: waap
       - working-directory: waap
         run: |
           files=$(gofmt -l .)

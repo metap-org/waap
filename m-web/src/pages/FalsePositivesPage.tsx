@@ -6,6 +6,7 @@
  * A report is entered here, from a request id someone forwarded. Intake from the block page itself
  * needs the edge to show a request id and a report form, which it does not yet.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -395,26 +396,37 @@ function HandleDialog({
               </Alert>
             ) : null}
             <DialogFooter>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => decide("dismiss", false)}
+              <ConfirmAction
+                title={t("waf.falsePositives.dismiss")}
+                description={t("waf.confirm.changeBody")}
+                confirmLabel={t("waf.falsePositives.dismiss")}
+                onConfirm={() => decide("dismiss", false)}
               >
-                {t("waf.falsePositives.dismiss")}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => decide("resolve", false)}
+                <Button variant="outline" disabled={busy}>
+                  {t("waf.falsePositives.dismiss")}
+                </Button>
+              </ConfirmAction>
+              <ConfirmAction
+                title={t("waf.falsePositives.resolveOnly")}
+                description={t("waf.confirm.changeBody")}
+                confirmLabel={t("waf.falsePositives.resolveOnly")}
+                onConfirm={() => decide("resolve", false)}
               >
-                {t("waf.falsePositives.resolveOnly")}
-              </Button>
-              <Button
-                disabled={busy || !ip}
-                onClick={() => decide("resolve", true)}
+                <Button variant="outline" disabled={busy}>
+                  {t("waf.falsePositives.resolveOnly")}
+                </Button>
+              </ConfirmAction>
+              <ConfirmAction
+                title={t("waf.falsePositives.allowAndResolve")}
+                description={t("waf.confirm.allowBody", { ip })}
+                confirmLabel={t("waf.falsePositives.allowAndResolve")}
+                destructive
+                onConfirm={() => decide("resolve", true)}
               >
-                {t("waf.falsePositives.allowAndResolve")}
-              </Button>
+                <Button disabled={busy || !ip}>
+                  {t("waf.falsePositives.allowAndResolve")}
+                </Button>
+              </ConfirmAction>
             </DialogFooter>
           </>
         ) : (

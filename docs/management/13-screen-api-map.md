@@ -46,7 +46,7 @@ chưa quyết), không chặn/không thuộc phân tích portal.
 | Tra DNS hiện tại (gợi ý originAddress) | `POST /api/waf.zones/{id}/dns-lookup` (hoặc endpoint độc lập trước khi Zone tồn tại) | **Custom** — DNS resolver, không liên quan CRUD |
 | Nút "Verify now" | `POST /api/waf.zones/{id}/verify` — check TXT/HTTP file rồi tự cập nhật `verificationStatus` | **Custom** (bước check), nhưng ghi kết quả xuống có thể tái dùng `PATCH` nội bộ |
 | Panel "Trạng thái DNS routing" | `POST /api/waf.zones/{id}/dns-routing-check` | **Custom** |
-| Test Origin Connection | `POST /api/waf.zones/{id}/test-origin` | **Custom** |
+| Test Origin Connection | `POST /api/waf.zones/{id}/actions/testOrigin` | **Custom** |
 | Checklist sẵn sàng activate | đọc từ `GET /api/waf.zones/{id}` (field `hasConfig`/`verificationStatus`), tính ở FE | **Generic** |
 | Nút Activate | `POST /api/waf.zones/{id}/transitions/activate` | **Generic** (đã test thật) |
 

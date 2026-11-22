@@ -10,8 +10,7 @@
 // in the background. metap already learned the alternative the hard way: a hand-minted static
 // JWT expired inside a running deployment and crashed the caller at boot.
 //
-// zonesURL is zones-service itself (every entity read here is one of its own) or the API gateway
-// in front of it. Telemetry does not go through here: it is written to the Analytics plane
+// zonesURL is management-service, the one process that serves every entity. Telemetry does not go through here: it is written to the Analytics plane
 // (package analytics).
 package management
 

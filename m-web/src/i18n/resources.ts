@@ -40,7 +40,25 @@ export const wafEn = {
       operations: "Operations",
       admin: "Administration",
     },
+    confirm: {
+      deleteBody: "This will be removed and cannot be undone.",
+      changeBody: "Apply this change now?",
+      runBody: "Run this now?",
+      zoneBody:
+        "This changes whether traffic to this zone is protected, and it takes effect at once.",
+      blockBody:
+        "Every request from {{ip}} to this zone is refused until the entry expires or you remove it.",
+      allowBody:
+        "Requests from {{ip}} will skip this zone's rules and be resolved as not an attack. Only allow an address you trust.",
+      closeAccountBody:
+        "The account is closed and its zones can no longer be changed through it.",
+      sendTestBody: "A real notification is sent to this policy's channels.",
+      revokeBody: "{{email}} loses the {{role}} role on this account.",
+      approvePlanBody:
+        "The customer moves to the requested plan and its limits apply from now on.",
+    },
     common: {
+      confirm: "Confirm",
       loading: "Loading…",
       all: "All",
       any: "Any severity",
@@ -377,6 +395,22 @@ export const wafEn = {
         noPredicatesYet: "Matches every request (no condition set)",
         switchToAdvanced: "Edit as JSON instead",
         switchToBuilder: "Back to rule builder",
+        dialogHint:
+          "Rules run top to bottom by priority; the first rule a request matches decides what happens to it.",
+        sectionWhen: "When",
+        sectionThen: "Then",
+        sectionOptions: "More options",
+        if: "IF",
+        and: "AND",
+        or: "OR",
+        rateLimitHint:
+          "Act only once a client has sent more than this many requests within the window.",
+        expiryTemporary: "Expires",
+        actionBlockHint: "Refuse the request.",
+        actionChallengeHint: "Ask the client to prove it is not a bot first.",
+        actionLogHint: "Let it through and record it.",
+        actionAllowHint: "Let it through.",
+        priorityHint: "Lower numbers run first.",
         advancedFallbackNotice:
           "This condition uses nested groups the builder can't show yet — edit it as JSON below, or clear it to start over in the builder.",
       },
@@ -953,7 +987,26 @@ export const wafVi = {
       operations: "Vận hành",
       admin: "Quản trị",
     },
+    confirm: {
+      deleteBody: "Mục này sẽ bị xoá và không khôi phục được.",
+      changeBody: "Áp dụng thay đổi này ngay?",
+      runBody: "Chạy ngay bây giờ?",
+      zoneBody:
+        "Thay đổi này quyết định traffic của zone có được bảo vệ hay không, và có hiệu lực ngay.",
+      blockBody:
+        "Mọi request từ {{ip}} tới zone này sẽ bị chặn cho đến khi mục hết hạn hoặc bạn gỡ nó.",
+      allowBody:
+        "Request từ {{ip}} sẽ bỏ qua các rule của zone và báo cáo được đóng là không phải tấn công. Chỉ cho phép địa chỉ bạn tin tưởng.",
+      closeAccountBody:
+        "Account bị đóng và các zone của nó không sửa được qua account này nữa.",
+      sendTestBody:
+        "Một thông báo thật sẽ được gửi tới các kênh của policy này.",
+      revokeBody: "{{email}} mất vai trò {{role}} trên account này.",
+      approvePlanBody:
+        "Khách hàng chuyển sang gói được yêu cầu và giới hạn của gói áp dụng từ bây giờ.",
+    },
     common: {
+      confirm: "Xác nhận",
       loading: "Đang tải…",
       all: "Tất cả",
       any: "Mọi mức độ",
@@ -1282,6 +1335,22 @@ export const wafVi = {
         noPredicatesYet: "Khớp mọi request (chưa có điều kiện)",
         switchToAdvanced: "Chỉnh sửa dạng JSON",
         switchToBuilder: "Quay lại tạo bằng form",
+        dialogHint:
+          "Rule chạy từ trên xuống theo độ ưu tiên; rule đầu tiên khớp request sẽ quyết định xử lý request đó.",
+        sectionWhen: "Khi",
+        sectionThen: "Thì",
+        sectionOptions: "Tuỳ chọn thêm",
+        if: "NẾU",
+        and: "VÀ",
+        or: "HOẶC",
+        rateLimitHint:
+          "Chỉ áp dụng khi một client gửi nhiều hơn số request này trong khoảng thời gian bên dưới.",
+        expiryTemporary: "Có hạn",
+        actionBlockHint: "Từ chối request.",
+        actionChallengeHint: "Bắt client chứng minh không phải bot trước.",
+        actionLogHint: "Cho qua và ghi lại.",
+        actionAllowHint: "Cho qua.",
+        priorityHint: "Số nhỏ chạy trước.",
         advancedFallbackNotice:
           "Điều kiện này dùng nhóm lồng nhau mà form chưa hiển thị được — chỉnh sửa dạng JSON bên dưới, hoặc xoá để bắt đầu lại bằng form.",
       },

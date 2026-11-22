@@ -24,7 +24,7 @@ alerting-service (correlate / evaluate) ──GET /v1/security-events?since=…�
 | `GET /health` | Không cần token; kiểm ClickHouse |
 
 **Ranh giới bảo mật**
-- Mọi route `/v1/*` cần token của platform (EdDSA, JWKS của zones-service; kiểm `iss`, `aud`, `exp`).
+- Mọi route `/v1/*` cần token của platform (EdDSA, JWKS của management-service; kiểm `iss`, `aud`, `exp`).
   Tenant luôn lấy từ token, mọi câu SQL bắt đầu bằng `tenant_id = ?`, mọi giá trị đều là tham số.
 - Không nhận SQL hay tên cột từ request: chỉ các trường trong allowlist; trường lạ trả `400`.
 - Ingest cần thêm `X-Analytics-Ingest-Token` (`ANALYTICS_INGEST_TOKEN`), để token người dùng

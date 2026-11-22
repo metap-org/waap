@@ -147,12 +147,13 @@ từng tenant, kể cả tenant mới thêm sau. Không còn là điểm cần M
 
 ### `waf.zones`
 ```
-state_field: "status", initial_state: "pending", terminal_states: ["suspended"]
+state_field: "status", initial_state: "pending", terminal_states: []   # suspended không còn là terminal (2026-11-22)
 transitions:
   activate: pending → active, guard: All([
     Attribute{attribute:"hasConfig", op:Eq, value:true},
     Attribute{attribute:"verificationStatus", op:Eq, value:"verified"},
   ])
+  activate: suspended → active, cùng guard   (2026-11-22: suspended activate lại được)
   pause:    active  → paused
   resume:   paused  → active
   suspend:  active → suspended

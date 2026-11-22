@@ -9,6 +9,7 @@
  * makes it appear here with no frontend change — and only writes keys the backend marks as
  * tenant-writable, since anything else comes back as a rejection by design.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -156,15 +157,22 @@ export function SettingsPage() {
                   {t("waf.common.save")}
                 </Button>
                 {item.overridden ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="ml-1"
-                    onClick={() => reset(item)}
-                    disabled={busy}
+                  <ConfirmAction
+                    title={t("waf.settings.reset")}
+                    description={t("waf.confirm.changeBody")}
+                    confirmLabel={t("waf.settings.reset")}
+                    onConfirm={() => reset(item)}
                   >
-                    {t("waf.settings.reset")}
-                  </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-1"
+
+                      disabled={busy}
+                    >
+                      {t("waf.settings.reset")}
+                    </Button>
+                  </ConfirmAction>
                 ) : null}
               </>
             )}

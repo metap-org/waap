@@ -6,6 +6,7 @@
  * "Run now" therefore hands the job to whatever scanner backend is configured and reports back
  * honestly when none is: the job queues, and the response says nothing will pick it up yet.
  */
+import { ConfirmAction } from "../../components/ConfirmAction";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -151,14 +152,21 @@ export function ZoneScansTab({ zoneId }: { zoneId: string }) {
                     {shortDate(job.data.lastRunAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => run(job.id)}
-                      disabled={busy}
+                    <ConfirmAction
+                      title={t("waf.zoneTabs.scans.runNow")}
+                      description={t("waf.confirm.runBody")}
+                      confirmLabel={t("waf.zoneTabs.scans.runNow")}
+                      onConfirm={() => run(job.id)}
                     >
-                      {t("waf.zoneTabs.scans.runNow")}
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+
+                        disabled={busy}
+                      >
+                        {t("waf.zoneTabs.scans.runNow")}
+                      </Button>
+                    </ConfirmAction>
                   </TableCell>
                 </TableRow>
               ))}

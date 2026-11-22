@@ -6,6 +6,7 @@
  * snapshot taken at creation, not a live relation — so this shows the zone's recent stream as
  * context rather than claiming to reconstruct the exact rows that were correlated.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -134,13 +135,20 @@ export function IncidentDetailPage() {
             <StatusBadge value={record.data.severity} />
             <StatusBadge value={state} />
             {next ? (
-              <Button
-                size="sm"
-                onClick={advance}
-                disabled={pendingAction !== null}
+              <ConfirmAction
+                title={t(`waf.actions.${next.action}`)}
+                description={t("waf.confirm.changeBody")}
+                confirmLabel={t(`waf.actions.${next.action}`)}
+                onConfirm={advance}
               >
-                {t(`waf.actions.${next.action}`)}
-              </Button>
+                <Button
+                  size="sm"
+
+                  disabled={pendingAction !== null}
+                >
+                  {t(`waf.actions.${next.action}`)}
+                </Button>
+              </ConfirmAction>
             ) : null}
             {workflow ? (
               <WorkflowVisualizeDialog

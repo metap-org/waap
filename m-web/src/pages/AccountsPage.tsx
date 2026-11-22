@@ -7,6 +7,7 @@
  * edits the zones of this account and nothing else. Closing is refused while a zone of the account
  * is running; the server's answer names the zones.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -169,14 +170,17 @@ export function AccountsPage() {
                         >
                           {t("waf.accounts.rename")}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => void close(account)}
+                        <ConfirmAction
+                          title={t("waf.accounts.close")}
+                          description={t("waf.confirm.closeAccountBody")}
+                          confirmLabel={t("waf.accounts.close")}
+                          destructive
+                          onConfirm={() => void close(account)}
                         >
-                          {t("waf.accounts.close")}
-                        </Button>
+                          <Button size="sm" variant="outline" disabled={busy}>
+                            {t("waf.accounts.close")}
+                          </Button>
+                        </ConfirmAction>
                       </>
                     ) : null}
                   </TableCell>
@@ -346,11 +350,15 @@ function MembersDialog({
                   {m.email}{" "}
                   <span className="text-muted-foreground">· {m.role}</span>
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() =>
+                <ConfirmAction
+                  title={t("waf.accounts.revoke")}
+                  description={t("waf.confirm.revokeBody", {
+                    email: m.email,
+                    role: m.role,
+                  })}
+                  confirmLabel={t("waf.accounts.revoke")}
+                  destructive
+                  onConfirm={() =>
                     void change(() =>
                       apiFetch(
                         `/admin/users/${encodeURIComponent(m.userId)}/roles/${encodeURIComponent(m.role)}?scopeType=${SCOPE}&scopeId=${encodeURIComponent(account.id)}`,
@@ -359,8 +367,10 @@ function MembersDialog({
                     )
                   }
                 >
-                  {t("waf.accounts.revoke")}
-                </Button>
+                  <Button size="sm" variant="ghost" disabled={busy}>
+                    {t("waf.accounts.revoke")}
+                  </Button>
+                </ConfirmAction>
               </li>
             ))}
           </ul>

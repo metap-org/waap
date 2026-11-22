@@ -2,10 +2,11 @@
  * Module 6 at zone scope — the raw event stream behind the charts, plus the one action that turns
  * events into work: correlation.
  *
- * Correlation is a real backend call (`/internal/incidents/correlate`), the same one the scheduler
- * drives — a "correlate now" button that ran different logic than the scheduled sweep would prove
+ * Correlation is a real backend call (the declared action `waf.incidents.correlate`), the same one a
+ * scheduler would drive — a "correlate now" button that ran different logic than the scheduled sweep would prove
  * nothing about what the product actually does.
  */
+import { ConfirmAction } from "../../components/ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -82,14 +83,21 @@ export function ZoneEventsTab({ zoneId }: { zoneId: string }) {
                 { value: "logged", label: t("waf.status.logged") },
               ]}
             />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={correlate}
-              disabled={busy}
+            <ConfirmAction
+              title={t("waf.zoneTabs.events.correlateNow")}
+              description={t("waf.confirm.runBody")}
+              confirmLabel={t("waf.zoneTabs.events.correlateNow")}
+              onConfirm={correlate}
             >
-              {t("waf.zoneTabs.events.correlateNow")}
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+
+                disabled={busy}
+              >
+                {t("waf.zoneTabs.events.correlateNow")}
+              </Button>
+            </ConfirmAction>
           </>
         }
       >

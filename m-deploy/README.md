@@ -5,50 +5,42 @@ nơi khách hàng cấu hình chính sách bảo vệ (DDoS L7, WAF, vulnerabili
 analytics, quản lý incident. Đây là **management plane** của `metap-demo-waf` — nơi giữ dữ liệu/config
 nguồn (source of truth), xây nhanh trên nền `metap` (metadata-driven CRUD/workflow/permission).
 Thư mục này giữ Dockerfile, docker-compose, `.env.example` và key JWKS cho các service `m-*`; code của
-từng service nằm ở `../m-zones`, `../m-scanning`, `../m-alerting`, `../m-gateway`, frontend ở `../m-web`.
+service nằm ở `../m-management` (một process, gồm các domain `zones`, `scanning`, `alerting`, `billing`), frontend ở `../m-web`.
 
 Không thuộc phạm vi cụm này: **`../c-config-distributor`** (control plane — lấy config từ đây,
 tính toán, đẩy xuống edge) và **`../e-edge`** (edge plane — thực thi mitigation thật tại biên) — xem
 `../docs/management/04-architecture-boundary.md` cho luồng dữ liệu đầy đủ giữa các plane.
 
-## Cấu trúc: 3 service, không còn 1 binary (2026-09-01)
+## Cấu trúc: một service cho cả management plane (2026-11-22)
 
-Các service `m-*` tách theo pillar, mỗi pillar 1
-binary/deploy cycle riêng (chung 1 Go module ở gốc repo), cùng trỏ **1 database chung theo tenant** (`Router::pool_for`, không
-tách theo data layer — xem lý do kỹ thuật ở doc-comment mỗi service's `main.rs`):
+Management plane là **một process: `management-service`** (`../m-management/cmd/management-service`, cổng
+`3000`), phục vụ mọi entity và mọi route; portal gọi thẳng nó, **không còn API gateway**. Mỗi domain là
+một package riêng trong `../m-management`, cùng cắm vào metap qua các điểm như nhau
+(`../docs/architecture/08-cross-cutting/21-metap-vs-app-map.md`):
 
-| Service | Sở hữu | Port HTTP |
-|---|---|---|
-| `zones-service` (`m-zones/`, `m-zones/cmd/zones-service`) | `waf.domains`, `waf.zones`, `waf.ddos_policies`, `waf.firewall_rules`, `waf.ip_access_lists` | 3000 |
-| `scanning-service` (`m-scanning/`) | `waf.scan_jobs`, `waf.scan_findings` | 3010 |
-| `alerting-service` (`m-alerting/`) | `waf.security_events` (read model trên Analytics plane), `waf.incidents`, `waf.alert_policies`, `waf.alert_notifications` | 3020 |
-| `api-gateway` (`m-gateway/cmd/api-gateway`) | không sở hữu entity nào: cửa HTTP duy nhất của portal | 4000 |
+| Domain (`m-management/...`) | Sở hữu |
+|---|---|
+| `zones/` | `waf.domains`, `waf.zones`, `waf.ddos_policies`, `waf.firewall_rules`, `waf.ip_access_lists`, `waf.accounts`, `waf.policy_versions` |
+| `scanning/` | `waf.scan_jobs`, `waf.scan_findings` |
+| `alerting/` | `waf.incidents`, `waf.alert_policies`, `waf.alert_notifications`, `waf.false_positive_reports` |
+| `billing/` | `waf.plans`, `waf.subscriptions`, `waf.plan_change_requests` |
+| `analytics/` | `waf.security_events`: read model trên Analytics plane (`app.Options.ExternalEntities`) |
 
-`zoneId` ở `scanning-service`/`alerting-service` là **`String` thuần, không phải `Reference`**
-(cùng workaround `waf.security_events.triggeredById` đã dùng cho case polymorphic) — đăng ký
-`zone_entity()` ở 2 service đó chỉ để pass `validate_references()` sẽ đồng thời lộ CRUD
-`waf.zones` qua route generic `/api/:entity*` của chính chúng, phá nguyên tắc "1 service sở hữu
-Zone". Chi tiết đầy đủ ở từng service's `main.rs` doc comment.
+Tách ra từng service (zones/scanning/alerting/billing + gateway) đã bỏ vì chưa cần: các domain gọi nhau
+ngay trong process (zones hỏi billing giới hạn gói, kiểm tra tham chiếu scan job/incident khi xoá zone)
+thay vì qua REST. Hệ quả cần biết:
+- `?expand=` (resolve reference xuyên entity) **chỉ do gateway làm**; service đơn lẻ không hỗ trợ.
+  Portal waap không dùng nó, nên không mất gì hôm nay; `platform-ui` có tuỳ chọn `expand` nhưng chưa ai truyền.
+- Không còn `SCANNING_URL`, `ALERTING_URL`, `BILLING_URL`, `BILLING_INTERNAL_SECRET`. Còn `ANALYTICS_URL`,
+  `OPERATOR_TENANT_ID`, `SCANNER_URL`, `DOH_RESOLVER_URL`, `EDGE_CNAME_TARGET`, `ALLOW_PRIVATE_TARGETS`.
+- `management-service` là **token issuer duy nhất** và cũng là nơi mọi login đi vào.
+- Hướng tách lại thành nhiều service (nếu cần) sẽ qua metap, chưa quyết.
 
-**Chỉ còn REST (2026-11-21, roadmap 116 trong `../../metap-docs`)** — GraphQL và gRPC đã bị gỡ khỏi `metap` lẫn
-waap. `m-gateway/` giờ là **API gateway** (`metap`'s `pkg/apigateway`, không chứa gì riêng của WAF): route
-`/api/{entity}*` (CRUD, `?ids=`, aggregate, transition, action khai báo `POST /api/{entity}[/{id}]/actions/{action}`)
-tới service đang phục vụ entity đó (học từ `/metadata/entities` của từng service), gộp `/metadata/entities` và
-`/metadata/entity-access` của cả 3 service, tự resolve `?expand=` xuyên service (vd. `waf.scan_jobs.zoneId` →
-`waf.zones`), và gửi các route còn lại theo tiền tố (`UPSTREAMS`: `/auth/`, `/me`, `/admin/`, `/platform/`, ... →
-zones-service). Gateway **không xác thực ai và không giữ credential nào** — mỗi service tự verify token của người
-gọi qua JWKS, nên không còn service account cho gateway. Gọi chéo giữa service (zones-service hỏi
-scanning/alerting trước khi xoá Zone) đi qua REST (`metap`'s `recordclient`, `SCANNING_URL`/`ALERTING_URL`) và chuyển
-tiếp token gốc của người gọi.
+**Chỉ còn REST** (roadmap 116 trong `../../metap-docs`): `POST /api/{entity}[/{id}]/actions/{action}` cho
+action khai báo, CRUD/aggregate/transition ở `/api/{entity}*`.
 
-**Ngoài phạm vi 3 service này** (Customer Portal backend) — Admin Portal backend
-(`Plan`/`Subscription`/billing, `docs/12-billing-plans.md`, chưa xây) là 1 trục tách khác hẳn
-(platform-level, xuyên tenant, không phải per-tenant DB), đi theo pattern
-`metap-control`/`metap-lowcode`'s platform-level service khi build, không phải pillar service
-nào ở trên — xem `docs/09-access-control.md`'s mô hình 2-portal.
-
-**`m-web/`'s dev server và nginx production đều chỉ proxy sang `api-gateway`** (`vite.config.ts`, `nginx.conf`) —
-không còn middleware tự định tuyến theo tên entity hay tự gộp metadata ở phía FE; việc đó là của gateway.
+**`m-web/`'s dev server và nginx production proxy thẳng sang `management-service`** (`vite.config.ts`,
+`nginx.conf`, biến `API_URL`).
 
 Bắt đầu đọc nghiệp vụ từ `docs/01-product-vision.md`; `docs/05-metap-technical-mapping.md` là
 bản ánh xạ kỹ thuật (entity/workflow/permission cụ thể trên `metap`) mà code dưới đây bám theo.
@@ -86,7 +78,7 @@ pillar 1-4 đã đăng ký, build sạch, test qua API thật** (2026-08-30):
 - `waf.incidents` — workflow `open→acknowledged→mitigating→resolved` (test hết chuỗi).
 - `waf.alert_policies` / `waf.alert_notifications` — CRUD.
 
-**Tách thành 3 service** (2026-09-01, xem bảng ở trên) — `cargo build/test --workspace` sạch cho
+**(Lịch sử) Tách thành 3 service** (2026-09-01; đã gộp lại 2026-11-22) — `cargo build/test --workspace` sạch cho
 cả 3, mỗi service tự verify đúng entity mình sở hữu (test `owns_exactly_its_own_N_entities`).
 **Verify sống qua HTTP thật sau khi tách** (cùng ngày, cả 3 service chạy thật + tenant/token
 thật): tạo `ScanJob` ở `scanning-service` với `zoneId` (String) trỏ 1 Zone có sẵn ở
@@ -140,11 +132,11 @@ cd ../waap/m-deploy
 cp .env.example .env    # tuỳ chọn: SMTP/PUBLIC_APP_URL
 
 # 2a. Cả stack bằng Docker: image production (Dockerfile Go dùng chung, chọn binary bằng SERVICE)
-docker compose up -d --build                 # 3 service + api-gateway + web (nginx, :8081)
+docker compose up -d --build                 # management-service + analytics-api + web (nginx, :8081)
 
 # 2b. Hoặc dev loop: `go run` từ source mount vào container + Vite dev server (:5173)
 docker compose -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.dev.yml restart zones-service   # sau khi sửa code Go
+docker compose -f docker-compose.dev.yml restart management-service   # sau khi sửa code Go
 # Stack không tự chạy migration: khi `git pull` ở ../../metap kéo về migration mới, chạy lại
 # (idempotent) rồi restart service. Thiếu bước này, route dùng bảng mới trả 500
 # (vd. `relation "sso_domains" does not exist`).
@@ -153,33 +145,27 @@ docker compose -f docker-compose.dev.yml restart zones-service   # sau khi sửa
 # 2c. Hoặc chạy thẳng trên host (mỗi lệnh 1 terminal)
 export RABBITMQ_URL=amqp://metap:metap@localhost:5672
 JWKS=http://localhost:3000/.well-known/jwks.json
-PORT=3000 JWKS_KEYS_DIR=m-deploy/keys/jwks go run ./m-zones/cmd/zones-service    # issuer, :3000
-PORT=3010 JWKS_URL=$JWKS go run ./m-scanning/cmd/scanning-service           # :3010
-PORT=3020 JWKS_URL=$JWKS go run ./m-alerting/cmd/alerting-service           # :3020
-UPSTREAMS="zones=http://localhost:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://localhost:3010;alerting=http://localhost:3020" \
-  go run ./m-gateway/cmd/api-gateway               # :4000
+PORT=3000 JWKS_KEYS_DIR=m-deploy/keys/jwks ANALYTICS_URL=http://localhost:3030 \
+  go run ./m-management/cmd/management-service     # :3000, issuer + mọi entity
 # 2c cần DNS mock riêng: (cd ../devtools/dns-mock && DNS_MOCK_SEED_FILE=seed.dev.json go run .)
-# rồi chạy zones-service với DOH_RESOLVER_URL=http://localhost:8053/resolve
+# rồi chạy management-service với DOH_RESOLVER_URL=http://localhost:8053/resolve
 ```
 
 **Analytics plane**: cả 2 compose chạy kèm `clickhouse` (:9000/:8123) và `analytics-api` (:3030,
-`../a-api`). Security event nằm ở đó; alerting-service đọc qua `ANALYTICS_URL` (cho correlate/evaluate)
+`../a-api`). Security event nằm ở đó; management-service đọc qua `ANALYTICS_URL` (cho correlate/evaluate)
 và phục vụ chúng cho portal thành entity chỉ-đọc `waf.security_events` (`app.Options.ExternalEntities`). Chạy 2c
-trên host thì đặt `ANALYTICS_URL=http://localhost:3030` cho alerting-service.
+trên host thì đặt `ANALYTICS_URL=http://localhost:3030` cho management-service.
 
 **DNS khi dev/staging**: cả 2 compose chạy kèm `dns-mock` (`../devtools/dns-mock`, xem README
-của nó). zones-service tra mọi bản ghi xác minh domain (TXT) và định tuyến (CNAME) qua đó thay cho
+của nó). management-service tra mọi bản ghi xác minh domain (TXT) và định tuyến (CNAME) qua đó thay cho
 `dns.google`. Muốn khai báo bản ghi thì vào UI ở `http://localhost:8053`, tra thật bằng
 `dig @127.0.0.1 -p 15353` (cổng host; đổi bằng `DNS_MOCK_HOST_PORT`).
 
 ### Token: một issuer duy nhất (JWKS)
 
-`zones-service` là **issuer duy nhất**: giữ key Ed25519 (`JWKS_KEYS_DIR`), ký mọi token (login,
-refresh, OAuth2) và publish `/.well-known/jwks.json`. `scanning-service`, `alerting-service`
-chỉ verify qua `JWKS_URL`, không giữ private key nào — `/auth/login` ở đó
-trả `501 not_token_issuer`, nên mọi login (portal, control-plane) đều
-trỏ về `:3000` (qua gateway thì `/auth/` cũng được route về đó). Gọi chéo giữa service (vd. `zones-service` hỏi `scanning-service` trước khi xoá
-Zone) chuyển tiếp token gốc của người gọi, không tự ký token mới.
+`management-service` là **issuer duy nhất**: giữ key Ed25519 (`JWKS_KEYS_DIR`), ký mọi token (login,
+refresh, OAuth2) và publish `/.well-known/jwks.json`. Chỉ `analytics-api` verify bằng `JWKS_URL`
+(không giữ private key); mọi login (portal, control-plane) đều vào `:3000`.
 
 Xoay key, không cần restart (issuer đọc lại thư mục mỗi `JWKS_KEY_DIR_RELOAD_SECONDS`, mặc định
 30s; verifier refresh mỗi `JWKS_REFRESH_SECONDS`, mặc định 60s, cache tối đa
@@ -209,7 +195,7 @@ Test: `go test ./...` (unit, không cần hạ tầng) và `go test -tags integr
 cd m-web
 pnpm install   # link:../../platform-ui + link:../../design-system — 2 repo sibling này
                # phải tồn tại ở đúng vị trí, xem package.json
-pnpm dev       # http://localhost:5173, proxy /api /metadata /auth /me /admin /platform ... sang api-gateway (GATEWAY_URL, mặc định :4000)
+pnpm dev       # http://localhost:5173, proxy /api /metadata /auth /me /admin /platform ... sang management-service (API_URL, mặc định :3000)
 ```
 
 ## `SettingsPage` (2026-09-26 → 2026-11-21)
@@ -219,17 +205,16 @@ thẳng `GET /admin/config` và `PUT/DELETE /admin/config/{key}` (`m-web/src/pag
 
 ## Docker
 
-- `Dockerfile` (thư mục này) là recipe Go dùng chung cho cả 4 binary — `--build-arg
-  SERVICE=m-zones/cmd/zones-service|m-scanning/cmd/scanning-service|m-alerting/cmd/alerting-service|m-gateway/cmd/api-gateway`; image runtime là
+- `Dockerfile` (thư mục này) là recipe Go dùng chung cho mọi binary — `--build-arg
+  SERVICE=m-management/cmd/management-service` (hoặc `c-config-distributor/cmd/waf-config-distributor`); image runtime là
   `alpine:3` + 1 binary tĩnh (~75MB). `web/Dockerfile` build production frontend (nginx).
 - **Mọi build dùng `context: ../../` (root `metap-org`)**: `go.mod` có `replace
   github.com/metap-org/metap => ../metap`, nên `metap/` phải nằm trong context (vẫn lấy code
   chưa commit ở `../../metap`, không phải 1 ref đã push); `web/` cần `design-system/`,
   `platform-ui/`, `metap-themes/`. `../../.dockerignore` giữ context đó không kéo theo
   `node_modules/`/`.git`/`target/`.
-- Không tự chạy Postgres/RabbitMQ — 3 service trỏ vào instance dùng chung của `../../metap` qua
+- Không tự chạy Postgres/RabbitMQ — management-service trỏ vào instance dùng chung của `../../metap` qua
   `host.docker.internal` (cổng host 5433/5672).
-- `web/nginx.conf` còn 1 gap ghi trong comment đầu file: `/metadata/entities` (không kèm tên
-  entity) chỉ proxy về `zones-service`, không gộp được cả 3 service như dev server của Vite.
+- `web/nginx.conf` còn 1 gap ghi trong comment đầu file: `/metadata/entities` nay đi thẳng về `management-service`, nên không còn gap gộp metadata.
 - Lịch sử: bản Rust (2026-09-01) có 5 Dockerfile riêng (`services/*/Dockerfile`, gateway generic
   của `metap`) và `cargo watch` cho dev — đã thay hết bằng bản Go ở trên ngày 2026-11-08.

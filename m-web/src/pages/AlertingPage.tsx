@@ -7,6 +7,7 @@
  * scheduled evaluation uses — so a green result here means the channel genuinely works, not that
  * a mock succeeded.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -170,9 +171,16 @@ export function AlertingPage() {
         description={t("waf.alerting.description")}
         actions={
           <>
-            <Button variant="outline" onClick={evaluateNow} disabled={busy}>
-              {t("waf.alerting.evaluateNow")}
-            </Button>
+            <ConfirmAction
+              title={t("waf.alerting.evaluateNow")}
+              description={t("waf.confirm.runBody")}
+              confirmLabel={t("waf.alerting.evaluateNow")}
+              onConfirm={evaluateNow}
+            >
+              <Button variant="outline" disabled={busy}>
+                {t("waf.alerting.evaluateNow")}
+              </Button>
+            </ConfirmAction>
             <Button onClick={startCreate}>{t("waf.alerting.newPolicy")}</Button>
           </>
         }
@@ -229,14 +237,21 @@ export function AlertingPage() {
                         : t("waf.common.no")}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => sendTest(policy)}
-                        disabled={busy}
+                      <ConfirmAction
+                        title={t("waf.alerting.sendTest")}
+                        description={t("waf.confirm.sendTestBody")}
+                        confirmLabel={t("waf.alerting.sendTest")}
+                        onConfirm={() => sendTest(policy)}
                       >
-                        {t("waf.alerting.sendTest")}
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+
+                          disabled={busy}
+                        >
+                          {t("waf.alerting.sendTest")}
+                        </Button>
+                      </ConfirmAction>
                       <Button
                         size="sm"
                         variant="ghost"

@@ -7,6 +7,7 @@
  * not a hardcoded button list — `metap` returns the available transitions per record, so a
  * workflow change in `zone_entity.rs` shows up here without a frontend change.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -59,7 +60,7 @@ const TRANSITIONS: Record<string, { action: string }[]> = {
   pending: [{ action: "activate" }],
   active: [{ action: "pause" }, { action: "suspend" }],
   paused: [{ action: "resume" }, { action: "suspend" }],
-  suspended: [],
+  suspended: [{ action: "activate" }],
 };
 
 const ZONE_ACTION_TOAST_KEY: Record<string, string> = {
@@ -203,13 +204,21 @@ export function ZoneDetailPage() {
               const info = transitionInfo.get(transition.action);
               const blocked = info ? !info.available : false;
               const button = (
-                <Button
-                  size="sm"
-                  onClick={() => act(transition.action)}
-                  disabled={busy || blocked}
+                <ConfirmAction
+                  title={t(`waf.actions.${transition.action}`)}
+                  description={t("waf.confirm.zoneBody")}
+                  confirmLabel={t(`waf.actions.${transition.action}`)}
+                  destructive={transition.action === "suspend"}
+                  onConfirm={() => act(transition.action)}
                 >
-                  {t(`waf.actions.${transition.action}`)}
-                </Button>
+                  <Button
+                    size="sm"
+
+                    disabled={busy || blocked}
+                  >
+                    {t(`waf.actions.${transition.action}`)}
+                  </Button>
+                </ConfirmAction>
               );
               return blocked && info?.reason ? (
                 <Tooltip key={transition.action}>

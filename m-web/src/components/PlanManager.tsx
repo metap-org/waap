@@ -4,6 +4,7 @@
  * read). A customer without a subscription gets the plan
  * marked as default; with none marked, a small built-in one.
  */
+import { ConfirmAction } from "./ConfirmAction";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -187,25 +188,31 @@ export function PlanManager() {
                   ) : null}
                 </span>
                 <span className="flex gap-2">
-                  <Button
-                    size="sm"
-                    disabled={busy}
-                    onClick={() =>
+                  <ConfirmAction
+                    title={t("waf.plan.manage.approve")}
+                    description={t("waf.confirm.approvePlanBody")}
+                    confirmLabel={t("waf.plan.manage.approve")}
+                    onConfirm={() =>
                       void guard(() => decidePlanChange(r.id, true, ""))
                     }
                   >
-                    {t("waf.plan.manage.approve")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() =>
+                    <Button size="sm" disabled={busy}>
+                      {t("waf.plan.manage.approve")}
+                    </Button>
+                  </ConfirmAction>
+                  <ConfirmAction
+                    title={t("waf.plan.manage.reject")}
+                    description={t("waf.confirm.changeBody")}
+                    confirmLabel={t("waf.plan.manage.reject")}
+                    destructive
+                    onConfirm={() =>
                       void guard(() => decidePlanChange(r.id, false, ""))
                     }
                   >
-                    {t("waf.plan.manage.reject")}
-                  </Button>
+                    <Button size="sm" variant="outline" disabled={busy}>
+                      {t("waf.plan.manage.reject")}
+                    </Button>
+                  </ConfirmAction>
                 </span>
               </li>
             ))}
@@ -297,18 +304,21 @@ export function PlanManager() {
                   ) : null}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
+                  <ConfirmAction
+                    title={t("waf.plan.manage.remove")}
+                    description={t("waf.confirm.deleteBody")}
+                    confirmLabel={t("waf.plan.manage.remove")}
+                    destructive
+                    onConfirm={() =>
                       void guard(() =>
                         deleteRecord(ENTITIES.subscriptions, s.id, s.version),
                       )
                     }
                   >
-                    {t("waf.plan.manage.remove")}
-                  </Button>
+                    <Button size="sm" variant="ghost" disabled={busy}>
+                      {t("waf.plan.manage.remove")}
+                    </Button>
+                  </ConfirmAction>
                 </TableCell>
               </TableRow>
             ))}

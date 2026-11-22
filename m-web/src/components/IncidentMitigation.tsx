@@ -7,6 +7,7 @@
  * anyone remembering to undo it; "keep" clears the expiry (it becomes a normal entry), "remove"
  * deletes it.
  */
+import { ConfirmAction } from "./ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -135,9 +136,17 @@ export function IncidentMitigation({
               }))}
             />
           </div>
-          <Button onClick={block} disabled={busy || !ip.trim() || !zoneId}>
-            {t("waf.incidentDetail.mitigation.block")}
-          </Button>
+          <ConfirmAction
+            title={t("waf.incidentDetail.mitigation.block")}
+            description={t("waf.confirm.blockBody", { ip: ip.trim() })}
+            confirmLabel={t("waf.incidentDetail.mitigation.block")}
+            destructive
+            onConfirm={block}
+          >
+            <Button disabled={busy || !ip.trim() || !zoneId}>
+              {t("waf.incidentDetail.mitigation.block")}
+            </Button>
+          </ConfirmAction>
         </div>
       ) : null}
 
@@ -176,11 +185,11 @@ export function IncidentMitigation({
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-right">
                     {expiresAt ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() =>
+                      <ConfirmAction
+                        title={t("waf.incidentDetail.mitigation.keep")}
+                        description={t("waf.confirm.changeBody")}
+                        confirmLabel={t("waf.incidentDetail.mitigation.keep")}
+                        onConfirm={() =>
                           run(async () => {
                             await updateRecord(
                               ENTITIES.ipAccessLists,
@@ -192,14 +201,17 @@ export function IncidentMitigation({
                           })
                         }
                       >
-                        {t("waf.incidentDetail.mitigation.keep")}
-                      </Button>
+                        <Button size="sm" variant="ghost" disabled={busy}>
+                          {t("waf.incidentDetail.mitigation.keep")}
+                        </Button>
+                      </ConfirmAction>
                     ) : null}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() =>
+                    <ConfirmAction
+                      title={t("waf.incidentDetail.mitigation.remove")}
+                      description={t("waf.confirm.deleteBody")}
+                      confirmLabel={t("waf.incidentDetail.mitigation.remove")}
+                      destructive
+                      onConfirm={() =>
                         run(async () => {
                           await deleteRecord(
                             ENTITIES.ipAccessLists,
@@ -210,8 +222,10 @@ export function IncidentMitigation({
                         })
                       }
                     >
-                      {t("waf.incidentDetail.mitigation.remove")}
-                    </Button>
+                      <Button size="sm" variant="ghost" disabled={busy}>
+                        {t("waf.incidentDetail.mitigation.remove")}
+                      </Button>
+                    </ConfirmAction>
                   </TableCell>
                 </TableRow>
               );

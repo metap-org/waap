@@ -6,6 +6,7 @@
  * `incident_entity.rs` (open → acknowledged → mitigating → resolved), so this screen does not
  * encode its own idea of the lifecycle beyond which action is offered from which state.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -105,9 +106,16 @@ export function IncidentsPage() {
         title={t("waf.incidents.title")}
         description={t("waf.incidents.description")}
         actions={
-          <Button variant="outline" onClick={correlate} disabled={busy}>
-            {t("waf.incidents.runCorrelation")}
-          </Button>
+          <ConfirmAction
+            title={t("waf.incidents.runCorrelation")}
+            description={t("waf.confirm.runBody")}
+            confirmLabel={t("waf.incidents.runCorrelation")}
+            onConfirm={correlate}
+          >
+            <Button variant="outline" disabled={busy}>
+              {t("waf.incidents.runCorrelation")}
+            </Button>
+          </ConfirmAction>
         }
       />
 
@@ -188,14 +196,21 @@ export function IncidentsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     {next ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => advance(incident)}
-                        disabled={busy}
+                      <ConfirmAction
+                        title={t(`waf.actions.${next.action}`)}
+                        description={t("waf.confirm.changeBody")}
+                        confirmLabel={t(`waf.actions.${next.action}`)}
+                        onConfirm={() => advance(incident)}
                       >
-                        {t(`waf.actions.${next.action}`)}
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+
+                          disabled={busy}
+                        >
+                          {t(`waf.actions.${next.action}`)}
+                        </Button>
+                      </ConfirmAction>
                     ) : (
                       <span className="text-xs text-muted-foreground">
                         {t("waf.incidents.done")}
