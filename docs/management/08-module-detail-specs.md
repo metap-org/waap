@@ -57,8 +57,8 @@ theo hostname, filter theo status/protectionMode, sort mặc định `-updatedAt
 - Info: `originAddress` (edit qua modal — **đổi `originAddress` trên zone đang active nên tăng
   `configVersion`** giống mọi thay đổi config khác, vì ảnh hưởng routing thật ở edge).
 - Action buttons theo đúng transition hợp lệ của state hiện tại (không hiện nút không hợp lệ):
-  `pending`→[Activate*]; `active`→[Pause][Suspend]; `paused`→[Resume][Suspend]; `suspended`→
-  không có action (terminal).
+  `pending`→[Activate*]; `active`→[Pause][Suspend]; `paused`→[Resume][Suspend]; `suspended`→[Activate*] (cùng guard
+  với `pending`; không còn là trạng thái cuối từ 2026-11-22).
 - Checklist + verification panel (mục 1) hiện khi còn `pending`.
 - "Danger zone": Delete Zone — chỉ Tenant Admin thấy nút (SOC bị ẩn hẳn theo permission `05`),
   confirm bằng gõ lại hostname.

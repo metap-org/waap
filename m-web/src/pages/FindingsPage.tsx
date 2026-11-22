@@ -6,6 +6,7 @@
  * `open` can go three ways (confirm / accept the risk / mark false positive), which is why this
  * offers a set of actions per row rather than the single "next step" the incident queue uses.
  */
+import { ConfirmAction } from "../components/ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -209,16 +210,22 @@ export function FindingsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       {(ACTIONS[state] ?? []).map((entry) => (
-                        <Button
-                          key={entry.action}
-                          size="sm"
-                          variant="outline"
-                          className="ml-1"
-                          disabled={busy}
-                          onClick={() => act(finding, entry.action)}
+                        <ConfirmAction
+                          title={t(`waf.actions.${entry.action}`)}
+                          description={t("waf.confirm.changeBody")}
+                          confirmLabel={t(`waf.actions.${entry.action}`)}
+                          onConfirm={() => act(finding, entry.action)}
                         >
-                          {t(`waf.actions.${entry.action}`)}
-                        </Button>
+                          <Button
+                            key={entry.action}
+                            size="sm"
+                            variant="outline"
+                            className="ml-1"
+                            disabled={busy}
+                          >
+                            {t(`waf.actions.${entry.action}`)}
+                          </Button>
+                        </ConfirmAction>
                       ))}
                     </TableCell>
                   </TableRow>

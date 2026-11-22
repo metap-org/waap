@@ -1,4 +1,4 @@
-# Dev loop for the WAF Customer Portal: the 3 Go services + api-gateway via `go run` from the
+# Dev loop for the WAF Customer Portal: the one Go management-service via `go run` from the
 # mounted source, plus the Vite dev server. Same prerequisites as docker-compose.yml (shared
 # Postgres/RabbitMQ from ../../metap, ./keys/jwks, ./.env — see README.md "Chạy local").
 #
@@ -22,7 +22,7 @@ x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
   CORS_ORIGINS: http://localhost:5173
-  TRUSTED_PROXIES: 172.16.0.0/12 # the api-gateway in front; see docker-compose.yml
+  TRUSTED_PROXIES: 172.16.0.0/12 # the web proxy in front; see docker-compose.yml
   # Workspace > Credentials, both homes. "In metap (encrypted)": a DEV-ONLY key (never reuse it).
   # "Secret manager": the dev Vault (OpenBao) from ../../metap's compose, `docker compose up -d
   # vault` there; without it that option just fails when used.
@@ -37,23 +37,23 @@ x-health: &health
   start_period: 20s
 
 services:
-  zones-service:
+  management-service:
     <<: *go
-    command: go run ./m-zones/cmd/zones-service
+    command: go run ./m-management/cmd/management-service
     ports: ["3000:3000"]
     environment:
       <<: *service-env
       PORT: "3000"
       # The token issuer: signs every token and publishes /.well-known/jwks.json.
       JWKS_KEYS_DIR: /workspace/waap/m-deploy/keys/jwks
-      SCANNING_URL: http://scanning-service:3010
-      ALERTING_URL: http://alerting-service:3020
-      # Plan limits are asked of billing-service; without BILLING_URL there are none.
-      BILLING_URL: http://billing-service:3040
+      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
+      # and its admin manages them. Unset = no plan limits at all.
+      OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
+      # Where security events are read from (the Analytics plane).
+      ANALYTICS_URL: http://analytics-api:3030
       # Dev only: origins and test hostnames live on localhost or in dns-mock. Production leaves this
       # unset, so the origin probe and the ownership-file fetch never contact a private address.
       ALLOW_PRIVATE_TARGETS: "true"
-      BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
       # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
       # dns.google — set records at http://localhost:8053.
       DOH_RESOLVER_URL: http://dns-mock:8053/resolve
@@ -95,63 +95,6 @@ services:
     command: go run .
     ports: ["1025:1025", "1143:1143", "1110:1110", "8025:8025"]
 
-  scanning-service:
-    <<: *go
-    command: go run ./m-scanning/cmd/scanning-service
-    ports: ["3010:3010"]
-    environment:
-      <<: *service-env
-      PORT: "3010"
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-    healthcheck:
-      <<: *health
-      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3010/health"]
-
-  alerting-service:
-    <<: *go
-    command: go run ./m-alerting/cmd/alerting-service
-    ports: ["3020:3020"]
-    environment:
-      <<: *service-env
-      PORT: "3020"
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      ANALYTICS_URL: http://analytics-api:3030
-    healthcheck:
-      <<: *health
-      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3020/health"]
-
-  billing-service:
-    <<: *go
-    command: go run ./m-billing/cmd/billing-service
-    ports: ["3040:3040"]
-    environment:
-      <<: *service-env
-      PORT: "3040"
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
-      # and its admin manages them. Unset = no plan limits at all.
-      OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
-      BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
-    healthcheck:
-      <<: *health
-      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3040/health"]
-
-  api-gateway:
-    <<: *go
-    command: go run ./m-gateway/cmd/api-gateway
-    ports: ["4000:4000"]
-    environment:
-      LISTEN_ADDR: 0.0.0.0:4000
-      TRUSTED_PROXIES: 172.16.0.0/12
-      # Entity routes go to whichever service serves the entity (each one's /metadata/entities);
-      # these prefixes say who answers the rest. Every service verifies the caller's token itself.
-      UPSTREAMS: "zones=http://zones-service:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://scanning-service:3010;alerting=http://alerting-service:3020;billing=http://billing-service:3040"
-    depends_on:
-      zones-service: { condition: service_healthy }
-      scanning-service: { condition: service_healthy }
-      alerting-service: { condition: service_healthy }
-      billing-service: { condition: service_healthy }
-
   # --- Analytics plane (../../a-api) — a separate plane, run here for the dev loop ---
   # ClickHouse holds security events (ADR-0020); analytics-api ingests them (from control-plane)
   # and answers the portal's reads through the gateway. Data survives restarts in the volume.
@@ -178,14 +121,14 @@ services:
     environment:
       PORT: "3030"
       CLICKHOUSE_URL: clickhouse://default:@clickhouse:9000
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      JWKS_URL: http://management-service:3000/.well-known/jwks.json
       ANALYTICS_INGEST_TOKEN: ${ANALYTICS_INGEST_TOKEN:-}
     healthcheck:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3030/health"]
     depends_on:
       clickhouse: { condition: service_healthy }
-      zones-service: { condition: service_healthy }
+      management-service: { condition: service_healthy }
 
   # Vite dev server (hot reload). design-system is consumed through its built dist/, so it is
   # built first; platform-ui is consumed from source.
@@ -195,11 +138,11 @@ services:
       service: web-dev
     working_dir: /workspace/waap/m-web
     environment:
-      GATEWAY_URL: http://api-gateway:4000
+      API_URL: http://management-service:3000
       VITE_USE_POLLING: "true"
     ports: ["5173:5173"]
     depends_on:
-      api-gateway: { condition: service_started }
+      management-service: { condition: service_healthy }
     command: >
       sh -c '
         cd /workspace/design-system && pnpm install --frozen-lockfile && pnpm build &&

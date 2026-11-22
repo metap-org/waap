@@ -1,0 +1,33 @@
+# Architecture guard only: `golangci-lint run ./...` from waap (the root module: m-*, c-*, model).
+# a-api and e-edge are separate modules with their own .golangci.yml.
+version: "2"
+linters:
+  default: none
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # The inner circle: business rules with no framework in them. Standard library only, so a
+        # rule can be read, tested and reused without metap, HTTP or a database
+        # (docs/architecture/08-cross-cutting/20-code-structure-standard.md).
+        pure-rules:
+          list-mode: strict
+          files:
+            - "**/m-management/*/rules/**"
+          allow:
+            - $gostd
+            - github.com/stretchr/testify # tests only; nothing else may be imported
+        # An entity file only declares: metap reads the declaration to build the table, the routes,
+        # the permission checks and the workflow. No logic, no I/O, no other layer of the service.
+        entities-declare-only:
+          list-mode: strict
+          files:
+            - "**/m-management/*/entities/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/metap-org/metap/pkg/metadata
+            - github.com/metap-org/metap/pkg/permission
+            - github.com/metap-org/metap/pkg/reconciler
+            - github.com/metap-org/waap/model

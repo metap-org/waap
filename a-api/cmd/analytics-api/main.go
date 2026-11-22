@@ -12,7 +12,7 @@
 //	CLICKHOUSE_URL             clickhouse://user:pass@host:9000 (default clickhouse://default:@localhost:9000)
 //	ANALYTICS_DATABASE         database holding the tables (default waf_analytics)
 //	ANALYTICS_RETENTION_DAYS   security event TTL (default 30, the v1 retention decision)
-//	JWKS_URL                   token issuer's JWKS (required) — zones-service in this product
+//	JWKS_URL                   token issuer's JWKS (required) — management-service in this product
 //	JWKS_CACHE_TTL_SECONDS     how long a fetched key set is trusted (default 300)
 //	ANALYTICS_INGEST_TOKEN     shared secret control-plane presents on ingest; unset = not checked (dev)
 package main

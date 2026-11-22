@@ -55,7 +55,7 @@ cp .env.example .env      # then set CONTROL_SERVICE_EMAIL / CONTROL_SERVICE_PAS
 go run ./c-config-distributor/cmd/waf-config-distributor   # from the repo root
 ```
 
-Needs the `m-*` services's services running (at least `zones-service` and `alerting-service`), plus
+Needs `management-service` running, plus
 Redis and RabbitMQ. The service account is a real user in the tenant whose config this
 distributes — create it with `metap`'s `dev-tools create-user`, and give it read access to
 `waf.zones`/`waf.ddos_policies`/`waf.firewall_rules` and create on `waf.security_events`.

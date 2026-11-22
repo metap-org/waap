@@ -4,9 +4,9 @@
 #
 # Before the first `docker compose up --build` (from this directory):
 #   1. keys:   (cd ../../metap && go run ./cmd/dev-tools gen-jwks-key ../waap/m-deploy/keys/jwks)
-#              — zones-service is the only token issuer; everyone else verifies via its JWKS.
-#   2. tenant + users: see README.md "Chạy local". The api-gateway holds no credential of its
-#      own: every request carries the caller's token, verified by the service it reaches.
+#              — management-service is the only token issuer; everyone else verifies via its JWKS.
+#   2. tenant + users: see README.md "Chạy local". The web proxy holds no credential of its own:
+#      every request carries the caller's token, verified by management-service.
 #
 # Every build uses `context: ../../` (the metap-org root): ./Dockerfile needs ../../metap for
 # go.mod's replace, web/Dockerfile needs design-system/platform-ui/metap-themes.
@@ -20,9 +20,9 @@ x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
   CORS_ORIGINS: http://localhost:5173,http://localhost:8081
-  # Behind api-gateway every request arrives from the gateway's address; trust its X-Forwarded-For
-  # so the rate limit counts callers, not one shared gateway. The compose network range here;
-  # in production list the gateway's own addresses, never a range a client could be in.
+  # Behind the web proxy every request arrives from the proxy's address; trust its X-Forwarded-For
+  # so the rate limit counts callers, not one shared proxy. The compose network range here;
+  # in production list the proxy's own addresses, never a range a client could be in.
   TRUSTED_PROXIES: 172.16.0.0/12
   # Workspace > Credentials. SECRETS_ENCRYPTION_KEYS ("id:base64key[,old...]", 32-byte keys; first
   # is active) enables "stored in metap, encrypted"; VAULT_ADDR+VAULT_TOKEN (or AWS_SECRETS_* /
@@ -32,22 +32,20 @@ x-service-env: &service-env
   VAULT_TOKEN: ${VAULT_TOKEN:-}
 
 services:
-  zones-service:
+  management-service:
     <<: *service
-    build: { context: ../../, dockerfile: waap/m-deploy/Dockerfile, args: { SERVICE: m-zones/cmd/zones-service } }
+    build: { context: ../../, dockerfile: waap/m-deploy/Dockerfile, args: { SERVICE: m-management/cmd/management-service } }
     ports: ["3000:3000"]
     environment:
       <<: *service-env
       PORT: "3000"
       # The token issuer: signs every token and publishes /.well-known/jwks.json.
       JWKS_KEYS_DIR: /app/keys/jwks
-      # gRPC targets for the cross-service zone-delete check (GuardedZonesBackend).
-      SCANNING_URL: http://scanning-service:3010
-      ALERTING_URL: http://alerting-service:3020
-      # Plan limits are asked of billing-service; without BILLING_URL there are none. Set a real
-      # secret outside local runs.
-      BILLING_URL: http://billing-service:3040
-      BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
+      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
+      # and its admin manages them. Unset = no plan limits at all.
+      OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
+      # Where security events are read from (the Analytics plane).
+      ANALYTICS_URL: http://analytics-api:3030
       # Dev/staging: DNS checks go to dns-mock. A real deployment leaves this unset (dns.google)
       # or points it at its own resolver.
       DOH_RESOLVER_URL: http://dns-mock:8053/resolve
@@ -89,64 +87,6 @@ services:
     volumes:
       - dns-mock:/var/lib/dns-mock
 
-  scanning-service:
-    <<: *service
-    build: { context: ../../, dockerfile: waap/m-deploy/Dockerfile, args: { SERVICE: m-scanning/cmd/scanning-service } }
-    ports: ["3010:3010"]
-    environment:
-      <<: *service-env
-      PORT: "3010"
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-    healthcheck:
-      <<: *health
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3010/health"]
-
-  alerting-service:
-    <<: *service
-    build: { context: ../../, dockerfile: waap/m-deploy/Dockerfile, args: { SERVICE: m-alerting/cmd/alerting-service } }
-    ports: ["3020:3020"]
-    environment:
-      <<: *service-env
-      PORT: "3020"
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      ANALYTICS_URL: http://analytics-api:3030
-    healthcheck:
-      <<: *health
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3020/health"]
-
-  billing-service:
-    <<: *service
-    build: { context: ../../, dockerfile: waap/m-deploy/Dockerfile, args: { SERVICE: m-billing/cmd/billing-service } }
-    ports: ["3040:3040"]
-    environment:
-      <<: *service-env
-      PORT: "3040"
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
-      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
-      # and its admin manages them. Unset = no plan limits at all.
-      OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
-      BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
-    healthcheck:
-      <<: *health
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3040/health"]
-
-  api-gateway:
-    <<: *service
-    build: { context: ../../, dockerfile: waap/m-deploy/Dockerfile, args: { SERVICE: m-gateway/cmd/api-gateway } }
-    ports: ["4000:4000"]
-    environment:
-      LISTEN_ADDR: 0.0.0.0:4000
-      # nginx (the SPA's front door) is the only thing in front: believe the address it forwards.
-      TRUSTED_PROXIES: 172.16.0.0/12
-      # Entity routes go to whichever service serves the entity (each one's /metadata/entities);
-      # these prefixes say who answers the rest. Every service verifies the caller's token itself.
-      UPSTREAMS: "zones=http://zones-service:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://scanning-service:3010;alerting=http://alerting-service:3020;billing=http://billing-service:3040"
-    depends_on:
-      zones-service: { condition: service_healthy }
-      scanning-service: { condition: service_healthy }
-      alerting-service: { condition: service_healthy }
-      billing-service: { condition: service_healthy }
-
   # --- Analytics plane (../../a-api) — separate plane, bundled here for local runs ---
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
@@ -169,7 +109,7 @@ services:
     environment:
       PORT: "3030"
       CLICKHOUSE_URL: clickhouse://default:@clickhouse:9000
-      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      JWKS_URL: http://management-service:3000/.well-known/jwks.json
       ANALYTICS_INGEST_TOKEN: ${ANALYTICS_INGEST_TOKEN:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3030/health"]
@@ -179,18 +119,14 @@ services:
       start_period: 10s
     depends_on:
       clickhouse: { condition: service_healthy }
-      zones-service: { condition: service_healthy }
+      management-service: { condition: service_healthy }
 
   # Production-mode web (pnpm build + nginx). For the Vite dev server use docker-compose.dev.yml.
   web:
     build: { context: ../../, dockerfile: waap/m-web/Dockerfile }
     ports: ["8081:80"]
     depends_on:
-      zones-service: { condition: service_healthy }
-      scanning-service: { condition: service_healthy }
-      alerting-service: { condition: service_healthy }
-      billing-service: { condition: service_healthy }
-      api-gateway: { condition: service_started }
+      management-service: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 10s

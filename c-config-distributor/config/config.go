@@ -10,7 +10,7 @@ import (
 
 type Config struct {
 	// ZonesURL serves waf.zones/ddos_policies/firewall_rules/ip_access_lists over REST
-	// (/api/{entity}): zones-service itself, or the API gateway in front of it.
+	// (/api/{entity}): management-service.
 	ZonesURL string
 	// AnalyticsURL is the Analytics plane's analytics-api — edge telemetry is written there in
 	// batches. AnalyticsIngestToken is its ingest secret (ANALYTICS_INGEST_TOKEN on both sides).

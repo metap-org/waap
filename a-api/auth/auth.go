@@ -1,6 +1,6 @@
 // Package auth verifies the platform's access tokens without depending on metap (ADR-0009:
 // Analytics does not use metap). Tokens are EdDSA JWTs signed by the single issuer
-// (zones-service), whose public keys are published as a JWKS. This package fetches that set,
+// (management-service), whose public keys are published as a JWKS. This package fetches that set,
 // caches it, and refetches when a token names a kid it hasn't seen (key rotation) — at most once
 // per minRefetch, so a flood of bogus kids can't turn into a flood of JWKS requests.
 //

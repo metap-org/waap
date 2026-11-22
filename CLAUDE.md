@@ -26,6 +26,19 @@ than deleted, not a path/command that still works in this repo — read it as "t
 Rust version used to do/be called," the same way `../metap/CLAUDE.md` treats its own
 `crates/`→`go/` references after its Rust removal.
 
+**Update 2026-11-22: the management plane is ONE service, and the gateway is gone.** `m-zones`, `m-scanning`,
+`m-alerting`, `m-billing` and `m-analytics` are now domain packages of `m-management/` (`zones`, `scanning`, `alerting`,
+`billing`, `analytics`), served by one process, `m-management/cmd/management-service` (port 3000, the token issuer); `m-gateway`
+(api-gateway) was removed and the portal (`m-web` dev proxy and nginx, `API_URL`) talks to it directly. Read every older
+`m-zones/...`, `zones-service`, `scanning-service`, `alerting-service`, `billing-service`, `api-gateway`, `SCANNING_URL`,
+`ALERTING_URL`, `BILLING_URL` and `BILLING_INTERNAL_SECRET` in this file and in the docs through this map; they describe the
+split that existed until then. Domains call each other in-process (zones asks billing for plan limits through `PlanLookup`; the
+zone-delete reference check reads scan jobs and incidents through the backend). `?expand=` was resolved only by the gateway;
+a single service does not serve it, and the portal does not use it. `m-management/zones/rules/` is standard-library-only business
+logic and `*/entities/` only declares; both are enforced by `waap/.golangci.yml` (depguard, a CI step). Where each piece plugs
+into metap, and how `zones/` is split into one package per layer (`guard`, `versions`, `netcheck`, `presets`, `policy`, `entities`, `rules`): `docs/architecture/08-cross-cutting/21-metap-vs-app-map.md`; the conventions: `20-code-structure-standard.md`.
+Splitting it into services again, through metap, is a decision the project owner has deferred.
+
 **Update 2026-11-21: REST only — GraphQL and gRPC removed (roadmap 116, `../metap-docs/docs/roadmap/116-*`).**
 `m-gateway` is now `api-gateway` (`m-gateway/cmd/api-gateway` = `metap`'s `pkg/apigateway`, no WAF code): it routes
 `/api/{entity}*` to the service that lists the entity in its `/metadata/entities`, merges the product-wide metadata,

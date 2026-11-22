@@ -3,11 +3,11 @@ import type { IncomingMessage } from "node:http";
 import { defineConfig, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Every backend call goes to the API gateway (`../m-gateway`, metap's pkg/apigateway, roadmap
-// 116): it routes /api/{entity} to the service that serves the entity, merges the product-wide
-// metadata, and sends the other routes by prefix. Env-overridable so `../m-deploy/
-// docker-compose.dev.yml`'s `web` service can point it at the container (`http://api-gateway:4000`).
-const GATEWAY = process.env.GATEWAY_URL ?? "http://localhost:4000";
+// Every backend call goes straight to management-service (`../m-management`): one process serves
+// every entity and every other route, there is no gateway in front. Env-overridable so
+// `../m-deploy/docker-compose.dev.yml`'s `web` service can point it at the container
+// (`http://management-service:3000`).
+const API = process.env.API_URL ?? "http://localhost:3000";
 
 /** Prefixes proxied to the backend. Some are shared with SPA routes (`/admin/users`,
  *  `/admin/roles`, `/auth/oidc/callback`, ...), see isSpaNavigation. */
@@ -104,8 +104,6 @@ export default defineConfig({
         path.resolve(import.meta.dirname, "../../design-system"),
       ],
     },
-    proxy: Object.fromEntries(
-      PROXIED_PREFIXES.map((prefix) => [prefix, GATEWAY]),
-    ),
+    proxy: Object.fromEntries(PROXIED_PREFIXES.map((prefix) => [prefix, API])),
   },
 });

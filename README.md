@@ -8,9 +8,7 @@ mỗi service là một thư mục phẳng ở gốc repo, tên mang tiền tố
 
 | Thư mục | Plane | Vai trò |
 |---|---|---|
-| `m-zones/`, `m-scanning/`, `m-alerting/` | Management | 3 service backend portal (Zone/DDoS/firewall/IP list, scan, alert/incident) — build trên `metap` |
-| `m-gateway/` | Management | GraphQL gateway của portal (engine generic ở `metap/pkg/graphqlgateway`, ở đây chỉ còn mutation riêng của WAF) |
-| `m-analytics/` | Management | Read model security event, dùng chung bởi `m-gateway` và `m-alerting` (dữ liệu nằm ở `a-api`) |
+| `m-management/` | Management | Một service backend portal (domain `zones`, `scanning`, `alerting`, `billing`, `analytics`; `zones/rules/` là logic thuần) — build trên `metap`, portal gọi thẳng, không gateway |
 | `m-web/` | Management | Customer Portal (`@metap/platform-ui`) |
 | `m-deploy/` | Management | Dockerfile, docker-compose, `.env.example`, key JWKS cho các `m-*` service |
 | `c-config-distributor/` | Control | Lấy config từ management, compile thành rule-set, đẩy xuống Redis cho edge; nhận telemetry từ edge — worker nền, không UI |

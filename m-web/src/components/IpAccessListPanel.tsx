@@ -12,6 +12,7 @@
  *   omitted). Same client-side-filter workaround as `FirewallRulesPanel` for the same
  *   `useRecords` empty-string-filter-stripping reason — see that component's file header.
  */
+import { ConfirmAction } from "./ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -200,14 +201,22 @@ export function IpAccessListPanel({ zoneId }: { zoneId?: string }) {
                       : t("waf.common.no")}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => remove(entry)}
-                      disabled={busy}
+                    <ConfirmAction
+                      title={t("waf.common.delete")}
+                      description={t("waf.confirm.deleteBody")}
+                      confirmLabel={t("waf.common.delete")}
+                      destructive
+                      onConfirm={() => remove(entry)}
                     >
-                      {t("waf.common.delete")}
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+
+                        disabled={busy}
+                      >
+                        {t("waf.common.delete")}
+                      </Button>
+                    </ConfirmAction>
                   </TableCell>
                 </TableRow>
               ))}

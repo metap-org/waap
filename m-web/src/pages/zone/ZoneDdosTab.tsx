@@ -10,6 +10,7 @@
  * therefore the `activate` guard) honest — deleting the last policy has to be able to take a zone
  * back to "not configured", not just adding the first one to "configured".
  */
+import { ConfirmAction } from "../../components/ConfirmAction";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -212,14 +213,22 @@ export function ZoneDdosTab({ zoneId }: { zoneId: string }) {
                     >
                       {t("waf.common.edit")}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => remove(policy)}
-                      disabled={busy}
+                    <ConfirmAction
+                      title={t("waf.common.delete")}
+                      description={t("waf.confirm.deleteBody")}
+                      confirmLabel={t("waf.common.delete")}
+                      destructive
+                      onConfirm={() => remove(policy)}
                     >
-                      {t("waf.common.delete")}
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+
+                        disabled={busy}
+                      >
+                        {t("waf.common.delete")}
+                      </Button>
+                    </ConfirmAction>
                   </TableCell>
                 </TableRow>
               ))}

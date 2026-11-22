@@ -7,11 +7,11 @@ package main
 import (
 	"github.com/metap-org/metap/pkg/app"
 
-	_ "github.com/metap-org/waap/m-alerting/entities"
-	_ "github.com/metap-org/waap/m-billing/entities"
 	_ "github.com/metap-org/waap/m-bootstrap"
-	_ "github.com/metap-org/waap/m-scanning/entities"
-	_ "github.com/metap-org/waap/m-zones/entities"
+	_ "github.com/metap-org/waap/m-management/alerting/entities"
+	_ "github.com/metap-org/waap/m-management/billing/entities"
+	_ "github.com/metap-org/waap/m-management/scanning/entities"
+	_ "github.com/metap-org/waap/m-management/zones/entities"
 )
 
 func main() { app.BootstrapMain(app.BootstrapOptions{Name: "waf-bootstrap"}) }

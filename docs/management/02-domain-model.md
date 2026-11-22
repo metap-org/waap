@@ -41,7 +41,8 @@ trò là bản domain model đầy đủ, chi tiết field xem entity riêng bê
 **Workflow `status`**: `pending → active` (guard: **cả 2 điều kiện** — đã có ít nhất 1
 DdosPolicy/FirewallRule, **và** `verificationStatus = verified` — không cho activate 1 zone
 trống config hoặc chưa chứng minh quyền sở hữu domain) `→ paused` (tạm ngưng bảo vệ, giữ config)
-`→ active` (bật lại) `→ suspended` (terminal, do admin platform khoá, vd không thanh toán).
+`→ active` (bật lại) `→ suspended` (do admin khoá, vd không thanh toán). **Không phải trạng thái cuối** (2026-11-22,
+chủ dự án): zone `suspended` activate lại được, vẫn qua guard của `activate` (domain đã verified và có config bảo vệ).
 
 ### `DdosPolicy`
 Chính sách DDoS L7 cho 1 Zone — đúng trụ cột đầu tiên chủ dự án nêu.
