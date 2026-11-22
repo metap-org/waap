@@ -21,6 +21,12 @@ ORDER BY table_name;
 -- waf_security_events    
 -- waf_zones              
 SELECT * FROM waf.waf_alert_policies LIMIT 20;
-SELECT * FROM waf.waf_zones LIMIT 20;
 
+SELECT * FROM waf.waf_zones 
+WHERE deleted != true
+LIMIT 20;
+
+SELECT * FROM waf.waf_subscriptions;
+SELECT * FROM waf.waf_plan_change_requests;
+SELECT * FROM waf.waf_plans;
 ```

@@ -9,5 +9,5 @@ RUN go build -trimpath -o /out/mail-mock .
 
 FROM alpine:3
 COPY --from=build /out/mail-mock /usr/local/bin/mail-mock
-EXPOSE 1025/tcp 8025/tcp
+EXPOSE 1025/tcp 1143/tcp 1110/tcp 8025/tcp
 ENTRYPOINT ["/usr/local/bin/mail-mock"]
