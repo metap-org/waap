@@ -64,6 +64,16 @@ bản ánh xạ kỹ thuật (entity/workflow/permission cụ thể trên `metap
 | `13-screen-api-map.md` | Từng màn hình ↔ API cụ thể — cái nào generic (metap tự sinh) vs cần code thêm |
 | `14-cloudflare-gap-analysis.md` | So sánh feature với Cloudflare thật — cái nào cố tình loại, cái nào là gap thật |
 
+## Cấu hình: file YAML, env ghi đè (2026-11-22)
+
+management-service đọc `config/management.yaml` (compose) hoặc `config/management.dev.yaml` (dev) qua
+`CONFIG_FILE`. Mỗi khoá là tên biến nó thay (`smtp.host` là `SMTP_HOST`); biến môi trường đặt trong
+container thắng file, biến rỗng coi như chưa đặt. Thứ tự: env, file, mặc định. Secret (mật khẩu DB và
+broker, `SMTP_PASSWORD`, `SECRETS_ENCRYPTION_KEYS`, `VAULT_TOKEN`) không để trong file mà ở `.env` hoặc
+env của container. Đổi cổng SMTP cho một môi trường: đặt `SMTP_PORT` trong `.env`, không sửa file.
+Giới hạn hiện tại: `e-edge` và `a-api` chỉ được import `metap/pkg/kit/*` (stdlib-only) nên chưa đọc
+được file YAML, vẫn chỉ đọc env.
+
 ## Trạng thái
 
 Backend (Rust, scaffold từ `metap`'s `templates/metap-app`) đã chạy được — **cả 9 entity của

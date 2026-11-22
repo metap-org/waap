@@ -32,8 +32,8 @@ type Config struct {
 	AnalyticsURL string
 }
 
-// ConfigFromEnv reads the environment.
-func ConfigFromEnv() Config {
+// LoadConfig reads the settings: the environment, then the config file (CONFIG_FILE), then the default.
+func LoadConfig() Config {
 	return Config{AnalyticsURL: env.String("ANALYTICS_URL", "http://localhost:3030")}
 }
 

@@ -16,8 +16,8 @@ type Config struct {
 	ScannerURL string
 }
 
-// ConfigFromEnv reads the environment.
-func ConfigFromEnv() Config { return Config{ScannerURL: env.String("SCANNER_URL", "")} }
+// LoadConfig reads the settings: the environment, then the config file (CONFIG_FILE), then the default.
+func LoadConfig() Config { return Config{ScannerURL: env.String("SCANNER_URL", "")} }
 
 // scannerTimeout bounds the hand-off request to the scanner backend (the scan itself runs on).
 const scannerTimeout = 15 * time.Second

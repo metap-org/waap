@@ -19,11 +19,6 @@ x-service: &service
 x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
-  CORS_ORIGINS: http://localhost:5173,http://localhost:8081
-  # Behind the web proxy every request arrives from the proxy's address; trust its X-Forwarded-For
-  # so the rate limit counts callers, not one shared proxy. The compose network range here;
-  # in production list the proxy's own addresses, never a range a client could be in.
-  TRUSTED_PROXIES: 172.16.0.0/12
   # Workspace > Credentials. SECRETS_ENCRYPTION_KEYS ("id:base64key[,old...]", 32-byte keys; first
   # is active) enables "stored in metap, encrypted"; VAULT_ADDR+VAULT_TOKEN (or AWS_SECRETS_* /
   # GCP_SECRETS_PROJECT_ID) enable "secret manager". Set either or both in .env.
@@ -38,25 +33,19 @@ services:
     ports: ["3000:3000"]
     environment:
       <<: *service-env
-      PORT: "3000"
-      # The token issuer: signs every token and publishes /.well-known/jwks.json.
-      JWKS_KEYS_DIR: /app/keys/jwks
-      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
-      # and its admin manages them. Unset = no plan limits at all.
+      # Everything that is not a secret is in config/management.yaml; a variable set here (from
+      # .env) wins over it. An empty value counts as unset, so the file's value stays.
+      CONFIG_FILE: /etc/waap/management.yaml
       OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
-      # Where security events are read from (the Analytics plane).
-      ANALYTICS_URL: http://analytics-api:3030
-      # Dev/staging: DNS checks go to dns-mock. A real deployment leaves this unset (dns.google)
-      # or points it at its own resolver.
-      DOH_RESOLVER_URL: http://dns-mock:8053/resolve
-      # Invitation and password-reset emails. Dev/staging default: mail-mock (UI on :8025). A real
-      # deployment sets SMTP_* in .env to its relay and PUBLIC_APP_URL to the portal's origin.
-      SMTP_HOST: ${SMTP_HOST:-mail-mock}
-      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-WAF Portal <no-reply@waf.local>}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8081}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+    volumes:
+      - ./keys:/app/keys:ro
+      - ./config/management.yaml:/etc/waap/management.yaml:ro
     healthcheck: &health
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 5s
