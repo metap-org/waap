@@ -6,7 +6,7 @@
  * field's value render (the origin under the hostname, a warning when a zone has no protection).
  */
 import { Link } from "react-router-dom";
-import { Button } from "@metap/ui";
+import { Badge, Button } from "@metap/ui";
 import { GeneratedList } from "@metap/platform-ui";
 import { useTranslation } from "react-i18next";
 import { ENTITIES } from "../api/waf";
@@ -28,6 +28,22 @@ export function ZonesPage() {
         hostname: (zone) => (
           <span>
             {String(zone.data.hostname ?? "")}
+            {Array.isArray(zone.data.tags)
+              ? (zone.data.tags as string[]).map((tag) => (
+                  <Badge key={tag} variant="secondary" className="ml-2">
+                    {tag}
+                  </Badge>
+                ))
+              : null}
+            {zone.data.status === "pending" ? (
+              <Link
+                className="ml-2 text-xs font-normal text-primary hover:underline"
+                to={`/onboarding?zone=${zone.id}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {t("waf.onboarding.resume")}
+              </Link>
+            ) : null}
             {zone.data.originAddress ? (
               <span className="block text-xs font-normal text-muted-foreground">
                 {String(zone.data.originAddress)}

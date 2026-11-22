@@ -70,6 +70,13 @@ export type ZoneData = {
   verificationStatus?: string;
   dnsRoutingStatus?: string;
   lastDnsCheckAt?: string;
+  originProtocol?: "http" | "https";
+  originPort?: number;
+  originHostHeader?: string;
+  originCheckedAt?: string;
+  originReachable?: boolean;
+  tags?: string[];
+  accountId?: string;
 };
 
 export type Zone = WafRecord<ZoneData>;
@@ -131,16 +138,70 @@ export type DomainVerifyResult = {
   data: {
     domain: Domain;
     ownershipVerified: boolean;
-    checked: { txt: string[]; expectedToken: string };
+    checked: {
+      method?: string;
+      txt?: string[];
+      file?: string;
+      expectedToken: string;
+    };
   };
 };
 
 /** Domain-ownership check (Increment 3) — verified once per apex domain, cascades onto every
  *  `Zone` under it (each zone's own `verificationStatus` mirror gets updated server-side). */
-export function verifyDomainDns(domainId: string) {
+export function verifyDomainDns(
+  domainId: string,
+  how: { method?: "dnsTxt" | "httpFile"; host?: string } = {},
+) {
   return act<DomainVerifyResult["data"]>(ENTITIES.domains, "verifyDns", {
     id: domainId,
+    input: { ...how },
   });
+}
+
+/** What a hostname resolves to now, normalised, with a suggested origin (before the zone exists). */
+export type HostnameView = {
+  hostname: string;
+  a: string[];
+  aaaa: string[];
+  cname: string[];
+  pointsToEdge: boolean;
+  suggestedOrigin?: string;
+  edgeTarget: string;
+  warnings: ("unresolved" | "pointsToEdge")[];
+};
+
+export function resolveHostname(hostname: string) {
+  return act<HostnameView>(ENTITIES.zones, "resolveHostname", {
+    input: { hostname },
+  });
+}
+
+export type OriginSpec = {
+  originAddress: string;
+  originProtocol?: string;
+  originPort?: number;
+  originHostHeader?: string;
+  hostname?: string;
+};
+
+/** Checks an origin can be reached with its own protocol, port and host header, before a zone exists. */
+export function probeOrigin(spec: OriginSpec) {
+  return act<OriginTestResult["data"]>(ENTITIES.zones, "probeOrigin", {
+    input: { ...spec },
+  });
+}
+
+export const PRESETS = ["essential", "api", "strict"] as const;
+export type PresetKey = (typeof PRESETS)[number];
+
+/** Gives a zone a starting set of protections; adds nothing a second time. */
+export function applyPreset(zoneId: string, preset: PresetKey) {
+  return act<{ preset: string; added: string[] }>(
+    ENTITIES.zones,
+    "applyPreset",
+    { id: zoneId, input: { preset } },
+  );
 }
 
 export type OriginTestResult = {

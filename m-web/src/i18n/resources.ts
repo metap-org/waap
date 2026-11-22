@@ -235,6 +235,12 @@ export const wafEn = {
           "Tenant-wide rules apply to every zone but belong to none, so they are not part of a version.",
       },
       overview: {
+        tagsTitle: "Tags",
+        tagsDescription:
+          "Short labels to find this zone by, such as prod or a client's name.",
+        tagPlaceholder: "Add a tag",
+        tagAdd: "Add",
+        tagRemove: "Remove tag {{tag}}",
         statEvents7d: "Events (7d)",
         statBlocked7d: "Blocked (7d)",
         statOpenIncidents: "Open incidents",
@@ -692,8 +698,93 @@ export const wafEn = {
       colShare: "Share",
     },
     onboarding: {
+      description:
+        "Protect a new hostname: details, proof of ownership, protection, then activate.",
+      useSuggested: "Use {{origin}} as the origin",
+      originUnreachableSoft:
+        "No answer yet — {{error}}. Check the address and the origin's firewall; you can still continue.",
+      originHint:
+        "Optional: checks the origin answers before anything depends on it.",
+      originAdvanced: "Origin protocol, port and host header",
+      originProtocol: "Protocol",
+      protocolDefault: "HTTPS (default)",
+      originPort: "Port",
+      originHostHeader: "Host header",
+      originAdvancedHint:
+        "Empty means HTTPS on its usual port with the zone's hostname as the host header.",
+      willBeStoredAs: "Will be saved as {{hostname}}",
+      unresolved:
+        "This name does not resolve yet. Check the spelling, or continue if you are adding the DNS record later.",
+      alreadyAtEdge: "This name already points at our edge.",
+      resolvesTo: "Today it points to {{where}}",
+      verifyDescription2:
+        "Prove you control {{apex}}, with a DNS record or a file on your site. One proof covers every hostname under it.",
+      method: { dnsTxt: "DNS TXT record", httpFile: "File on your site" },
+      filePath: "URL: ",
+      fileContent: "content: ",
+      fileHost: "Host to check",
+      fileHostHint: "Where the file is served: {{apex}} or a name under it.",
+      txtOther: "The TXT record has a different value: {{found}}",
+      txtNone: "No TXT record found yet. DNS can take a few minutes.",
+      routeTitle: "Point traffic at us",
+      routeDescription:
+        "Add this record when you are ready to send real traffic through the edge. Not needed to activate.",
+      edgeTargetShown: "shown after Check routing",
+      originLastOk: "Last check: reachable",
+      originLastFailed: "Last check: no answer",
+      verifiedHint: "Domain verified.",
+      notVerifiedHint2:
+        "You can set up protection now; activation needs the domain verified.",
+      copy: "Copy",
+      copied: "Copied",
+      presetApplied: "Added {{count}} protections",
+      presetNothingNew: "Nothing new to add: this zone already has them",
+      preset: {
+        essential: {
+          name: "Essential",
+          summary:
+            "DDoS policy that challenges floods, and a rule that blocks access to sensitive files.",
+        },
+        api: {
+          name: "API",
+          summary:
+            "Tighter DDoS limits, sensitive files blocked, and a rate limit on sign-in.",
+        },
+        strict: {
+          name: "Strict",
+          summary:
+            "Blocks instead of challenging, and refuses methods browsers do not use.",
+        },
+      },
+      presetExplain:
+        "A preset adds a DDoS policy and a few rules you can edit afterwards. Applying one again adds nothing twice.",
+      applyPreset: "Apply preset",
+      skipProtection: "Skip for now",
+      activateDescription2:
+        "Activation needs a verified domain and some protection. The other checks are advice.",
+      check: {
+        verified: {
+          ok: "Domain ownership verified",
+          todo: "Domain ownership not verified",
+        },
+        protection: {
+          ok: "The zone has protection",
+          todo: "The zone has no protection yet",
+        },
+        origin: {
+          ok: "Origin answered the last check",
+          todo: "Origin not checked, or did not answer",
+        },
+        routing: {
+          ok: "Traffic already points at the edge",
+          todo: "Traffic does not point at the edge yet",
+        },
+      },
+      optional: "(advice)",
+      goFix: "Fix",
+      finishLater: "Finish later",
+      resume: "Continue setup",
       title: "Add a zone",
-      description: "Protect a new hostname in four steps.",
       stepDetails: "Details",
       stepVerify: "Verify domain",
       stepProtection: "Protection",
@@ -1049,6 +1140,12 @@ export const wafVi = {
           "Rule áp dụng cho cả tenant thì áp dụng mọi zone nhưng không thuộc zone nào, nên không nằm trong phiên bản.",
       },
       overview: {
+        tagsTitle: "Thẻ",
+        tagsDescription:
+          "Nhãn ngắn để tìm zone này, ví dụ prod hoặc tên khách hàng.",
+        tagPlaceholder: "Thêm thẻ",
+        tagAdd: "Thêm",
+        tagRemove: "Gỡ thẻ {{tag}}",
         statEvents7d: "Sự kiện (7 ngày)",
         statBlocked7d: "Đã chặn (7 ngày)",
         statOpenIncidents: "Sự cố đang mở",
@@ -1506,8 +1603,90 @@ export const wafVi = {
       colShare: "Tỷ lệ",
     },
     onboarding: {
+      description:
+        "Bảo vệ một hostname mới: thông tin, chứng minh quyền sở hữu, bảo vệ, rồi kích hoạt.",
+      useSuggested: "Dùng {{origin}} làm origin",
+      originUnreachableSoft:
+        "Chưa có phản hồi — {{error}}. Kiểm tra địa chỉ và firewall của origin; vẫn có thể tiếp tục.",
+      originHint:
+        "Không bắt buộc: kiểm tra origin có trả lời trước khi có gì phụ thuộc vào nó.",
+      originAdvanced: "Giao thức, cổng và Host header của origin",
+      originProtocol: "Giao thức",
+      protocolDefault: "HTTPS (mặc định)",
+      originPort: "Cổng",
+      originHostHeader: "Host header",
+      originAdvancedHint:
+        "Để trống nghĩa là HTTPS ở cổng thường lệ, Host header là hostname của zone.",
+      willBeStoredAs: "Sẽ được lưu là {{hostname}}",
+      unresolved:
+        "Tên này chưa phân giải được. Kiểm tra chính tả, hoặc tiếp tục nếu bạn thêm bản ghi DNS sau.",
+      alreadyAtEdge: "Tên này đã trỏ về edge của chúng tôi.",
+      resolvesTo: "Hiện đang trỏ tới {{where}}",
+      verifyDescription2:
+        "Chứng minh bạn kiểm soát {{apex}} bằng bản ghi DNS hoặc một file trên site. Một lần chứng minh dùng cho mọi hostname bên dưới.",
+      method: { dnsTxt: "Bản ghi DNS TXT", httpFile: "File trên site của bạn" },
+      filePath: "URL: ",
+      fileContent: "nội dung: ",
+      fileHost: "Host để kiểm tra",
+      fileHostHint: "Nơi file được phục vụ: {{apex}} hoặc một tên bên dưới nó.",
+      txtOther: "Bản ghi TXT có giá trị khác: {{found}}",
+      txtNone: "Chưa thấy bản ghi TXT. DNS có thể mất vài phút.",
+      routeTitle: "Trỏ traffic về chúng tôi",
+      routeDescription:
+        "Thêm bản ghi này khi bạn sẵn sàng cho traffic thật đi qua edge. Không bắt buộc để kích hoạt.",
+      edgeTargetShown: "hiện sau khi bấm Kiểm tra định tuyến",
+      originLastOk: "Lần kiểm tra gần nhất: có phản hồi",
+      originLastFailed: "Lần kiểm tra gần nhất: không phản hồi",
+      verifiedHint: "Domain đã xác minh.",
+      notVerifiedHint2:
+        "Bạn có thể thiết lập bảo vệ ngay; kích hoạt cần domain đã xác minh.",
+      copy: "Sao chép",
+      copied: "Đã sao chép",
+      presetApplied: "Đã thêm {{count}} biện pháp bảo vệ",
+      presetNothingNew: "Không có gì mới để thêm: zone đã có sẵn",
+      preset: {
+        essential: {
+          name: "Cơ bản",
+          summary:
+            "DDoS policy thách thức đợt tấn công dồn dập, và rule chặn truy cập file nhạy cảm.",
+        },
+        api: {
+          name: "API",
+          summary:
+            "Giới hạn DDoS chặt hơn, chặn file nhạy cảm, và giới hạn tần suất đăng nhập.",
+        },
+        strict: {
+          name: "Nghiêm ngặt",
+          summary:
+            "Chặn thay vì thách thức, và từ chối các method trình duyệt không dùng.",
+        },
+      },
+      presetExplain:
+        "Preset thêm một DDoS policy và vài rule bạn có thể sửa sau. Áp dụng lại sẽ không thêm trùng.",
+      applyPreset: "Áp dụng preset",
+      skipProtection: "Bỏ qua lúc này",
+      activateDescription2:
+        "Kích hoạt cần domain đã xác minh và có bảo vệ. Các kiểm tra khác chỉ là lời khuyên.",
+      check: {
+        verified: {
+          ok: "Đã xác minh quyền sở hữu domain",
+          todo: "Chưa xác minh quyền sở hữu domain",
+        },
+        protection: { ok: "Zone đã có bảo vệ", todo: "Zone chưa có bảo vệ" },
+        origin: {
+          ok: "Origin có phản hồi ở lần kiểm tra gần nhất",
+          todo: "Chưa kiểm tra origin, hoặc origin không phản hồi",
+        },
+        routing: {
+          ok: "Traffic đã trỏ về edge",
+          todo: "Traffic chưa trỏ về edge",
+        },
+      },
+      optional: "(lời khuyên)",
+      goFix: "Sửa",
+      finishLater: "Để sau",
+      resume: "Tiếp tục thiết lập",
       title: "Thêm zone",
-      description: "Bảo vệ một hostname mới trong 4 bước.",
       stepDetails: "Chi tiết",
       stepVerify: "Xác minh domain",
       stepProtection: "Bảo vệ",

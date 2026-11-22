@@ -41,6 +41,9 @@ const (
 	ActionSyncConfigState = "syncConfigState"   // zones
 	ActionRollback        = "rollback"          // policy_versions
 	ActionExportData      = "exportData"        // zones (entity scope): the tenant's configuration as one document
+	ActionResolveHostname = "resolveHostname"   // zones (entity scope): what a hostname resolves to now
+	ActionProbeOrigin     = "probeOrigin"       // zones (entity scope): can this origin be reached, before the zone exists
+	ActionApplyPreset     = "applyPreset"       // zones: give the zone a starting set of protections
 	ActionValidatePolicy  = "validatePolicy"    // zones: check a zone's rules before they matter
 	ActionPlanUsage       = "planUsage"         // zones (entity scope): the tenant's plan and what it uses
 	ActionRequestPlan     = "requestPlanChange" // plan_change_requests (entity scope): a customer asks for another plan

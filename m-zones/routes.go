@@ -179,6 +179,10 @@ func hasSuffix(s, suffix string) bool {
 }
 
 type verifyDNSBody struct {
+	// Method is "dnsTxt" (the default) or "httpFile" (UC-21); Host is where the file is fetched
+	// from for httpFile (the domain itself, or a name under it).
+	Method string `json:"method"`
+	Host   string `json:"host"`
 	// ExpectedToken is an optional override for local/manual testing — normally the check reads
 	// the domain's own verificationToken and never trusts a caller-supplied value.
 	ExpectedToken *string `json:"expectedToken"`
@@ -209,28 +213,41 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 		expectedToken, _ = jsonAsString(domain.Data[model.FieldVerificationToken])
 	}
 
-	client := httpClient()
-	txt := dnsLookup(client, "_waf-verify."+apexDomain, "TXT")
-	ownershipOK := expectedToken != ""
-	if ownershipOK {
-		found := false
+	method := body.Method
+	if method == "" {
+		method = model.VerificationMethodDNSTxt
+	}
+	var txt []string
+	ownershipOK := false
+	checked := map[string]any{"method": method, "expectedToken": expectedToken}
+	switch method {
+	case model.VerificationMethodHTTPFile:
+		if expectedToken != "" {
+			found, detail, err := fetchVerificationFile(ctx, apexDomain, body.Host, expectedToken)
+			if err != nil {
+				return nil, err
+			}
+			ownershipOK = found
+			checked["file"] = detail
+		}
+	case model.VerificationMethodDNSTxt:
+		txt = dnsLookup(httpClient(), "_waf-verify."+apexDomain, "TXT")
+		checked["txt"] = txt
 		for _, t := range txt {
-			if t == expectedToken {
-				found = true
-				break
+			if expectedToken != "" && t == expectedToken {
+				ownershipOK = true
 			}
 		}
-		ownershipOK = found
+	default:
+		return nil, crud.NewServiceErrorFields(http.StatusUnprocessableEntity, errcode.ValidationFailed,
+			map[string][]string{"method": {"must be dnsTxt or httpFile"}})
 	}
 
 	if !ownershipOK {
-		return map[string]any{
-			"domain": domain, "ownershipVerified": false,
-			"checked": map[string]any{"txt": txt, "expectedToken": expectedToken},
-		}, nil
+		return map[string]any{"domain": domain, "ownershipVerified": false, "checked": checked}, nil
 	}
 
-	patch := crud.JsonObject{model.FieldVerificationStatus: jsonString(model.VerificationVerified)}
+	patch := crud.JsonObject{model.FieldVerificationStatus: jsonString(model.VerificationVerified), model.FieldVerificationMethod: jsonString(method)}
 	updatedDomain, err := state.Crud.Update(ctx, model.Domains, domainID, domain.Version, patch, rc, nil)
 	if err != nil {
 		return nil, err
@@ -250,39 +267,30 @@ func verifyDomainDNS(ctx context.Context, state *httpserver.AppState, rc *permis
 		}
 	}
 
-	return map[string]any{
-		"domain": updatedDomain, "ownershipVerified": true,
-		"checked": map[string]any{"txt": txt, "expectedToken": expectedToken},
-	}, nil
+	return map[string]any{"domain": updatedDomain, "ownershipVerified": true, "checked": checked}, nil
 }
 
 // TestOrigin is POST /api/waf.zones/{id}/test-origin — "can we actually reach the origin the
-// customer gave us", a one-shot connectivity check. Not stored on the zone.
+// customer gave us" with the zone's own origin settings. The result is also kept on the zone
+// (originCheckedAt, originReachable) so onboarding can show how far a person got; a failed save of
+// that does not hide the answer.
 func testOrigin(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
 	got, err := state.Crud.Get(ctx, model.Zones, zoneID, rc)
 	if err != nil {
 		return nil, err
 	}
-	origin, _ := jsonAsString(got.Record.Data[model.FieldOriginAddress])
-	if origin == "" {
+	spec := originSpecOf(got.Record.Data)
+	if spec.Address == "" {
 		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no origin address.")
 	}
-	// A customer types "1.2.3.4" or "origin.example.com" as often as a full URL.
-	targetURL := origin
-	if len(origin) < 7 || (origin[:7] != "http://" && (len(origin) < 8 || origin[:8] != "https://")) {
-		targetURL = "https://" + origin
+	if spec.HostHeader == "" {
+		spec.HostHeader, _ = jsonAsString(got.Record.Data[model.FieldHostname])
 	}
-
-	started := time.Now()
-	resp, err := httpClient().Get(targetURL)
-	elapsedMs := time.Since(started).Milliseconds()
-
-	var payload map[string]any
-	if err != nil {
-		payload = map[string]any{"reachable": false, "error": err.Error(), "latencyMs": elapsedMs, "url": targetURL}
-	} else {
-		defer resp.Body.Close()
-		payload = map[string]any{"reachable": true, "status": resp.StatusCode, "latencyMs": elapsedMs, "url": targetURL}
+	payload := probeOrigin(ctx, spec)
+	reachable, _ := payload["reachable"].(bool)
+	patch := crud.JsonObject{model.FieldOriginCheckedAt: jsonString(standard.NowRFC3339()), model.FieldOriginReachable: jsonBool(reachable)}
+	if _, err := state.Crud.Update(ctx, model.Zones, zoneID, got.Record.Version, patch, rc, nil); err != nil {
+		slog.Warn("origin check done but not saved on the zone", "zone", zoneID, "error", err)
 	}
 	return payload, nil
 }
@@ -421,6 +429,26 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 		{model.Zones, model.ActionSyncConfigState, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(syncConfigState(ctx, state, c.RC, c.ID))
 		}},
+		{model.Zones, model.ActionResolveHostname, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(resolveHostname(ctx, c.Input))
+		}},
+		{model.Zones, model.ActionProbeOrigin, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			spec := originSpecOf(crud.JsonObject{
+				model.FieldOriginAddress: c.Input[model.FieldOriginAddress], model.FieldOriginProtocol: c.Input[model.FieldOriginProtocol],
+				model.FieldOriginPort: c.Input[model.FieldOriginPort], model.FieldOriginHostHeader: c.Input[model.FieldOriginHostHeader],
+			})
+			if spec.HostHeader == "" {
+				spec.HostHeader, _ = jsonAsString(c.Input[model.FieldHostname])
+			}
+			return crud.ToObject(probeOrigin(ctx, spec), nil)
+		}},
+		{model.Zones, model.ActionApplyPreset, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			key, _ := jsonAsString(c.Input["preset"])
+			// Through the guarded backend, as a person's own edits are: validation, plan limits,
+			// the zone's account and policy versions all apply.
+			guarded := NewGuardedZonesBackend(state.Crud, scanningURL(), alertingURL()).WithPlanLimits(PlanClientFromEnv())
+			return crud.ToObject(applyPreset(ctx, guarded, c.ID, key, c.RC))
+		}},
 		{model.Zones, model.ActionValidatePolicy, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(validateZonePolicy(ctx, state.Crud, c.ID, c.RC))
 		}},
@@ -440,6 +468,8 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 		}},
 		{model.Domains, model.ActionVerifyDNS, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			var body verifyDNSBody
+			body.Method, _ = jsonAsString(c.Input["method"])
+			body.Host, _ = jsonAsString(c.Input["host"])
 			if raw, ok := c.Input["expectedToken"]; ok {
 				if tok, ok := jsonAsString(raw); ok {
 					body.ExpectedToken = &tok

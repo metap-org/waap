@@ -51,6 +51,16 @@ func ZoneEntity() metadata.EntityDefinition {
 		Fields: []metadata.EntityField{
 			hostname,
 			metadata.NewField(model.FieldOriginAddress, "Origin Address", metadata.KindString).Require(),
+			// How the edge reaches the origin (UC-24). Empty protocol means https, empty port the
+			// protocol's own, empty host header the zone's hostname.
+			metadata.EnumField(model.FieldOriginProtocol, "Origin Protocol", "http", "https"),
+			metadata.NewField(model.FieldOriginPort, "Origin Port", metadata.KindNumber),
+			metadata.NewField(model.FieldOriginHostHeader, "Origin Host Header", metadata.KindString),
+			// The last origin connectivity check, kept so onboarding can show where a person got to.
+			metadata.NewField(model.FieldOriginCheckedAt, "Origin Checked At", metadata.KindDatetime),
+			metadata.NewField(model.FieldOriginReachable, "Origin Reachable", metadata.KindBoolean),
+			// Free labels for finding zones (UC-34): a JSON array of short strings.
+			metadata.NewField(model.FieldTags, "Tags", metadata.KindJSON),
 			metadata.EnumField(model.FieldStatus, "Status", "pending", "active", "paused", "suspended").Index(),
 			metadata.EnumField(model.FieldProtectionMode, "Protection Mode", "monitor", "enforce").Require().Index().WithWidget(metadata.WidgetRadio),
 			metadata.NewField(model.FieldConfigVersion, "Config Version", metadata.KindNumber).Sort(),
@@ -91,6 +101,9 @@ func ZoneEntity() metadata.EntityDefinition {
 			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
 			{Name: model.ActionValidatePolicy, Label: "Check policy", Description: "Checks the zone's rules, DDoS policies and IP lists for mistakes. Changes nothing.", Scope: metadata.ActionScopeRecord},
 			{Name: model.ActionExportData, Label: "Export data", Description: "Everything this tenant has configured, as one document.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionResolveHostname, Label: "Resolve hostname", Description: "What a hostname resolves to now, and a suggested origin.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionProbeOrigin, Label: "Probe origin", Description: "Checks an origin can be reached, before a zone exists for it.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionApplyPreset, Label: "Apply preset", Description: "Gives the zone a starting set of protections.", Scope: metadata.ActionScopeRecord},
 			{Name: model.ActionPlanUsage, Label: "Plan and usage", Description: "The tenant's plan, its limits and how much of them is used.", Scope: metadata.ActionScopeEntity},
 			{Name: model.ActionSyncConfigState, Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
 		},
