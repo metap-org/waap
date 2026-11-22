@@ -96,20 +96,20 @@ Cố định trước khi viết S1/S2, để hai bên làm song song. Chi tiế
 
 | UC | Trạng thái | Ghi chú | Nguồn |
 |---|---|---|---|
-| 20 Thêm zone | Có | tự tạo domain theo apex; chưa kiểm danh sách đen domain | mã |
-| 21 Xác minh domain | Một phần | chỉ TXT `_waf-verify`; chưa có httpFile (enum có, route chưa) | mã |
-| 22 Hướng dẫn trỏ DNS | Một phần | có `dnsRoutingStatus` và action `verifyDns`; chưa có hướng dẫn theo từng cách kết nối | mã |
-| 23 Hostname | Chưa | mỗi zone một hostname; chưa có nhiều hostname hay wildcard | mã |
-| 24 Origin | Một phần | địa chỉ + action `testOrigin`; chưa có cổng, giao thức, SNI, header | mã |
+| 20 Thêm zone | Có | hostname được chuẩn hoá và kiểm (bỏ scheme, đường dẫn, cổng; từ chối IP, tên một nhãn, ký tự lạ; chấp nhận `*.domain`); gõ xong hiện tên đang trỏ về đâu, gợi ý origin, cảnh báo nếu tra không ra; tự tạo domain theo apex; chưa kiểm danh sách đen domain | mã |
+| 21 Xác minh domain | Có | chọn TXT `_waf-verify` hoặc file `/.well-known/waf-verify/<token>` (host phải là domain hoặc tên dưới nó; chỉ kết nối tới địa chỉ công khai) | mã |
+| 22 Hướng dẫn trỏ DNS | Một phần | bản ghi CNAME cần thêm hiện ngay ở bước kết nối kèm nút sao chép, kiểm tra định tuyến chỉ để biết, không chặn; chưa có hướng dẫn riêng cho A/AAAA hay theo nhà cung cấp DNS | mã |
+| 23 Hostname | Một phần | wildcard `*.domain` được chấp nhận (một zone cho mọi subdomain); mỗi zone vẫn một hostname, chưa có nhiều hostname trong một zone | mã |
+| 24 Origin | Có | địa chỉ, giao thức, cổng, Host header (cũng là tên TLS); kiểm tra origin ngay ở form trước khi tạo zone và lưu lần kiểm tra gần nhất; chỉ kết nối tới địa chỉ công khai (tắt được cho dev) | mã |
 | 25 TLS, nguồn IP client | Chưa | | mã |
-| 26 Preset | Chưa | | mã |
+| 26 Preset | Có | ba preset (Cơ bản, API, Nghiêm ngặt) áp dụng ở bước bảo vệ: một DDoS policy và vài rule, ghi thành một version, áp lại không thêm trùng; chưa có preset do vận hành định nghĩa | mã |
 | 27 Kích hoạt zone | Có | cổng: domain đã xác minh và zone có cấu hình bảo vệ | mã |
-| 28 Tiến độ onboarding | Một phần | trang Onboarding; chưa ghi từng bước | mã |
+| 28 Tiến độ onboarding | Một phần | tiến độ đọc từ chính zone (đã xác minh, có bảo vệ, origin kiểm lần cuối, định tuyến), mở lại từ danh sách zone ("Tiếp tục thiết lập") ở bước chưa xong; chưa có nhắc ngày 1, 3, 7 và huỷ claim sau 14 ngày | mã |
 | 29 Bật chặn theo bậc | Một phần | chỉ `monitor` đến `enforce` cho cả zone, chưa theo nhóm rule | mã |
 | 30, 31 Khoá origin, hoàn tất onboarding | Chưa | | mã |
 | 32 Tạm dừng, mở lại | Có | workflow `active`, `paused` | mã |
 | 33 Gỡ zone | Một phần | xoá có chặn khi còn scan job hay incident; chưa có trạng thái `removed` giải phóng domain | mã |
-| 34 Tag, nhóm zone | Chưa | | mã |
+| 34 Tag, nhóm zone | Một phần | tag tự do trên zone (hiện ở danh sách, sửa ở trang tổng quan); chưa có nhóm zone để phân quyền | mã |
 
 ### S2 Policy và thay đổi
 

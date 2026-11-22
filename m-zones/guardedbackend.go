@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/metap-org/metap/pkg/kit/errcode"
@@ -194,6 +195,12 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 			// validation error rather than this wrapper inventing a different one.
 			return b.inner.Create(ctx, entity, data, rc, reason)
 		}
+		normalized, err := normalizeZoneFields(data)
+		if err != nil {
+			return crud.RecordDto{}, err
+		}
+		data = normalized
+		hostname, _ = jsonAsString(data[model.FieldHostname])
 		domainID, verified, err := b.resolveDomainID(ctx, hostname, rc)
 		if err != nil {
 			return crud.RecordDto{}, err
@@ -235,6 +242,12 @@ func (b *GuardedZonesBackend) Update(ctx context.Context, entity string, id uuid
 	// domainId is create-only (matching the old zoneDomainGuard, which only ever intercepted
 	// create) — a Zone's domain never changes once it's assigned.
 	switch entity {
+	case model.Zones:
+		normalized, err := normalizeZoneFields(data)
+		if err != nil {
+			return crud.RecordDto{}, err
+		}
+		data = normalized
 	case model.FirewallRules:
 		if err := validateFirewallRule(data); err != nil {
 			return crud.RecordDto{}, err
@@ -311,4 +324,67 @@ func validateExpiry(data crud.JsonObject) error {
 		}
 	}
 	return nil
+}
+
+// normalizeZoneFields cleans what a person typed into a zone's own fields before they are stored:
+// the hostname to its canonical form, and tags to a short list of distinct labels. The origin port
+// must be a real port. Fields absent from data stay absent (an update touches only what it names).
+func normalizeZoneFields(data crud.JsonObject) (crud.JsonObject, error) {
+	out := cloneJsonObject(data)
+	fieldErrors := map[string][]string{}
+	if raw, ok := jsonAsString(data[model.FieldHostname]); ok {
+		h, err := NormalizeHostname(raw)
+		if err != nil {
+			fieldErrors[model.FieldHostname] = []string{err.Error()}
+		} else {
+			out[model.FieldHostname] = jsonString(h)
+		}
+	}
+	if port, ok := jsonAsFloat(data[model.FieldOriginPort]); ok && (port < 1 || port > 65535 || port != float64(int(port))) {
+		fieldErrors[model.FieldOriginPort] = []string{"must be a port between 1 and 65535"}
+	}
+	if raw, ok := data[model.FieldTags]; ok && string(raw) != "null" {
+		tags, err := normalizeTags(raw)
+		if err != nil {
+			fieldErrors[model.FieldTags] = []string{err.Error()}
+		} else {
+			out[model.FieldTags] = tags
+		}
+	}
+	if len(fieldErrors) > 0 {
+		return nil, crud.NewServiceErrorFields(422, errcode.ValidationFailed, fieldErrors)
+	}
+	return out, nil
+}
+
+const (
+	maxTags      = 10
+	maxTagLength = 32
+)
+
+// normalizeTags accepts a JSON array of strings and returns it trimmed, de-duplicated (ignoring
+// case) and bounded: a tag is a short label, not free text.
+func normalizeTags(raw json.RawMessage) (json.RawMessage, error) {
+	var in []string
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return nil, fmt.Errorf("must be a list of text labels")
+	}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, t := range in {
+		t = strings.TrimSpace(t)
+		if t == "" || seen[strings.ToLower(t)] {
+			continue
+		}
+		if len([]rune(t)) > maxTagLength {
+			return nil, fmt.Errorf("a tag is at most %d characters", maxTagLength)
+		}
+		seen[strings.ToLower(t)] = true
+		out = append(out, t)
+	}
+	if len(out) > maxTags {
+		return nil, fmt.Errorf("at most %d tags", maxTags)
+	}
+	b, _ := json.Marshal(out)
+	return b, nil
 }

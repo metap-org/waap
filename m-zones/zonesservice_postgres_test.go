@@ -595,3 +595,107 @@ func TestExportTenantDataHoldsTheTenantsConfiguration(t *testing.T) {
 	assert.Len(t, doc.Entities["waf.accounts"], 1, "the default account")
 	assert.Empty(t, doc.Truncated)
 }
+
+// What a person types is stored canonically, an invalid hostname is refused with a field error, tags
+// are tidied, and the origin port must be a real one.
+func TestZoneFieldsAreNormalisedOnCreateAndUpdate(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "http://localhost:1", "http://localhost:1")
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+	base := func(host string, extra crud.JsonObject) crud.JsonObject {
+		d := crud.JsonObject{"hostname": jsonMarshal(t, host), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}
+		for k, v := range extra {
+			d[k] = v
+		}
+		return d
+	}
+
+	zone, err := backend.Create(ctx, "waf.zones", base("HTTPS://Shop."+strings.ToUpper(apex)+":8443/x", crud.JsonObject{
+		"tags": jsonMarshal(t, []string{" prod ", "Prod", "eu"}), "originPort": jsonMarshal(t, 8080),
+	}), rc, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "shop."+apex, jsonString0(zone.Data["hostname"]))
+	assert.JSONEq(t, `["prod","eu"]`, string(zone.Data["tags"]))
+
+	for _, bad := range []crud.JsonObject{
+		base("203.0.113.5", nil), base("not a host", nil),
+		base("ok."+apex, crud.JsonObject{"originPort": jsonMarshal(t, 70000)}),
+		base("ok."+apex, crud.JsonObject{"tags": jsonMarshal(t, "not-a-list")}),
+	} {
+		_, err := backend.Create(ctx, "waf.zones", bad, rc, nil)
+		se, ok := crud.AsServiceError(err)
+		require.True(t, ok, "%v", err)
+		assert.EqualValues(t, 422, se.Status)
+	}
+
+	// An update normalises too, and only the fields it names are touched.
+	upd, err := backend.Update(ctx, "waf.zones", zone.ID, zone.Version, crud.JsonObject{"hostname": jsonMarshal(t, "WWW."+apex)}, rc, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "www."+apex, jsonString0(upd.Data["hostname"]))
+	assert.JSONEq(t, `["prod","eu"]`, string(upd.Data["tags"]))
+}
+
+// A preset gives a zone its starting protections through the guarded path (one policy version, not
+// one per rule), turns hasConfig on, and applying it again adds nothing.
+func TestApplyPresetIsOneVersionAndIdempotent(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "http://localhost:1", "http://localhost:1")
+	actions := crud.NewActionRegistry()
+	require.NoError(t, zonesservice.RegisterActions(state, actions))
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+	zone, err := backend.Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, "a."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+	require.NoError(t, err)
+
+	apply := func(key string) crud.JsonObject {
+		out, err := actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "applyPreset", ID: zone.ID, RC: rc, Input: crud.JsonObject{"preset": jsonMarshal(t, key)}})
+		require.NoError(t, err)
+		return out
+	}
+	count := func(entity string) int {
+		res, err := state.Crud.List(ctx, entity, query.ListInput{Limit: 50, Filters: [][2]string{{"zoneId", zone.ID.String()}}}, rc)
+		require.NoError(t, err)
+		return len(res.Data)
+	}
+	versions := func() int {
+		res, err := state.Crud.List(ctx, "waf.policy_versions", query.ListInput{Limit: 50, Filters: [][2]string{{"zoneId", zone.ID.String()}}}, rc)
+		require.NoError(t, err)
+		return len(res.Data)
+	}
+
+	out := apply("api")
+	assert.JSONEq(t, `["DDoS policy","Block access to sensitive files","Rate limit sign-in"]`, string(out["added"]))
+	assert.Equal(t, 1, count("waf.ddos_policies"))
+	assert.Equal(t, 2, count("waf.firewall_rules"))
+	assert.Equal(t, 2, versions(), "the zone as it was, and one version for the whole preset")
+	got, err := state.Crud.Get(ctx, "waf.zones", zone.ID, rc)
+	require.NoError(t, err)
+	assert.Equal(t, "true", string(got.Record.Data["hasConfig"]))
+
+	out = apply("api")
+	assert.JSONEq(t, `[]`, string(out["added"]))
+	assert.Equal(t, 2, count("waf.firewall_rules"))
+	assert.Equal(t, 2, versions(), "nothing added, nothing recorded")
+
+	_, err = actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "applyPreset", ID: zone.ID, RC: rc, Input: crud.JsonObject{"preset": jsonMarshal(t, "nope")}})
+	require.Error(t, err)
+}

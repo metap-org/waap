@@ -50,6 +50,9 @@ services:
       ALERTING_URL: http://alerting-service:3020
       # Plan limits are asked of billing-service; without BILLING_URL there are none.
       BILLING_URL: http://billing-service:3040
+      # Dev only: origins and test hostnames live on localhost or in dns-mock. Production leaves this
+      # unset, so the origin probe and the ownership-file fetch never contact a private address.
+      ALLOW_PRIVATE_TARGETS: "true"
       BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
       # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
       # dns.google — set records at http://localhost:8053.

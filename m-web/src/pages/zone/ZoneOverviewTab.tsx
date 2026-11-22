@@ -12,6 +12,7 @@ import {
 } from "../../api/waf";
 import { ApiErrorMessage, dayLabel, shortDate } from "@metap/platform-ui";
 import { StatusBadge } from "../../components/primitives";
+import { ZoneTags } from "../../components/ZoneTags";
 
 export function ZoneOverviewTab({ zone }: { zone: Zone }) {
   const { t } = useTranslation();
@@ -61,6 +62,8 @@ export function ZoneOverviewTab({ zone }: { zone: Zone }) {
   return (
     <div className="mt-4 grid gap-4">
       {queryError ? <ApiErrorMessage error={queryError} /> : null}
+
+      <ZoneTags zone={zone} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile

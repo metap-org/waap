@@ -77,9 +77,10 @@ const (
 
 // waf.domains verificationStatus / verificationMethod, and waf.zones dnsRoutingStatus.
 const (
-	VerificationUnverified   = "unverified"
-	VerificationVerified     = "verified"
-	VerificationMethodDNSTxt = "dnsTxt"
+	VerificationUnverified     = "unverified"
+	VerificationVerified       = "verified"
+	VerificationMethodDNSTxt   = "dnsTxt"
+	VerificationMethodHTTPFile = "httpFile"
 
 	DNSRouted    = "routed"
 	DNSNotRouted = "notRouted"

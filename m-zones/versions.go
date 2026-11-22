@@ -200,7 +200,7 @@ func isVersioned(entity string) bool {
 // ensureBaseline records the zone as it is before its first tracked change, so version 1 is what
 // the customer had and the change that follows is version 2. Best effort, like recordChange.
 func ensureBaseline(ctx context.Context, backend crud.RecordBackend, zoneID uuid.UUID, rc *permission.RequestContext) {
-	if zoneID == uuid.Nil {
+	if zoneID == uuid.Nil || versionsOff(ctx) {
 		return
 	}
 	latest, err := latestVersion(ctx, backend, zoneID, rc)
@@ -218,7 +218,7 @@ func ensureBaseline(ctx context.Context, backend crud.RecordBackend, zoneID uuid
 // recordChange snapshots the zone after a rule change. A failure here is logged, not returned: the
 // change itself already happened and refusing it now would only hide that.
 func recordChange(ctx context.Context, backend crud.RecordBackend, zoneID uuid.UUID, rc *permission.RequestContext, verb, entity string) {
-	if zoneID == uuid.Nil {
+	if zoneID == uuid.Nil || versionsOff(ctx) {
 		return
 	}
 	if _, err := recordVersion(ctx, backend, zoneID, rc, versionNote{source: versionSourceChange, summary: verb + " " + entityLabel(entity)}); err != nil {
