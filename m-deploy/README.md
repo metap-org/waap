@@ -145,6 +145,10 @@ docker compose up -d --build                 # 3 service + api-gateway + web (ng
 # 2b. Hoặc dev loop: `go run` từ source mount vào container + Vite dev server (:5173)
 docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml restart zones-service   # sau khi sửa code Go
+# Stack không tự chạy migration: khi `git pull` ở ../../metap kéo về migration mới, chạy lại
+# (idempotent) rồi restart service. Thiếu bước này, route dùng bảng mới trả 500
+# (vd. `relation "sso_domains" does not exist`).
+(cd ../../metap && go run ./cmd/db-migrate)
 
 # 2c. Hoặc chạy thẳng trên host (mỗi lệnh 1 terminal)
 export RABBITMQ_URL=amqp://metap:metap@localhost:5672

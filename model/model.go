@@ -8,16 +8,22 @@ package model
 const (
 	Zones              = "waf.zones"
 	Domains            = "waf.domains"
+	Accounts           = "waf.accounts"
 	DdosPolicies       = "waf.ddos_policies"
 	FirewallRules      = "waf.firewall_rules"
 	IPAccessLists      = "waf.ip_access_lists"
+	PolicyVersions     = "waf.policy_versions"
 	ScanJobs           = "waf.scan_jobs"
 	ScanFindings       = "waf.scan_findings"
 	AlertPolicies      = "waf.alert_policies"
 	AlertNotifications = "waf.alert_notifications"
 	Incidents          = "waf.incidents"
+	FalsePositives     = "waf.false_positive_reports"
 	SecurityEvents     = "waf.security_events" // a read model served from the analytics plane
 )
+
+// Scope types (metadata scopes: a role held only inside one).
+const ScopeAccount = "account"
 
 // Field names shared across entities.
 const (
@@ -30,6 +36,8 @@ const (
 	ActionVerifyDNS       = "verifyDns"       // zones, domains
 	ActionTestOrigin      = "testOrigin"      // zones
 	ActionSyncConfigState = "syncConfigState" // zones
+	ActionRollback        = "rollback"        // policy_versions
+	ActionPlanUsage       = "planUsage"       // zones (entity scope): the tenant's plan and what it uses
 	ActionRun             = "run"             // scan_jobs
 	ActionTest            = "test"            // alert_policies
 	ActionEvaluate        = "evaluate"        // alert_policies
@@ -41,6 +49,9 @@ const (
 	ErrScanAlreadyInProgress     = "scan_already_in_progress"
 	ErrScannerUnavailable        = "scanner_unavailable"
 	ErrReferenceCheckUnavailable = "reference_check_unavailable"
+	ErrPlanLimitReached          = "plan_limit_reached"
+	ErrAccountInUse              = "account_in_use"
+	ErrAccountClosed             = "account_closed"
 )
 
 // List page sizes: the MaxLimit of an entity's list views. Most entities cap at DefaultMaxListLimit;

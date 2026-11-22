@@ -3,6 +3,7 @@ package compile
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/metap-org/waap/c-config-distributor/management"
 	"github.com/metap-org/waap/c-config-distributor/ruleset"
@@ -307,4 +308,26 @@ func TestCompileZonePlacesIPAccessListsBeforeRegularRulesAllowBeforeBlock(t *tes
 	// Whitelist (allow) first regardless of input order, then blacklist (block), then the
 	// regular rule last regardless of its own (lower) priority number.
 	assert.False(t, compiled.Rules[0].ID != "wl-1" || compiled.Rules[1].ID != "bl-1" || compiled.Rules[2].ID != "r-1", "unexpected rule order: %+v", compiled.Rules)
+}
+
+func TestCompileIPAccessListDropsExpiredEntriesButKeepsOpenEndedOnes(t *testing.T) {
+	now = func() time.Time { return time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC) }
+	t.Cleanup(func() { now = time.Now })
+	entry := func(expiresAt any) management.Record {
+		data := map[string]any{"type": "blacklist", "value": "203.0.113.9", "enabled": true}
+		if expiresAt != nil {
+			data["expiresAt"] = expiresAt
+		}
+		return record("e", nil, data)
+	}
+	_, ok := compileIPAccessList(entry("2026-11-22T11:59:59Z"))
+	assert.False(t, ok, "past expiry is dropped")
+	_, ok = compileIPAccessList(entry("2026-11-22T12:00:00Z"))
+	assert.False(t, ok, "expiry at this instant is dropped")
+	_, ok = compileIPAccessList(entry("2026-11-22T12:00:01Z"))
+	assert.True(t, ok, "future expiry still applies")
+	_, ok = compileIPAccessList(entry(nil))
+	assert.True(t, ok, "no expiry is permanent")
+	_, ok = compileIPAccessList(entry("garbage"))
+	assert.True(t, ok, "an unreadable expiry never drops a protection")
 }

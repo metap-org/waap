@@ -7,6 +7,7 @@ package entities
 
 import (
 	"github.com/metap-org/metap/pkg/metadata"
+	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/reconciler"
 	"github.com/metap-org/waap/model"
 )
@@ -18,6 +19,9 @@ func DdosPolicyEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn(model.DdosPolicies, "waf"),
 		Fields: []metadata.EntityField{
 			metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Require().Index(),
+			// Copied from the zone when the record is created, so a role held inside an account can
+			// reach it (a scope is read off the record itself). Empty on a tenant-wide record.
+			metadata.NewField(model.FieldAccountID, "Account", metadata.KindString).Index(),
 			metadata.EnumField(model.FieldSensitivity, "Sensitivity", "low", "medium", "high", "aggressive").Require().WithWidget(metadata.WidgetRadio),
 			metadata.NewField(model.FieldRequestRateThreshold, "Request Rate Threshold", metadata.KindNumber).Require().Sort(),
 			metadata.NewField(model.FieldBurstWindow, "Burst Window (s)", metadata.KindNumber).Require(),
@@ -36,7 +40,8 @@ func DdosPolicyEntity() metadata.EntityDefinition {
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    model.DefaultMaxListLimit,
 		}},
-		Audit: &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
+		Scopes: []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
+		Audit:  &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
 	}
 }
 

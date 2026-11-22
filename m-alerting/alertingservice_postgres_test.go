@@ -55,7 +55,7 @@ func setupRegistry(t *testing.T, pool *pgxpool.Pool) *metadata.MetadataRegistry 
 	ctx := context.Background()
 	registry := metadata.NewMetadataRegistry()
 	for _, def := range []metadata.EntityDefinition{
-		entities.AlertPolicyEntity(), entities.AlertNotificationEntity(), entities.IncidentEntity(),
+		entities.AlertPolicyEntity(), entities.AlertNotificationEntity(), entities.IncidentEntity(), entities.FalsePositiveEntity(),
 	} {
 		require.NoError(t, registry.Register(def), "register %s", def.Name)
 		_, err := reconciler.ReconcileWithScope(ctx, pool, control.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
@@ -76,7 +76,7 @@ func seedAdmin(t *testing.T, pool *pgxpool.Pool, tenantID, userID uuid.UUID) {
 func cleanupEntityRows(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID) {
 	t.Cleanup(func() {
 		ctx := context.Background()
-		for _, table := range []string{"waf.waf_alert_notifications", "waf.waf_alert_policies", "waf.waf_incidents"} {
+		for _, table := range []string{"waf.waf_alert_notifications", "waf.waf_alert_policies", "waf.waf_incidents", "waf.waf_false_positive_reports"} {
 			pool.Exec(ctx, "DELETE FROM "+table+" WHERE tenant_id = $1", tenantID)
 		}
 	})
@@ -367,4 +367,34 @@ func TestTestAlertPolicySendsAndRecordsANotification(t *testing.T) {
 	require.NoError(t, err, "expected exactly 1 notification row, got %v / %+v", err, notifications)
 	require.NoError(t, err)
 	require.Len(t, notifications.Data, 1, "expected exactly 1 notification row, got %v / %+v", err, notifications)
+}
+
+// A false positive report starts open and is decided exactly once: dismissed or resolved, after
+// which it cannot be reopened or decided again.
+func TestFalsePositiveReportIsDecidedOnce(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+
+	report, err := state.Crud.Create(ctx, "waf.false_positive_reports", crud.JsonObject{
+		"zoneId":      jsonMarshal(t, "zone-1"),
+		"requestId":   jsonMarshal(t, "req-42"),
+		"sourceIp":    jsonMarshal(t, "203.0.113.9"),
+		"description": jsonMarshal(t, "Checkout blocked"),
+	}, rc, nil)
+	require.NoError(t, err)
+	require.NotNil(t, report.Status)
+	assert.Equal(t, "open", *report.Status)
+
+	decided, err := state.Crud.Transition(ctx, "waf.false_positive_reports", report.ID, "dismiss", report.Version, crud.JsonObject{"resolutionNote": jsonMarshal(t, "Expected block")}, rc, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "dismissed", *decided.Status)
+
+	_, err = state.Crud.Transition(ctx, "waf.false_positive_reports", report.ID, "resolve", decided.Version, nil, rc, nil)
+	require.Error(t, err, "a decided report cannot be decided again")
 }

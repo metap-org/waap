@@ -45,6 +45,7 @@ func obj(t *testing.T, pairs map[string]any) crud.JsonObject {
 func TestCreateZoneReusesTheExistingDomainForItsApex(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
+	expectDefaultAccount(inner, rc)
 	domainID := uuid.New()
 
 	inner.EXPECT().List(mock.Anything, "waf.domains", mock.MatchedBy(func(in query.ListInput) bool {
@@ -58,11 +59,20 @@ func TestCreateZoneReusesTheExistingDomainForItsApex(t *testing.T) {
 	require.NoError(t, err)
 }
 
+
+// A zone always lands in an account; these tests are about something else, so the tenant already
+// has its default one.
+func expectDefaultAccount(inner *crudmock.RecordBackend, rc *permission.RequestContext) {
+	inner.EXPECT().List(mock.Anything, "waf.accounts", mock.Anything, rc).
+		Return(crud.ListResult{Data: []crud.RecordDto{{ID: uuid.New()}}}, nil)
+}
+
 // A zone added under a domain that is already verified starts verified: the verify action only
 // cascades onto zones that exist when it runs, so without this the new zone could never activate.
 func TestCreateZoneUnderAVerifiedDomainStartsVerified(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
+	expectDefaultAccount(inner, rc)
 	domainID := uuid.New()
 
 	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ListResult{Data: []crud.RecordDto{{
@@ -79,6 +89,7 @@ func TestCreateZoneUnderAVerifiedDomainStartsVerified(t *testing.T) {
 func TestCreateZoneUnderAnUnverifiedDomainDoesNotMarkItVerified(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
+	expectDefaultAccount(inner, rc)
 
 	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ListResult{Data: []crud.RecordDto{{
 		ID: uuid.New(), Data: obj(t, map[string]any{"verificationStatus": "unverified"}),
@@ -95,6 +106,7 @@ func TestCreateZoneUnderAnUnverifiedDomainDoesNotMarkItVerified(t *testing.T) {
 func TestCreateZoneCreatesAnUnverifiedDomainWhenNoneExists(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
+	expectDefaultAccount(inner, rc)
 	newDomainID := uuid.New()
 
 	inner.EXPECT().List(mock.Anything, "waf.domains", mock.Anything, rc).Return(crud.ListResult{Data: []crud.RecordDto{}}, nil)

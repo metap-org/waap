@@ -38,6 +38,7 @@ import {
   useRecords,
 } from "../api/waf";
 import { StatusBadge } from "../components/primitives";
+import { IncidentMitigation } from "../components/IncidentMitigation";
 import { NEXT_ACTION, type IncidentData } from "./IncidentsPage";
 
 const INCIDENT_ACTION_TOAST_KEY: Record<string, string> = {
@@ -226,6 +227,15 @@ export function IncidentDetailPage() {
             </TableBody>
           </Table>
         </SectionCard>
+
+        {incidentId ? (
+          <IncidentMitigation
+            incidentId={incidentId}
+            zoneId={zoneId}
+            title={record.data.title}
+            closed={state === "resolved"}
+          />
+        ) : null}
 
         {entity.data?.audit?.enabled ? (
           <SectionCard title={t("waf.incidentDetail.auditTrail")}>

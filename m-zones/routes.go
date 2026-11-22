@@ -421,6 +421,17 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 		{model.Zones, model.ActionSyncConfigState, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(syncConfigState(ctx, state, c.RC, c.ID))
 		}},
+		{model.Zones, model.ActionPlanUsage, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(tenantUsage(ctx, state.Crud, SharedPoolTier(state.Router.SharedPool()), c.RC))
+		}},
+		{model.PolicyVersions, model.ActionRollback, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			// state.Crud, not the guarded wrapper: the rollback records its own single version.
+			result, err := rollbackToVersion(ctx, state.Crud, c.ID, c.RC)
+			if err != nil {
+				return nil, err
+			}
+			return crud.ToObject(result, nil)
+		}},
 		{model.Domains, model.ActionVerifyDNS, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			var body verifyDNSBody
 			if raw, ok := c.Input["expectedToken"]; ok {

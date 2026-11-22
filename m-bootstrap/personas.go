@@ -32,7 +32,8 @@ func Personas() bootstrap.Bootstrap {
 			{Role: RoleSecurityAnalyst, Entities: []string{"waf.*"}, Actions: []string{"read"}},
 			{Role: RoleSecurityAnalyst, Entities: []string{model.FirewallRules, model.DdosPolicies, model.IPAccessLists},
 				Actions: []string{"create", "update", "delete"}},
-			{Role: RoleSecurityAnalyst, Entities: []string{model.Incidents, model.ScanFindings}, Actions: []string{"update", "transition"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{model.Incidents, model.ScanFindings, model.FalsePositives}, Actions: []string{"update", "transition"}},
+			{Role: RoleSecurityAnalyst, Entities: []string{model.FalsePositives}, Actions: []string{"create"}},
 			{Role: RoleSecurityAnalyst, Entities: []string{model.AlertPolicies}, Actions: []string{"create", "update"}},
 
 			// Developer: owns remediation of scan findings, no DDoS policy or firewall rule access.

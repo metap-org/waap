@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOwnsExactlyItsOwnThreeEntities(t *testing.T) {
+func TestOwnsExactlyItsOwnEntities(t *testing.T) {
 	registry := metadata.NewMetadataRegistry()
 	require.NoError(t, registry.RegisterAllSubmitted(), "RegisterAllSubmitted")
 	require.NoError(t, registry.ValidateReferences(), "ValidateReferences")
@@ -17,7 +17,7 @@ func TestOwnsExactlyItsOwnThreeEntities(t *testing.T) {
 	for _, e := range registry.ListEntities() {
 		names = append(names, e.Name)
 	}
-	for _, want := range []string{"waf.incidents", "waf.alert_policies", "waf.alert_notifications"} {
+	for _, want := range []string{"waf.incidents", "waf.alert_policies", "waf.alert_notifications", "waf.false_positive_reports"} {
 		found := false
 		for _, n := range names {
 			if n == want {
@@ -27,5 +27,5 @@ func TestOwnsExactlyItsOwnThreeEntities(t *testing.T) {
 		}
 		assert.True(t, found, "missing entity: %s", want)
 	}
-	assert.Len(t, names, 3, "unexpected entity count: %v", names)
+	assert.Len(t, names, 4, "unexpected entity count: %v", names)
 }

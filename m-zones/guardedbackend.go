@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/metap-org/metap/pkg/kit/errcode"
 
@@ -67,6 +68,8 @@ type GuardedZonesBackend struct {
 	inner    crud.RecordBackend
 	scanning crud.RecordBackend
 	alerting crud.RecordBackend
+	// tierOf resolves a tenant's plan tier; nil means no quotas (see WithPlanLimits).
+	tierOf TierLookup
 }
 
 // NewGuardedZonesBackend guards inner; scanningURL/alertingURL are the siblings' REST base URLs
@@ -125,6 +128,12 @@ func validateIPAccessList(data crud.JsonObject) error {
 		return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
 			map[string][]string{model.FieldValue: {"not a valid IP address or CIDR"}})
 	}
+	if raw, ok := jsonAsString(data[model.FieldExpiresAt]); ok && raw != "" {
+		if _, err := time.Parse(time.RFC3339, raw); err != nil {
+			return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
+				map[string][]string{model.FieldExpiresAt: {"not a valid timestamp"}})
+		}
+	}
 	return nil
 }
 
@@ -180,6 +189,9 @@ func (b *GuardedZonesBackend) GetMany(ctx context.Context, entity string, ids []
 }
 
 func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
+	if err := b.checkQuota(ctx, entity, data, rc); err != nil {
+		return crud.RecordDto{}, err
+	}
 	switch entity {
 	case model.Zones:
 		hostname, ok := jsonAsString(data[model.FieldHostname])
@@ -193,6 +205,11 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 			return crud.RecordDto{}, err
 		}
 		withDomain := cloneJsonObject(data)
+		accountID, err := b.resolveAccount(ctx, data, rc)
+		if err != nil {
+			return crud.RecordDto{}, err
+		}
+		withDomain[model.FieldAccountID] = jsonString(accountID.String())
 		withDomain[model.FieldDomainID] = jsonString(domainID.String())
 		if verified {
 			withDomain[model.FieldVerificationStatus] = jsonString(model.VerificationVerified)
@@ -202,15 +219,22 @@ func (b *GuardedZonesBackend) Create(ctx context.Context, entity string, data cr
 		if err := validateFirewallRule(data); err != nil {
 			return crud.RecordDto{}, err
 		}
-		return b.inner.Create(ctx, entity, data, rc, reason)
 	case model.IPAccessLists:
 		if err := validateIPAccessList(data); err != nil {
 			return crud.RecordDto{}, err
 		}
-		return b.inner.Create(ctx, entity, data, rc, reason)
-	default:
+	}
+	if !isVersioned(entity) {
 		return b.inner.Create(ctx, entity, data, rc, reason)
 	}
+	zoneID := zoneOfRule(data)
+	ensureBaseline(ctx, b.inner, zoneID, rc)
+	data = b.withZoneAccount(ctx, zoneID, data, rc)
+	created, err := b.inner.Create(ctx, entity, data, rc, reason)
+	if err == nil {
+		recordChange(ctx, b.inner, zoneID, rc, "Created", entity)
+	}
+	return created, err
 }
 
 func (b *GuardedZonesBackend) Update(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
@@ -226,10 +250,33 @@ func (b *GuardedZonesBackend) Update(ctx context.Context, entity string, id uuid
 			return crud.RecordDto{}, err
 		}
 	}
-	return b.inner.Update(ctx, entity, id, expectedVersion, data, rc, reason)
+	if !isVersioned(entity) {
+		return b.inner.Update(ctx, entity, id, expectedVersion, data, rc, reason)
+	}
+	zoneID := b.zoneOf(ctx, entity, id, rc)
+	ensureBaseline(ctx, b.inner, zoneID, rc)
+	updated, err := b.inner.Update(ctx, entity, id, expectedVersion, data, rc, reason)
+	if err == nil {
+		recordChange(ctx, b.inner, zoneID, rc, "Updated", entity)
+	}
+	return updated, err
+}
+
+// zoneOf is the zone a rule record belongs to (uuid.Nil when tenant-wide or unreadable).
+func (b *GuardedZonesBackend) zoneOf(ctx context.Context, entity string, id uuid.UUID, rc *permission.RequestContext) uuid.UUID {
+	got, err := b.inner.Get(ctx, entity, id, rc)
+	if err != nil {
+		return uuid.Nil
+	}
+	return zoneOfRule(got.Record.Data)
 }
 
 func (b *GuardedZonesBackend) Transition(ctx context.Context, entity string, id uuid.UUID, action string, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
+	if entity == model.Accounts && action == model.AccountClose {
+		if err := b.refuseCloseWhileRunning(ctx, id, rc); err != nil {
+			return crud.RecordDto{}, err
+		}
+	}
 	return b.inner.Transition(ctx, entity, id, action, expectedVersion, data, rc, reason)
 }
 
@@ -244,7 +291,16 @@ func (b *GuardedZonesBackend) Delete(ctx context.Context, entity string, id uuid
 				fmt.Sprintf("This zone is still referenced by %q and cannot be deleted.", blockingEntity))
 		}
 	}
-	return b.inner.Delete(ctx, entity, id, expectedVersion, rc, reason)
+	if !isVersioned(entity) {
+		return b.inner.Delete(ctx, entity, id, expectedVersion, rc, reason)
+	}
+	zoneID := b.zoneOf(ctx, entity, id, rc)
+	ensureBaseline(ctx, b.inner, zoneID, rc)
+	deleted, err := b.inner.Delete(ctx, entity, id, expectedVersion, rc, reason)
+	if err == nil {
+		recordChange(ctx, b.inner, zoneID, rc, "Deleted", entity)
+	}
+	return deleted, err
 }
 
 func (b *GuardedZonesBackend) Aggregate(ctx context.Context, entity string, spec query.AggregateSpec, rc *permission.RequestContext) ([]json.RawMessage, error) {

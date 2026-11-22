@@ -33,6 +33,7 @@ import {
   transitionRecord,
   useInvalidateWaf,
   useRecord,
+  useRecords,
   verifyDns,
   verifyDomainDns,
   type Domain,
@@ -56,6 +57,14 @@ export function OnboardingPage() {
   const [hostname, setHostname] = useState("");
   const [originAddress, setOriginAddress] = useState("");
   const [protectionMode, setProtectionMode] = useState("monitor");
+  // Only asked when the workspace has more than one open account; otherwise the server files the
+  // zone under the default one.
+  const [accountId, setAccountId] = useState("");
+  const accounts = useRecords<{ name?: string }>(
+    ENTITIES.accounts,
+    { status: "active" },
+    100,
+  );
   const [zone, setZone] = useState<Zone | null>(null);
   // Ownership lives on the zone's parent `Domain` now (Increment 3) — `createZone` doesn't know
   // the domain id until the server assigns one (`routes::zone_domain_guard`), so this is fetched
@@ -94,6 +103,7 @@ export function OnboardingPage() {
         hostname: hostname.trim(),
         originAddress: originAddress.trim(),
         protectionMode,
+        ...(accountId ? { accountId } : {}),
         dnsRoutingStatus: "unknown",
         hasConfig: false,
         configVersion: 1,
@@ -244,6 +254,25 @@ export function OnboardingPage() {
                 onChange={(e) => setOriginAddress(e.target.value)}
               />
             </div>
+            {(accounts.data ?? []).length > 1 ? (
+              <div>
+                <Label htmlFor="account">
+                  {t("waf.accounts.chooseAccount")}
+                </Label>
+                <Select
+                  id="account"
+                  value={accountId}
+                  onValueChange={(value) => setAccountId(String(value))}
+                  options={[
+                    { value: "", label: t("waf.accounts.defaultAccount") },
+                    ...(accounts.data ?? []).map((a) => ({
+                      value: a.id,
+                      label: a.data.name ?? a.id,
+                    })),
+                  ]}
+                />
+              </div>
+            ) : null}
             <div>
               <Label htmlFor="mode">{t("waf.onboarding.protectionMode")}</Label>
               <Select

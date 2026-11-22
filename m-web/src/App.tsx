@@ -69,6 +69,17 @@ const IncidentDetailPage = lazy(() =>
     default: m.IncidentDetailPage,
   })),
 );
+const FalsePositivesPage = lazy(() =>
+  import("./pages/FalsePositivesPage").then((m) => ({
+    default: m.FalsePositivesPage,
+  })),
+);
+const PlanPage = lazy(() =>
+  import("./pages/PlanPage").then((m) => ({ default: m.PlanPage })),
+);
+const AccountsPage = lazy(() =>
+  import("./pages/AccountsPage").then((m) => ({ default: m.AccountsPage })),
+);
 const FindingsPage = lazy(() =>
   import("./pages/FindingsPage").then((m) => ({ default: m.FindingsPage })),
 );
@@ -169,6 +180,13 @@ function RequireAuth() {
       entity: ENTITIES.incidents,
     },
     {
+      to: "/false-positives",
+      label: t("waf.nav.falsePositives"),
+      group: operations,
+      icon: navIcons.incidents,
+      entity: ENTITIES.falsePositives,
+    },
+    {
       to: "/findings",
       label: t("waf.nav.findings"),
       group: operations,
@@ -181,6 +199,20 @@ function RequireAuth() {
       group: operations,
       icon: navIcons.alerting,
       entity: ENTITIES.alertPolicies,
+    },
+    {
+      to: "/accounts",
+      label: t("waf.nav.accounts"),
+      group: admin,
+      icon: navIcons.workspace,
+      roles: ["admin"],
+    },
+    {
+      to: "/plan",
+      label: t("waf.nav.plan"),
+      group: admin,
+      icon: navIcons.settings,
+      roles: ["admin"],
     },
     {
       to: "/settings",
@@ -356,6 +388,9 @@ export default function App() {
               path="/incidents/:incidentId"
               element={<IncidentDetailPage />}
             />
+            <Route path="/false-positives" element={<FalsePositivesPage />} />
+            <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/plan" element={<PlanPage />} />
             <Route path="/findings" element={<FindingsPage />} />
             <Route path="/alerting" element={<AlertingPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />

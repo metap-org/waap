@@ -26,18 +26,23 @@ import {
   type AggregateSpec,
   type ApiRecord,
   type SingleResponse,
+  useAuth,
 } from "@metap/platform-ui";
+import { useQuery } from "@tanstack/react-query";
 
 export const ENTITIES = {
   zones: "waf.zones",
   domains: "waf.domains",
+  accounts: "waf.accounts",
   ddosPolicies: "waf.ddos_policies",
   firewallRules: "waf.firewall_rules",
   ipAccessLists: "waf.ip_access_lists",
+  policyVersions: "waf.policy_versions",
   scanJobs: "waf.scan_jobs",
   scanFindings: "waf.scan_findings",
   securityEvents: "waf.security_events",
   incidents: "waf.incidents",
+  falsePositives: "waf.false_positive_reports",
   alertPolicies: "waf.alert_policies",
   alertNotifications: "waf.alert_notifications",
 } as const;
@@ -162,6 +167,37 @@ export function syncConfigState(zoneId: string) {
   );
 }
 
+export type PolicyVersionData = {
+  zoneId: string;
+  number: number;
+  source: "baseline" | "change" | "rollback";
+  summary?: string;
+  restoredFrom?: number;
+  snapshot?: PolicySnapshot;
+};
+export type PolicyVersion = WafRecord<PolicyVersionData>;
+/** One zone's rules as a version holds them: entity name -> its records (id + field values). */
+export type PolicySnapshot = Record<
+  string,
+  { id: string; data: Record<string, unknown> }[]
+>;
+
+export type RollbackResult = {
+  restoredVersion: number;
+  newVersion: number;
+  created: number;
+  updated: number;
+  deleted: number;
+};
+
+/** Restores the zone's rules, DDoS policies and IP lists to what a version holds. The server
+ *  records the rollback as a new version, so history is never rewritten. */
+export function rollbackToVersion(versionId: string) {
+  return act<RollbackResult>(ENTITIES.policyVersions, "rollback", {
+    id: versionId,
+  });
+}
+
 export function runScanJob(jobId: string) {
   return act<{ dispatched: boolean; detail: string }>(
     ENTITIES.scanJobs,
@@ -197,4 +233,28 @@ export function evaluateAlerts() {
  *  count on a dashboard is worse than one extra refetch after a mutation. */
 export function useInvalidateWaf() {
   return useInvalidateRecords();
+}
+
+/* ------------------------------------------------------------------ plan and usage */
+
+export type PlanLimits = {
+  name: string;
+  maxZones: number;
+  maxRulesPerZone: number;
+};
+export type PlanUsage = {
+  tier: string;
+  plan: PlanLimits;
+  zones: number;
+  plans: PlanLimits[];
+};
+
+/** The tenant's plan, what it allows and what is used (0 in a limit means no limit). */
+export function usePlanUsage() {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ["records", "plan-usage"],
+    queryFn: () => invokeAction<PlanUsage>(ENTITIES.zones, "planUsage"),
+    enabled: status === "authenticated",
+  });
 }

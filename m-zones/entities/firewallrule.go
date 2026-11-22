@@ -11,6 +11,7 @@ package entities
 
 import (
 	"github.com/metap-org/metap/pkg/metadata"
+	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/reconciler"
 	"github.com/metap-org/waap/model"
 )
@@ -26,6 +27,9 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 		TableName: reconciler.QualifiedTableNameIn(model.FirewallRules, "waf"),
 		Fields: []metadata.EntityField{
 			zoneID,
+			// Copied from the zone when the record is created, so a role held inside an account can
+			// reach it (a scope is read off the record itself). Empty on a tenant-wide record.
+			metadata.NewField(model.FieldAccountID, "Account", metadata.KindString).Index(),
 			metadata.NewField(model.FieldName, "Name", metadata.KindString).Require().Sort(),
 			metadata.NewField(model.FieldPriority, "Priority", metadata.KindNumber).Require().Sort(),
 			metadata.NewField(model.FieldMatchCondition, "Match Condition", metadata.KindJSON).Require(),
@@ -45,7 +49,8 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    model.LargeMaxListLimit,
 		}},
-		Audit: &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
+		Scopes: []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
+		Audit:  &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
 	}
 }
 
