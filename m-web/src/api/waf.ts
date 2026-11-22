@@ -26,18 +26,26 @@ import {
   type AggregateSpec,
   type ApiRecord,
   type SingleResponse,
+  useAuth,
 } from "@metap/platform-ui";
+import { useQuery } from "@tanstack/react-query";
 
 export const ENTITIES = {
   zones: "waf.zones",
   domains: "waf.domains",
+  accounts: "waf.accounts",
+  plans: "waf.plans",
+  subscriptions: "waf.subscriptions",
+  planChanges: "waf.plan_change_requests",
   ddosPolicies: "waf.ddos_policies",
   firewallRules: "waf.firewall_rules",
   ipAccessLists: "waf.ip_access_lists",
+  policyVersions: "waf.policy_versions",
   scanJobs: "waf.scan_jobs",
   scanFindings: "waf.scan_findings",
   securityEvents: "waf.security_events",
   incidents: "waf.incidents",
+  falsePositives: "waf.false_positive_reports",
   alertPolicies: "waf.alert_policies",
   alertNotifications: "waf.alert_notifications",
 } as const;
@@ -162,6 +170,61 @@ export function syncConfigState(zoneId: string) {
   );
 }
 
+export type PolicyVersionData = {
+  zoneId: string;
+  number: number;
+  source: "baseline" | "change" | "rollback";
+  summary?: string;
+  restoredFrom?: number;
+  snapshot?: PolicySnapshot;
+};
+export type PolicyVersion = WafRecord<PolicyVersionData>;
+/** One zone's rules as a version holds them: entity name -> its records (id + field values). */
+export type PolicySnapshot = Record<
+  string,
+  { id: string; data: Record<string, unknown> }[]
+>;
+
+export type RollbackResult = {
+  restoredVersion: number;
+  newVersion: number;
+  created: number;
+  updated: number;
+  deleted: number;
+};
+
+/** Restores the zone's rules, DDoS policies and IP lists to what a version holds. The server
+ *  records the rollback as a new version, so history is never rewritten. */
+export function rollbackToVersion(versionId: string) {
+  return act<RollbackResult>(ENTITIES.policyVersions, "rollback", {
+    id: versionId,
+  });
+}
+
+export type PolicyFinding = {
+  severity: "error" | "warning" | "info";
+  code: string;
+  entity?: string;
+  id?: string;
+  subject?: string;
+};
+export type PolicyReport = {
+  findings: PolicyFinding[];
+  errors: number;
+  rules: number;
+  entries: number;
+};
+
+/** Checks a zone's rules, DDoS policies and IP lists for mistakes. Changes nothing. */
+export function validatePolicy(zoneId: string) {
+  return act<PolicyReport>(ENTITIES.zones, "validatePolicy", { id: zoneId });
+}
+
+/** The tenant's configuration (accounts, zones, rules, DDoS policies, IP lists) as one document. */
+export function exportTenantData() {
+  return act<Record<string, unknown>>(ENTITIES.zones, "exportData");
+}
+
 export function runScanJob(jobId: string) {
   return act<{ dispatched: boolean; detail: string }>(
     ENTITIES.scanJobs,
@@ -197,4 +260,77 @@ export function evaluateAlerts() {
  *  count on a dashboard is worse than one extra refetch after a mutation. */
 export function useInvalidateWaf() {
   return useInvalidateRecords();
+}
+
+/* ------------------------------------------------------------------ plan and usage */
+
+export type PlanLimits = {
+  id?: string;
+  name: string;
+  maxZones: number;
+  maxRulesPerZone: number;
+};
+export type PlanUsage = {
+  /** False when no limit applies to this workspace (the service provider's own, or none set up). */
+  enforced: boolean;
+  /** True for the service provider's workspace, which manages plans and subscriptions. */
+  operator: boolean;
+  plan: PlanLimits;
+  zones: number;
+  plans: PlanLimits[];
+};
+
+export type CustomerTenant = { id: string; name: string };
+
+export type PlanRequest = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  planId: string;
+  planName: string;
+  reply: string;
+  createdAt: string;
+};
+
+/** Asks the service provider for another plan (this workspace's admin only). */
+export function requestPlanChange(planId: string, note: string) {
+  return act<{ id: string; status: string }>(
+    ENTITIES.planChanges,
+    "requestPlanChange",
+    { input: { planId, note } },
+  );
+}
+
+/** This workspace's own plan change requests, newest first. */
+export function myPlanRequests() {
+  return act<{ requests: PlanRequest[] }>(
+    ENTITIES.planChanges,
+    "myPlanRequests",
+  );
+}
+
+/** The service provider's admin approves or rejects a request. */
+export function decidePlanChange(id: string, approve: boolean, note: string) {
+  return act<{ status: string; applied: string }>(
+    ENTITIES.planChanges,
+    "decide",
+    { id, input: { approve, note } },
+  );
+}
+
+/** The tenants a subscription can be given to (service provider's admin only). */
+export function listCustomerTenants() {
+  return act<{ tenants: CustomerTenant[] }>(
+    ENTITIES.subscriptions,
+    "listTenants",
+  );
+}
+
+/** The tenant's plan, what it allows and what is used (0 in a limit means no limit). */
+export function usePlanUsage() {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ["records", "plan-usage"],
+    queryFn: () => invokeAction<PlanUsage>(ENTITIES.zones, "planUsage"),
+    enabled: status === "authenticated",
+  });
 }

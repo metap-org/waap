@@ -48,6 +48,9 @@ services:
       JWKS_KEYS_DIR: /workspace/waap/m-deploy/keys/jwks
       SCANNING_URL: http://scanning-service:3010
       ALERTING_URL: http://alerting-service:3020
+      # Plan limits are asked of billing-service; without BILLING_URL there are none.
+      BILLING_URL: http://billing-service:3040
+      BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
       # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
       # dns.google — set records at http://localhost:8053.
       DOH_RESOLVER_URL: http://dns-mock:8053/resolve
@@ -114,6 +117,22 @@ services:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3020/health"]
 
+  billing-service:
+    <<: *go
+    command: go run ./m-billing/cmd/billing-service
+    ports: ["3040:3040"]
+    environment:
+      <<: *service-env
+      PORT: "3040"
+      JWKS_URL: http://zones-service:3000/.well-known/jwks.json
+      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
+      # and its admin manages them. Unset = no plan limits at all.
+      OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
+      BILLING_INTERNAL_SECRET: ${BILLING_INTERNAL_SECRET:-dev-billing-secret}
+    healthcheck:
+      <<: *health
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:3040/health"]
+
   api-gateway:
     <<: *go
     command: go run ./m-gateway/cmd/api-gateway
@@ -123,11 +142,12 @@ services:
       TRUSTED_PROXIES: 172.16.0.0/12
       # Entity routes go to whichever service serves the entity (each one's /metadata/entities);
       # these prefixes say who answers the rest. Every service verifies the caller's token itself.
-      UPSTREAMS: "zones=http://zones-service:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://scanning-service:3010;alerting=http://alerting-service:3020"
+      UPSTREAMS: "zones=http://zones-service:3000|/health,/auth/,/me,/admin/,/platform/,/tenant-users,/preferences,/dashboards,/oauth/,/.well-known/,/scim/,/public/;scanning=http://scanning-service:3010;alerting=http://alerting-service:3020;billing=http://billing-service:3040"
     depends_on:
       zones-service: { condition: service_healthy }
       scanning-service: { condition: service_healthy }
       alerting-service: { condition: service_healthy }
+      billing-service: { condition: service_healthy }
 
   # --- Analytics plane (../../a-api) — a separate plane, run here for the dev loop ---
   # ClickHouse holds security events (ADR-0020); analytics-api ingests them (from control-plane)

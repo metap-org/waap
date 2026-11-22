@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestOwnsExactlyItsOwnFiveEntities is a regression guard for RegisterAllSubmitted — catches an
+// TestOwnsExactlyItsOwnEntities is a regression guard for RegisterAllSubmitted — catches an
 // entities/*.go file that forgot its init() SubmitEntity call, a name collision, or another
 // service's entity accidentally ending up registered here.
-func TestOwnsExactlyItsOwnFiveEntities(t *testing.T) {
+func TestOwnsExactlyItsOwnEntities(t *testing.T) {
 	registry := metadata.NewMetadataRegistry()
 	require.NoError(t, registry.RegisterAllSubmitted(), "RegisterAllSubmitted")
 	require.NoError(t, registry.ValidateReferences(), "ValidateReferences")
@@ -20,7 +20,7 @@ func TestOwnsExactlyItsOwnFiveEntities(t *testing.T) {
 	for _, e := range registry.ListEntities() {
 		names = append(names, e.Name)
 	}
-	expected := []string{"waf.domains", "waf.zones", "waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists"}
+	expected := []string{"waf.domains", "waf.zones", "waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists", "waf.policy_versions", "waf.accounts"}
 	for _, want := range expected {
 		found := false
 		for _, n := range names {
@@ -45,7 +45,8 @@ func TestSubmittedEntitiesReconcileInReferenceOrder(t *testing.T) {
 	}
 	require.Contains(t, pos, "waf.zones")
 	require.Less(t, pos["waf.domains"], pos["waf.zones"])
-	for _, child := range []string{"waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists"} {
+	require.Less(t, pos["waf.accounts"], pos["waf.zones"])
+	for _, child := range []string{"waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists", "waf.policy_versions"} {
 		require.Less(t, pos["waf.zones"], pos[child], child)
 	}
 }

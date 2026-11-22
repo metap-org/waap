@@ -57,6 +57,24 @@ const (
 	IncidentResolve         = "resolve"
 )
 
+// waf.false_positive_reports (StateField "status"): a report is open until someone decides.
+const (
+	FalsePositiveOpen      = "open"
+	FalsePositiveDismissed = "dismissed"
+	FalsePositiveResolved  = "resolved"
+
+	FalsePositiveDismiss = "dismiss"
+	FalsePositiveResolve = "resolve"
+)
+
+// waf.accounts (StateField "status"): closing is final.
+const (
+	AccountActive = "active"
+	AccountClosed = "closed"
+
+	AccountClose = "close"
+)
+
 // waf.domains verificationStatus / verificationMethod, and waf.zones dnsRoutingStatus.
 const (
 	VerificationUnverified   = "unverified"

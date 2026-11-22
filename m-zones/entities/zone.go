@@ -56,6 +56,9 @@ func ZoneEntity() metadata.EntityDefinition {
 			metadata.NewField(model.FieldConfigVersion, "Config Version", metadata.KindNumber).Sort(),
 			metadata.NewField(model.FieldHasConfig, "Has Config", metadata.KindBoolean),
 			metadata.RefField(model.FieldDomainID, "Domain", model.Domains, "apexDomain").Require().Index(),
+			// Optional: zones created before accounts existed have none. New ones are given the
+			// chosen account, or the tenant's default one (guardedbackend).
+			metadata.RefField(model.FieldAccountID, "Account", model.Accounts, "name").Index(),
 			metadata.EnumField(model.FieldVerificationStatus, "Verification Status", model.VerificationUnverified, model.VerificationVerified).Index(),
 			metadata.EnumField(model.FieldDNSRoutingStatus, "DNS Routing Status", model.DNSNotRouted, model.DNSRouted, "unknown"),
 			metadata.NewField(model.FieldLastDNSCheckAt, "Last DNS Check At", metadata.KindDatetime).Sort(),
@@ -80,10 +83,15 @@ func ZoneEntity() metadata.EntityDefinition {
 				{Action: model.ZoneSuspend, From: model.ZoneStatusPaused, To: model.ZoneStatusSuspended, Label: "Suspend"},
 			},
 		},
-		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		// A role held only inside an account reaches the zones of that account.
+		Scopes: []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
+		Audit:  &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
 			{Name: model.ActionVerifyDNS, Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord},
 			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionValidatePolicy, Label: "Check policy", Description: "Checks the zone's rules, DDoS policies and IP lists for mistakes. Changes nothing.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionExportData, Label: "Export data", Description: "Everything this tenant has configured, as one document.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionPlanUsage, Label: "Plan and usage", Description: "The tenant's plan, its limits and how much of them is used.", Scope: metadata.ActionScopeEntity},
 			{Name: model.ActionSyncConfigState, Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
 		},
 	}

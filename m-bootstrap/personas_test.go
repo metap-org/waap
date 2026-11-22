@@ -8,6 +8,7 @@ import (
 	"github.com/metap-org/metap/pkg/metadata"
 
 	_ "github.com/metap-org/waap/m-alerting/entities"
+	_ "github.com/metap-org/waap/m-billing/entities"
 	_ "github.com/metap-org/waap/m-scanning/entities"
 	_ "github.com/metap-org/waap/m-zones/entities"
 )

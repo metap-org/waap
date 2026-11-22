@@ -36,7 +36,7 @@ func main() {
 			return zonesservice.NewGuardedZonesBackend(state.Crud,
 				env.String("SCANNING_URL", "http://localhost:3010"),
 				env.String("ALERTING_URL", "http://localhost:3020"),
-			), nil
+			).WithPlanLimits(zonesservice.PlanClientFromEnv()), nil
 		},
 		Routes:  zonesservice.MountRoutes,
 		Actions: zonesservice.RegisterActions,

@@ -82,11 +82,11 @@ Cố định trước khi viết S1/S2, để hai bên làm song song. Chi tiế
 | UC | Trạng thái | Ghi chú | Nguồn |
 |---|---|---|---|
 | 01 Đăng ký org | Có | `/auth/signup` + xác nhận email + trang `/signup`; tắt mặc định (`signup.enabled`); chưa có ô CAPTCHA ở giao diện | mã |
-| 02 Account (tạo, đổi tên, đóng) | Chưa | metap chỉ có tenant (= org); khái niệm account bên dưới org chưa được mô hình hoá | mã |
+| 02 Account (tạo, đổi tên, đóng) | Có | entity `waf.accounts` (tạo, đổi tên, đóng); mỗi zone thuộc một account (mặc định `default`, tạo cùng zone đầu tiên); đóng bị từ chối khi còn zone active hoặc paused và liệt kê zone; account đóng không nhận zone mới. Không cần đổi `metap`: phạm vi `account` dùng role theo phạm vi sẵn có (roadmap 115). Zone cũ chưa có account chỉ thấy được bằng role toàn tenant | mã |
 | 03 Đăng nhập, MFA | Có | mật khẩu, TOTP, mã khôi phục, SSO OIDC; rate limit theo IP cho các route đăng nhập | mã |
 | 04 Quản lý phiên | Có | trang Bảo mật tài khoản | roadmap 115 |
 | 05, 06 Mời, nhận lời mời | Có | email qua mail-mock ở dev | mã |
-| 07 Gán vai trò | Một phần | vai trò và phân quyền xong (roadmap 114); gán theo phạm vi (account, nhóm zone) có backend, chưa có màn hình | roadmap 115 |
+| 07 Gán vai trò | Một phần | vai trò và phân quyền xong (roadmap 114); gán theo phạm vi account có màn hình (Account, Thành viên) và có hiệu lực trên zone, rule, DDoS policy, IP list và version của account; chưa có phạm vi nhóm zone và zone, chưa có sự cố hay finding theo account | roadmap 115, mã |
 | 08 Gỡ thành viên | Có | thu hồi vai trò khi gỡ; thu hồi phiên và API key chưa kiểm lại | mã (một phần) |
 | 09 Quyền xem dữ liệu request | Chưa | chưa có quyền riêng | mã |
 | 10, 11, 12 API key, service account | Có | tab Workspace; trần hạn key theo setting | roadmap 115 |
@@ -119,14 +119,14 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 |---|---|---|---|
 | 40 Soạn policy | Một phần | CRUD rule, DDoS policy, danh sách IP, có bật/tắt; chưa có bản nháp tách khỏi bản đang chạy | mã |
 | 41 DDoS, managed ruleset | Một phần | DDoS policy có; managed ruleset nằm ngoài v1 | mã |
-| 42 Kiểm nháp | Chưa | control-plane biên dịch được (đã chạy thật), chưa có "kiểm" bấm được từ portal | mã |
+| 42 Kiểm nháp | Một phần | nút Kiểm tra policy ở tab Phiên bản của zone: rule có điều kiện sai, rule trùng độ ưu tiên, rate limit thiếu ngưỡng, IP ở cả whitelist và blacklist, zone chưa có gì bảo vệ; chỉ đọc, không ghi. Chưa có bản nháp tách khỏi bản đang chạy để kiểm | mã |
 | 43 đến 45 Change request, duyệt, tự xác nhận | Chưa | không có entity hay luồng | mã |
 | 46 Phát hành | Một phần | phát hành ngay; `configVersion` là băm nội dung bộ rule, chưa có `PolicyVersion` bất biến kèm người duyệt | mã |
 | 47 Theo dõi phát hành | Chưa | edge không báo tiến độ ngược lại | mã |
-| 48 Xem, so sánh version | Chưa | chỉ có audit của zone | mã |
-| 49 Rollback | Chưa | | mã |
-| 50 Under Attack | Chưa | | mã |
-| 51 Rule tạm có hạn | Chưa | rule không có hạn | mã |
+| 48 Xem, so sánh version | Một phần | tab Phiên bản của zone: mỗi thay đổi rule, DDoS policy hay IP list ghi một snapshot bất biến (`waf.policy_versions`), xem khác biệt với bản trước; chưa ghi người duyệt (không có luồng duyệt); rule áp dụng cả tenant không nằm trong version của zone nào | mã |
+| 49 Rollback | Có | action `rollback` trên một version: khôi phục (tạo lại, sửa, xoá) rồi ghi một version mới; không nguyên tử, lỗi giữa chừng thì chạy lại cùng version để hoàn tất | mã |
+| 50 Under Attack | Chưa | là hành vi của edge (thách thức mọi request); phía management chưa có gì để làm khi edge chưa đọc cờ | mã |
+| 51 Rule tạm có hạn | Có | firewall rule có `expiresAt` (chọn 1 giờ đến 7 ngày khi tạo hoặc sửa); control-plane ngừng biên dịch rule hết hạn ở lần resync kế (tối đa 1 phút); kiểm tra policy báo rule đã hết hạn | mã |
 | 52 Đổi thông tin không ảnh hưởng traffic | Có | | mã |
 
 ### S3 Vận hành bảo mật
@@ -134,29 +134,29 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 | UC | Trạng thái | Ghi chú | Nguồn |
 |---|---|---|---|
 | 60 Xem sự kiện chặn | Có | tab Events của zone và trang Analytics, qua analytics-api (ClickHouse) | mã |
-| 61, 62 Báo và xử lý chặn nhầm | Chưa | | mã |
+| 61 Báo chặn nhầm | Một phần | entity `waf.false_positive_reports`, SOC ghi báo cáo trong portal; chưa có nhận từ trang chặn (edge chưa hiện request ID và form báo) | mã |
+| 62 Xử lý chặn nhầm | Một phần | trang Chặn nhầm: bỏ qua, đóng, hoặc cho IP đi qua (whitelist) kèm cảnh báo CGNAT/dải riêng; ngoại lệ chưa qua change request (UC-43 chưa có) | mã |
 | 63 Alert policy | Có | ngưỡng, cửa sổ, kênh; action đánh giá | mã |
 | 64 Kênh và gửi thử | Có | action `test` | mã |
 | 65 Alert thành case | Có | action `correlate` (luật tĩnh: cùng zone + cùng IP trong 15 phút) | mã |
 | 66 Xử lý case | Có | workflow incident | mã |
-| 67 Mitigation từ case | Chưa | | mã |
-| 68 Đóng case | Một phần | đóng được; mitigation còn giữ chưa chuyển thành rule có chủ | mã |
+| 67 Mitigation từ case | Một phần | chặn IP nguồn có thời hạn (1 giờ đến 7 ngày) từ incident; hết hạn tự gỡ ở lần resync kế (tối đa 1 phút); chưa có Under Attack và challenge | mã |
+| 68 Đóng case | Một phần | đóng được; mitigation còn lại giữ vĩnh viễn hoặc gỡ ngay từ trang incident; chưa tự nhắc khi đóng | mã |
 
 ### S4 đến S6
 
 | Lát | Trạng thái |
 |---|---|
-| S4 Gói và thanh toán (UC-70 đến 75) | Chưa làm gì: không có entity gói, hạn mức hay hoá đơn. `tier` của tenant chỉ là nhãn |
-| S5 UC-80 Xuất dữ liệu | Chưa |
-| S5 UC-81 Xoá org | Một phần: phía platform admin xong (trang Tenants, lên lịch và huỷ xoá, job chuyển `deleted` sau thời gian lưu giữ); Owner tự yêu cầu chưa có; chưa xoá dữ liệu vật lý |
+| S4 Gói và thanh toán (UC-70 đến 75) | Một phần. Có: service riêng `billing-service` (`m-billing`) sở hữu `waf.plans` và `waf.subscriptions`, nằm trong tenant vận hành (`OPERATOR_TENANT_ID`), admin của tenant đó định nghĩa gói (số zone, số rule mỗi zone, gói mặc định) và gán subscription cho từng tenant khách; trang Gói cho khách xem mức dùng và cảnh báo từ 80% (UC-70, 74); `zones-service` hỏi billing-service qua REST (`/internal/plans/resolve`, bí mật dùng chung) rồi chặn tạo zone và rule vượt hạn mức (`plan_limit_reached`; billing không trả lời thì cho qua), không xoá gì của khách đang vượt; tenant vận hành không bị giới hạn; chưa đặt tenant vận hành thì không giới hạn gì. Không dùng `tier` của metap. Khách (admin) xin đổi gói, admin vận hành duyệt hoặc từ chối kèm phản hồi (UC-71, 73): nâng gói có hiệu lực ngay, hạ gói có hiệu lực sau một kỳ 30 ngày kể từ lúc duyệt (subscription ghi gói chờ và ngày áp dụng); hạ gói không xoá gì của khách, chỉ chặn thêm. Chưa có: thanh toán, hoá đơn, trần chi tiêu, RPS, kỳ thanh toán thật (UC-72, 74 phần trần chi tiêu, 75) |
+| S5 UC-80 Xuất dữ liệu | Có | Cài đặt, Xuất dữ liệu: một file JSON gồm account, domain, zone, DDoS policy, firewall rule, IP list mà người xuất được phép thấy, đọc theo trang, báo nếu quá lớn bị cắt. Chưa có cấu hình của billing và phần phân tích |
+| S5 UC-81 Xoá org | Có (không xoá dữ liệu vật lý) | platform admin lên lịch và huỷ xoá (trang Tenants); Owner tự xoá ở Cài đặt bằng cách gõ tên workspace: workspace bị khoá ngay, mọi admin nhận email kèm liên kết huỷ dùng một lần (trang `/cancel-deletion`, công khai vì workspace đã khoá nên không đăng nhập được), job chuyển `deleted` sau 30 ngày; chưa xoá dữ liệu vật lý |
 | S5 UC-82 Chuyển zone sang org khác | Chưa |
 | S6 UC-90 SSO | Có (OIDC và SAML 2.0): domain email phải được chứng minh sở hữu bằng bản ghi TXT mới định tuyến đăng nhập hay tạo thành viên, bắt buộc SSO (kể cả khi nhận lời mời), chỉ tin email IdP đã xác minh (OIDC), ánh xạ nhóm IdP sang role (không bao giờ admin); chưa có đăng xuất một lần (SLO) và assertion mã hoá |
 | S6 UC-91 Khôi phục Owner | Có: yêu cầu, chờ, báo admin, hoàn tất (trang Tenants, hộp thoại Truy cập) |
 | S6 UC-92 NCC hỗ trợ | Một phần: tenant cấp quyền, platform admin mở phiên hỗ trợ; chưa duyệt từng phiên hay thông báo từng phiên |
 
-### Ba chỗ lệch cần quyết
+### Ba chỗ lệch cần quyết (cập nhật 2026-11-22)
 
-1. **S2 đang làm ngược đặc tả.** Đặc tả muốn draft, duyệt, version bất biến, rollback; mã hiện phát hành ngay. Nếu khách đầu tiên chưa cần duyệt, có thể coi "ghi thẳng" là MVP và chỉ làm version và rollback (UC-48, 49) trước, vì chúng không đòi luồng duyệt.
-2. **Account (UC-02) và phạm vi theo account** chưa tồn tại trong metap. Nếu đặc tả vẫn cần nhiều account trong một org thì đây là thay đổi ở `metap`, không phải ở waap.
-3. **S4 (gói, thanh toán) chưa bắt đầu**, trong khi kế hoạch đề xuất làm S3 trước S4; hiện S3 gần xong nên S4 là lát tiếp theo nếu có khách trả tiền.
-
+1. **S2 đang làm ngược đặc tả.** Version và rollback (UC-48, 49) đã làm; draft tách khỏi bản chạy, duyệt (UC-43 đến 45) và theo dõi phát hành (UC-47) vẫn chưa. "Ghi thẳng" vẫn là MVP.
+2. **Account (UC-02)**: xong ở waap, không đổi `metap`.
+3. **S4**: chỉ làm gói, subscription và hạn mức (chủ dự án chọn bỏ thanh toán, hoá đơn). Làm tiếp khi có khách trả tiền và chốt cổng thanh toán.

@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/management"
@@ -279,6 +280,9 @@ func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
 	if enabled, ok := rule.Bool(model.FieldEnabled); ok && !enabled {
 		return ruleset.CompiledRule{}, false
 	}
+	if expired(rule) {
+		return ruleset.CompiledRule{}, false
+	}
 	ruleType, ok := rule.Str(model.FieldRuleType)
 	if !ok {
 		ruleType = "waf"
@@ -319,6 +323,24 @@ func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
 	}, true
 }
 
+// now is the clock an expiry is judged by; a variable so a test can move it.
+var now = time.Now
+
+// expired reports whether a temporary entry's expiresAt has passed. An entry with no expiry, or one
+// whose value cannot be read, never expires: dropping a protection on a parse error would be the
+// worse mistake.
+func expired(entry management.Record) bool {
+	raw, ok := entry.Str(model.FieldExpiresAt)
+	if !ok || raw == "" {
+		return false
+	}
+	at, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return false
+	}
+	return !at.After(now())
+}
+
 // compileIPAccessList translates one IpAccessList row into the same CompiledRule shape
 // compileRule produces for a FirewallRule — no new wire type.
 //
@@ -331,6 +353,9 @@ func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
 // in the compiled list, not anything the edge's evaluator reads off this field.
 func compileIPAccessList(entry management.Record) (ruleset.CompiledRule, bool) {
 	if enabled, ok := entry.Bool(model.FieldEnabled); ok && !enabled {
+		return ruleset.CompiledRule{}, false
+	}
+	if expired(entry) {
 		return ruleset.CompiledRule{}, false
 	}
 	listType, ok := entry.Str(model.FieldType)
