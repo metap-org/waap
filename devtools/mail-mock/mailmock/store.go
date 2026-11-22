@@ -39,6 +39,8 @@ type Store struct {
 	messages []Message
 	nextID   int
 	capacity int
+	// boxes is per-mailbox client state (flags, deletions); see mailbox.go.
+	boxes map[string]*boxState
 }
 
 func NewStore(capacity int) *Store {

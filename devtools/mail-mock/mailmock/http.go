@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+// Info says where the mock's protocols listen (as configured; empty = off), for the UI to show.
+type Info struct {
+	SMTP     string `json:"smtp"`
+	IMAP     string `json:"imap"`
+	POP3     string `json:"pop3"`
+	Messages int    `json:"messages"`
+}
+
 //go:embed ui.html
 var uiHTML []byte
 
@@ -16,9 +24,18 @@ var uiHTML []byte
 //	GET    /api/messages/latest   the newest one (?to= as above), 404 when there is none
 //	GET    /api/messages/{id}     one message
 //	DELETE /api/messages          drop every message
+//	GET    /api/info              the ports the protocols listen on and the message count
 //	GET    /health
-func Handler(store *Store) http.Handler {
+func Handler(store *Store, info ...Info) http.Handler {
+	var in Info
+	if len(info) > 0 {
+		in = info[0]
+	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/info", func(w http.ResponseWriter, _ *http.Request) {
+		in.Messages = len(store.List(""))
+		writeJSON(w, http.StatusOK, map[string]any{"data": in})
+	})
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(uiHTML)
