@@ -17,6 +17,7 @@ package main
 
 import (
 	"github.com/metap-org/metap/pkg/app"
+	"github.com/metap-org/metap/pkg/configfile"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 
@@ -34,8 +35,9 @@ import (
 )
 
 func main() {
-	zonesCfg, billingCfg := zones.ConfigFromEnv(), billing.ConfigFromEnv()
-	scanningCfg, alertingCfg := scanning.ConfigFromEnv(), alerting.ConfigFromEnv()
+	configfile.MustLoadFromEnv() // before any setting is read
+	zonesCfg, billingCfg := zones.LoadConfig(), billing.LoadConfig()
+	scanningCfg, alertingCfg := scanning.LoadConfig(), alerting.LoadConfig()
 
 	app.Main(app.Options{
 		Name: "management-service",

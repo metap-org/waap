@@ -1,0 +1,32 @@
+# management-service, for docker-compose.yml. Read at start through CONFIG_FILE; every key is the
+# environment variable it replaces (smtp.host is SMTP_HOST), and a variable set in the container
+# wins over the file, so a deployment overrides one value with an env var and edits nothing here.
+# Secrets (database and broker passwords, SMTP_PASSWORD, SECRETS_ENCRYPTION_KEYS, VAULT_TOKEN) are
+# not in this file: they come from the environment (.env).
+port: 3000
+cors_origins: [http://localhost:5173, http://localhost:8081]
+# Behind the web proxy every request arrives from the proxy's address; trust its X-Forwarded-For so
+# the rate limit counts callers. The compose network range; in production list the proxy's own
+# addresses, never a range a client could be in.
+trusted_proxies: [172.16.0.0/12]
+
+# The token issuer: signs every token and publishes /.well-known/jwks.json.
+jwks:
+  keys_dir: /app/keys/jwks
+
+# Where security events are read from (the Analytics plane).
+analytics_url: http://analytics-api:3030
+# Dev/staging: DNS checks go to dns-mock. A real deployment removes this (dns.google) or points it at
+# its own resolver.
+doh_resolver_url: http://dns-mock:8053/resolve
+
+# Invitation and password-reset emails. Dev/staging: mail-mock (UI on :8025). A real deployment sets
+# SMTP_HOST, SMTP_PORT, SMTP_FROM and PUBLIC_APP_URL (the portal's origin) in .env.
+smtp:
+  host: mail-mock
+  port: 1025
+  from: "WAF Portal <no-reply@waf.local>"
+public_app_url: http://localhost:8081
+
+# The tenant (uuid) that runs this service: it owns plans and subscriptions, is never limited, and
+# its admin manages them. Set OPERATOR_TENANT_ID in .env; empty means no plan limits at all.

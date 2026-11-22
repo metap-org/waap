@@ -21,8 +21,6 @@ x-go: &go
 x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
   RABBITMQ_URL: amqp://metap:metap@host.docker.internal:5672
-  CORS_ORIGINS: http://localhost:5173
-  TRUSTED_PROXIES: 172.16.0.0/12 # the web proxy in front; see docker-compose.yml
   # Workspace > Credentials, both homes. "In metap (encrypted)": a DEV-ONLY key (never reuse it).
   # "Secret manager": the dev Vault (OpenBao) from ../../metap's compose, `docker compose up -d
   # vault` there; without it that option just fails when used.
@@ -43,26 +41,10 @@ services:
     ports: ["3000:3000"]
     environment:
       <<: *service-env
-      PORT: "3000"
-      # The token issuer: signs every token and publishes /.well-known/jwks.json.
-      JWKS_KEYS_DIR: /workspace/waap/m-deploy/keys/jwks
-      # The tenant that runs this service: it owns the plans and subscriptions, is never limited,
-      # and its admin manages them. Unset = no plan limits at all.
+      # Everything that is not a secret is in config/management.dev.yaml; a variable set here wins.
+      CONFIG_FILE: /workspace/waap/m-deploy/config/management.dev.yaml
+      # The tenant that runs this service (plans, subscriptions, never limited). Unset = no limits.
       OPERATOR_TENANT_ID: ${OPERATOR_TENANT_ID:-}
-      # Where security events are read from (the Analytics plane).
-      ANALYTICS_URL: http://analytics-api:3030
-      # Dev only: origins and test hostnames live on localhost or in dns-mock. Production leaves this
-      # unset, so the origin probe and the ownership-file fetch never contact a private address.
-      ALLOW_PRIVATE_TARGETS: "true"
-      # Every DNS check (domain-ownership TXT, routing CNAME) goes to the dev DNS mock instead of
-      # dns.google — set records at http://localhost:8053.
-      DOH_RESOLVER_URL: http://dns-mock:8053/resolve
-      # Invitation and password-reset emails go to the dev mail mock (read them at
-      # http://localhost:8025); the links point at the Vite dev server.
-      SMTP_HOST: mail-mock
-      SMTP_PORT: "1025"
-      SMTP_FROM: "WAF Portal <no-reply@waf.local>"
-      PUBLIC_APP_URL: http://localhost:5173
     healthcheck:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3000/health"]

@@ -15,8 +15,8 @@ import (
 // (docs/architecture/08-cross-cutting/20-code-structure-standard.md, 2.10).
 type Config = netcheck.Config
 
-// ConfigFromEnv reads the environment.
-func ConfigFromEnv() Config {
+// LoadConfig reads the settings: the environment, then the config file (CONFIG_FILE), then the default.
+func LoadConfig() Config {
 	return Config{
 		DoHURL:              env.String("DOH_RESOLVER_URL", "https://dns.google/resolve"),
 		EdgeCNAMETarget:     env.String("EDGE_CNAME_TARGET", "edge.waf.local"),

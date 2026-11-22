@@ -15,8 +15,8 @@ type Config struct {
 	OperatorTenant uuid.UUID
 }
 
-// ConfigFromEnv reads OPERATOR_TENANT_ID.
-func ConfigFromEnv() Config {
+// LoadConfig reads OPERATOR_TENANT_ID (environment, then the config file).
+func LoadConfig() Config {
 	id, _ := uuid.Parse(env.String("OPERATOR_TENANT_ID", ""))
 	return Config{OperatorTenant: id}
 }

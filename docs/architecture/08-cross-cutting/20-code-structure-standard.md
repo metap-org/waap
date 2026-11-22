@@ -95,8 +95,12 @@ Mỗi mục: **cách chuẩn** (điểm mở có sẵn của metap), **cấm**.
 - Địa chỉ đích do người dùng nhập (origin, hostname): qua client chống SSRF dùng chung.
 
 ### 2.10 Cấu hình và dây nối
-- Đọc env **một lần** ở `cmd/` bằng `kit/env`, gom vào một struct `Config`, truyền xuống. Cấm gọi
-  `env.Lookup` trong hàm nghiệp vụ.
+- Đọc cấu hình **một lần** ở `cmd/` bằng `kit/env`, gom vào một struct `Config` (`LoadConfig()`),
+  truyền xuống. Cấm gọi `env.Lookup` trong hàm nghiệp vụ.
+- Nguồn giá trị, cái đầu thắng: biến môi trường → file YAML (`CONFIG_FILE`, `metap/pkg/configfile`)
+  → mặc định tại chỗ đọc. Khoá trong file là tên biến nó thay (`smtp.host` = `SMTP_HOST`). Cấu hình
+  ổn định để trong file; env chỉ ghi đè theo môi trường và mang secret. Dòng đầu của `main` là
+  `configfile.MustLoadFromEnv()`.
 - `cmd/<service>/main.go` chỉ dựng `app.Options{Name, Actions, WrapBackend, Routes}` rồi
   `app.Main`. Không logic.
 
