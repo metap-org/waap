@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -178,4 +179,102 @@ func TestInternalRouteNeedsTheSecret(t *testing.T) {
 
 	t.Setenv("BILLING_INTERNAL_SECRET", "")
 	assert.Equal(t, 503, get("anything", tenant), "no secret configured: refuse rather than serve open")
+}
+
+// A customer asks, the operator decides: an upgrade applies at once, a downgrade is scheduled and
+// the customer keeps the bigger plan until it is due; only the right people may ask and decide.
+func TestPlanChangeRequestsAreDecidedByTheOperator(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistryAll(t, pool)
+	operator, customer, userID := uuid.New(), uuid.New(), uuid.New()
+	seedAdmin(t, pool, operator, userID)
+	t.Cleanup(func() {
+		for _, table := range []string{"waf.waf_plan_change_requests", "waf.waf_subscriptions", "waf.waf_plans"} {
+			pool.Exec(context.Background(), "DELETE FROM "+table+" WHERE tenant_id = $1", operator)
+		}
+	})
+	state, _ := newTestState(t, pool, registry)
+	ctx := context.Background()
+	opRC, custRC := adminContext(operator, userID), adminContext(customer, userID)
+	src := &billingservice.PlanSource{Operator: operator, Backend: state.Crud}
+	now := time.Now()
+
+	mk := func(name string, zones int, def bool) crud.RecordDto {
+		r, err := state.Crud.Create(ctx, "waf.plans", obj(t, map[string]any{"name": name, "maxZones": zones, "maxRulesPerZone": zones * 5, "isDefault": def, "enabled": true}), opRC, nil)
+		require.NoError(t, err)
+		return r
+	}
+	small, big, mid := mk("Small", 1, true), mk("Big", 10, false), mk("Mid", 5, false)
+	planOf := func() string {
+		r, err := src.Resolve(ctx, customer)
+		require.NoError(t, err)
+		return r.Plan.Name
+	}
+	assert.Equal(t, "Small", planOf())
+
+	// Only the customer's admin may ask, and not for the plan it has.
+	_, err := src.RequestPlanChange(ctx, &permission.RequestContext{TenantID: customer.String(), Roles: []string{"viewer"}, HasRoles: true}, big.ID.String(), "", "Acme")
+	assert.Error(t, err, "a non-admin cannot ask")
+	_, err = src.RequestPlanChange(ctx, custRC, small.ID.String(), "", "Acme")
+	assert.Error(t, err, "already on it")
+	_, err = src.RequestPlanChange(ctx, opRC, big.ID.String(), "", "Op")
+	assert.Error(t, err, "the operator is not on a plan")
+
+	asked, err := src.RequestPlanChange(ctx, custRC, big.ID.String(), "we grew", "Acme")
+	require.NoError(t, err)
+	_, err = src.RequestPlanChange(ctx, custRC, big.ID.String(), "again", "Acme")
+	assert.Error(t, err, "one open request at a time")
+	mine, err := src.MyPlanRequests(ctx, custRC)
+	require.NoError(t, err)
+	require.Len(t, mine, 1)
+	assert.Equal(t, "pending", mine[0]["status"])
+	assert.Equal(t, "Big", mine[0]["planName"])
+
+	reqID := idOf(asked)
+	_, err = src.DecidePlanChange(ctx, custRC, reqID, true, "", now)
+	assert.Error(t, err, "a customer cannot decide")
+
+	// Approved upgrade: applies at once.
+	res, err := src.DecidePlanChange(ctx, opRC, reqID, true, "welcome", now)
+	require.NoError(t, err)
+	assert.Equal(t, "now", res["applied"])
+	assert.Equal(t, "Big", planOf())
+	_, err = src.DecidePlanChange(ctx, opRC, reqID, true, "", now)
+	assert.Error(t, err, "decided once")
+
+	// A downgrade is approved but waits: the customer keeps Big until it is due.
+	asked, err = src.RequestPlanChange(ctx, custRC, small.ID.String(), "", "Acme")
+	require.NoError(t, err)
+	reqID = idOf(asked)
+	res, err = src.DecidePlanChange(ctx, opRC, reqID, true, "", now)
+	require.NoError(t, err)
+	assert.Equal(t, "scheduled", res["applied"])
+	assert.Equal(t, "Big", planOf(), "still the bigger plan until the period ends")
+
+	// A rejected request changes nothing.
+	asked, err = src.RequestPlanChange(ctx, custRC, mid.ID.String(), "", "Acme")
+	require.NoError(t, err)
+	reqID = idOf(asked)
+	res, err = src.DecidePlanChange(ctx, opRC, reqID, false, "not now", now)
+	require.NoError(t, err)
+	assert.Equal(t, "rejected", res["status"])
+	mine, _ = src.MyPlanRequests(ctx, custRC)
+	assert.Equal(t, "not now", mine[0]["reply"])
+}
+
+func setupRegistryAll(t *testing.T, pool *pgxpool.Pool) *metadata.MetadataRegistry {
+	registry := metadata.NewMetadataRegistry()
+	for _, def := range []metadata.EntityDefinition{entities.PlanEntity(), entities.SubscriptionEntity(), entities.PlanChangeRequestEntity()} {
+		require.NoError(t, registry.Register(def))
+		_, err := reconciler.ReconcileWithScope(context.Background(), pool, control.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
+		require.NoError(t, err, "reconcile %s", def.Name)
+	}
+	return registry
+}
+
+func idOf(o crud.JsonObject) uuid.UUID {
+	var s string
+	_ = json.Unmarshal(o["id"], &s)
+	id, _ := uuid.Parse(s)
+	return id
 }

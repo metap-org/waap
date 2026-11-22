@@ -331,3 +331,18 @@ func TestCompileIPAccessListDropsExpiredEntriesButKeepsOpenEndedOnes(t *testing.
 	_, ok = compileIPAccessList(entry("garbage"))
 	assert.True(t, ok, "an unreadable expiry never drops a protection")
 }
+
+func TestCompileRuleDropsAnExpiredTemporaryRule(t *testing.T) {
+	now = func() time.Time { return time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC) }
+	t.Cleanup(func() { now = time.Now })
+	rule := func(expiresAt string) management.Record {
+		return record("r", nil, map[string]any{
+			"name": "temp", "ruleType": "waf", "action": "block", "enabled": true, "priority": 1,
+			"matchCondition": map[string]any{"field": "uri.path", "op": "eq", "value": "/x"}, "expiresAt": expiresAt,
+		})
+	}
+	_, ok := compileRule(rule("2026-11-22T11:00:00Z"))
+	assert.False(t, ok, "expired")
+	_, ok = compileRule(rule("2026-11-23T11:00:00Z"))
+	assert.True(t, ok, "still running")
+}

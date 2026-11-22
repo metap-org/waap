@@ -49,6 +49,9 @@ func MountRoutes(r chi.Router, state *httpserver.AppState) {
 
 // RegisterActions registers the declared actions of this service's entities.
 func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+	if err := registerChangeActions(state, reg); err != nil {
+		return err
+	}
 	return reg.Register(model.Subscriptions, model.ActionListTenants, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 		return crud.ToObject(listCustomerTenants(ctx, state, c.RC))
 	})

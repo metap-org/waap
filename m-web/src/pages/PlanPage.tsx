@@ -6,11 +6,20 @@
  * The service provider's own workspace (the one set as OPERATOR_TENANT_ID) also manages the plans
  * and gives each customer a subscription; see `PlanManager`.
  */
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
   AlertDescription,
   Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Textarea,
   PageHeader,
   Progress,
   SectionCard,
@@ -21,8 +30,17 @@ import {
   TableHeader,
   TableRow,
 } from "@metap/ui";
-import { ApiErrorMessage } from "@metap/platform-ui";
-import { usePlanUsage, type PlanLimits } from "../api/waf";
+import {
+  ApiErrorMessage,
+  useAsyncAction,
+  useCurrentUser,
+} from "@metap/platform-ui";
+import {
+  myPlanRequests,
+  requestPlanChange,
+  usePlanUsage,
+  type PlanLimits,
+} from "../api/waf";
 import { PlanManager } from "../components/PlanManager";
 
 /** Share of a limit used at which the page starts warning (UC-74). */
@@ -31,6 +49,37 @@ const WARN_AT = 0.8;
 export function PlanPage() {
   const { t } = useTranslation();
   const usage = usePlanUsage();
+  const me = useCurrentUser();
+  const queryClient = useQueryClient();
+  const { busy, run } = useAsyncAction();
+  const [asking, setAsking] = useState<PlanLimits | null>(null);
+  const [note, setNote] = useState("");
+  const [askError, setAskError] = useState<Error | null>(null);
+  const requests = useQuery({
+    queryKey: ["records", "plan-requests"],
+    queryFn: async () => (await myPlanRequests()).data.requests,
+    enabled: usage.data?.enforced === true && !usage.data.operator,
+  });
+  const isAdmin = Boolean(me.data?.roles.includes("admin"));
+  const waiting = (requests.data ?? []).some((r) => r.status === "pending");
+
+  async function ask() {
+    if (!asking?.id) return;
+    setAskError(null);
+    try {
+      await run(async () => {
+        await requestPlanChange(asking.id as string, note.trim());
+        await queryClient.invalidateQueries({
+          queryKey: ["records", "plan-requests"],
+        });
+        setAsking(null);
+        setNote("");
+      });
+    } catch (e) {
+      setAskError(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
+
   if (usage.isLoading) {
     return (
       <p className="text-sm text-muted-foreground">{t("waf.common.loading")}</p>
@@ -103,6 +152,7 @@ export function PlanPage() {
                   <TableHead>{t("waf.plan.colPlan")}</TableHead>
                   <TableHead>{t("waf.plan.colZones")}</TableHead>
                   <TableHead>{t("waf.plan.colRules")}</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -122,15 +172,87 @@ export function PlanPage() {
                     <TableCell>
                       {limitText(p, "maxRulesPerZone", t("waf.plan.unlimited"))}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {isAdmin && p.id !== plan.id ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={waiting}
+                          onClick={() => setAsking(p)}
+                        >
+                          {t("waf.plan.request.ask")}
+                        </Button>
+                      ) : null}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            {waiting ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t("waf.plan.request.waiting")}
+              </p>
+            ) : null}
+            {(requests.data ?? []).length > 0 ? (
+              <ul className="mt-3 space-y-1 text-sm">
+                {(requests.data ?? []).map((r) => (
+                  <li key={r.id}>
+                    <Badge variant="outline" className="mr-2">
+                      {t(`waf.plan.request.status.${r.status}`)}
+                    </Badge>
+                    {r.planName}
+                    {r.reply ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        — {r.reply}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </SectionCard>
         ) : null}
 
         {operator ? <PlanManager /> : null}
       </div>
+      {asking ? (
+        <Dialog open onOpenChange={(open) => !open && setAsking(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {t("waf.plan.request.title", { name: asking.name })}
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {asking.maxZones !== 0 && zones > asking.maxZones
+                ? t("waf.plan.request.overLimit", {
+                    used: zones,
+                    limit: asking.maxZones,
+                  })
+                : t("waf.plan.request.explain")}
+            </p>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("waf.plan.request.notePlaceholder")}
+            />
+            {askError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{askError.message}</AlertDescription>
+              </Alert>
+            ) : null}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAsking(null)}>
+                {t("shell.cancel")}
+              </Button>
+              <Button disabled={busy} onClick={() => void ask()}>
+                {t("waf.plan.request.send")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

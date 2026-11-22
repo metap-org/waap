@@ -180,6 +180,26 @@ export const wafEn = {
     },
     zoneTabs: {
       versions: {
+        check: "Check policy",
+        checkClean: "No problems found",
+        checkWarnings: "Passes, with warnings",
+        checkErrors: "{{count}} error(s) to fix",
+        checkCounts:
+          "{{rules}} live rules and policies, {{entries}} IP entries",
+        severity: { error: "Error", warning: "Warning", info: "Note" },
+        finding: {
+          ruleConditionInvalid:
+            'Rule "{{subject}}" has a match condition that is not valid, so it will not apply.',
+          rulePriorityShared:
+            "These rules share a priority, so which one wins is not defined: {{subject}}.",
+          ruleExpired: 'Rule "{{subject}}" has expired and no longer applies.',
+          rateLimitThresholdMissing:
+            'Rate limit rule "{{subject}}" has no threshold; a default will be used.',
+          ipOnBothLists:
+            "{{subject}} is on both the whitelist and the blacklist. The whitelist wins, so the block never applies.",
+          noProtection:
+            "This zone has no active rule, DDoS policy or IP entry, so nothing protects it.",
+        },
         title: "Policy versions",
         description:
           "A snapshot of this zone's DDoS policies, firewall rules and IP lists after every change. Roll back to restore one; the rollback is itself a new version.",
@@ -267,6 +287,17 @@ export const wafEn = {
         toastRemoved: "DDoS policy removed",
       },
       rules: {
+        colExpires: "Expires",
+        expired: "Expired",
+        expiry: "Expires",
+        expiryNever: "Never (permanent)",
+        expiryKeep: "Keep current expiry",
+        expiry1h: "In 1 hour",
+        expiry6h: "In 6 hours",
+        expiry24h: "In 24 hours",
+        expiry7d: "In 7 days",
+        expiryHint:
+          "A temporary rule stops applying by itself (at the next resync, within a minute of expiry).",
         title: "Firewall rules",
         description:
           "Evaluated top to bottom — the first matching rule decides the action.",
@@ -421,6 +452,22 @@ export const wafEn = {
       defaultAccount: "Default account",
     },
     plan: {
+      request: {
+        ask: "Request this plan",
+        waiting: "A request is waiting for the service provider.",
+        title: "Request the {{name}} plan",
+        explain:
+          "Your service provider decides. An upgrade applies as soon as it is approved; a move to a smaller plan applies from the end of the current period.",
+        overLimit:
+          "You use {{used}} zones and this plan allows {{limit}}. A move to it keeps what you have but you cannot add more until you are within the limit.",
+        notePlaceholder: "Why you need it (optional)",
+        send: "Send request",
+        status: {
+          pending: "Waiting",
+          approved: "Approved",
+          rejected: "Rejected",
+        },
+      },
       title: "Plan and usage",
       description:
         "What this workspace's plan allows and how much of it is used.",
@@ -443,6 +490,12 @@ export const wafEn = {
       operatorNote:
         "This is the service provider's workspace: it is never limited. {{zones}} zones in use. Define plans and give customers a subscription below.",
       manage: {
+        requestsTitle: "Plan change requests",
+        requestsDescription:
+          "Customers asking for another plan. An upgrade applies at once; a downgrade from the end of the current period.",
+        approve: "Approve",
+        reject: "Reject",
+        pending: "Moving to {{plan}} on {{when}}",
         plansTitle: "Plans",
         plansDescription:
           "What each plan allows. A customer without a subscription gets the plan marked as default.",
@@ -692,7 +745,30 @@ export const wafEn = {
       activateModeLabel: "Mode",
       activateZone: "Activate zone",
     },
+    cancelDeletion: {
+      title: "Cancel workspace deletion",
+      explain:
+        "The owner asked to delete this workspace. Cancel the deletion to reopen it for everyone, exactly as it was.",
+      button: "Cancel the deletion",
+      done: "The deletion is cancelled and the workspace is open again.",
+      signIn: "Sign in",
+      noToken: "This link is incomplete. Use the link from the email.",
+    },
     settings: {
+      deleteTitle: "Delete this workspace",
+      deleteDescription:
+        "Only the workspace owner can do this. The workspace is suspended at once and deleted after 30 days; every admin is emailed a link that cancels it until then.",
+      deleteConfirmLabel: "Type the workspace's name to confirm",
+      deleteButton: "Delete workspace",
+      deleteScheduled:
+        "Deletion scheduled for {{when}}. Every admin has been emailed a link to cancel it.",
+      exportTitle: "Export your data",
+      exportDescription:
+        "Download everything configured in this workspace (accounts, domains, zones, DDoS policies, firewall rules, IP lists) as one JSON file.",
+      exportButton: "Download export",
+      exportDone: "Export downloaded",
+      exportTruncated:
+        "Export downloaded, but these were too large and are incomplete: {{entities}}",
       title: "Tenant settings",
       description: "Branding and platform behaviour for this tenant.",
       secretManaged:
@@ -919,6 +995,25 @@ export const wafVi = {
     },
     zoneTabs: {
       versions: {
+        check: "Kiểm tra policy",
+        checkClean: "Không có vấn đề",
+        checkWarnings: "Đạt, có cảnh báo",
+        checkErrors: "{{count}} lỗi cần sửa",
+        checkCounts: "{{rules}} rule và policy đang chạy, {{entries}} IP",
+        severity: { error: "Lỗi", warning: "Cảnh báo", info: "Ghi chú" },
+        finding: {
+          ruleConditionInvalid:
+            'Rule "{{subject}}" có điều kiện khớp không hợp lệ nên sẽ không áp dụng.',
+          rulePriorityShared:
+            "Các rule này cùng độ ưu tiên nên không xác định rule nào thắng: {{subject}}.",
+          ruleExpired: 'Rule "{{subject}}" đã hết hạn và không còn áp dụng.',
+          rateLimitThresholdMissing:
+            'Rule rate limit "{{subject}}" chưa có ngưỡng; sẽ dùng giá trị mặc định.',
+          ipOnBothLists:
+            "{{subject}} nằm ở cả whitelist và blacklist. Whitelist thắng nên lệnh chặn không bao giờ áp dụng.",
+          noProtection:
+            "Zone này chưa có rule, DDoS policy hay IP nào đang hoạt động nên chưa được bảo vệ.",
+        },
         title: "Phiên bản policy",
         description:
           "Ảnh chụp DDoS policy, firewall rule và IP list của zone sau mỗi thay đổi. Khôi phục một phiên bản sẽ đưa cấu hình về đúng như lúc đó; bản khôi phục cũng là một phiên bản mới.",
@@ -1006,6 +1101,17 @@ export const wafVi = {
         toastRemoved: "Đã xoá chính sách DDoS",
       },
       rules: {
+        colExpires: "Hết hạn",
+        expired: "Đã hết hạn",
+        expiry: "Hết hạn",
+        expiryNever: "Không (vĩnh viễn)",
+        expiryKeep: "Giữ hạn hiện tại",
+        expiry1h: "Sau 1 giờ",
+        expiry6h: "Sau 6 giờ",
+        expiry24h: "Sau 24 giờ",
+        expiry7d: "Sau 7 ngày",
+        expiryHint:
+          "Rule tạm tự ngừng áp dụng (ở lần resync kế, trong vòng một phút sau khi hết hạn).",
         title: "Firewall rule",
         description:
           "Được đánh giá từ trên xuống — rule khớp đầu tiên quyết định hành động.",
@@ -1171,11 +1277,56 @@ export const wafVi = {
       atLimit:
         "Đã chạm giới hạn zone của gói: chưa thêm được zone mới cho đến khi nâng gói. Các zone đang có vẫn chạy bình thường.",
       compare: "Các gói",
-      changeHint: "Gói do quản trị nền tảng đặt; nhờ họ đổi khi cần.",
+      changeHint: "Gói do nhà cung cấp dịch vụ đặt; nhờ họ đổi khi cần.",
       colPlan: "Gói",
       colZones: "Zone",
       colRules: "Rule mỗi zone",
       yours: "Đang dùng",
+      noLimits: "Không có giới hạn gói",
+      noLimitsNote:
+        "Workspace này không bị giới hạn. Đang dùng {{zones}} zone.",
+      operatorNote:
+        "Đây là workspace của nhà cung cấp dịch vụ: không bao giờ bị giới hạn. Đang dùng {{zones}} zone. Định nghĩa gói và gán subscription cho khách ở dưới.",
+      request: {
+        ask: "Xin chuyển sang gói này",
+        waiting: "Đang có một yêu cầu chờ nhà cung cấp dịch vụ xử lý.",
+        title: "Xin chuyển sang gói {{name}}",
+        explain:
+          "Nhà cung cấp dịch vụ quyết định. Nâng gói có hiệu lực ngay khi được duyệt; hạ xuống gói nhỏ hơn có hiệu lực từ cuối kỳ hiện tại.",
+        overLimit:
+          "Bạn đang dùng {{used}} zone mà gói này cho {{limit}}. Chuyển sang vẫn giữ những gì đang có nhưng không thêm được cho đến khi trong giới hạn.",
+        notePlaceholder: "Lý do cần gói này (không bắt buộc)",
+        send: "Gửi yêu cầu",
+        status: {
+          pending: "Đang chờ",
+          approved: "Đã duyệt",
+          rejected: "Từ chối",
+        },
+      },
+      manage: {
+        plansTitle: "Các gói",
+        plansDescription:
+          "Mỗi gói cho phép gì. Khách chưa có subscription nhận gói đánh dấu mặc định.",
+        newPlan: "Gói mới",
+        edit: "Sửa",
+        default: "mặc định",
+        off: "tắt",
+        zeroHint: "0 nghĩa là không giới hạn.",
+        defaultHint: "Gói mặc định cho khách chưa có subscription",
+        enabled: "Đang bán",
+        subsTitle: "Khách hàng",
+        subsDescription:
+          "Gán gói cho từng workspace khách. Thay đổi có hiệu lực ở lần tạo zone hoặc rule kế tiếp.",
+        customer: "Khách hàng",
+        assign: "Gán gói",
+        remove: "Gỡ",
+        requestsTitle: "Yêu cầu đổi gói",
+        requestsDescription:
+          "Khách xin đổi gói. Nâng gói có hiệu lực ngay; hạ gói từ cuối kỳ hiện tại.",
+        approve: "Duyệt",
+        reject: "Từ chối",
+        pending: "Chuyển sang {{plan}} vào {{when}}",
+      },
     },
     falsePositives: {
       title: "Chặn nhầm",
@@ -1408,7 +1559,30 @@ export const wafVi = {
       activateModeLabel: "Chế độ",
       activateZone: "Kích hoạt zone",
     },
+    cancelDeletion: {
+      title: "Huỷ việc xoá workspace",
+      explain:
+        "Owner đã yêu cầu xoá workspace này. Huỷ việc xoá để mở lại cho mọi người, giữ nguyên như cũ.",
+      button: "Huỷ việc xoá",
+      done: "Đã huỷ việc xoá, workspace đã mở lại.",
+      signIn: "Đăng nhập",
+      noToken: "Liên kết này không đầy đủ. Hãy dùng liên kết trong email.",
+    },
     settings: {
+      deleteTitle: "Xoá workspace này",
+      deleteDescription:
+        "Chỉ owner của workspace mới làm được. Workspace bị tạm khoá ngay và bị xoá sau 30 ngày; mọi admin nhận email kèm liên kết để huỷ trong thời gian đó.",
+      deleteConfirmLabel: "Gõ tên workspace để xác nhận",
+      deleteButton: "Xoá workspace",
+      deleteScheduled:
+        "Đã lên lịch xoá vào {{when}}. Mọi admin đã nhận email kèm liên kết để huỷ.",
+      exportTitle: "Xuất dữ liệu",
+      exportDescription:
+        "Tải về mọi thứ đã cấu hình trong workspace này (account, domain, zone, DDoS policy, firewall rule, IP list) thành một file JSON.",
+      exportButton: "Tải file xuất",
+      exportDone: "Đã tải file xuất",
+      exportTruncated:
+        "Đã tải file xuất, nhưng các mục này quá lớn nên chưa đầy đủ: {{entities}}",
       title: "Cài đặt tenant",
       description: "Thương hiệu và hành vi nền tảng cho tenant này.",
       secretManaged:

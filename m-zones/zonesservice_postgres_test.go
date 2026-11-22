@@ -554,3 +554,44 @@ func TestPlanQuotasFollowWhatBillingServiceSays(t *testing.T) {
 }
 
 func second(_ crud.RecordDto, err error) error { return err }
+
+// The export holds everything the caller sees for the tenant, across pages, and only that tenant's.
+func TestExportTenantDataHoldsTheTenantsConfiguration(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	backend := zonesservice.NewGuardedZonesBackend(state.Crud, "http://localhost:1", "http://localhost:1")
+	actions := crud.NewActionRegistry()
+	require.NoError(t, zonesservice.RegisterActions(state, actions))
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+
+	zone, err := backend.Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, "a."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+	require.NoError(t, err)
+	for i := 0; i < 55; i++ { // more than one page
+		_, err = backend.Create(ctx, "waf.ip_access_lists", crud.JsonObject{"zoneId": jsonMarshal(t, zone.ID.String()), "type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, fmt.Sprintf("203.0.113.%d", i))}, rc, nil)
+		require.NoError(t, err)
+	}
+
+	out, err := actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "exportData", RC: rc})
+	require.NoError(t, err)
+	var doc struct {
+		TenantID  string                       `json:"tenantId"`
+		Entities  map[string][]json.RawMessage `json:"entities"`
+		Truncated []string                     `json:"truncated"`
+	}
+	raw, _ := json.Marshal(out)
+	require.NoError(t, json.Unmarshal(raw, &doc))
+	assert.Equal(t, tenantID.String(), doc.TenantID)
+	assert.Len(t, doc.Entities["waf.zones"], 1)
+	assert.Len(t, doc.Entities["waf.ip_access_lists"], 55)
+	assert.Len(t, doc.Entities["waf.accounts"], 1, "the default account")
+	assert.Empty(t, doc.Truncated)
+}

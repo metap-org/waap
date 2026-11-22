@@ -119,14 +119,14 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 |---|---|---|---|
 | 40 Soạn policy | Một phần | CRUD rule, DDoS policy, danh sách IP, có bật/tắt; chưa có bản nháp tách khỏi bản đang chạy | mã |
 | 41 DDoS, managed ruleset | Một phần | DDoS policy có; managed ruleset nằm ngoài v1 | mã |
-| 42 Kiểm nháp | Chưa | control-plane biên dịch được (đã chạy thật), chưa có "kiểm" bấm được từ portal | mã |
+| 42 Kiểm nháp | Một phần | nút Kiểm tra policy ở tab Phiên bản của zone: rule có điều kiện sai, rule trùng độ ưu tiên, rate limit thiếu ngưỡng, IP ở cả whitelist và blacklist, zone chưa có gì bảo vệ; chỉ đọc, không ghi. Chưa có bản nháp tách khỏi bản đang chạy để kiểm | mã |
 | 43 đến 45 Change request, duyệt, tự xác nhận | Chưa | không có entity hay luồng | mã |
 | 46 Phát hành | Một phần | phát hành ngay; `configVersion` là băm nội dung bộ rule, chưa có `PolicyVersion` bất biến kèm người duyệt | mã |
 | 47 Theo dõi phát hành | Chưa | edge không báo tiến độ ngược lại | mã |
 | 48 Xem, so sánh version | Một phần | tab Phiên bản của zone: mỗi thay đổi rule, DDoS policy hay IP list ghi một snapshot bất biến (`waf.policy_versions`), xem khác biệt với bản trước; chưa ghi người duyệt (không có luồng duyệt); rule áp dụng cả tenant không nằm trong version của zone nào | mã |
 | 49 Rollback | Có | action `rollback` trên một version: khôi phục (tạo lại, sửa, xoá) rồi ghi một version mới; không nguyên tử, lỗi giữa chừng thì chạy lại cùng version để hoàn tất | mã |
-| 50 Under Attack | Chưa | | mã |
-| 51 Rule tạm có hạn | Chưa | rule không có hạn | mã |
+| 50 Under Attack | Chưa | là hành vi của edge (thách thức mọi request); phía management chưa có gì để làm khi edge chưa đọc cờ | mã |
+| 51 Rule tạm có hạn | Có | firewall rule có `expiresAt` (chọn 1 giờ đến 7 ngày khi tạo hoặc sửa); control-plane ngừng biên dịch rule hết hạn ở lần resync kế (tối đa 1 phút); kiểm tra policy báo rule đã hết hạn | mã |
 | 52 Đổi thông tin không ảnh hưởng traffic | Có | | mã |
 
 ### S3 Vận hành bảo mật
@@ -147,9 +147,9 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 
 | Lát | Trạng thái |
 |---|---|
-| S4 Gói và thanh toán (UC-70 đến 75) | Một phần. Có: service riêng `billing-service` (`m-billing`) sở hữu `waf.plans` và `waf.subscriptions`, nằm trong tenant vận hành (`OPERATOR_TENANT_ID`), admin của tenant đó định nghĩa gói (số zone, số rule mỗi zone, gói mặc định) và gán subscription cho từng tenant khách; trang Gói cho khách xem mức dùng và cảnh báo từ 80% (UC-70, 74); `zones-service` hỏi billing-service qua REST (`/internal/plans/resolve`, bí mật dùng chung) rồi chặn tạo zone và rule vượt hạn mức (`plan_limit_reached`; billing không trả lời thì cho qua), không xoá gì của khách đang vượt; tenant vận hành không bị giới hạn; chưa đặt tenant vận hành thì không giới hạn gì. Không dùng `tier` của metap. Chưa có: chọn và đổi gói tự phục vụ, trạng thái và kỳ hạn subscription, thanh toán, hoá đơn, trần chi tiêu, RPS (UC-71, 72, 73, 75) |
-| S5 UC-80 Xuất dữ liệu | Chưa |
-| S5 UC-81 Xoá org | Một phần: phía platform admin xong (trang Tenants, lên lịch và huỷ xoá, job chuyển `deleted` sau thời gian lưu giữ); Owner tự yêu cầu chưa có; chưa xoá dữ liệu vật lý |
+| S4 Gói và thanh toán (UC-70 đến 75) | Một phần. Có: service riêng `billing-service` (`m-billing`) sở hữu `waf.plans` và `waf.subscriptions`, nằm trong tenant vận hành (`OPERATOR_TENANT_ID`), admin của tenant đó định nghĩa gói (số zone, số rule mỗi zone, gói mặc định) và gán subscription cho từng tenant khách; trang Gói cho khách xem mức dùng và cảnh báo từ 80% (UC-70, 74); `zones-service` hỏi billing-service qua REST (`/internal/plans/resolve`, bí mật dùng chung) rồi chặn tạo zone và rule vượt hạn mức (`plan_limit_reached`; billing không trả lời thì cho qua), không xoá gì của khách đang vượt; tenant vận hành không bị giới hạn; chưa đặt tenant vận hành thì không giới hạn gì. Không dùng `tier` của metap. Khách (admin) xin đổi gói, admin vận hành duyệt hoặc từ chối kèm phản hồi (UC-71, 73): nâng gói có hiệu lực ngay, hạ gói có hiệu lực sau một kỳ 30 ngày kể từ lúc duyệt (subscription ghi gói chờ và ngày áp dụng); hạ gói không xoá gì của khách, chỉ chặn thêm. Chưa có: thanh toán, hoá đơn, trần chi tiêu, RPS, kỳ thanh toán thật (UC-72, 74 phần trần chi tiêu, 75) |
+| S5 UC-80 Xuất dữ liệu | Có | Cài đặt, Xuất dữ liệu: một file JSON gồm account, domain, zone, DDoS policy, firewall rule, IP list mà người xuất được phép thấy, đọc theo trang, báo nếu quá lớn bị cắt. Chưa có cấu hình của billing và phần phân tích |
+| S5 UC-81 Xoá org | Có (không xoá dữ liệu vật lý) | platform admin lên lịch và huỷ xoá (trang Tenants); Owner tự xoá ở Cài đặt bằng cách gõ tên workspace: workspace bị khoá ngay, mọi admin nhận email kèm liên kết huỷ dùng một lần (trang `/cancel-deletion`, công khai vì workspace đã khoá nên không đăng nhập được), job chuyển `deleted` sau 30 ngày; chưa xoá dữ liệu vật lý |
 | S5 UC-82 Chuyển zone sang org khác | Chưa |
 | S6 UC-90 SSO | Có (OIDC và SAML 2.0): domain email phải được chứng minh sở hữu bằng bản ghi TXT mới định tuyến đăng nhập hay tạo thành viên, bắt buộc SSO (kể cả khi nhận lời mời), chỉ tin email IdP đã xác minh (OIDC), ánh xạ nhóm IdP sang role (không bao giờ admin); chưa có đăng xuất một lần (SLO) và assertion mã hoá |
 | S6 UC-91 Khôi phục Owner | Có: yêu cầu, chờ, báo admin, hoàn tất (trang Tenants, hộp thoại Truy cập) |

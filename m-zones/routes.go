@@ -421,6 +421,12 @@ func RegisterActions(state *httpserver.AppState, reg *crud.ActionRegistry) error
 		{model.Zones, model.ActionSyncConfigState, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(syncConfigState(ctx, state, c.RC, c.ID))
 		}},
+		{model.Zones, model.ActionValidatePolicy, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(validateZonePolicy(ctx, state.Crud, c.ID, c.RC))
+		}},
+		{model.Zones, model.ActionExportData, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
+			return crud.ToObject(exportTenantData(ctx, state.Crud, c.RC))
+		}},
 		{model.Zones, model.ActionPlanUsage, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(tenantUsage(ctx, state.Crud, PlanClientFromEnv(), c.RC))
 		}},

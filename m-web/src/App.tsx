@@ -80,6 +80,11 @@ const PlanPage = lazy(() =>
 const AccountsPage = lazy(() =>
   import("./pages/AccountsPage").then((m) => ({ default: m.AccountsPage })),
 );
+const CancelDeletionPage = lazy(() =>
+  import("./pages/CancelDeletionPage").then((m) => ({
+    default: m.CancelDeletionPage,
+  })),
+);
 const FindingsPage = lazy(() =>
   import("./pages/FindingsPage").then((m) => ({ default: m.FindingsPage })),
 );
@@ -365,6 +370,7 @@ export default function App() {
           {/* Public account pages the invitation and password-reset emails link to. */}
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/signup/verify" element={<SignupVerifyPage />} />
+          <Route path="/cancel-deletion" element={<CancelDeletionPage />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />

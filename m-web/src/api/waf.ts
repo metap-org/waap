@@ -36,6 +36,7 @@ export const ENTITIES = {
   accounts: "waf.accounts",
   plans: "waf.plans",
   subscriptions: "waf.subscriptions",
+  planChanges: "waf.plan_change_requests",
   ddosPolicies: "waf.ddos_policies",
   firewallRules: "waf.firewall_rules",
   ipAccessLists: "waf.ip_access_lists",
@@ -200,6 +201,30 @@ export function rollbackToVersion(versionId: string) {
   });
 }
 
+export type PolicyFinding = {
+  severity: "error" | "warning" | "info";
+  code: string;
+  entity?: string;
+  id?: string;
+  subject?: string;
+};
+export type PolicyReport = {
+  findings: PolicyFinding[];
+  errors: number;
+  rules: number;
+  entries: number;
+};
+
+/** Checks a zone's rules, DDoS policies and IP lists for mistakes. Changes nothing. */
+export function validatePolicy(zoneId: string) {
+  return act<PolicyReport>(ENTITIES.zones, "validatePolicy", { id: zoneId });
+}
+
+/** The tenant's configuration (accounts, zones, rules, DDoS policies, IP lists) as one document. */
+export function exportTenantData() {
+  return act<Record<string, unknown>>(ENTITIES.zones, "exportData");
+}
+
 export function runScanJob(jobId: string) {
   return act<{ dispatched: boolean; detail: string }>(
     ENTITIES.scanJobs,
@@ -256,6 +281,41 @@ export type PlanUsage = {
 };
 
 export type CustomerTenant = { id: string; name: string };
+
+export type PlanRequest = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  planId: string;
+  planName: string;
+  reply: string;
+  createdAt: string;
+};
+
+/** Asks the service provider for another plan (this workspace's admin only). */
+export function requestPlanChange(planId: string, note: string) {
+  return act<{ id: string; status: string }>(
+    ENTITIES.planChanges,
+    "requestPlanChange",
+    { input: { planId, note } },
+  );
+}
+
+/** This workspace's own plan change requests, newest first. */
+export function myPlanRequests() {
+  return act<{ requests: PlanRequest[] }>(
+    ENTITIES.planChanges,
+    "myPlanRequests",
+  );
+}
+
+/** The service provider's admin approves or rejects a request. */
+export function decidePlanChange(id: string, approve: boolean, note: string) {
+  return act<{ status: string; applied: string }>(
+    ENTITIES.planChanges,
+    "decide",
+    { id, input: { approve, note } },
+  );
+}
 
 /** The tenants a subscription can be given to (service provider's admin only). */
 export function listCustomerTenants() {

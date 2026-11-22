@@ -280,6 +280,9 @@ func compileRule(rule management.Record) (ruleset.CompiledRule, bool) {
 	if enabled, ok := rule.Bool(model.FieldEnabled); ok && !enabled {
 		return ruleset.CompiledRule{}, false
 	}
+	if expired(rule) {
+		return ruleset.CompiledRule{}, false
+	}
 	ruleType, ok := rule.Str(model.FieldRuleType)
 	if !ok {
 		ruleType = "waf"

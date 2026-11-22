@@ -32,6 +32,8 @@ import {
   toast,
 } from "@metap/ui";
 import { StatusBadge } from "../components/primitives";
+import { ExportDataCard } from "../components/ExportDataCard";
+import { DeleteWorkspaceCard } from "../components/DeleteWorkspaceCard";
 
 type ConfigItem = {
   key: string;
@@ -180,6 +182,7 @@ export function SettingsPage() {
       />
 
       <div className="grid gap-4">
+        <ExportDataCard />
         <SectionCard
           title={t("waf.settings.languageTitle")}
           description={t("waf.settings.languageDescription")}
@@ -226,6 +229,7 @@ export function SettingsPage() {
             <TableBody>{renderRows(rest)}</TableBody>
           </Table>
         </SectionCard>
+        <DeleteWorkspaceCard />
       </div>
     </div>
   );

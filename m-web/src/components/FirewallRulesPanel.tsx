@@ -56,7 +56,11 @@ import {
   useRecords,
   type WafRecord,
 } from "../api/waf";
-import { ApiErrorMessage, useAsyncAction } from "@metap/platform-ui";
+import {
+  ApiErrorMessage,
+  formatDateTime,
+  useAsyncAction,
+} from "@metap/platform-ui";
 import { StatusBadge } from "./primitives";
 import {
   FIELDS,
@@ -83,6 +87,7 @@ type RuleData = {
   matchCondition?: unknown;
   rateLimitThreshold?: number;
   rateLimitWindow?: number;
+  expiresAt?: string | null;
 };
 
 const EMPTY: RuleData = {
@@ -97,7 +102,7 @@ const EMPTY: RuleData = {
 /** `zoneId` present -> this zone's own rules (unchanged behaviour). Omitted -> every tenant-wide
  *  rule, fetched unfiltered and filtered client-side (see the file header for why). */
 export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const invalidate = useInvalidateWaf();
   const scoped = useRecords<RuleData>(
     ENTITIES.firewallRules,
@@ -128,6 +133,8 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
   // needs the persistent inline notice, the latter is just a normal mode the user picked.
   const [autoFellBackToAdvanced, setAutoFellBackToAdvanced] = useState(false);
   const [open, setOpen] = useState(false);
+  // "" = permanent, "keep" = leave an existing expiry as it is, else hours from now (UC-51).
+  const [expiry, setExpiry] = useState("");
   const { busy, run } = useAsyncAction();
 
   function loadCondition(condition: unknown) {
@@ -207,6 +214,7 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
         ? (ordered[ordered.length - 1]?.data.priority ?? 0) + 10
         : 100;
     setDraft({ ...EMPTY, priority: nextPriority });
+    setExpiry("");
     loadCondition(EMPTY.matchCondition);
     setOpen(true);
   }
@@ -214,6 +222,7 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
   function startEdit(rule: WafRecord<RuleData>) {
     setEditing(rule);
     setDraft(rule.data);
+    setExpiry(rule.data.expiresAt ? "keep" : "");
     loadCondition(rule.data.matchCondition);
     setOpen(true);
   }
@@ -233,9 +242,15 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
           return;
         }
       }
+      const expiresAt =
+        expiry === "keep"
+          ? draft.expiresAt
+          : expiry === ""
+            ? null
+            : new Date(Date.now() + Number(expiry) * 3600 * 1000).toISOString();
       const payload = zoneId
-        ? { ...draft, matchCondition, zoneId }
-        : { ...draft, matchCondition };
+        ? { ...draft, matchCondition, zoneId, expiresAt }
+        : { ...draft, matchCondition, expiresAt };
       if (editing) {
         await updateRecord(
           ENTITIES.firewallRules,
@@ -321,6 +336,7 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
                 <TableHead>{t("waf.zoneTabs.rules.colType")}</TableHead>
                 <TableHead>{t("waf.zoneTabs.rules.colAction")}</TableHead>
                 <TableHead>{t("waf.zoneTabs.rules.colEnabled")}</TableHead>
+                <TableHead>{t("waf.zoneTabs.rules.colExpires")}</TableHead>
                 <TableHead className="text-right">
                   {t("waf.zoneTabs.rules.colActions")}
                 </TableHead>
@@ -365,6 +381,13 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
                     {rule.data.enabled
                       ? t("waf.common.yes")
                       : t("waf.common.no")}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    {rule.data.expiresAt
+                      ? Date.parse(rule.data.expiresAt) <= Date.now()
+                        ? t("waf.zoneTabs.rules.expired")
+                        : formatDateTime(rule.data.expiresAt, i18n.language)
+                      : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -648,6 +671,34 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
                   />
                 </>
               )}
+            </div>
+            <div>
+              <Label htmlFor="rule-expiry">
+                {t("waf.zoneTabs.rules.expiry")}
+              </Label>
+              <Select
+                id="rule-expiry"
+                value={expiry}
+                onValueChange={(value) => setExpiry(String(value))}
+                options={[
+                  { value: "", label: t("waf.zoneTabs.rules.expiryNever") },
+                  ...(editing?.data.expiresAt
+                    ? [
+                        {
+                          value: "keep",
+                          label: t("waf.zoneTabs.rules.expiryKeep"),
+                        },
+                      ]
+                    : []),
+                  { value: "1", label: t("waf.zoneTabs.rules.expiry1h") },
+                  { value: "6", label: t("waf.zoneTabs.rules.expiry6h") },
+                  { value: "24", label: t("waf.zoneTabs.rules.expiry24h") },
+                  { value: "168", label: t("waf.zoneTabs.rules.expiry7d") },
+                ]}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("waf.zoneTabs.rules.expiryHint")}
+              </p>
             </div>
             <div>
               <Label htmlFor="rule-priority">

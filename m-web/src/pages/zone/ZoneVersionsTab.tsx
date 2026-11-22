@@ -37,6 +37,8 @@ import {
 import {
   ENTITIES,
   rollbackToVersion,
+  validatePolicy,
+  type PolicyReport,
   useInvalidateWaf,
   useRecord,
   useRecords,
@@ -56,6 +58,7 @@ export function ZoneVersionsTab({ zoneId }: { zoneId: string }) {
   const invalidate = useInvalidateWaf();
   const { busy, run } = useAsyncAction();
   const [open, setOpen] = useState<string | null>(null);
+  const [report, setReport] = useState<PolicyReport | null>(null);
   const versions = useRecords<PolicyVersionData>(
     ENTITIES.policyVersions,
     { zoneId },
@@ -64,6 +67,12 @@ export function ZoneVersionsTab({ zoneId }: { zoneId: string }) {
     { sort: "-number" },
   );
   const rows = versions.data ?? [];
+
+  async function check() {
+    await run(async () => {
+      setReport((await validatePolicy(zoneId)).data);
+    });
+  }
 
   async function rollback(id: string) {
     await run(async () => {
@@ -80,7 +89,53 @@ export function ZoneVersionsTab({ zoneId }: { zoneId: string }) {
       <SectionCard
         title={t("waf.zoneTabs.versions.title")}
         description={t("waf.zoneTabs.versions.description")}
+        actions={
+          <Button size="sm" variant="outline" onClick={check} disabled={busy}>
+            {t("waf.zoneTabs.versions.check")}
+          </Button>
+        }
       >
+        {report ? (
+          <div className="mb-4 rounded-md border p-3 text-sm">
+            <p className="font-medium">
+              {report.errors > 0
+                ? t("waf.zoneTabs.versions.checkErrors", {
+                    count: report.errors,
+                  })
+                : report.findings.some((f) => f.severity === "warning")
+                  ? t("waf.zoneTabs.versions.checkWarnings")
+                  : t("waf.zoneTabs.versions.checkClean")}
+              <span className="ml-2 font-normal text-muted-foreground">
+                {t("waf.zoneTabs.versions.checkCounts", {
+                  rules: report.rules,
+                  entries: report.entries,
+                })}
+              </span>
+            </p>
+            <ul className="mt-2 space-y-1">
+              {report.findings.map((f, i) => (
+                <li key={`${f.code}-${f.id ?? i}`} className="flex gap-2">
+                  <Badge
+                    variant={
+                      f.severity === "error"
+                        ? "destructive"
+                        : f.severity === "warning"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {t(`waf.zoneTabs.versions.severity.${f.severity}`)}
+                  </Badge>
+                  <span>
+                    {t(`waf.zoneTabs.versions.finding.${f.code}`, {
+                      subject: f.subject ?? "",
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {versions.isLoading ? (
           <p className="text-sm text-muted-foreground">
             {t("waf.common.loading")}

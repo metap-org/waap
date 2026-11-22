@@ -18,5 +18,5 @@ func TestOwnsExactlyItsOwnEntities(t *testing.T) {
 	for _, e := range registry.ListEntities() {
 		names = append(names, e.Name)
 	}
-	require.ElementsMatch(t, []string{"waf.plans", "waf.subscriptions"}, names)
+	require.ElementsMatch(t, []string{"waf.plans", "waf.subscriptions", "waf.plan_change_requests"}, names)
 }

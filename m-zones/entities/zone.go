@@ -89,6 +89,8 @@ func ZoneEntity() metadata.EntityDefinition {
 		Actions: []metadata.EntityAction{
 			{Name: model.ActionVerifyDNS, Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord},
 			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionValidatePolicy, Label: "Check policy", Description: "Checks the zone's rules, DDoS policies and IP lists for mistakes. Changes nothing.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionExportData, Label: "Export data", Description: "Everything this tenant has configured, as one document.", Scope: metadata.ActionScopeEntity},
 			{Name: model.ActionPlanUsage, Label: "Plan and usage", Description: "The tenant's plan, its limits and how much of them is used.", Scope: metadata.ActionScopeEntity},
 			{Name: model.ActionSyncConfigState, Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
 		},

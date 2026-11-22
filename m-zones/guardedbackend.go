@@ -118,7 +118,7 @@ func validateFirewallRule(data crud.JsonObject) error {
 		return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
 			map[string][]string{model.FieldMatchCondition: {"not a recognized rule expression"}})
 	}
-	return nil
+	return validateExpiry(data)
 }
 
 // validateIPAccessList ports ipAccessListValueGuard's validation verbatim.
@@ -128,13 +128,7 @@ func validateIPAccessList(data crud.JsonObject) error {
 		return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
 			map[string][]string{model.FieldValue: {"not a valid IP address or CIDR"}})
 	}
-	if raw, ok := jsonAsString(data[model.FieldExpiresAt]); ok && raw != "" {
-		if _, err := time.Parse(time.RFC3339, raw); err != nil {
-			return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
-				map[string][]string{model.FieldExpiresAt: {"not a valid timestamp"}})
-		}
-	}
-	return nil
+	return validateExpiry(data)
 }
 
 // zoneReferencedBy ports zoneDeleteGuard's cross-service check — see this file's own doc
@@ -305,4 +299,16 @@ func (b *GuardedZonesBackend) Delete(ctx context.Context, entity string, id uuid
 
 func (b *GuardedZonesBackend) Aggregate(ctx context.Context, entity string, spec query.AggregateSpec, rc *permission.RequestContext) ([]json.RawMessage, error) {
 	return b.inner.Aggregate(ctx, entity, spec, rc)
+}
+
+// validateExpiry accepts an absent or empty expiresAt, or an RFC 3339 timestamp (a temporary rule or
+// IP entry, UC-51); anything else is refused rather than stored as a protection that never lapses.
+func validateExpiry(data crud.JsonObject) error {
+	if raw, ok := jsonAsString(data[model.FieldExpiresAt]); ok && raw != "" {
+		if _, err := time.Parse(time.RFC3339, raw); err != nil {
+			return crud.NewServiceErrorFields(422, errcode.ValidationFailed,
+				map[string][]string{model.FieldExpiresAt: {"not a valid timestamp"}})
+		}
+	}
+	return nil
 }

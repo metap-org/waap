@@ -55,6 +55,11 @@ func SubscriptionEntity() metadata.EntityDefinition {
 		Fields: []metadata.EntityField{
 			customer,
 			metadata.RefField(model.FieldPlanID, "Plan", model.Plans, "name").Require().Index(),
+			// A downgrade takes effect later (UC-73): the plan the customer moves to, and from when.
+			// Plain strings: they are resolved against the plans at the time, and a plan removed
+			// meanwhile just means the move does not happen.
+			metadata.NewField(model.FieldPendingPlanID, "Pending plan", metadata.KindString),
+			metadata.NewField(model.FieldPendingFrom, "Pending from", metadata.KindDatetime),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
@@ -68,7 +73,41 @@ func SubscriptionEntity() metadata.EntityDefinition {
 	}
 }
 
+// PlanChangeRequestEntity is a customer asking for another plan (UC-71, UC-73). The customer cannot
+// edit the subscription itself, so it asks; the operator's admin approves (an upgrade applies at
+// once, a downgrade from the end of the current period) or rejects with a reply.
+func PlanChangeRequestEntity() metadata.EntityDefinition {
+	return metadata.EntityDefinition{
+		Name:      model.PlanChanges,
+		Label:     "Plan change request",
+		TableName: reconciler.QualifiedTableNameIn(model.PlanChanges, "waf"),
+		Fields: []metadata.EntityField{
+			metadata.NewField(model.FieldCustomerTenantID, "Customer tenant", metadata.KindString).Require().Index(),
+			// The customer's name when it asked, so the operator's list reads without a lookup.
+			metadata.NewField(model.FieldCustomerName, "Customer", metadata.KindString),
+			metadata.RefField(model.FieldRequestedPlanID, "Requested plan", model.Plans, "name").Require().Index(),
+			metadata.EnumField(model.FieldStatus, "Status", "pending", "approved", "rejected").Index(),
+			metadata.NewField(model.FieldNote, "Customer note", metadata.KindString),
+			metadata.NewField(model.FieldDecisionNote, "Reply", metadata.KindString),
+		},
+		ListViews: []metadata.EntityListView{{
+			Name: "default", Label: "Default",
+			Fields:      []string{"customerName", "requestedPlanId", "status", "note"},
+			Filters:     []string{"status"},
+			DefaultSort: metadata.Ptr("-createdAt"),
+			MaxLimit:    model.DefaultMaxListLimit,
+		}},
+		Audit: &metadata.EntityAuditConfig{Enabled: true},
+		Actions: []metadata.EntityAction{
+			{Name: model.ActionRequestPlan, Label: "Request a plan", Description: "Ask the service provider for another plan.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionMyPlanRequests, Label: "My requests", Description: "The plan change requests of the caller's own workspace.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionDecidePlan, Label: "Decide", Description: "Approve or reject a plan change request.", Scope: metadata.ActionScopeRecord},
+		},
+	}
+}
+
 func init() {
 	metadata.SubmitEntity(PlanEntity)
+	metadata.SubmitEntity(PlanChangeRequestEntity)
 	metadata.SubmitEntity(SubscriptionEntity)
 }

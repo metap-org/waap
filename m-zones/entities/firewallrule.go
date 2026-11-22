@@ -41,10 +41,13 @@ func FirewallRuleEntity() metadata.EntityDefinition {
 			metadata.NewField(model.FieldRateLimitWindow, "Rate Limit Window (s)", metadata.KindNumber),
 			metadata.EnumField(model.FieldAction, "Action", "allow", "block", "challenge", "log").Require(),
 			metadata.NewField(model.FieldEnabled, "Enabled", metadata.KindBoolean).Index().WithWidget(metadata.WidgetSwitch),
+			// A temporary rule (UC-51): the control plane stops compiling it once this time has
+			// passed, so it lapses on its own at the next resync. Empty means permanent.
+			metadata.NewField(model.FieldExpiresAt, "Expires at", metadata.KindDatetime).Sort(),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:      []string{model.FieldZoneID, "name", "priority", "ruleType", "action", "enabled"},
+			Fields:      []string{model.FieldZoneID, "name", "priority", "ruleType", "action", "enabled", "expiresAt"},
 			Filters:     []string{model.FieldZoneID, "ruleType", "enabled"},
 			DefaultSort: metadata.Ptr("priority"),
 			MaxLimit:    model.LargeMaxListLimit,

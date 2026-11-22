@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -95,7 +96,7 @@ func (p *PlanSource) For(ctx context.Context, tenant uuid.UUID) (Plan, bool, err
 		return Plan{}, false, err
 	}
 	if len(subs.Data) > 0 {
-		if raw, ok := jsonAsString(subs.Data[0].Data[model.FieldPlanID]); ok {
+		if raw, ok := jsonAsString(effectivePlanID(subs.Data[0].Data, time.Now())); ok {
 			if id, err := uuid.Parse(raw); err == nil {
 				if got, err := p.Backend.Get(ctx, model.Plans, id, rc); err == nil {
 					return planFromRecord(got.Record), true, nil

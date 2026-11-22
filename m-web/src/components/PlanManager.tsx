@@ -31,6 +31,7 @@ import { ApiErrorMessage, useAsyncAction } from "@metap/platform-ui";
 import {
   ENTITIES,
   createRecord,
+  decidePlanChange,
   deleteRecord,
   listCustomerTenants,
   updateRecord,
@@ -46,7 +47,18 @@ type PlanData = {
   isDefault?: boolean;
   enabled?: boolean;
 };
-type SubscriptionData = { customerTenantId?: string; planId?: string };
+type SubscriptionData = {
+  customerTenantId?: string;
+  planId?: string;
+  pendingPlanId?: string;
+  pendingFrom?: string;
+};
+type RequestData = {
+  customerName?: string;
+  requestedPlanId?: string;
+  status?: string;
+  note?: string;
+};
 
 export function PlanManager() {
   const { t } = useTranslation();
@@ -60,6 +72,11 @@ export function PlanManager() {
   const [error, setError] = useState<Error | null>(null);
   const plans = useRecords<PlanData>(ENTITIES.plans, {}, 50);
   const subs = useRecords<SubscriptionData>(ENTITIES.subscriptions, {}, 100);
+  const requests = useRecords<RequestData>(
+    ENTITIES.planChanges,
+    { status: "pending" },
+    50,
+  );
   const tenants = useQuery({
     queryKey: ["records", "customer-tenants"],
     queryFn: async () => (await listCustomerTenants()).data.tenants,
@@ -146,6 +163,56 @@ export function PlanManager() {
         )}
       </SectionCard>
 
+      {(requests.data ?? []).length > 0 ? (
+        <SectionCard
+          title={t("waf.plan.manage.requestsTitle")}
+          description={t("waf.plan.manage.requestsDescription")}
+        >
+          <ul className="divide-y text-sm">
+            {(requests.data ?? []).map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-3 py-2"
+              >
+                <span>
+                  <span className="font-medium">
+                    {r.data.customerName ?? "—"}
+                  </span>
+                  {" → "}
+                  {planName(r.data.requestedPlanId)}
+                  {r.data.note ? (
+                    <span className="block text-xs text-muted-foreground">
+                      {r.data.note}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void guard(() => decidePlanChange(r.id, true, ""))
+                    }
+                  >
+                    {t("waf.plan.manage.approve")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void guard(() => decidePlanChange(r.id, false, ""))
+                    }
+                  >
+                    {t("waf.plan.manage.reject")}
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      ) : null}
+
       <SectionCard
         title={t("waf.plan.manage.subsTitle")}
         description={t("waf.plan.manage.subsDescription")}
@@ -218,6 +285,16 @@ export function PlanManager() {
                       }))}
                   />
                   <span className="sr-only">{planName(s.data.planId)}</span>
+                  {s.data.pendingPlanId ? (
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {t("waf.plan.manage.pending", {
+                        plan: planName(s.data.pendingPlanId),
+                        when: s.data.pendingFrom
+                          ? new Date(s.data.pendingFrom).toLocaleDateString()
+                          : "—",
+                      })}
+                    </span>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

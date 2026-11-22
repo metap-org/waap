@@ -11,6 +11,7 @@ const (
 	Accounts           = "waf.accounts"
 	Plans              = "waf.plans"
 	Subscriptions      = "waf.subscriptions"
+	PlanChanges        = "waf.plan_change_requests"
 	DdosPolicies       = "waf.ddos_policies"
 	FirewallRules      = "waf.firewall_rules"
 	IPAccessLists      = "waf.ip_access_lists"
@@ -39,7 +40,12 @@ const (
 	ActionTestOrigin      = "testOrigin"      // zones
 	ActionSyncConfigState = "syncConfigState" // zones
 	ActionRollback        = "rollback"        // policy_versions
+	ActionExportData      = "exportData"      // zones (entity scope): the tenant's configuration as one document
+	ActionValidatePolicy  = "validatePolicy"  // zones: check a zone's rules before they matter
 	ActionPlanUsage       = "planUsage"       // zones (entity scope): the tenant's plan and what it uses
+	ActionRequestPlan     = "requestPlanChange" // plan_change_requests (entity scope): a customer asks for another plan
+	ActionMyPlanRequests  = "myPlanRequests"    // plan_change_requests (entity scope): the caller's own requests
+	ActionDecidePlan      = "decide"            // plan_change_requests (record scope): approve or reject
 	ActionListTenants     = "listTenants"     // subscriptions (entity scope): the customers a plan can be given to
 	ActionRun             = "run"             // scan_jobs
 	ActionTest            = "test"            // alert_policies
