@@ -88,22 +88,23 @@ func (b *accountGuard) resolveAccount(ctx context.Context, data crud.JsonObject,
 	return created.ID, nil
 }
 
-// withZoneAccount returns data with the zone's account copied in (a tenant-wide record, or a zone
-// that cannot be read, gets none and stays reachable by tenant-wide roles only).
+// withZoneAccount returns data with the zone's account copied in. The account is never the
+// caller's to say: any accountId in data is dropped first, so a tenant-wide record, or a zone that
+// cannot be read or has no account, ends up with none (reachable by tenant-wide roles only) rather
+// than with whatever the client sent.
 func (b *accountGuard) withZoneAccount(ctx context.Context, zoneID uuid.UUID, data crud.JsonObject, rc *permission.RequestContext) crud.JsonObject {
+	out := jx.Clone(data)
+	delete(out, model.FieldAccountID)
 	if zoneID == uuid.Nil {
-		return data
+		return out
 	}
 	zone, err := b.inner.Get(ctx, model.Zones, zoneID, rc)
 	if err != nil {
-		return data
+		return out
 	}
-	raw, ok := zone.Record.Data[model.FieldAccountID]
-	if !ok {
-		return data
+	if raw, ok := zone.Record.Data[model.FieldAccountID]; ok {
+		out[model.FieldAccountID] = raw
 	}
-	out := jx.Clone(data)
-	out[model.FieldAccountID] = raw
 	return out
 }
 
