@@ -79,6 +79,10 @@ func SubscriptionEntity() metadata.EntityDefinition {
 // edit the subscription itself, so it asks; the operator's admin approves (an upgrade applies at
 // once, a downgrade from the end of the current period) or rejects with a reply.
 func PlanChangeRequestEntity() metadata.EntityDefinition {
+	// One waiting request per customer, enforced by the database: openRequestKey is the customer's
+	// tenant while the request waits and empty once decided, and empty values never collide.
+	openKey := metadata.NewField(model.FieldOpenRequestKey, "Open request key", metadata.KindString)
+	openKey.Unique = metadata.Ptr(true)
 	return metadata.EntityDefinition{
 		Name:      model.PlanChanges,
 		Label:     "Plan change request",
@@ -91,6 +95,7 @@ func PlanChangeRequestEntity() metadata.EntityDefinition {
 			metadata.EnumField(model.FieldStatus, "Status", "pending", "approved", "rejected").Index(),
 			metadata.NewField(model.FieldNote, "Customer note", metadata.KindString),
 			metadata.NewField(model.FieldDecisionNote, "Reply", metadata.KindString),
+			openKey,
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
