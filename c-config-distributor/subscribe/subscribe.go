@@ -14,13 +14,13 @@ package subscribe
 import (
 	"context"
 	"encoding/json"
-	"github.com/metap-org/metap/pkg/events"
+	"github.com/metap-org/metap/pkg/messaging/events"
 	"log/slog"
 
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/ports"
 
-	"github.com/metap-org/metap/pkg/infra/eventbus"
+	"github.com/metap-org/metap/pkg/messaging/eventbus"
 
 	"github.com/metap-org/waap/c-config-distributor/sync"
 	"github.com/metap-org/waap/model"

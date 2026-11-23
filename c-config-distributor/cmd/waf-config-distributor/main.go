@@ -24,7 +24,6 @@ import (
 	"os"
 
 	metapconfig "github.com/metap-org/metap/pkg/config"
-	"github.com/metap-org/metap/pkg/infra"
 
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/c-config-distributor/analytics"
@@ -38,7 +37,7 @@ import (
 
 func main() {
 	metapconfig.MustLoadFileFromEnv() // before any setting is read
-	infra.InitTracing()
+	metapconfig.InitLogging()
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("loading config", standard.LogError, err)
