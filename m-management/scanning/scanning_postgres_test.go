@@ -19,12 +19,12 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metap-org/metap/pkg/control"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/kit/httpx/router"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/peripherals"
 	"github.com/metap-org/metap/pkg/permission"
@@ -206,7 +206,7 @@ func TestSubmitFindingsCompletesTheJobAndCreatesFindings(t *testing.T) {
 	require.NoError(t, err, "transition to queued: %v / %+v", err, queuedResult)
 	require.NoError(t, err)
 
-	r := chi.NewRouter()
+	r := router.New()
 	scanning.MountRoutes(r, state)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

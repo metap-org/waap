@@ -40,7 +40,7 @@ import (
 	"github.com/metap-org/waap/c-config-distributor/ports"
 	"github.com/metap-org/waap/model"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/metap-org/metap/pkg/kit/httpx/router"
 )
 
 // EdgeEvent is one event as the edge reports it. Field names match waf.security_events' own
@@ -126,7 +126,7 @@ func healthHandler(state *State) http.HandlerFunc {
 }
 
 func Router(state *State) http.Handler {
-	r := chi.NewRouter()
+	r := router.New()
 	r.Use(httpx.Recover)
 	r.Get("/health", healthHandler(state))
 	r.Post("/ingest/events", ingestHandler(state))

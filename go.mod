@@ -11,7 +11,6 @@ ignore (
 )
 
 require (
-	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/metap-org/metap v0.0.0
