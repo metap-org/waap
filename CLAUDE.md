@@ -49,9 +49,10 @@ authenticates nobody. The portal (`m-web`, dev proxy and nginx) talks only to it
 `GuardedZonesBackend` reaches scanning/alerting over REST (`metap`'s `recordclient`, `SCANNING_URL`/`ALERTING_URL`);
 control-plane reads zones over REST (`ZONES_URL` = zones-service or the gateway); alerting-service serves the
 `waf.security_events` read model (`app.Options.ExternalEntities` over `m-analytics.Backend`). Every gateway/gRPC/
-GraphQL description below is history. Rate limiting and caller identity: nginx overwrites `X-Forwarded-For`, the api-gateway and every
-service list the compose network in `TRUSTED_PROXIES` (production: the exact gateway/LB addresses), so limits count callers, not
-the gateway (`../metap/CLAUDE.md`, "Who is calling"). The `configVersion` the edge compares is a hash of the compiled rule-set computed by the
+GraphQL description below is history. Rate limiting and caller identity (the gateway part is history since the 2026-11-22 note above):
+nginx overwrites `X-Forwarded-For` and management-service lists the compose network in `trusted_proxies`
+(`m-deploy/config/management*.yaml`; production: the exact proxy/LB addresses), so limits count callers, not the proxy
+(`../metap/CLAUDE.md`, "Who is calling"). The `configVersion` the edge compares is a hash of the compiled rule-set computed by the
 distributor at publish time (`ruleset.ContentVersion`); `Zone.configVersion` in management is unused (nothing ever bumped it, so
 rules added after the edge's first load never arrived — found by the live run in roadmap 116).
 

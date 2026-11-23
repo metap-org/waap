@@ -11,7 +11,7 @@ nào; trang này là bản đồ tổng.
 ## 2. Một request đi qua những gì
 
 ```
- Portal ──► api-gateway ─────────────────────────────────────────────  (metap)
+ Portal ──► nginx (SPA, TLS, X-Forwarded-For) ───────────────────────  (hạ tầng)
                 │
                 ▼   management-service  (một process, do metap dựng: app.Main)
    ┌───────────────────────────────────────────────────────────────────────────┐
