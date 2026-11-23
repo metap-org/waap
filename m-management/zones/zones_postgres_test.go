@@ -796,3 +796,51 @@ func TestApplyPresetIsOneVersionAndIdempotent(t *testing.T) {
 	_, err = actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "applyPreset", ID: zone.ID, RC: rc, Input: crud.JsonObject{"preset": jsonMarshal(t, "nope")}})
 	require.Error(t, err)
 }
+
+// Rule changes made at the same moment each get their own version number (audit 08): the number is
+// unique per zone and the writer that loses the race takes the next one.
+func TestConcurrentRuleChangesGetDistinctVersionNumbers(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	backend := guard.New(state.Crud)
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE apex_domain = $1 OR data->>'apexDomain' = $1", apex)
+	})
+	zone, err := backend.Create(ctx, "waf.zones", crud.JsonObject{
+		"hostname": jsonMarshal(t, "race."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor"),
+	}, rc, nil)
+	require.NoError(t, err)
+
+	const n = 6
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, _ = backend.Create(ctx, "waf.firewall_rules", crud.JsonObject{
+				"zoneId": jsonMarshal(t, zone.ID.String()), "name": jsonMarshal(t, fmt.Sprintf("race%d", i)), "priority": jsonMarshal(t, i+1),
+				"matchCondition": jsonMarshal(t, map[string]any{"field": "uri.path", "op": "eq", "value": fmt.Sprintf("/%d", i)}),
+				"ruleType":       jsonMarshal(t, "waf"), "action": jsonMarshal(t, "block"),
+			}, rc, nil)
+		}(i)
+	}
+	wg.Wait()
+
+	sortAsc := "number"
+	res, err := state.Crud.List(ctx, "waf.policy_versions", query.ListInput{Limit: 50, Sort: &sortAsc, Filters: [][2]string{{"zoneId", zone.ID.String()}}}, rc)
+	require.NoError(t, err)
+	seen := map[string]bool{}
+	for _, v := range res.Data {
+		num := string(v.Data["number"])
+		assert.False(t, seen[num], "version %s appears twice", num)
+		seen[num] = true
+	}
+	assert.GreaterOrEqual(t, len(res.Data), 2, "the changes were recorded")
+}
