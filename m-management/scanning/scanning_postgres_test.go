@@ -13,7 +13,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"github.com/metap-org/metap/pkg/jwks"
+	"github.com/metap-org/metap/pkg/auth/jwks"
 	"github.com/metap-org/metap/pkg/permission/policypg"
 	"github.com/metap-org/metap/pkg/secrets"
 	"net"
