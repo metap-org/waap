@@ -884,6 +884,8 @@ export const wafEn = {
       deleteDescription:
         "Only the workspace owner can do this. The workspace is suspended at once and deleted after 30 days; every admin is emailed a link that cancels it until then.",
       deleteConfirmLabel: "Type the workspace's name to confirm",
+      deletePasswordLabel: "Your password",
+      deleteMfaLabel: "Authentication code (only if you use two-step sign-in)",
       deleteButton: "Delete workspace",
       deleteScheduled:
         "Deletion scheduled for {{when}}. Every admin has been emailed a link to cancel it.",
@@ -1821,6 +1823,8 @@ export const wafVi = {
       deleteDescription:
         "Chỉ owner của workspace mới làm được. Workspace bị tạm khoá ngay và bị xoá sau 30 ngày; mọi admin nhận email kèm liên kết để huỷ trong thời gian đó.",
       deleteConfirmLabel: "Gõ tên workspace để xác nhận",
+      deletePasswordLabel: "Mật khẩu của bạn",
+      deleteMfaLabel: "Mã xác thực (chỉ khi bạn dùng đăng nhập hai bước)",
       deleteButton: "Xoá workspace",
       deleteScheduled:
         "Đã lên lịch xoá vào {{when}}. Mọi admin đã nhận email kèm liên kết để huỷ.",
