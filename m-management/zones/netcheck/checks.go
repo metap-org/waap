@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
@@ -139,86 +140,123 @@ type VerifyDNSBody struct {
 	ExpectedToken *string `json:"expectedToken"`
 }
 
-// VerifyDomainDNS is the action waf.domains.verifyDns — domain-ownership check, proven once
-// per apex domain rather than once per Zone.
+// domainFields is what verifyDns reads of the domain record.
+type domainFields struct {
+	ApexDomain        string `json:"apexDomain"`
+	VerificationToken string `json:"verificationToken"`
+}
+
+// DomainVerification is what verifyDns on a domain answers.
+type DomainVerification struct {
+	Domain            crud.RecordDto `json:"domain"`
+	OwnershipVerified bool           `json:"ownershipVerified"`
+	Checked           map[string]any `json:"checked"`
+}
+
+// VerifyDomain is the action waf.domains.verifyDns — domain-ownership check, proven once per apex
+// domain rather than once per Zone.
 //
-// On a real match of the domain's own verificationToken in a _waf-verify.<apexDomain> TXT
-// record, this both marks the Domain itself verified and cascades that onto every Zone under it
-// — writing each zone's own verificationStatus mirror field directly.
-func VerifyDomainDNS(ctx context.Context, cfg Config, state *httpserver.AppState, rc *permission.RequestContext, domainID uuid.UUID, body VerifyDNSBody) (map[string]any, error) {
+// The lookups (DNS, or a file over HTTP) happen first, outside any transaction. On a real match of
+// the domain's own verificationToken this marks the Domain itself verified and cascades that onto
+// every Zone under it — writing each zone's own verificationStatus mirror field directly — as one
+// step, so the domain is never verified without its audit entry and its zones' mirrors.
+//
+// It reads and writes through the service's own backend, not the guard chain: the cascade writes a
+// mirror field, which is not an edit a person makes.
+func VerifyDomain(cfg Config) action.Action {
+	return action.Record(model.Domains, model.ActionVerifyDNS,
+		func(ctx context.Context, a *action.Ctx, d domainFields, in VerifyDNSBody) (DomainVerification, error) {
+			if d.ApexDomain == "" {
+				return DomainVerification{}, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Domain has no apexDomain.")
+			}
+			expectedToken := d.VerificationToken
+			if in.ExpectedToken != nil {
+				expectedToken = *in.ExpectedToken
+			}
+			method := in.Method
+			if method == "" {
+				method = model.VerificationMethodDNSTxt
+			}
+			proven, checked, err := cfg.checkOwnership(ctx, method, d.ApexDomain, in.Host, expectedToken)
+			if err != nil {
+				return DomainVerification{}, err
+			}
+			if !proven {
+				return DomainVerification{Domain: a.Current, Checked: checked}, nil
+			}
 
-	got, err := state.Crud.Get(ctx, model.Domains, domainID, rc)
+			var verified crud.RecordDto
+			if err := a.Step(ctx, "verify", func(ctx context.Context) error {
+				patch := crud.JsonObject{model.FieldVerificationStatus: jx.String(model.VerificationVerified), model.FieldVerificationMethod: jx.String(method)}
+				updated, err := a.Records.Update(ctx, model.Domains, a.ID, a.Current.Version, patch, a.RC, nil)
+				if err != nil {
+					return err
+				}
+				verified = updated
+				a.Audit("domain.ownership_verified", a.ID, map[string]string{"method": method, "apexDomain": d.ApexDomain})
+				cascadeVerified(ctx, a)
+				return nil
+			}); err != nil {
+				return DomainVerification{}, err
+			}
+			return DomainVerification{Domain: verified, OwnershipVerified: true, Checked: checked}, nil
+		})
+}
+
+// cascadeVerified marks every zone under the domain verified — best-effort per zone: one failing
+// zone must not stop the others, and must not undo the domain's own now-verified status.
+func cascadeVerified(ctx context.Context, a *action.Ctx) {
+	listInput := query.ListInput{Limit: zoneCascadeLimit, Filters: [][2]string{{model.FieldDomainID, a.ID.String()}}}
+	zones, err := a.Records.List(ctx, model.Zones, listInput, a.RC)
 	if err != nil {
-		return nil, err
+		return
 	}
-	domain := got.Record
+	for _, zone := range zones.Data {
+		patch := crud.JsonObject{model.FieldVerificationStatus: jx.String(model.VerificationVerified)}
+		if _, err := a.Records.Update(ctx, model.Zones, zone.ID, zone.Version, patch, a.RC, nil); err != nil {
+			slog.Error("domain verified but cascading verificationStatus onto this zone failed",
+				"zone_id", zone.ID, "domain_id", a.ID, standard.LogError, err)
+		}
+	}
+}
 
-	apexDomain, _ := jx.AsString(domain.Data[model.FieldApexDomain])
-	if apexDomain == "" {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Domain has no apexDomain.")
-	}
-	expectedToken := ""
-	if body.ExpectedToken != nil {
-		expectedToken = *body.ExpectedToken
-	} else {
-		expectedToken, _ = jx.AsString(domain.Data[model.FieldVerificationToken])
-	}
-
-	method := body.Method
-	if method == "" {
-		method = model.VerificationMethodDNSTxt
-	}
-	var txt []string
-	ownershipOK := false
+// checkOwnership asks the outside world whether the domain's owner placed expectedToken where only
+// they could: a TXT record under _waf-verify, or a file served over HTTP. It reports what it
+// looked at either way, and refuses a method it does not know.
+func (c Config) checkOwnership(ctx context.Context, method, apexDomain, host, expectedToken string) (bool, map[string]any, error) {
 	checked := map[string]any{"method": method, "expectedToken": expectedToken}
 	switch method {
 	case model.VerificationMethodHTTPFile:
-		if expectedToken != "" {
-			found, detail, err := cfg.fetchVerificationFile(ctx, apexDomain, body.Host, expectedToken)
-			if err != nil {
-				return nil, err
-			}
-			ownershipOK = found
-			checked["file"] = detail
+		if expectedToken == "" {
+			return false, checked, nil
 		}
+		found, detail, err := c.fetchVerificationFile(ctx, apexDomain, host, expectedToken)
+		if err != nil {
+			return false, nil, err
+		}
+		checked["file"] = detail
+		return found, checked, nil
 	case model.VerificationMethodDNSTxt:
-		txt = cfg.dnsLookup("_waf-verify."+apexDomain, "TXT")
+		txt := c.dnsLookup("_waf-verify."+apexDomain, "TXT")
 		checked["txt"] = txt
-		for _, t := range txt {
-			if expectedToken != "" && t == expectedToken {
-				ownershipOK = true
-			}
-		}
+		return txtProves(txt, expectedToken), checked, nil
 	default:
-		return nil, crud.NewServiceErrorFields(http.StatusUnprocessableEntity, errcode.ValidationFailed,
+		return false, nil, crud.NewServiceErrorFields(http.StatusUnprocessableEntity, errcode.ValidationFailed,
 			map[string][]string{"method": {"must be dnsTxt or httpFile"}})
 	}
+}
 
-	if !ownershipOK {
-		return map[string]any{"domain": domain, "ownershipVerified": false, "checked": checked}, nil
+// txtProves reports whether one of the TXT answers is the expected token. An empty token proves nothing.
+func txtProves(txt []string, expectedToken string) bool {
+	if expectedToken == "" {
+		return false
 	}
-
-	patch := crud.JsonObject{model.FieldVerificationStatus: jx.String(model.VerificationVerified), model.FieldVerificationMethod: jx.String(method)}
-	updatedDomain, err := state.Crud.Update(ctx, model.Domains, domainID, domain.Version, patch, rc, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Cascade onto every zone under this domain — best-effort per zone (one failing zone must
-	// not stop the others, and must not undo the domain's own now-verified status).
-	listInput := query.ListInput{Limit: zoneCascadeLimit, Filters: [][2]string{{model.FieldDomainID, domainID.String()}}}
-	zones, err := state.Crud.List(ctx, model.Zones, listInput, rc)
-	if err == nil {
-		for _, zone := range zones.Data {
-			zonePatch := crud.JsonObject{model.FieldVerificationStatus: jx.String(model.VerificationVerified)}
-			if _, err := state.Crud.Update(ctx, model.Zones, zone.ID, zone.Version, zonePatch, rc, nil); err != nil {
-				slog.Error("domain verified but cascading verificationStatus onto this zone failed",
-					"zone_id", zone.ID, "domain_id", domainID, standard.LogError, err)
-			}
+	for _, t := range txt {
+		if t == expectedToken {
+			return true
 		}
 	}
-
-	return map[string]any{"domain": updatedDomain, "ownershipVerified": true, "checked": checked}, nil
+	return false
 }
 
 // TestOrigin is the action waf.zones.TestOrigin — "can we actually reach the origin the

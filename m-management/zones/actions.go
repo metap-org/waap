@@ -10,6 +10,7 @@ package zones
 import (
 	"context"
 
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/waap/m-management/billing"
@@ -56,13 +57,6 @@ func registerActions(cfg Config, plans billing.PlanLookup, state *httpserver.App
 			}
 			return crud.ToObject(cfg.ProbeOrigin(ctx, spec), nil)
 		}},
-		{model.Zones, model.ActionApplyPreset, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			key, _ := jx.AsString(c.Input["preset"])
-			// Through the guarded backend, as a person's own edits are: validation, plan limits,
-			// the zone's account and policy versions all apply.
-			guarded := Guarded(state.Crud, plans)
-			return crud.ToObject(presets.Apply(ctx, guarded, c.ID, key, c.RC))
-		}},
 		{model.Zones, model.ActionValidatePolicy, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
 			return crud.ToObject(policy.Validate(ctx, state.Crud, c.ID, c.RC))
 		}},
@@ -80,21 +74,53 @@ func registerActions(cfg Config, plans billing.PlanLookup, state *httpserver.App
 			}
 			return crud.ToObject(result, nil)
 		}},
-		{model.Domains, model.ActionVerifyDNS, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			var body netcheck.VerifyDNSBody
-			body.Method, _ = jx.AsString(c.Input["method"])
-			body.Host, _ = jx.AsString(c.Input["host"])
-			if raw, ok := c.Input["expectedToken"]; ok {
-				if tok, ok := jx.AsString(raw); ok {
-					body.ExpectedToken = &tok
-				}
-			}
-			return crud.ToObject(netcheck.VerifyDomainDNS(ctx, cfg, state, c.RC, c.ID, body))
-		}},
 	} {
 		if err := reg.Register(a.entity, a.name, a.run); err != nil {
 			return err
 		}
 	}
-	return nil
+	return registerTypedActions(cfg, plans, state, reg)
+}
+
+// registerTypedActions registers the actions written with pkg/action: typed input and output, a
+// context that carries the caller, and writes, events and audit that commit together.
+func registerTypedActions(cfg Config, plans billing.PlanLookup, state *httpserver.AppState, reg *crud.ActionRegistry) error {
+	deps := state.ActionDeps()
+
+	// Ownership verification reads and writes through the service's own backend, like the other
+	// checks above: its cascade writes a mirror field, not an edit a person makes.
+	direct := deps
+	direct.Records = state.Crud
+	if err := netcheck.VerifyDomain(cfg).Register(reg, direct); err != nil {
+		return err
+	}
+	return ApplyPreset(state.Crud, plans).Register(reg, deps)
+}
+
+type applyPresetIn struct {
+	Preset string `json:"preset"`
+}
+
+// ApplyPreset is the action waf.zones.applyPreset: the preset's protections go through the guarded
+// backend (validation, plan limits, the zone's account, versions), as a person's own edits do, and
+// all of them in one step: either the zone gets the whole preset and its single policy version, or
+// it gets nothing.
+func ApplyPreset(base crud.RecordBackend, plans billing.PlanLookup) action.Action {
+	return action.Record(model.Zones, model.ActionApplyPreset,
+		func(ctx context.Context, a *action.Ctx, _ action.None, in applyPresetIn) (presets.Result, error) {
+			guarded := Guarded(base, plans)
+			var out presets.Result
+			err := a.Step(ctx, "apply", func(ctx context.Context) error {
+				var err error
+				out, err = presets.Apply(ctx, guarded, a.ID, in.Preset, a.RC)
+				return err
+			})
+			if err != nil {
+				return presets.Result{}, err
+			}
+			if len(out.Added) > 0 {
+				a.Audit("zone.preset_applied", a.ID, out)
+			}
+			return out, nil
+		})
 }

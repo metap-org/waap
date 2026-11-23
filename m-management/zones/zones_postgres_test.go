@@ -797,6 +797,50 @@ func TestApplyPresetIsOneVersionAndIdempotent(t *testing.T) {
 	require.Error(t, err)
 }
 
+// A preset is applied as one unit: when its second rule is refused by the plan, the zone has
+// neither that rule nor the DDoS policy and the first rule the same call already created, and no
+// version was recorded (the earlier code left the partial preset behind).
+func TestApplyPresetThatHitsAPlanLimitLeavesNothingBehind(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+
+	zone, err := guard.New(state.Crud).Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, "a."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+	require.NoError(t, err)
+
+	// One rule per zone: the "api" preset wants two.
+	oneRule := planLookupFunc(func(context.Context, uuid.UUID) (billing.Resolution, error) {
+		return billing.Resolution{Enforced: true, Plan: billing.Plan{Name: "Tiny", MaxZones: billing.Unlimited, MaxRulesPerZone: 1}}, nil
+	})
+	actions := crud.NewActionRegistry()
+	require.NoError(t, zones.RegisterActions(zones.Config{}, oneRule)(state, actions))
+
+	count := func(entity string) int {
+		res, err := state.Crud.List(ctx, entity, query.ListInput{Limit: 50, Filters: [][2]string{{"zoneId", zone.ID.String()}}}, rc)
+		require.NoError(t, err)
+		return len(res.Data)
+	}
+	rulesBefore, policiesBefore, versionsBefore := count("waf.firewall_rules"), count("waf.ddos_policies"), count("waf.policy_versions")
+
+	_, err = actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "applyPreset", ID: zone.ID, RC: rc, Input: crud.JsonObject{"preset": jsonMarshal(t, "api")}})
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.Equal(t, "plan_limit_reached", se.Code, "the plan's refusal reaches the caller with its own code")
+
+	assert.Equal(t, rulesBefore, count("waf.firewall_rules"), "the rule created before the refusal is gone")
+	assert.Equal(t, policiesBefore, count("waf.ddos_policies"), "so is the DDoS policy")
+	assert.Equal(t, versionsBefore, count("waf.policy_versions"), "and no version was recorded")
+}
+
 // Rule changes made at the same moment each get their own version number (audit 08): the number is
 // unique per zone and the writer that loses the race takes the next one.
 func TestConcurrentRuleChangesGetDistinctVersionNumbers(t *testing.T) {

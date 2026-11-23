@@ -3,7 +3,7 @@
 // waf.domains — the apex domain a Zone (subdomain) hangs off. Ownership verification
 // (verificationToken/verificationMethod/verificationStatus) lives here: proven once per apex
 // domain, and every Zone under it inherits that via Zone.verificationStatus, a technical mirror
-// field kept in sync by routes.VerifyDomainDNS's cascade.
+// field kept in sync by netcheck.VerifyDomain's cascade.
 package entities
 
 import (
