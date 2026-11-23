@@ -243,3 +243,52 @@ func TestDeleteZoneGoesThroughWhenNothingReferencesIt(t *testing.T) {
 	_, err := g.Delete(context.Background(), "waf.zones", id, 1, rc, nil)
 	require.NoError(t, err)
 }
+
+// The account of a rule is its zone's, never the client's: an accountId in the request is dropped
+// when the zone cannot be read or has none, and replaced by the zone's when it has one (audit 08 #7).
+func TestRuleAccountIsTheZonesNotTheClients(t *testing.T) {
+	rc := testRC()
+	zoneID := uuid.New()
+	zoneAccount := uuid.New()
+	forged := uuid.New()
+	rule := func() crud.JsonObject {
+		return obj(t, map[string]any{"zoneId": zoneID.String(), "accountId": forged.String(), "action": "block"})
+	}
+
+	t.Run("zone not readable", func(t *testing.T) {
+		inner := crudmock.NewRecordBackend(t)
+		g := &accountGuard{passthrough{inner}}
+		inner.EXPECT().Get(mock.Anything, "waf.zones", zoneID, rc).Return(crud.GetResult{}, assert.AnError)
+		inner.EXPECT().Create(mock.Anything, "waf.firewall_rules", mock.MatchedBy(func(data crud.JsonObject) bool {
+			_, has := data["accountId"]
+			return !has
+		}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
+		_, err := g.Create(context.Background(), "waf.firewall_rules", rule(), rc, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("zone with no account", func(t *testing.T) {
+		inner := crudmock.NewRecordBackend(t)
+		g := &accountGuard{passthrough{inner}}
+		inner.EXPECT().Get(mock.Anything, "waf.zones", zoneID, rc).
+			Return(crud.GetResult{Record: crud.RecordDto{Data: crud.JsonObject{}}}, nil)
+		inner.EXPECT().Create(mock.Anything, "waf.firewall_rules", mock.MatchedBy(func(data crud.JsonObject) bool {
+			_, has := data["accountId"]
+			return !has
+		}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
+		_, err := g.Create(context.Background(), "waf.firewall_rules", rule(), rc, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("zone with an account", func(t *testing.T) {
+		inner := crudmock.NewRecordBackend(t)
+		g := &accountGuard{passthrough{inner}}
+		inner.EXPECT().Get(mock.Anything, "waf.zones", zoneID, rc).
+			Return(crud.GetResult{Record: crud.RecordDto{Data: obj(t, map[string]any{"accountId": zoneAccount.String()})}}, nil)
+		inner.EXPECT().Create(mock.Anything, "waf.firewall_rules", mock.MatchedBy(func(data crud.JsonObject) bool {
+			return string(data["accountId"]) == `"`+zoneAccount.String()+`"`
+		}), rc, (*string)(nil)).Return(crud.RecordDto{ID: uuid.New()}, nil)
+		_, err := g.Create(context.Background(), "waf.firewall_rules", rule(), rc, nil)
+		require.NoError(t, err)
+	})
+}
