@@ -14,6 +14,9 @@ import (
 const (
 	defaultWindowMinutes = 15
 	defaultThreshold     = 5
+	// The window a caller may ask for, in minutes.
+	minWindowMinutes = 1
+	maxWindowMinutes = 24 * 60
 	// How many recent events one correlation pass reads. Bounded on purpose: this is a periodic
 	// sweep, not a backfill, and an unbounded read of the highest-volume entity in the product is
 	// the last thing this service should do on a timer.
