@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
@@ -39,7 +38,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	if !ok {
 		return
 	}
-	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	jobID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		httpserver.WriteServiceError(w, http.StatusBadRequest, errcode.ValidationFailed, "Invalid job id.", nil)
 		return

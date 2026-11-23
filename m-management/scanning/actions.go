@@ -21,9 +21,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/kit/httpx/router"
 	"github.com/metap-org/waap/model"
 )
 
@@ -37,7 +37,7 @@ func RegisterActions(cfg Config) func(*httpserver.AppState, *crud.ActionRegistry
 }
 
 // MountRoutes serves the scanner's callback. Running a scan is a declared action (RegisterActions).
-func MountRoutes(r chi.Router, state *httpserver.AppState) {
+func MountRoutes(r *router.Router, state *httpserver.AppState) {
 	wrap := func(h func(http.ResponseWriter, *http.Request, *httpserver.AppState)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { h(w, r, state) }
 	}
