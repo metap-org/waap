@@ -11,6 +11,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/metap-org/metap/pkg/permission/policypg"
+	"github.com/metap-org/metap/pkg/secrets"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,12 +22,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/metap-org/metap/pkg/control"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/testkit"
 
 	"github.com/metap-org/waap/m-management/billing"
@@ -56,9 +58,9 @@ func genRSAKeyPair(t *testing.T) (privatePEM string, publicKey *rsa.PublicKey) {
 }
 
 func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*httpserver.AppState, string) {
-	tenantRegistry := control.NewPostgresTenantRegistry(pool)
-	router := control.NewRouter(pool, control.NewRegistryCache(tenantRegistry), control.EnvStore{})
-	permissions := permission.NewPermissionService(control.NewPostgresPolicyStore(router))
+	tenantRegistry := tenancy.NewPostgresTenantRegistry(pool)
+	router := tenancy.NewRouter(pool, tenancy.NewRegistryCache(tenantRegistry), secrets.EnvStore{})
+	permissions := permission.NewPermissionService(policypg.NewPostgresPolicyStore(router))
 	var mdPtr atomic.Pointer[metadata.MetadataRegistry]
 	mdPtr.Store(registry)
 	privPEM, pubKey := genRSAKeyPair(t)
@@ -74,7 +76,7 @@ func setupRegistry(t *testing.T, pool *pgxpool.Pool) *metadata.MetadataRegistry 
 	registry := metadata.NewMetadataRegistry()
 	for _, def := range []metadata.EntityDefinition{entities.PlanEntity(), entities.SubscriptionEntity()} {
 		require.NoError(t, registry.Register(def))
-		_, err := reconciler.ReconcileWithScope(context.Background(), pool, control.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
+		_, err := reconciler.ReconcileWithScope(context.Background(), pool, tenancy.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
 		require.NoError(t, err, "reconcile %s", def.Name)
 	}
 	return registry
@@ -230,7 +232,7 @@ func setupRegistryAll(t *testing.T, pool *pgxpool.Pool) *metadata.MetadataRegist
 	registry := metadata.NewMetadataRegistry()
 	for _, def := range []metadata.EntityDefinition{entities.PlanEntity(), entities.SubscriptionEntity(), entities.PlanChangeRequestEntity()} {
 		require.NoError(t, registry.Register(def))
-		_, err := reconciler.ReconcileWithScope(context.Background(), pool, control.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
+		_, err := reconciler.ReconcileWithScope(context.Background(), pool, tenancy.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
 		require.NoError(t, err, "reconcile %s", def.Name)
 	}
 	return registry
