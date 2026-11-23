@@ -1,6 +1,7 @@
 /**
  * Delete the workspace (UC-81). Only the workspace's owner may; the server refuses anyone else, so
- * this card does not try to guess who that is. Typing the workspace's name is the confirmation. The
+ * this card does not try to guess who that is. Typing the workspace's name and re-entering the
+ * password (and an authentication code, for an owner who has one) is the confirmation. The
  * workspace is then suspended for 30 days and every admin is emailed a link that cancels the
  * deletion; the person is signed out, since the workspace is closed to them too.
  */
@@ -22,6 +23,8 @@ export function DeleteWorkspaceCard() {
   const { t } = useTranslation();
   const { busy, run } = useAsyncAction();
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
@@ -31,7 +34,11 @@ export function DeleteWorkspaceCard() {
       await run(async () => {
         const res = await apiFetch<Result>("/admin/workspace/deletion", {
           method: "POST",
-          body: JSON.stringify({ confirmName: name.trim() }),
+          body: JSON.stringify({
+            confirmName: name.trim(),
+            password,
+            ...(mfaCode.trim() ? { mfaCode: mfaCode.trim() } : {}),
+          }),
         });
         setResult(res);
       });
@@ -70,6 +77,30 @@ export function DeleteWorkspaceCard() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
+          <div>
+            <Label htmlFor="delete-password">
+              {t("waf.settings.deletePasswordLabel")}
+            </Label>
+            <Input
+              id="delete-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="delete-mfa">
+              {t("waf.settings.deleteMfaLabel")}
+            </Label>
+            <Input
+              id="delete-mfa"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value)}
+            />
+          </div>
           {error ? (
             <Alert variant="destructive">
               <AlertDescription>{error.message}</AlertDescription>
@@ -78,7 +109,7 @@ export function DeleteWorkspaceCard() {
           <div>
             <Button
               variant="destructive"
-              disabled={busy || !name.trim()}
+              disabled={busy || !name.trim() || !password}
               onClick={() => void submit()}
             >
               {t("waf.settings.deleteButton")}
