@@ -59,7 +59,10 @@ func evaluateAlerts(ctx context.Context, cfg Config, state *httpserver.AppState,
 				"eventCount":      count,
 				"windowMinutes":   windowMinutes,
 			}
-			delivered, detail := deliver(channels, payload)
+			if err := ensureCanRecord(ctx, state, rc); err != nil {
+				return nil, err
+			}
+			delivered, detail := cfg.deliver(ctx, channels, payload)
 			notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
 			if err != nil {
 				return nil, err
@@ -81,7 +84,7 @@ func evaluateAlerts(ctx context.Context, cfg Config, state *httpserver.AppState,
 // testAlertPolicy is the action waf.alert_policies.test — the "Send test alert" button. Runs
 // the real delivery path and writes a real AlertNotification, because a test that takes a
 // different path than production proves nothing about production.
-func testAlertPolicy(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, policyID uuid.UUID) (map[string]any, error) {
+func testAlertPolicy(ctx context.Context, cfg Config, state *httpserver.AppState, rc *permission.RequestContext, policyID uuid.UUID) (map[string]any, error) {
 	getResult, err := state.Crud.Get(ctx, model.AlertPolicies, policyID, rc)
 	if err != nil {
 		return nil, err
@@ -94,7 +97,10 @@ func testAlertPolicy(ctx context.Context, state *httpserver.AppState, rc *permis
 		"policy":  strField(policy, model.FieldName),
 		"message": "Test alert from the WAF portal",
 	}
-	delivered, detail := deliver(channels, payload)
+	if err := ensureCanRecord(ctx, state, rc); err != nil {
+		return nil, err
+	}
+	delivered, detail := cfg.deliver(ctx, channels, payload)
 	notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
 	if err != nil {
 		return nil, err

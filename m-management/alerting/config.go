@@ -30,11 +30,16 @@ const recordScanLimit = 50
 type Config struct {
 	// AnalyticsURL is the Analytics plane's query API, where security events are read from.
 	AnalyticsURL string
+	// AllowPrivateTargets lets a webhook reach private addresses and use http (dev only, see notify.go).
+	AllowPrivateTargets bool
 }
 
 // LoadConfig reads the settings: the environment, then the config file (CONFIG_FILE), then the default.
 func LoadConfig() Config {
-	return Config{AnalyticsURL: env.String("ANALYTICS_URL", "http://localhost:3030")}
+	return Config{
+		AnalyticsURL:        env.String("ANALYTICS_URL", "http://localhost:3030"),
+		AllowPrivateTargets: env.String("ALLOW_PRIVATE_TARGETS", "") == "true",
+	}
 }
 
 // analytics is the client of the Analytics plane.

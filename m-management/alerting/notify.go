@@ -6,12 +6,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	neturl "net/url"
 
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
-	"github.com/metap-org/metap/pkg/kit/httpx"
+	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/kit/safehttp"
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/waap/model"
@@ -27,14 +31,30 @@ func channelsObject(raw json.RawMessage) map[string]json.RawMessage {
 // reads it defensively: {"webhook": "https://..."} posts, {"email": "..."} logs (there is no
 // mail transport in this product yet — saying so in a log line is more honest than a
 // deliveryStatus: "sent" nobody can verify).
-func deliver(channels json.RawMessage, payload any) (bool, string) {
+//
+// The webhook URL is the tenant's to choose, so it is also theirs to point at our own network: it
+// goes through safehttp (public addresses only, no redirect, unless Config.AllowPrivateTargets) and
+// must be https. What comes back in detail is a short code, never the transport error, so the
+// answer cannot be used to map what is reachable from here.
+func (c Config) deliver(ctx context.Context, channels json.RawMessage, payload any) (bool, string) {
 	obj := channelsObject(channels)
 	if raw, ok := obj["webhook"]; ok {
 		if url, ok := jsonAsString(raw); ok {
+			if err := c.checkWebhookURL(url); err != nil {
+				return false, "webhook refused: " + err.Error()
+			}
 			body, _ := json.Marshal(payload)
-			resp, err := httpx.NewClient(deliveryTimeout).Post(url, standard.MediaTypeJSON, bytes.NewReader(body))
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 			if err != nil {
-				return false, fmt.Sprintf("webhook error: %v", err)
+				return false, "webhook refused: not a valid URL"
+			}
+			req.Header.Set(standard.HeaderContentType, standard.MediaTypeJSON)
+			resp, err := safehttp.NewClient(safehttp.Options{Timeout: deliveryTimeout, AllowPrivate: c.AllowPrivateTargets}).Do(req)
+			if err != nil {
+				if errors.Is(err, safehttp.ErrPrivateTarget) {
+					return false, "webhook refused: the address is not public"
+				}
+				return false, "webhook unreachable"
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -49,6 +69,33 @@ func deliver(channels json.RawMessage, payload any) (bool, string) {
 		}
 	}
 	return false, "no deliverable channel configured"
+}
+
+// checkWebhookURL accepts an https URL with a host (http too, when private targets are allowed:
+// development, where the receiver is a local mock).
+func (c Config) checkWebhookURL(raw string) error {
+	u, err := neturl.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil {
+		return errors.New("not a valid URL")
+	}
+	if u.Scheme != "https" && !(c.AllowPrivateTargets && u.Scheme == "http") {
+		return errors.New("must be an https URL")
+	}
+	return nil
+}
+
+// ensureCanRecord refuses before anything goes out when the caller could not record the delivery:
+// a notification is written after every attempt, so a caller who cannot write it must not be able to
+// make the attempt either.
+func ensureCanRecord(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext) error {
+	d, err := state.Permissions.CanCreateEntity(ctx, rc, model.AlertNotifications)
+	if err != nil {
+		return err
+	}
+	if !d.Allowed {
+		return crud.NewServiceErrorMsg(http.StatusForbidden, errcode.Forbidden, "You may not send alerts for this policy.")
+	}
+	return nil
 }
 
 func channelName(channels json.RawMessage) string {
