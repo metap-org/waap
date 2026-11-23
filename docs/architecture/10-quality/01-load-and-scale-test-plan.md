@@ -8,7 +8,8 @@ Mục tiêu: có số đo thật cho API quản lý ở quy mô dữ liệu lớ
 [7.5](../07-deployment/05-capacity-and-sharding.md)), tìm nút thắt trước khi khách thật gặp, và có bộ test
 chạy lại được để thấy hồi quy.
 
-Số mục tiêu ở §3 do tôi đề xuất, chưa được duyệt: [10.1](00-index.md) chưa có số cho management plane.
+**Yêu cầu tải đã chốt: backend và DB phải chịu được 1.000 rps** (§3.1). Các số còn lại ở §3 do tôi đề xuất, chưa
+được duyệt: [10.1](00-index.md) chưa có số cho management plane.
 
 ## 1. Đối tượng đo
 
@@ -46,6 +47,59 @@ Postgres chỉnh gần production (không dùng cấu hình compose mặc địn
 | P-DATA-1 | Không action nào giữ toàn bộ dữ liệu một tenant trong RAM: `exportData`/`planUsage`/`validatePolicy` ở 100k zone/tenant dùng ≤ 1 GB, hoặc trả lỗi có kiểm soát |
 | P-WRITE-1 | Import 10.000 zone / 50.000 rule của một tenant: có số thông lượng và biết trần (§5 T3) |
 | P-STRESS-1 | Quá tải thì load-shed có kiểm soát (429/503), không treo/OOM; phục hồi trong 60 s sau khi bỏ tải |
+
+## 3.1 Yêu cầu 1.000 rps và những gì nó kéo theo
+
+Yêu cầu: **management service và Postgres duy trì 1.000 request/s** trên dữ liệu lớn (§4), không phải trên
+database rỗng. Phần dưới là suy luận từ mã để biết phải đo gì và dự đoán nút thắt; mọi con số "ước" phải được
+thay bằng số đo ở T2 (`pg_stat_statements`), không dùng làm kết luận.
+
+**Cần chốt để đo đúng** (đề xuất mặc định trong ngoặc):
+- 1.000 rps là mức *duy trì* hay đỉnh? (duy trì 30 phút, và đỉnh 1,5× trong 5 phút)
+- Hỗn hợp request? (85% đọc: list/get/`?ids=`; 10% ghi qua guard; 5% khác gồm action và aggregate)
+- Một instance hay nhiều instance sau load balancer? (đo cả hai: một instance để biết trần, 3 instance để biết DB có là nút thắt không)
+- Tải đến từ bao nhiêu IP/người dùng? Ảnh hưởng bộ giới hạn tốc độ (xem dưới).
+
+**Mỗi request tốn bao nhiêu truy vấn** (đọc từ `pkg/httpserver/auth.go` và `pkg/control/authcontext.go`, chưa đo):
+
+| Bước | Truy vấn |
+|---|---|
+| Xác thực JWT → kiểm phiên và thành viên (`CheckSession`) | 1 (pool dùng chung) |
+| Mở giao dịch theo tenant, nạp vai trò + vai trò theo scope | 2 trong 1 giao dịch |
+| Kiểm phiên theo `sid` (`ApplySessionClaim`, ghi `last_seen` tối đa 1 lần/phút) | 1, thỉnh thoảng thêm 1 ghi |
+| Nạp policy của entity (có cache chỉ khi cấu hình Redis cho policy) | 0 hoặc 1 |
+| Đọc nghiệp vụ (list: dữ liệu + có thể thêm đếm; get: 1) | 1–2 |
+| **Cộng đọc** | **khoảng 5–8** |
+| Ghi qua guard: đếm quota, tra account, đọc/ghi snapshot version, ghi, audit (giao dịch riêng, khoá chuỗi tenant), outbox | khoảng 12–25 |
+
+Ở 1.000 rps hỗn hợp trên: khoảng **6.000–10.000 truy vấn/s** và 2.000–3.000 giao dịch/s vào Postgres. Với mỗi
+truy vấn 1–2 ms, số kết nối Postgres bận trung bình khoảng 10–20; có biến động (đuôi trễ) thì cần dư gấp 3–4 lần.
+
+**Phát hiện: pool kết nối cứng 5.** `infra.Connect` (metap) luôn đặt `MaxConns = 5`, ghi đè cả `pool_max_conns`
+trong URL. Ở mức tải trên, 5 kết nối đã bão hoà ngay cả trong trường hợp lý tưởng, nên **1.000 rps không đạt được
+nếu không sửa**. Đã sửa ở metap (nhánh `claude/metap-docs-features-g1zjqn`, chờ PR): `pool_max_conns` trong URL
+được tôn trọng, mặc định giữ 5. Cần chọn cỡ pool khi đo: bắt đầu 32, quét 16/32/64/128; theo dõi thời gian chờ
+lấy kết nối (`pgxpool.Stat`: `AcquireDuration`, `EmptyAcquireCount`).
+
+**Trần phía Postgres**: `max_connections` ≥ (số instance × cỡ pool) + dư cho migration/giám sát. Nếu cần nhiều
+instance thì đo thêm PgBouncer ở chế độ transaction (tương thích vì metap dùng `SET LOCAL search_path` trong
+giao dịch, không dùng cấu hình theo phiên). Đo CPU/IOPS Postgres, `shared_buffers`, tỉ lệ cache hit, checkpoint,
+chờ WAL (ghi 100 giao dịch/s trở lên).
+
+**Bộ giới hạn tốc độ có thể là trần thật trước cả DB**: mặc định 5 req/s mỗi IP (burst 300). 1.000 rps đến từ
+một load balancer mà không khai `trusted_proxies` thì chung một bucket và bị chặn ở 5 rps; đến từ người dùng sau NAT
+doanh nghiệp (nhiều người một IP) cũng chạm trần. Phải quyết: mức giới hạn thích hợp cho portal/API ở production,
+và đo với phân bố IP thực tế (ví dụ 200 IP đều nhau mỗi IP 5 rps, và 20 IP lệch). Ghi vào báo cáo cấu hình đã dùng.
+
+**Tiêu chí đạt cho yêu cầu 1.000 rps** (đề xuất, cần duyệt):
+
+| Mã | Tiêu chí |
+|---|---|
+| P-CAP-1 | Duy trì 1.000 rps hỗn hợp 30 phút ở dữ liệu 1M zone: lỗi 5xx/timeout < 0,1%, p95 ≤ 250 ms, p99 ≤ 500 ms |
+| P-CAP-2 | Postgres: CPU ≤ 70%, tỉ lệ cache hit ≥ 99%, không chờ khoá kéo dài, autovacuum theo kịp, không kết nối bị từ chối |
+| P-CAP-3 | Pool: thời gian chờ lấy kết nối p99 ≤ 10 ms; không có thời điểm nào toàn bộ pool bận kéo dài |
+| P-CAP-4 | Đỉnh 1.500 rps trong 5 phút: suy giảm có kiểm soát (độ trễ tăng, có 429/503), không treo, về bình thường trong 60 s |
+| P-CAP-5 | Tìm đầu gối: tăng 250 → 2.000 rps theo bậc 250; ghi rps tại đầu gối và tài nguyên nào cạn trước (CPU service, pool, CPU/IO Postgres, khoá audit, rate limit) |
 
 ## 4. Dữ liệu lớn: cách sinh
 
@@ -87,6 +141,14 @@ ngưỡng hồi quy +20% làm đỏ CI.
   nhiều IP giả qua `X-Forwarded-For`; **không** tắt bộ giới hạn. Bộ giới hạn được đo riêng ở T5.
 - Đăng nhập một lần rồi dùng token/API key cho toàn bộ tải (không đo `/auth/login` trong T2: argon2 chủ ý chậm).
 
+### T2b. Kiểm tải 1.000 rps (P-CAP-1…5)
+- Sau T2 ở 1M zone. k6 `constant-arrival-rate` (1.000 rps) với hỗn hợp §3.1; token/API key phân bố trên ≥ 200 người dùng và ≥ 50 tenant
+  (tải một tenant duy nhất sẽ che mất tranh chấp khác và dồn vào một chuỗi audit).
+- Bậc thang: 250 → 500 → 1.000 → 1.500 → 2.000 rps, mỗi bậc 5 phút, rồi duy trì 1.000 rps 30 phút.
+- Một instance, rồi 3 instance sau load balancer; cỡ pool quét 16/32/64/128; có/không PgBouncer.
+- Đo song song: `pg_stat_activity` (kết nối bận, chờ), `pg_stat_statements` (top theo tổng thời gian), `pgxpool.Stat`, CPU/IO máy DB (`iostat`), tỉ lệ cache hit, WAL; goroutine và GC của service.
+- Kết quả: bảng rps → p50/p95/p99, lỗi, tài nguyên cạn đầu tiên; danh sách câu SQL top cần tối ưu.
+
 ### T3. Ghi hàng loạt và audit
 - Import 10.000 zone / 50.000 rule của **một** tenant bằng 1, 8, 32 luồng; rồi 100 tenant song song.
 - Giả thuyết: chuỗi audit `FOR UPDATE` trên một dòng mỗi tenant tuần tự hoá ghi của tenant đó → thêm luồng không tăng thông lượng một tenant. Đo A/B có/không `audit.enabled`, một tenant so với nhiều tenant.
@@ -119,12 +181,12 @@ Tải ổn định 50% mức đầu gối T2 + ghi 5/s. Đo rò bộ nhớ/gorou
 
 | Pha | Nội dung | Ước lượng | Xong khi |
 |---|---|---|---|
-| A | T1 + công cụ dữ liệu tầng 1–2 | 3 ngày | Có microbench làm mốc; nạp được 1M zone |
-| B | T2 | 3–4 ngày | Đường cong p95 theo 1k–1M zone; danh sách câu SQL top; nút thắt đầu tiên có số |
+| A | T1 + công cụ dữ liệu tầng 1–2 + sửa/đưa vào cỡ pool (đã có nhánh) | 3 ngày | Có microbench làm mốc; nạp được 1M zone; cỡ pool cấu hình được |
+| B | T2 + T2b | 5–6 ngày | Đường cong p95 theo 1k–1M zone; rps tại đầu gối; danh sách câu SQL top; nút thắt đầu tiên có số |
 | C | T3 + T4 | 4 ngày | Trần ghi một tenant, tăng trưởng audit/outbox, RAM của action nặng |
 | D | T5 + T6 + báo cáo | 3 ngày + chạy máy | Bảng "cách vỡ", soak sạch hoặc có danh sách rò rỉ, báo cáo so §3 |
 
-Tổng khoảng 2–3 tuần cho một người, nếu có máy perf cố định.
+Tổng khoảng 3 tuần cho một người, nếu có máy perf cố định.
 
 ## 8. Câu hỏi cần chốt
 
