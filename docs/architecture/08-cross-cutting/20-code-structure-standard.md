@@ -100,7 +100,7 @@ Mỗi mục: **cách chuẩn** (điểm mở có sẵn của metap), **cấm**.
 - Nguồn giá trị, cái đầu thắng: biến môi trường → file YAML (`CONFIG_FILE`, `metap/pkg/configfile`)
   → mặc định tại chỗ đọc. Khoá trong file là tên biến nó thay (`smtp.host` = `SMTP_HOST`). Cấu hình
   ổn định để trong file; env chỉ ghi đè theo môi trường và mang secret. Dòng đầu của `main` là
-  `configfile.MustLoadFromEnv()`.
+  `config.MustLoadFileFromEnv()`.
 - `cmd/<service>/main.go` chỉ dựng `app.Options{Name, Actions, WrapBackend, Routes}` rồi
   `app.Main`. Không logic.
 

@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/metap-org/metap/pkg/configfile"
+	metapconfig "github.com/metap-org/metap/pkg/config"
 	"github.com/metap-org/metap/pkg/infra"
 
 	"github.com/metap-org/metap/pkg/kit/standard"
@@ -37,7 +37,7 @@ import (
 )
 
 func main() {
-	configfile.MustLoadFromEnv() // before any setting is read
+	metapconfig.MustLoadFileFromEnv() // before any setting is read
 	infra.InitTracing()
 	cfg, err := config.Load()
 	if err != nil {

@@ -17,7 +17,7 @@ package main
 
 import (
 	"github.com/metap-org/metap/pkg/app"
-	"github.com/metap-org/metap/pkg/configfile"
+	"github.com/metap-org/metap/pkg/config"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 
@@ -35,7 +35,7 @@ import (
 )
 
 func main() {
-	configfile.MustLoadFromEnv() // before any setting is read
+	config.MustLoadFileFromEnv() // before any setting is read
 	zonesCfg, billingCfg := zones.LoadConfig(), billing.LoadConfig()
 	scanningCfg, alertingCfg := scanning.LoadConfig(), alerting.LoadConfig()
 
