@@ -118,4 +118,4 @@ flowchart LR
 
 ## 10.2 Kế hoạch test tải và dữ liệu lớn
 
-Xem [01-load-and-scale-test-plan.md](01-load-and-scale-test-plan.md): test hiệu năng, stress, soak, dữ liệu lớn cho management, distributor, edge, analytics (bản nháp, chờ chốt mục tiêu).
+Xem [01-load-and-scale-test-plan.md](01-load-and-scale-test-plan.md): test hiệu năng, stress, soak, dữ liệu lớn, tạm thời chỉ cho management service (bản nháp, chờ chốt mục tiêu; các plane khác chưa lên kế hoạch).
