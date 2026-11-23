@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
@@ -26,7 +27,41 @@ type quotaGuard struct {
 	plans billing.PlanLookup
 }
 
+// quotaLocks serialises count-then-create for one quota scope (the tenant's zones, or one zone's
+// rules): without it N concurrent creates all read the same count and overshoot the limit by N-1.
+// It is in-process, which is what the management service is (one process); with replicas this needs
+// a database-side guard (advisory lock in the creating transaction) instead.
+var quotaLocks keyedMutex
+
+type keyedMutex struct{ m sync.Map }
+
+// lock takes the mutex for key and returns its release.
+func (k *keyedMutex) lock(key string) func() {
+	v, _ := k.m.LoadOrStore(key, &sync.Mutex{})
+	mu := v.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
+// quotaScope names what a create counts against, or "" when the entity has no quota.
+func quotaScope(entity string, data crud.JsonObject, rc *permission.RequestContext) string {
+	switch entity {
+	case model.Zones:
+		return rc.TenantID + "|" + entity
+	case model.FirewallRules:
+		if zone := versions.ZoneOfRule(data); zone != uuid.Nil {
+			return rc.TenantID + "|" + entity + "|" + zone.String()
+		}
+	}
+	return ""
+}
+
 func (g *quotaGuard) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
+	if g.plans != nil {
+		if scope := quotaScope(entity, data, rc); scope != "" {
+			defer quotaLocks.lock(scope)()
+		}
+	}
 	if err := g.checkQuota(ctx, entity, data, rc); err != nil {
 		return crud.RecordDto{}, err
 	}
@@ -43,6 +78,9 @@ func (g *quotaGuard) Update(ctx context.Context, entity string, id uuid.UUID, ex
 				return crud.RecordDto{}, err
 			}
 			if versions.ZoneOfRule(current.Record.Data) != to {
+				if g.plans != nil {
+					defer quotaLocks.lock(quotaScope(entity, data, rc))()
+				}
 				if err := g.checkQuota(ctx, entity, data, rc); err != nil {
 					return crud.RecordDto{}, err
 				}

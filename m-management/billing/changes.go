@@ -140,8 +140,13 @@ func (p *PlanSource) RequestPlanChange(ctx context.Context, rc *permission.Reque
 		model.FieldRequestedPlanID:  jsonStr(target.ID),
 		model.FieldStatus:           jsonStr(requestPending),
 		model.FieldNote:             jsonStr(note),
+		model.FieldOpenRequestKey:   jsonStr(tenant.String()),
 	}, rc0, nil)
 	if err != nil {
+		// Two requests at once both pass the check above; the unique key lets only one in.
+		if se, ok := crud.AsServiceError(err); ok && se.Code == errcode.UniqueViolation {
+			return nil, crud.NewServiceErrorMsg(http.StatusConflict, errcode.ValidationFailed, "There is already a request waiting for an answer.")
+		}
 		return nil, err
 	}
 	return crud.ToObject(map[string]any{"id": created.ID.String(), "status": requestPending}, nil)
@@ -193,7 +198,7 @@ func (p *PlanSource) DecidePlanChange(ctx context.Context, rc *permission.Reques
 	}
 	// Claim the request first, on the version just read: of two deciders only one wins (the other
 	// gets version_conflict), and nothing is applied for a request somebody else already decided.
-	patch := crud.JsonObject{model.FieldStatus: jsonStr(status), model.FieldDecisionNote: jsonStr(note)}
+	patch := crud.JsonObject{model.FieldStatus: jsonStr(status), model.FieldDecisionNote: jsonStr(note), model.FieldOpenRequestKey: json.RawMessage("null")}
 	claimed, err := p.Backend.Update(ctx, model.PlanChanges, requestID, req.Record.Version, patch, op, nil)
 	if err != nil {
 		return nil, err
@@ -204,7 +209,8 @@ func (p *PlanSource) DecidePlanChange(ctx context.Context, rc *permission.Reques
 		if err != nil {
 			// Not applied: hand the request back so it can be decided again, instead of leaving an
 			// "approved" that never happened.
-			reopen := crud.JsonObject{model.FieldStatus: jsonStr(requestPending), model.FieldDecisionNote: json.RawMessage("null")}
+			reopen := crud.JsonObject{model.FieldStatus: jsonStr(requestPending), model.FieldDecisionNote: json.RawMessage("null"),
+				model.FieldOpenRequestKey: req.Record.Data[model.FieldCustomerTenantID]}
 			if _, rerr := p.Backend.Update(ctx, model.PlanChanges, requestID, claimed.Version, reopen, op, nil); rerr != nil {
 				slog.Error("plan change could not be applied and the request could not be reopened", "request", requestID, "error", err, "reopen_error", rerr)
 			}

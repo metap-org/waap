@@ -18,6 +18,7 @@ import (
 	"github.com/metap-org/metap/pkg/permission/policypg"
 	"github.com/metap-org/metap/pkg/secrets"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -598,6 +599,44 @@ func TestPlanQuotasFollowWhatTheBillingDomainSays(t *testing.T) {
 	assert.Equal(t, "Small", view.Plan.Name)
 	assert.EqualValues(t, 4, view.Zones)
 	assert.Len(t, view.Plans, 1)
+}
+
+// Concurrent creates cannot overshoot the plan: the count and the create happen under one lock per
+// quota scope (audit 08 #5), so exactly the allowed number get through.
+func TestConcurrentCreatesDoNotOvershootThePlan(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+	const allowed, attempts = 2, 8
+	client := planLookupFunc(func(context.Context, uuid.UUID) (billing.Resolution, error) {
+		return billing.Resolution{Enforced: true, Plan: billing.Plan{Name: "Small", MaxZones: allowed, MaxRulesPerZone: 1}}, nil
+	})
+	backend := guard.New(state.Crud).WithPlanLimits(client)
+
+	var wg sync.WaitGroup
+	var created atomic.Int32
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := backend.Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, fmt.Sprintf("c%d.%s", i, apex)),
+				"originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+			if err == nil {
+				created.Add(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	assert.EqualValues(t, allowed, created.Load(), "only the plan's allowance gets through")
 }
 
 func second(_ crud.RecordDto, err error) error { return err }

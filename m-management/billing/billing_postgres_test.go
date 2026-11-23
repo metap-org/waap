@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"github.com/metap-org/metap/pkg/permission/policypg"
 	"github.com/metap-org/metap/pkg/secrets"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -243,4 +244,62 @@ func idOf(o crud.JsonObject) uuid.UUID {
 	_ = json.Unmarshal(o["id"], &s)
 	id, _ := uuid.Parse(s)
 	return id
+}
+
+// Two requests at once from one customer cannot both wait, and two deciders at once cannot both
+// win (audit 08 #4): the database lets one waiting request per customer in.
+func TestConcurrentPlanRequestsAndDecisionsLetOneThrough(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistryAll(t, pool)
+	operator, customer, userID := uuid.New(), uuid.New(), uuid.New()
+	seedAdmin(t, pool, operator, userID)
+	t.Cleanup(func() {
+		for _, table := range []string{"waf.waf_plan_change_requests", "waf.waf_subscriptions", "waf.waf_plans"} {
+			pool.Exec(context.Background(), "DELETE FROM "+table+" WHERE tenant_id = $1", operator)
+		}
+	})
+	state, _ := newTestState(t, pool, registry)
+	ctx := context.Background()
+	opRC, custRC := adminContext(operator, userID), adminContext(customer, userID)
+	src := &billing.PlanSource{Operator: operator, Backend: state.Crud}
+	mk := func(name string, zones int, def bool) crud.RecordDto {
+		r, err := state.Crud.Create(ctx, "waf.plans", obj(t, map[string]any{"name": name, "maxZones": zones, "maxRulesPerZone": zones * 5, "isDefault": def, "enabled": true}), opRC, nil)
+		require.NoError(t, err)
+		return r
+	}
+	_, big := mk("Small", 1, true), mk("Big", 10, false)
+
+	const n = 6
+	var wg sync.WaitGroup
+	var asked atomic.Int32
+	var requestID atomic.Value
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if got, err := src.RequestPlanChange(ctx, custRC, big.ID.String(), "", "Acme"); err == nil {
+				asked.Add(1)
+				requestID.Store(idOf(got))
+			}
+		}()
+	}
+	wg.Wait()
+	require.EqualValues(t, 1, asked.Load(), "only one request waits per customer")
+
+	var decided atomic.Int32
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(approve bool) {
+			defer wg.Done()
+			if _, err := src.DecidePlanChange(ctx, opRC, requestID.Load().(uuid.UUID), approve, "", time.Now()); err == nil {
+				decided.Add(1)
+			}
+		}(i%2 == 0)
+	}
+	wg.Wait()
+	assert.EqualValues(t, 1, decided.Load(), "only one decision is taken")
+
+	// Decided: the customer can ask again.
+	_, err := src.RequestPlanChange(ctx, custRC, big.ID.String(), "", "Acme")
+	assert.NoError(t, err)
 }
