@@ -2,6 +2,7 @@ package compile
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -345,4 +346,28 @@ func TestCompileRuleDropsAnExpiredTemporaryRule(t *testing.T) {
 	assert.False(t, ok, "expired")
 	_, ok = compileRule(rule("2026-11-23T11:00:00Z"))
 	assert.True(t, ok, "still running")
+}
+
+// A condition over the cost limits is dropped, like any other the edge cannot represent (audit 08).
+func TestParseMatchRefusesConditionsOverTheCostLimits(t *testing.T) {
+	leaf := `{"field":"uri.path","op":"eq","value":"/x"}`
+	deep := leaf
+	for i := 0; i < MaxMatchDepth+2; i++ {
+		deep = `{"not":` + deep + `}`
+	}
+	_, ok := ParseMatch(json.RawMessage(deep))
+	assert.False(t, ok, "too deep")
+
+	items := make([]string, MaxMatchPredicates+1)
+	for i := range items {
+		items[i] = leaf
+	}
+	_, ok = ParseMatch(json.RawMessage(`{"all":[` + strings.Join(items, ",") + `]}`))
+	assert.False(t, ok, "too many comparisons")
+
+	_, ok = ParseMatch(json.RawMessage(`{"field":"uri.path","op":"regex","value":"` + strings.Repeat("a", MaxRegexLength+1) + `"}`))
+	assert.False(t, ok, "pattern too long")
+
+	_, ok = ParseMatch(json.RawMessage(`{"all":[` + leaf + `,{"any":[` + leaf + `]}]}`))
+	assert.True(t, ok, "an ordinary nested condition is fine")
 }

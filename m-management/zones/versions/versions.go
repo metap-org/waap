@@ -131,43 +131,58 @@ func RecordVersion(ctx context.Context, backend crud.RecordBackend, zoneID uuid.
 	if err != nil {
 		return 0, err
 	}
-	latest, err := latestVersion(ctx, backend, zoneID, rc)
-	if err != nil {
-		return 0, err
-	}
-	next := 1
-	if latest != nil {
-		if h, _ := jx.AsString(latest.Data[model.FieldContentHash]); h == hash && !note.force {
-			return 0, nil
-		}
-		n, _ := jx.AsFloat(latest.Data[model.FieldVersion])
-		next = int(n) + 1
-	}
 	rawSnap, err := json.Marshal(snap)
 	if err != nil {
 		return 0, err
 	}
-	data := crud.JsonObject{
-		model.FieldZoneID:      jx.String(zoneID.String()),
-		model.FieldVersion:     json.RawMessage(fmt.Sprint(next)),
-		model.FieldSource:      jx.String(note.source),
-		model.FieldSummary:     jx.String(note.summary),
-		model.FieldContentHash: jx.String(hash),
-		model.FieldSnapshot:    rawSnap,
-	}
+	account := json.RawMessage(nil)
 	if zone, err := backend.Get(ctx, model.Zones, zoneID, rc); err == nil {
-		if account, ok := zone.Record.Data[model.FieldAccountID]; ok {
+		account = zone.Record.Data[model.FieldAccountID]
+	}
+	// The number is the latest plus one, and (zoneId, version) is unique: when two changes race for
+	// the same number the loser reads the new latest and tries again, so history has no two "version 5".
+	var lastErr error
+	for attempt := 0; attempt < recordVersionAttempts; attempt++ {
+		latest, err := latestVersion(ctx, backend, zoneID, rc)
+		if err != nil {
+			return 0, err
+		}
+		next := 1
+		if latest != nil {
+			if h, _ := jx.AsString(latest.Data[model.FieldContentHash]); h == hash && !note.force {
+				return 0, nil
+			}
+			n, _ := jx.AsFloat(latest.Data[model.FieldVersion])
+			next = int(n) + 1
+		}
+		data := crud.JsonObject{
+			model.FieldZoneID:      jx.String(zoneID.String()),
+			model.FieldVersion:     json.RawMessage(fmt.Sprint(next)),
+			model.FieldSource:      jx.String(note.source),
+			model.FieldSummary:     jx.String(note.summary),
+			model.FieldContentHash: jx.String(hash),
+			model.FieldSnapshot:    rawSnap,
+		}
+		if account != nil {
 			data[model.FieldAccountID] = account
 		}
+		if note.restoredFrom > 0 {
+			data[model.FieldRestoredFrom] = json.RawMessage(fmt.Sprint(note.restoredFrom))
+		}
+		_, err = backend.Create(ctx, model.PolicyVersions, data, AsAdmin(rc), nil)
+		if err == nil {
+			return next, nil
+		}
+		if se, ok := crud.AsServiceError(err); !ok || se.Code != errcode.UniqueViolation {
+			return 0, err
+		}
+		lastErr = err
 	}
-	if note.restoredFrom > 0 {
-		data[model.FieldRestoredFrom] = json.RawMessage(fmt.Sprint(note.restoredFrom))
-	}
-	if _, err := backend.Create(ctx, model.PolicyVersions, data, AsAdmin(rc), nil); err != nil {
-		return 0, err
-	}
-	return next, nil
+	return 0, lastErr
 }
+
+// recordVersionAttempts bounds the retries when other changes keep taking the next number.
+const recordVersionAttempts = 5
 
 // ZoneOfRule is the zone a rule record belongs to, or uuid.Nil for a tenant-wide one.
 func ZoneOfRule(data crud.JsonObject) uuid.UUID {

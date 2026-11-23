@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/metap-org/metap/pkg/crud"
+	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
@@ -21,6 +22,34 @@ import (
 // through Analytics' own ingest.
 type Backend struct {
 	Client *Client
+	// Permissions decides who may read security events. The records live outside metap, so nothing
+	// else checks it: the routes only know the caller is signed in. Nil refuses every read.
+	Permissions ReadChecker
+}
+
+// ReadChecker answers whether the caller may read an entity (metap's PermissionService does).
+type ReadChecker interface {
+	CanReadEntity(ctx context.Context, rc *permission.RequestContext, entity string) (permission.PermissionDecision, error)
+}
+
+// canRead is the entity-level read check every read of the model goes through, so a role the
+// tenant did not grant waf.security_events cannot read the events by calling the generic route.
+func (b *Backend) canRead(ctx context.Context, rc *permission.RequestContext) error {
+	if b.Permissions == nil {
+		return crud.NewServiceErrorMsg(http.StatusForbidden, errcode.Forbidden, "Security events are not readable here.")
+	}
+	decision, err := b.Permissions.CanReadEntity(ctx, rc, SecurityEvents)
+	if err != nil {
+		return err
+	}
+	if !decision.Allowed {
+		reason := decision.Reason
+		if reason == "" {
+			reason = errcode.Forbidden
+		}
+		return crud.NewServiceError(http.StatusForbidden, reason)
+	}
+	return nil
 }
 
 var _ crud.RecordBackend = (*Backend)(nil)
@@ -69,6 +98,9 @@ func readOnly() error {
 }
 
 func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc *permission.RequestContext) (crud.ListResult, error) {
+	if err := b.canRead(ctx, rc); err != nil {
+		return crud.ListResult{}, err
+	}
 	if input.JQL != nil && strings.TrimSpace(*input.JQL) != "" {
 		return crud.ListResult{}, crud.NewServiceErrorMsg(http.StatusBadRequest, "invalid_query", "jql is not supported for security events; use filter.")
 	}
@@ -96,6 +128,9 @@ func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc 
 }
 
 func (b *Backend) Get(ctx context.Context, _ string, id uuid.UUID, rc *permission.RequestContext) (crud.GetResult, error) {
+	if err := b.canRead(ctx, rc); err != nil {
+		return crud.GetResult{}, err
+	}
 	e, err := b.Client.Get(ctx, token(rc), id)
 	if err != nil {
 		return crud.GetResult{}, failure(err)
@@ -142,6 +177,9 @@ func deref(s *string) string {
 }
 
 func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateSpec, rc *permission.RequestContext) ([]json.RawMessage, error) {
+	if err := b.canRead(ctx, rc); err != nil {
+		return nil, err
+	}
 	req := AggregateSpec{
 		Metrics: spec.Metrics, GroupBy: deref(spec.GroupBy), Bucket: deref(spec.Bucket),
 		TimeField: deref(spec.TimeField), Filters: spec.Filters, Since: deref(spec.Since), Until: deref(spec.Until),

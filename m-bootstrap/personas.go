@@ -10,7 +10,9 @@ package bootstrap
 
 import (
 	"github.com/metap-org/metap/pkg/bootstrap"
+	"github.com/metap-org/metap/pkg/metadata"
 
+	"github.com/metap-org/waap/m-management/analytics"
 	"github.com/metap-org/waap/model"
 )
 
@@ -20,7 +22,14 @@ const (
 	RoleViewer          = "viewer"
 )
 
-func init() { bootstrap.Submit(Personas) }
+func init() {
+	bootstrap.Submit(Personas)
+	// waf.security_events is a read model served from the Analytics plane, so no service submits it
+	// (management-service registers it itself as an external entity). The one-shot bootstrap must
+	// still know it, or `waf.*` would expand without it and nobody but an admin could be granted
+	// read on it: the read model checks the permission (analytics.Backend).
+	metadata.SubmitEntity(analytics.SecurityEventEntity)
+}
 
 // Personas is docs/management's persona table as grants.
 func Personas() bootstrap.Bootstrap {
@@ -40,8 +49,8 @@ func Personas() bootstrap.Bootstrap {
 			{Role: RoleDeveloper, Entities: []string{model.ScanFindings}, Actions: []string{"read", "update", "transition"}},
 			{Role: RoleDeveloper, Entities: []string{model.ScanJobs}, Actions: []string{"read"}},
 
-			// Viewer: read-only incidents and alert history.
-			{Role: RoleViewer, Entities: []string{model.Incidents, model.AlertNotifications}, Actions: []string{"read"}},
+			// Viewer: read-only incidents, alert history and the security-event analytics.
+			{Role: RoleViewer, Entities: []string{model.Incidents, model.AlertNotifications, model.SecurityEvents}, Actions: []string{"read"}},
 		},
 	}
 }

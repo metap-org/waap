@@ -42,14 +42,35 @@ func IsValidMatchCondition(raw json.RawMessage) bool {
 	if len(raw) == 0 {
 		return true
 	}
+	if len(raw) > MaxMatchBytes {
+		return false
+	}
 	var value any
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return false
 	}
-	return isValidMatchConditionValue(value)
+	return isValidMatchConditionValue(value, 0, &matchBudget{})
 }
 
-func isValidMatchConditionValue(value any) bool {
+// The limits on one condition: the same numbers as c-config-distributor/compile (its own copy; the
+// two planes deploy separately). The edge shares its CPU between tenants and evaluates every rule
+// of a zone against every request, so what one rule may cost is bounded; a rule over a limit would
+// be dropped when published, and is refused here so its author is told.
+const (
+	MaxMatchBytes       = 32 << 10
+	MaxMatchDepth       = 8
+	MaxMatchPredicates  = 50
+	MaxMatchValues      = 200
+	MaxMatchValueLength = 1024
+	MaxRegexLength      = 512
+)
+
+type matchBudget struct{ predicates int }
+
+func isValidMatchConditionValue(value any, depth int, budget *matchBudget) bool {
+	if depth > MaxMatchDepth {
+		return false
+	}
 	if value == nil {
 		return true
 	}
@@ -59,13 +80,13 @@ func isValidMatchConditionValue(value any) bool {
 	}
 
 	if items, ok := object["all"].([]any); ok {
-		return allValid(items)
+		return allValid(items, depth, budget)
 	}
 	if items, ok := object["any"].([]any); ok {
-		return allValid(items)
+		return allValid(items, depth, budget)
 	}
 	if inner, ok := object["not"]; ok {
-		return isValidMatchConditionValue(inner)
+		return isValidMatchConditionValue(inner, depth+1, budget)
 	}
 
 	field, ok := object["field"].(string)
@@ -77,9 +98,24 @@ func isValidMatchConditionValue(value any) bool {
 		return false
 	}
 
+	budget.predicates++
+	if budget.predicates > MaxMatchPredicates {
+		return false
+	}
 	values, hasValues := object["values"].([]any)
+	if len(values) > MaxMatchValues {
+		return false
+	}
+	for _, v := range values {
+		if str, ok := v.(string); ok && len(str) > MaxMatchValueLength {
+			return false
+		}
+	}
 	hasNonEmptyValues := hasValues && len(values) > 0
 	value1, hasValue := object["value"]
+	if str, ok := value1.(string); ok && len(str) > MaxMatchValueLength {
+		return false
+	}
 	hasRealValue := hasValue && value1 != nil
 
 	if op == "in" || op == "notIn" {
@@ -100,7 +136,7 @@ func isValidMatchConditionValue(value any) bool {
 
 	if op == "regex" {
 		pattern, ok := value1.(string)
-		if !ok {
+		if !ok || len(pattern) > MaxRegexLength {
 			return false
 		}
 		// regexp is RE2 syntax, not Rust's regex crate's — close enough for a "does the pattern
@@ -116,9 +152,9 @@ func isValidMatchConditionValue(value any) bool {
 	return true
 }
 
-func allValid(items []any) bool {
+func allValid(items []any, depth int, budget *matchBudget) bool {
 	for _, item := range items {
-		if !isValidMatchConditionValue(item) {
+		if !isValidMatchConditionValue(item, depth+1, budget) {
 			return false
 		}
 	}

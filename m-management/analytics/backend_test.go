@@ -46,7 +46,7 @@ func fakeAnalyticsAPI(t *testing.T) (*httptest.Server, *[]*http.Request, *[]stri
 
 func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	srv, reqs, bodies := fakeAnalyticsAPI(t)
-	backend := &analytics.Backend{Client: analytics.NewClient(srv.URL)}
+	backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Permissions: readers{allow: true}}
 	rc := &permission.RequestContext{ForwardedBearerToken: "caller-token"}
 	ctx := context.Background()
 
@@ -89,4 +89,39 @@ func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	se, ok := crud.AsServiceError(err)
 	require.True(t, ok)
 	require.Equal(t, "invalid_query", se.Code)
+}
+
+// readers is the permission answer the tests choose.
+type readers struct{ allow bool }
+
+func (r readers) CanReadEntity(context.Context, *permission.RequestContext, string) (permission.PermissionDecision, error) {
+	if r.allow {
+		return permission.Allowed(), nil
+	}
+	return permission.Forbidden(), nil
+}
+
+// The events live outside metap, so the read check is the backend's own: a role the tenant did not
+// grant waf.security_events (a Viewer, a Developer) gets a 403 from every read, and nothing is
+// asked of Analytics (audit 08).
+func TestSecurityEventsNeedTheReadPermission(t *testing.T) {
+	srv, reqs, _ := fakeAnalyticsAPI(t)
+	rc := &permission.RequestContext{ForwardedBearerToken: "caller-token"}
+	ctx := context.Background()
+	for name, permissions := range map[string]analytics.ReadChecker{"denied": readers{}, "unwired": nil} {
+		backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Permissions: permissions}
+		_, err := backend.List(ctx, analytics.SecurityEvents, query.ListInput{Limit: 10}, rc)
+		se, ok := crud.AsServiceError(err)
+		require.True(t, ok, name)
+		require.EqualValues(t, 403, se.Status, name)
+		_, err = backend.Get(ctx, analytics.SecurityEvents, uuid.New(), rc)
+		se, ok = crud.AsServiceError(err)
+		require.True(t, ok, name)
+		require.EqualValues(t, 403, se.Status, name)
+		_, err = backend.Aggregate(ctx, analytics.SecurityEvents, query.AggregateSpec{}, rc)
+		se, ok = crud.AsServiceError(err)
+		require.True(t, ok, name)
+		require.EqualValues(t, 403, se.Status, name)
+	}
+	require.Empty(t, *reqs, "a refused read never reaches Analytics")
 }

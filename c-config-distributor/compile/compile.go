@@ -120,6 +120,33 @@ func opFrom(raw string) (ruleset.Op, bool) {
 // author wrote is worse than a firewall rule that is missing: the missing one shows up as "my
 // rule isn't working", the broadened one silently blocks real traffic.
 func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
+	if len(raw) > MaxMatchBytes {
+		return ruleset.MatchExpr{}, false
+	}
+	return parseMatch(raw, 0, &matchBudget{})
+}
+
+// Limits on one authored matchCondition. Every rule is evaluated against every request of its zone
+// on an edge shared by many tenants, so what a rule may cost is bounded where it is accepted: a
+// rule over a limit is dropped like any other condition the edge cannot represent. zones-service
+// applies the same numbers at save time (its own copy, rules/matchcondition.go), so an author hears
+// about it before the rule is silently left out.
+const (
+	MaxMatchBytes       = 32 << 10 // the whole condition, as authored
+	MaxMatchDepth       = 8        // nesting of all / any / not
+	MaxMatchPredicates  = 50       // field comparisons in one condition
+	MaxMatchValues      = 200      // entries of one `values` list
+	MaxMatchValueLength = 1024     // bytes of one value
+	MaxRegexLength      = 512      // bytes of one regular expression
+)
+
+// matchBudget counts the comparisons of one condition across its whole tree.
+type matchBudget struct{ predicates int }
+
+func parseMatch(raw json.RawMessage, depth int, budget *matchBudget) (ruleset.MatchExpr, bool) {
+	if depth > MaxMatchDepth {
+		return ruleset.MatchExpr{}, false
+	}
 	if len(raw) == 0 || string(raw) == "null" {
 		// No condition at all is meaningful for IP-list and rate-limit rules: the rule applies
 		// to every request and the rate-limit budget (or the value list) is the real condition.
@@ -137,7 +164,7 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 		}
 		parsed := make([]ruleset.MatchExpr, 0, len(items))
 		for _, item := range items {
-			expr, ok := ParseMatch(item)
+			expr, ok := parseMatch(item, depth+1, budget)
 			if !ok {
 				return ruleset.MatchExpr{}, false
 			}
@@ -152,7 +179,7 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 		}
 		parsed := make([]ruleset.MatchExpr, 0, len(items))
 		for _, item := range items {
-			expr, ok := ParseMatch(item)
+			expr, ok := parseMatch(item, depth+1, budget)
 			if !ok {
 				return ruleset.MatchExpr{}, false
 			}
@@ -161,7 +188,7 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 		return ruleset.Any(parsed), true
 	}
 	if notRaw, ok := object["not"]; ok {
-		inner, ok := ParseMatch(notRaw)
+		inner, ok := parseMatch(notRaw, depth+1, budget)
 		if !ok {
 			return ruleset.MatchExpr{}, false
 		}
@@ -227,6 +254,19 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 		}
 	}
 
+	budget.predicates++
+	if budget.predicates > MaxMatchPredicates || len(values) > MaxMatchValues {
+		return ruleset.MatchExpr{}, false
+	}
+	for _, v := range values {
+		if len(v) > MaxMatchValueLength {
+			return ruleset.MatchExpr{}, false
+		}
+	}
+	if value != nil && len(*value) > MaxMatchValueLength {
+		return ruleset.MatchExpr{}, false
+	}
+
 	if op == ruleset.OpIn || op == ruleset.OpNotIn {
 		if len(values) == 0 {
 			return ruleset.MatchExpr{}, false
@@ -260,6 +300,9 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 	// not something this function may rely on.
 	if op == ruleset.OpRegex {
 		if value == nil {
+			return ruleset.MatchExpr{}, false
+		}
+		if len(*value) > MaxRegexLength {
 			return ruleset.MatchExpr{}, false
 		}
 		if _, err := regexp.Compile(*value); err != nil {

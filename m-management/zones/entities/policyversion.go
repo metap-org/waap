@@ -47,8 +47,11 @@ func PolicyVersionEntity() metadata.EntityDefinition {
 		Actions: []metadata.EntityAction{
 			{Name: model.ActionRollback, Label: "Roll back to this version", Description: "Restores the zone's rules, DDoS policies and IP lists to this version.", Scope: metadata.ActionScopeRecord},
 		},
-		Scopes: []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
-		Audit:  &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
+		// Two edits at once must not both become "version 5": the writer that loses retries with the
+		// next number (versions.RecordVersion).
+		UniqueConstraints: []metadata.EntityUniqueConstraint{{Fields: []string{model.FieldZoneID, model.FieldVersion}}},
+		Scopes:            []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
+		Audit:             &metadata.EntityAuditConfig{Enabled: true, Parent: model.FieldZoneID},
 	}
 }
 

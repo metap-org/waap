@@ -2,6 +2,7 @@ package rules
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,4 +49,40 @@ func TestAllAnyNotRecurseAndRequireEveryChildValid(t *testing.T) {
 
 	invalid := mustJSON(t, `{"any":[{"field":"method","op":"eq","value":"POST"},{"field":"bogus","op":"eq","value":"x"}]}`)
 	assert.False(t, IsValidMatchCondition(invalid), "expected invalid nested condition to be rejected")
+}
+
+// One rule may not cost the shared edge unbounded work (audit 08): depth, comparisons, list sizes
+// and pattern length are capped; ordinary conditions are unaffected.
+func TestMatchConditionCostLimits(t *testing.T) {
+	leaf := `{"field":"uri.path","op":"eq","value":"/x"}`
+	nest := func(depth int) string {
+		s := leaf
+		for i := 0; i < depth; i++ {
+			s = `{"not":` + s + `}`
+		}
+		return s
+	}
+	assert.True(t, IsValidMatchCondition(mustJSON(t, nest(MaxMatchDepth-1))))
+	assert.False(t, IsValidMatchCondition(mustJSON(t, nest(MaxMatchDepth+2))), "too deep")
+
+	many := func(n int) string {
+		items := make([]string, n)
+		for i := range items {
+			items[i] = leaf
+		}
+		return `{"any":[` + strings.Join(items, ",") + `]}`
+	}
+	assert.True(t, IsValidMatchCondition(mustJSON(t, many(MaxMatchPredicates))))
+	assert.False(t, IsValidMatchCondition(mustJSON(t, many(MaxMatchPredicates+1))), "too many comparisons")
+
+	long := strings.Repeat("a", MaxRegexLength+1)
+	assert.False(t, IsValidMatchCondition(mustJSON(t, `{"field":"uri.path","op":"regex","value":"`+long+`"}`)), "pattern too long")
+	assert.True(t, IsValidMatchCondition(mustJSON(t, `{"field":"uri.path","op":"regex","value":"^/api/v[0-9]+/"}`)))
+
+	values := make([]string, MaxMatchValues+1)
+	for i := range values {
+		values[i] = `"203.0.113.1"`
+	}
+	assert.False(t, IsValidMatchCondition(mustJSON(t, `{"field":"ip","op":"in","values":[`+strings.Join(values, ",")+`]}`)), "too many values")
+	assert.False(t, IsValidMatchCondition(mustJSON(t, `{"field":"uri.path","op":"contains","value":"`+strings.Repeat("b", MaxMatchValueLength+1)+`"}`)), "value too long")
 }

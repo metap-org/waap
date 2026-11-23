@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/waap/model"
 )
@@ -30,6 +31,13 @@ func severityFor(count int) string {
 	default:
 		return "critical"
 	}
+}
+
+// incidentTitleNames reports whether an incident title is the one correlate wrote for sourceIP
+// ("N events from <ip> in Mm"). The address is matched as a whole: a plain substring test made an
+// open incident for 11.2.3.45 hide a new one for 1.2.3.4.
+func incidentTitleNames(title, sourceIP string) bool {
+	return strings.Contains(title, " from "+sourceIP+" in ")
 }
 
 func occurredAtOrFallback(event crud.RecordDto) time.Time {
@@ -71,6 +79,16 @@ func correlateIncidents(ctx context.Context, cfg Config, state *httpserver.AppSt
 	if body.Threshold != nil {
 		threshold = *body.Threshold
 	}
+	// A sweep is bounded where it is asked for: a threshold under 1 would open an incident for
+	// every address that sent one event, and a window under a minute or over a day is not the
+	// correlation this action is for.
+	if windowMinutes < minWindowMinutes || windowMinutes > maxWindowMinutes {
+		return nil, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{
+			"windowMinutes": {fmt.Sprintf("must be between %d and %d", minWindowMinutes, maxWindowMinutes)}})
+	}
+	if threshold < 1 {
+		return nil, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{"threshold": {"must be at least 1"}})
+	}
 
 	filters := map[string]string{}
 	if body.ZoneID != nil {
@@ -111,7 +129,7 @@ func correlateIncidents(ctx context.Context, cfg Config, state *httpserver.AppSt
 		}
 		alreadyOpen := false
 		for _, incident := range existing {
-			if strings.Contains(strField(incident, model.FieldTitle), key.sourceIP) {
+			if incidentTitleNames(strField(incident, model.FieldTitle), key.sourceIP) {
 				alreadyOpen = true
 				break
 			}
