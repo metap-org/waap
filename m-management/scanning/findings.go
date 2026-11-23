@@ -4,6 +4,7 @@ package scanning
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -14,6 +15,9 @@ import (
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/model"
 )
+
+// maxFindingsPerCall bounds the rows one callback writes (the request body is already capped).
+const maxFindingsPerCall = 500
 
 type findingInput struct {
 	Severity    string  `json:"severity"`
@@ -49,8 +53,22 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 		succeeded = *body.Succeeded
 	}
 
+	if len(body.Findings) > maxFindingsPerCall {
+		httpserver.WriteServiceError(w, http.StatusRequestEntityTooLarge, model.ErrTooManyFindings,
+			fmt.Sprintf("At most %d findings per call; send the rest in further calls.", maxFindingsPerCall), nil)
+		return
+	}
+
 	job, ok := loadJob(r.Context(), w, state, jobID, rc)
 	if !ok {
+		return
+	}
+	// Only a job that is waiting for or running a scan takes results. Checked before anything is
+	// written: a repeated callback, or one for an idle/finished job, must not add findings and then
+	// fail on the transition.
+	if job.Status == nil || (*job.Status != model.ScanJobQueued && *job.Status != model.ScanJobRunning) {
+		httpserver.WriteServiceError(w, http.StatusConflict, model.ErrScanNotRunnable,
+			"This scan job is not waiting for results.", nil)
 		return
 	}
 

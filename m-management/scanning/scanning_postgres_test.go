@@ -244,4 +244,23 @@ func TestSubmitFindingsCompletesTheJobAndCreatesFindings(t *testing.T) {
 	require.NoError(t, err, "list findings")
 	require.NoError(t, err)
 	require.Len(t, findings.Data, 2, "expected 2 findings for this job, got %+v", findings)
+
+	// A repeated callback (scanner retry) is refused up front: no duplicate findings, no 500 after
+	// the rows were already written.
+	again := doPost(t, baseURL+"/internal/scan-jobs/"+jobID.String()+"/findings", token, findingsBody)
+	require.Equal(t, http.StatusConflict, again.StatusCode)
+	assert.Equal(t, "scan_not_running", decodeJSON(t, again)["error"].(map[string]any)["code"])
+	findings, err = state.Crud.List(ctx, "waf.scan_findings",
+		query.ListInput{Limit: 10, Filters: [][2]string{{"scanJobId", jobID.String()}}}, rc)
+	require.NoError(t, err)
+	require.Len(t, findings.Data, 2, "the retry must not add findings")
+
+	// One call may not write an unbounded number of rows.
+	many := make([]map[string]any, 501)
+	for i := range many {
+		many[i] = map[string]any{"severity": "low", "category": "headers", "endpoint": "/"}
+	}
+	tooMany, _ := json.Marshal(map[string]any{"findings": many})
+	big := doPost(t, baseURL+"/internal/scan-jobs/"+jobID.String()+"/findings", token, tooMany)
+	require.Equal(t, http.StatusRequestEntityTooLarge, big.StatusCode)
 }

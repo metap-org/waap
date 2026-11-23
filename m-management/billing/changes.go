@@ -14,6 +14,7 @@ package billing
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -186,17 +187,30 @@ func (p *PlanSource) DecidePlanChange(ctx context.Context, rc *permission.Reques
 	if status, _ := jsonAsString(req.Record.Data[model.FieldStatus]); status != requestPending {
 		return nil, crud.NewServiceErrorMsg(http.StatusConflict, errcode.ValidationFailed, "This request was already decided.")
 	}
-	result := map[string]any{"status": requestRejected, "applied": "none"}
+	status := requestRejected
+	if approve {
+		status = requestApproved
+	}
+	// Claim the request first, on the version just read: of two deciders only one wins (the other
+	// gets version_conflict), and nothing is applied for a request somebody else already decided.
+	patch := crud.JsonObject{model.FieldStatus: jsonStr(status), model.FieldDecisionNote: jsonStr(note)}
+	claimed, err := p.Backend.Update(ctx, model.PlanChanges, requestID, req.Record.Version, patch, op, nil)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]any{"status": status, "applied": "none"}
 	if approve {
 		applied, err := p.applyPlanChange(ctx, req.Record.Data, now)
 		if err != nil {
+			// Not applied: hand the request back so it can be decided again, instead of leaving an
+			// "approved" that never happened.
+			reopen := crud.JsonObject{model.FieldStatus: jsonStr(requestPending), model.FieldDecisionNote: json.RawMessage("null")}
+			if _, rerr := p.Backend.Update(ctx, model.PlanChanges, requestID, claimed.Version, reopen, op, nil); rerr != nil {
+				slog.Error("plan change could not be applied and the request could not be reopened", "request", requestID, "error", err, "reopen_error", rerr)
+			}
 			return nil, err
 		}
-		result["status"], result["applied"] = requestApproved, applied
-	}
-	patch := crud.JsonObject{model.FieldStatus: jsonStr(result["status"].(string)), model.FieldDecisionNote: jsonStr(note)}
-	if _, err := p.Backend.Update(ctx, model.PlanChanges, requestID, req.Record.Version, patch, op, nil); err != nil {
-		return nil, err
+		result["applied"] = applied
 	}
 	return result, nil
 }

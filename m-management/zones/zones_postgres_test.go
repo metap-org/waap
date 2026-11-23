@@ -565,6 +565,19 @@ func TestPlanQuotasFollowWhatTheBillingDomainSays(t *testing.T) {
 	require.NoError(t, newRule(zone.ID, 3))
 	_, err = newZone("b")
 	require.NoError(t, err)
+	// Moving a rule into a zone that is full is a way around the per-zone limit, so it is checked too.
+	answer.Store(lookupAnswer{res: billing.Resolution{Enforced: true, Plan: billing.Plan{Name: "Small", MaxZones: billing.Unlimited, MaxRulesPerZone: 3}}})
+	zoneB, err := backend.List(ctx, "waf.zones", query.ListInput{Limit: 10, Filters: [][2]string{{"hostname", "b." + apex}}}, rc)
+	require.NoError(t, err)
+	require.Len(t, zoneB.Data, 1)
+	loose, err := backend.Create(ctx, "waf.firewall_rules", crud.JsonObject{
+		"zoneId": jsonMarshal(t, zoneB.Data[0].ID.String()), "name": jsonMarshal(t, "loose"), "priority": jsonMarshal(t, 1),
+		"matchCondition": jsonMarshal(t, map[string]any{"field": "uri.path", "op": "eq", "value": "/x"}), "ruleType": jsonMarshal(t, "waf"), "action": jsonMarshal(t, "block"),
+	}, rc, nil)
+	require.NoError(t, err)
+	_, err = backend.Update(ctx, "waf.firewall_rules", loose.ID, loose.Version, crud.JsonObject{"zoneId": jsonMarshal(t, zone.ID.String())}, rc, nil)
+	assert.Equal(t, "plan_limit_reached", code(err), "zone a already holds 3 rules")
+
 	answer.Store(lookupAnswer{})
 	_, err = newZone("c")
 	require.NoError(t, err)
