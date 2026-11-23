@@ -32,3 +32,23 @@ func TestPersonasMatchRegisteredEntities(t *testing.T) {
 		}
 	}
 }
+
+// The Analytics read model is not stored by any service, so the bootstrap must register it itself:
+// without it `waf.*` would not reach it and only an admin could read security events (the read
+// model checks the permission).
+func TestSecurityEventsCanBeGrantedToThePersonas(t *testing.T) {
+	reg := metadata.NewMetadataRegistry()
+	require.NoError(t, reg.RegisterAllSubmitted())
+	_, ok := reg.GetEntity("waf.security_events")
+	require.True(t, ok, "the read model is known to the bootstrap")
+	var viewer bool
+	for _, g := range Personas().Grants {
+		if g.Role != RoleViewer {
+			continue
+		}
+		for _, e := range g.Entities {
+			viewer = viewer || e == "waf.security_events"
+		}
+	}
+	require.True(t, viewer, "a Viewer reads the analytics")
+}

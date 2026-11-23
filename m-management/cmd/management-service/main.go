@@ -65,8 +65,8 @@ func main() {
 		// the caller's own token so the portal lists and aggregates it like any entity.
 		ExternalEntities: []app.ExternalEntity{{
 			Definition: analytics.SecurityEventEntity(),
-			Backend: func(*httpserver.AppState) (crud.RecordBackend, error) {
-				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL)}, nil
+			Backend: func(state *httpserver.AppState) (crud.RecordBackend, error) {
+				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL), Permissions: state.Permissions}, nil
 			},
 		}},
 	})
