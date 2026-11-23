@@ -18,21 +18,20 @@
 package scanning
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/httpx/router"
-	"github.com/metap-org/waap/model"
 )
 
-// RegisterActions registers the handlers for the actions declared on this service's entities.
+// RegisterActions registers the actions declared on this service's entities.
 func RegisterActions(cfg Config) func(*httpserver.AppState, *crud.ActionRegistry) error {
 	return func(state *httpserver.AppState, reg *crud.ActionRegistry) error {
-		return reg.Register(model.ScanJobs, model.ActionRun, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			return crud.ToObject(runScanJob(ctx, cfg, state, c.RC, c.ID))
-		})
+		// Reads and writes through the service's own backend, as the scan job always did.
+		deps := state.ActionDeps()
+		deps.Records = state.Crud
+		return RunScanJob(cfg, state).Register(reg, deps)
 	}
 }
 

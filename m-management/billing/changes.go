@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
@@ -284,34 +285,45 @@ func jsonStr(s string) json.RawMessage {
 	return b
 }
 
-// registerChangeActions wires the three actions of waf.plan_change_requests.
-func registerChangeActions(cfg Config, state *httpserver.AppState, reg *crud.ActionRegistry) error {
-	for _, a := range []struct {
-		name string
-		run  crud.ActionHandler
-	}{
-		{model.ActionRequestPlan, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			planID, _ := jsonAsString(c.Input["planId"])
-			note, _ := jsonAsString(c.Input["note"])
+type requestPlanIn struct {
+	PlanID string `json:"planId"`
+	Note   string `json:"note"`
+}
+
+// RequestPlan is the action waf.plan_change_requests.requestPlan: a customer asks for a plan.
+func RequestPlan(cfg Config, state *httpserver.AppState) action.Action {
+	return action.Entity(model.PlanChanges, model.ActionRequestPlan,
+		func(ctx context.Context, a *action.Ctx, in requestPlanIn) (crud.JsonObject, error) {
 			// The name is read from the tenant registry, not taken from the caller.
 			var name string
-			_ = state.Router.SharedPool().QueryRow(ctx, "SELECT name FROM control.tenants WHERE id::text = $1", c.RC.TenantID).Scan(&name)
-			return cfg.PlanSource(state.Crud).RequestPlanChange(ctx, c.RC, planID, note, name)
-		}},
-		{model.ActionMyPlanRequests, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			list, err := cfg.PlanSource(state.Crud).MyPlanRequests(ctx, c.RC)
-			return crud.ToObject(map[string]any{"requests": list}, err)
-		}},
-		{model.ActionDecidePlan, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-			approve, _ := jsonAsBool(c.Input["approve"])
-			note, _ := jsonAsString(c.Input["note"])
-			res, err := cfg.PlanSource(state.Crud).DecidePlanChange(ctx, c.RC, c.ID, approve, note, time.Now())
-			return crud.ToObject(res, err)
-		}},
-	} {
-		if err := reg.Register(model.PlanChanges, a.name, a.run); err != nil {
-			return err
-		}
-	}
-	return nil
+			_ = state.Router.SharedPool().QueryRow(ctx, "SELECT name FROM control.tenants WHERE id::text = $1", a.RC.TenantID).Scan(&name)
+			return cfg.PlanSource(state.Crud).RequestPlanChange(ctx, a.RC, in.PlanID, in.Note, name)
+		})
+}
+
+// MyPlanRequests is the action waf.plan_change_requests.myPlanRequests: the caller's own requests.
+func MyPlanRequests(cfg Config, state *httpserver.AppState) action.Action {
+	return action.Entity(model.PlanChanges, model.ActionMyPlanRequests,
+		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
+			list, err := cfg.PlanSource(state.Crud).MyPlanRequests(ctx, a.RC)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"requests": list}, nil
+		})
+}
+
+type decidePlanIn struct {
+	Approve bool   `json:"approve"`
+	Note    string `json:"note"`
+}
+
+// DecidePlan is the action waf.plan_change_requests.decidePlan: the operator approves or rejects.
+// It is declared on one record but reads that record itself, under the request's own lock, so it is
+// written as an entity action: the framework does not read the record first.
+func DecidePlan(cfg Config, state *httpserver.AppState) action.Action {
+	return action.Entity(model.PlanChanges, model.ActionDecidePlan,
+		func(ctx context.Context, a *action.Ctx, in decidePlanIn) (map[string]any, error) {
+			return cfg.PlanSource(state.Crud).DecidePlanChange(ctx, a.RC, a.ID, in.Approve, in.Note, time.Now())
+		})
 }
