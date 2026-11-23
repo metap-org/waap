@@ -2,13 +2,11 @@ package netcheck
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/metap-org/metap/pkg/crud"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,9 +99,9 @@ func TestVerificationFileMustContainTheTokenAndStayUnderTheDomain(t *testing.T) 
 func TestResolveHostnameRejectsInvalidAndNormalises(t *testing.T) {
 	// Nothing answers at the resolver: the name resolves to nothing.
 	cfg := Config{DoHURL: "http://127.0.0.1:1/resolve", EdgeCNAMETarget: "edge.waf.local"}
-	_, err := cfg.ResolveHostname(context.Background(), crud.JsonObject{"hostname": json.RawMessage(`"203.0.113.5"`)})
+	_, err := cfg.ResolveHostname(context.Background(), "203.0.113.5")
 	assert.Error(t, err)
-	view, err := cfg.ResolveHostname(context.Background(), crud.JsonObject{"hostname": json.RawMessage(`"HTTPS://Shop.Example.com/"`)})
+	view, err := cfg.ResolveHostname(context.Background(), "HTTPS://Shop.Example.com/")
 	require.NoError(t, err)
 	assert.Equal(t, "shop.example.com", view.Hostname)
 	assert.Equal(t, []string{"unresolved"}, view.Warnings)

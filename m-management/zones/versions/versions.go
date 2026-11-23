@@ -259,9 +259,10 @@ type RollbackResult struct {
 // RollbackToVersion makes the zone's rules, DDoS policies and IP lists equal to version versionID's
 // snapshot. Records that still exist are updated in place, ones deleted since are created again
 // (with a new id), ones added since are deleted. It writes through backend as rc, so it needs the
-// same rights as making those edits by hand; it is not atomic, so a failure part-way leaves a
-// partial restore that the next rollback (to the same version) completes. Then it records a new
-// version so the history shows the rollback.
+// same rights as making those edits by hand. The rollback action runs it as one step (zones.RollbackVersion),
+// so a failure part-way leaves the zone as it was; called on its own it is not atomic, and a partial
+// restore is completed by the next rollback to the same version. Then it records a new version so the
+// history shows the rollback.
 func RollbackToVersion(ctx context.Context, backend crud.RecordBackend, versionID uuid.UUID, rc *permission.RequestContext) (RollbackResult, error) {
 	var out RollbackResult
 	got, err := backend.Get(ctx, model.PolicyVersions, versionID, rc)

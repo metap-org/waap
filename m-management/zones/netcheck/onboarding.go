@@ -112,8 +112,8 @@ func (c Config) ProbeOrigin(ctx context.Context, spec OriginSpec) map[string]any
 	return map[string]any{"reachable": true, "status": resp.StatusCode, "latencyMs": elapsed, "url": target}
 }
 
-// resolveHostnameView is what the Add zone form shows under the hostname as it is typed.
-type resolveHostnameView struct {
+// HostnameView is what the Add zone form shows under the hostname as it is typed.
+type HostnameView struct {
 	Hostname string   `json:"hostname"`
 	A        []string `json:"a"`
 	AAAA     []string `json:"aaaa"`
@@ -130,15 +130,14 @@ type resolveHostnameView struct {
 
 // ResolveHostname normalises a typed hostname and says what it resolves to now (UC-20). A name that
 // is not a valid hostname is a validation error naming the field.
-func (c Config) ResolveHostname(ctx context.Context, input crud.JsonObject) (resolveHostnameView, error) {
-	raw, _ := jx.AsString(input[model.FieldHostname])
-	host, err := rules.NormalizeHostname(raw)
+func (c Config) ResolveHostname(ctx context.Context, typed string) (HostnameView, error) {
+	host, err := rules.NormalizeHostname(typed)
 	if err != nil {
-		return resolveHostnameView{}, crud.NewServiceErrorFields(http.StatusUnprocessableEntity, errcode.ValidationFailed,
+		return HostnameView{}, crud.NewServiceErrorFields(http.StatusUnprocessableEntity, errcode.ValidationFailed,
 			map[string][]string{model.FieldHostname: {err.Error()}})
 	}
 	lookupHost := strings.TrimPrefix(host, "*.") // a wildcard resolves through its domain
-	view := resolveHostnameView{
+	view := HostnameView{
 		Hostname: host, EdgeTarget: c.EdgeCNAMETarget, Warnings: []string{},
 		A: c.dnsLookup(lookupHost, "A"), AAAA: c.dnsLookup(lookupHost, "AAAA"), CNAME: c.dnsLookup(lookupHost, "CNAME"),
 	}

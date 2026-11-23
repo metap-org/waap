@@ -14,13 +14,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/standard"
-	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/waap/m-management/zones/internal/jx"
 	"github.com/metap-org/waap/model"
@@ -83,47 +80,53 @@ func trimOneLayer(s string, c byte) string {
 	return s
 }
 
-// VerifyDNS is the action waf.zones.verifyDns — the informational DNS routing check: is
-// this zone's own hostname actually pointed at edge-plane yet? Never gates activation, purely
-// informational.
-func VerifyDNS(ctx context.Context, cfg Config, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
-	got, err := state.Crud.Get(ctx, model.Zones, zoneID, rc)
-	if err != nil {
-		return nil, err
-	}
-	record := got.Record
+// zoneHostname is what verifyDns reads of a zone.
+type zoneHostname struct {
+	Hostname string `json:"hostname"`
+}
 
-	hostname, _ := jx.AsString(record.Data[model.FieldHostname])
-	if hostname == "" {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no hostname.")
-	}
+// ZoneDNSCheck is what verifyDns on a zone answers.
+type ZoneDNSCheck struct {
+	Zone      crud.RecordDto `json:"zone"`
+	DNSRouted bool           `json:"dnsRouted"`
+	Checked   map[string]any `json:"checked"`
+}
 
-	cname := cfg.dnsLookup(hostname, "CNAME")
-	target := cfg.EdgeCNAMETarget
-	routed := false
+// VerifyZone is the action waf.zones.verifyDns — the informational DNS routing check: is this
+// zone's own hostname actually pointed at edge-plane yet? Never gates activation, purely
+// informational; what it learns is kept on the zone.
+func VerifyZone(cfg Config) action.Action {
+	return action.Record(model.Zones, model.ActionVerifyDNS,
+		func(ctx context.Context, a *action.Ctx, z zoneHostname, _ action.None) (ZoneDNSCheck, error) {
+			if z.Hostname == "" {
+				return ZoneDNSCheck{}, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no hostname.")
+			}
+			cname := cfg.dnsLookup(z.Hostname, "CNAME")
+			routed := routesToEdge(cname, cfg.EdgeCNAMETarget)
+			status := model.DNSNotRouted
+			if routed {
+				status = model.DNSRouted
+			}
+			patch := crud.JsonObject{
+				model.FieldDNSRoutingStatus: jx.String(status),
+				model.FieldLastDNSCheckAt:   jx.String(standard.NowRFC3339()),
+			}
+			updated, err := a.Records.Update(ctx, model.Zones, a.ID, a.Current.Version, patch, a.RC, nil)
+			if err != nil {
+				return ZoneDNSCheck{}, err
+			}
+			return ZoneDNSCheck{Zone: updated, DNSRouted: routed, Checked: map[string]any{"cname": cname, "expectedTarget": cfg.EdgeCNAMETarget}}, nil
+		})
+}
+
+// routesToEdge reports whether one of the CNAME answers ends in the edge's target.
+func routesToEdge(cname []string, target string) bool {
 	for _, c := range cname {
 		if hasSuffix(c, target) {
-			routed = true
-			break
+			return true
 		}
 	}
-
-	status := model.DNSNotRouted
-	if routed {
-		status = model.DNSRouted
-	}
-	patch := crud.JsonObject{
-		model.FieldDNSRoutingStatus: jx.String(status),
-		model.FieldLastDNSCheckAt:   jx.String(standard.NowRFC3339()),
-	}
-	updated, err := state.Crud.Update(ctx, model.Zones, zoneID, record.Version, patch, rc, nil)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"zone": updated, "dnsRouted": routed,
-		"checked": map[string]any{"cname": cname, "expectedTarget": target},
-	}, nil
+	return false
 }
 
 func hasSuffix(s, suffix string) bool {
@@ -259,27 +262,26 @@ func txtProves(txt []string, expectedToken string) bool {
 	return false
 }
 
-// TestOrigin is the action waf.zones.TestOrigin — "can we actually reach the origin the
+// TestZoneOrigin is the action waf.zones.testOrigin — "can we actually reach the origin the
 // customer gave us" with the zone's own origin settings. The result is also kept on the zone
 // (originCheckedAt, originReachable) so onboarding can show how far a person got; a failed save of
 // that does not hide the answer.
-func TestOrigin(ctx context.Context, cfg Config, state *httpserver.AppState, rc *permission.RequestContext, zoneID uuid.UUID) (map[string]any, error) {
-	got, err := state.Crud.Get(ctx, model.Zones, zoneID, rc)
-	if err != nil {
-		return nil, err
-	}
-	spec := OriginSpecOf(got.Record.Data)
-	if spec.Address == "" {
-		return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no origin address.")
-	}
-	if spec.HostHeader == "" {
-		spec.HostHeader, _ = jx.AsString(got.Record.Data[model.FieldHostname])
-	}
-	payload := cfg.ProbeOrigin(ctx, spec)
-	reachable, _ := payload["reachable"].(bool)
-	patch := crud.JsonObject{model.FieldOriginCheckedAt: jx.String(standard.NowRFC3339()), model.FieldOriginReachable: jx.Bool(reachable)}
-	if _, err := state.Crud.Update(ctx, model.Zones, zoneID, got.Record.Version, patch, rc, nil); err != nil {
-		slog.Warn("origin check done but not saved on the zone", "zone", zoneID, "error", err)
-	}
-	return payload, nil
+func TestZoneOrigin(cfg Config) action.Action {
+	return action.Record(model.Zones, model.ActionTestOrigin,
+		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (map[string]any, error) {
+			spec := OriginSpecOf(a.Current.Data)
+			if spec.Address == "" {
+				return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no origin address.")
+			}
+			if spec.HostHeader == "" {
+				spec.HostHeader, _ = jx.AsString(a.Current.Data[model.FieldHostname])
+			}
+			payload := cfg.ProbeOrigin(ctx, spec)
+			reachable, _ := payload["reachable"].(bool)
+			patch := crud.JsonObject{model.FieldOriginCheckedAt: jx.String(standard.NowRFC3339()), model.FieldOriginReachable: jx.Bool(reachable)}
+			if _, err := a.Records.Update(ctx, model.Zones, a.ID, a.Current.Version, patch, a.RC, nil); err != nil {
+				slog.Warn("origin check done but not saved on the zone", "zone", a.ID, "error", err)
+			}
+			return payload, nil
+		})
 }
