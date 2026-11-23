@@ -13,6 +13,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/metap-org/metap/pkg/jwks"
 	"net"
 	"net/http"
 	"os"
@@ -26,7 +27,6 @@ import (
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/httpx/router"
 	"github.com/metap-org/metap/pkg/metadata"
-	"github.com/metap-org/metap/pkg/peripherals"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/metap/pkg/reconciler"
@@ -215,7 +215,7 @@ func TestSubmitFindingsCompletesTheJobAndCreatesFindings(t *testing.T) {
 	t.Cleanup(func() { server.Close() })
 	baseURL := "http://" + listener.Addr().String()
 
-	token, err := peripherals.MintJWT(privPEM, tenantID, userID, 3600)
+	token, err := jwks.MintRSAJWT(privPEM, tenantID, userID, 3600)
 	require.NoError(t, err)
 
 	findingsBody, _ := json.Marshal(map[string]any{
