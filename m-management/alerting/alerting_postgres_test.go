@@ -16,6 +16,8 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"github.com/metap-org/metap/pkg/permission/policypg"
+	"github.com/metap-org/metap/pkg/secrets"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -25,7 +27,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metap-org/metap/pkg/control"
+	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/metadata"
@@ -52,7 +54,7 @@ func setupRegistry(t *testing.T, pool *pgxpool.Pool) *metadata.MetadataRegistry 
 		entities.AlertPolicyEntity(), entities.AlertNotificationEntity(), entities.IncidentEntity(), entities.FalsePositiveEntity(),
 	} {
 		require.NoError(t, registry.Register(def), "register %s", def.Name)
-		_, err := reconciler.ReconcileWithScope(ctx, pool, control.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
+		_, err := reconciler.ReconcileWithScope(ctx, pool, tenancy.PlatformTenantID, def, nil, reconciler.ScopeAllTenants)
 		require.NoError(t, err, "reconcile %s", def.Name)
 	}
 	return registry
@@ -85,9 +87,9 @@ func genRSAKeyPair(t *testing.T) (privatePEM string, publicKey *rsa.PublicKey) {
 }
 
 func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*httpserver.AppState, string) {
-	tenantRegistry := control.NewPostgresTenantRegistry(pool)
-	router := control.NewRouter(pool, control.NewRegistryCache(tenantRegistry), control.EnvStore{})
-	permissions := permission.NewPermissionService(control.NewPostgresPolicyStore(router))
+	tenantRegistry := tenancy.NewPostgresTenantRegistry(pool)
+	router := tenancy.NewRouter(pool, tenancy.NewRegistryCache(tenantRegistry), secrets.EnvStore{})
+	permissions := permission.NewPermissionService(policypg.NewPostgresPolicyStore(router))
 	var mdPtr atomic.Pointer[metadata.MetadataRegistry]
 	mdPtr.Store(registry)
 	privPEM, pubKey := genRSAKeyPair(t)
