@@ -38,7 +38,7 @@ a single service does not serve it, and the portal does not use it. `m-managemen
 logic and `*/entities/` only declares; both are enforced by `waap/.golangci.yml` (depguard, a CI step). Where each piece plugs
 into metap, and how `zones/` is split into one package per layer (`guard`, `versions`, `netcheck`, `presets`, `policy`, `entities`, `rules`): `docs/architecture/08-cross-cutting/21-metap-vs-app-map.md`; the conventions: `20-code-structure-standard.md`.
 Splitting it into services again, through metap, is a decision the project owner has deferred.
-Configuration is a YAML file (`CONFIG_FILE`, `m-deploy/config/management*.yaml`, loaded by `metap/pkg/configfile`) with the environment overriding it; each key is the env var it replaces (`smtp.host` = `SMTP_HOST`), so no reader changed. `e-edge` and `a-api` still read env only (kit-only rule).
+Configuration is a YAML file (`CONFIG_FILE`, `m-deploy/config/management*.yaml`, loaded by `metap/pkg/config` (`file.go`)) with the environment overriding it; each key is the env var it replaces (`smtp.host` = `SMTP_HOST`), so no reader changed. `e-edge` and `a-api` still read env only (kit-only rule).
 
 **Update 2026-11-21: REST only — GraphQL and gRPC removed (roadmap 116, `../metap-docs/docs/roadmap/116-*`).**
 `m-gateway` is now `api-gateway` (`m-gateway/cmd/api-gateway` = `metap`'s `pkg/apigateway`, no WAF code): it routes
