@@ -111,7 +111,7 @@ func jsonMarshal(t *testing.T, v any) json.RawMessage {
 func invoke(t *testing.T, state *httpserver.AppState, analyticsURL string, call crud.ActionCall) map[string]any {
 	t.Helper()
 	actions := crud.NewActionRegistry()
-	require.NoError(t, alerting.RegisterActions(alerting.Config{AnalyticsURL: analyticsURL})(state, actions))
+	require.NoError(t, alerting.RegisterActions(alerting.Config{AnalyticsURL: analyticsURL, AllowPrivateTargets: true})(state, actions))
 	out, err := actions.Invoke(context.Background(), call)
 	require.NoError(t, err)
 	raw, err := json.Marshal(out)
@@ -344,7 +344,7 @@ func TestTestAlertPolicySendsAndRecordsANotification(t *testing.T) {
 	policyID := policyResult.ID
 
 	actions := crud.NewActionRegistry()
-	require.NoError(t, alerting.RegisterActions(alerting.Config{})(state, actions))
+	require.NoError(t, alerting.RegisterActions(alerting.Config{AllowPrivateTargets: true})(state, actions))
 	data, err := actions.Invoke(ctx, crud.ActionCall{Entity: "waf.alert_policies", Name: "test", ID: policyID, RC: rc})
 	require.NoError(t, err)
 	require.Equal(t, json.RawMessage("true"), data["delivered"], "expected delivered=true, got %+v", data)

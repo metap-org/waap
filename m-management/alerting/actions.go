@@ -59,6 +59,6 @@ func registerActions(cfg Config, state *httpserver.AppState, reg *crud.ActionReg
 		return err
 	}
 	return reg.Register(model.AlertPolicies, model.ActionTest, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-		return crud.ToObject(testAlertPolicy(ctx, state, c.RC, c.ID))
+		return crud.ToObject(testAlertPolicy(ctx, cfg, state, c.RC, c.ID))
 	})
 }

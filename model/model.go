@@ -62,6 +62,8 @@ const (
 	ErrScannerUnavailable        = "scanner_unavailable"
 	ErrReferenceCheckUnavailable = "reference_check_unavailable"
 	ErrPlanLimitReached          = "plan_limit_reached"
+	ErrTooManyFindings           = "too_many_findings"
+	ErrScanNotRunnable           = "scan_not_running"
 	ErrAccountInUse              = "account_in_use"
 	ErrAccountClosed             = "account_closed"
 )

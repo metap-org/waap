@@ -115,3 +115,7 @@ flowchart LR
 | Chi phí (hồ sơ công ty phần mềm) | Băng thông ≈ 520 đ/GB; chi phí cố định ≈ 170k USD/tháng khi ra mắt, ≈ 510k USD/tháng ở giai đoạn tăng trưởng ([8.18](../08-cross-cutting/18-segments-and-plans.md)) |
 | Rule / zone (tối đa theo gói cao nhất) | 1.000 custom rule |
 | Retention tối đa | 365 ngày (archive), 30 ngày (hot) |
+
+## 10.2 Kế hoạch test tải và dữ liệu lớn
+
+Xem [01-load-and-scale-test-plan.md](01-load-and-scale-test-plan.md): test hiệu năng, stress, soak, dữ liệu lớn, tạm thời chỉ cho management service (bản nháp, chờ chốt mục tiêu; các plane khác chưa lên kế hoạch).

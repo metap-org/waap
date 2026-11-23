@@ -33,6 +33,25 @@ func (g *quotaGuard) Create(ctx context.Context, entity string, data crud.JsonOb
 	return g.inner.Create(ctx, entity, data, rc, reason)
 }
 
+// Update closes the one way around the per-zone rule limit: moving a rule to another zone is not a
+// create, but it adds a rule to that zone.
+func (g *quotaGuard) Update(ctx context.Context, entity string, id uuid.UUID, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
+	if entity == model.FirewallRules {
+		if to := versions.ZoneOfRule(data); to != uuid.Nil {
+			current, err := g.inner.Get(ctx, entity, id, rc)
+			if err != nil {
+				return crud.RecordDto{}, err
+			}
+			if versions.ZoneOfRule(current.Record.Data) != to {
+				if err := g.checkQuota(ctx, entity, data, rc); err != nil {
+					return crud.RecordDto{}, err
+				}
+			}
+		}
+	}
+	return g.inner.Update(ctx, entity, id, expectedVersion, data, rc, reason)
+}
+
 // checkQuota refuses a create that would take the tenant past its plan. Zones are counted across
 // the tenant, firewall rules within the zone they are created for.
 func (b *quotaGuard) checkQuota(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext) error {
@@ -45,7 +64,9 @@ func (b *quotaGuard) checkQuota(ctx context.Context, entity string, data crud.Js
 	}
 	res, err := b.plans.Resolve(ctx, tenant)
 	if err != nil {
-		slog.Warn("plan limit not checked: plans could not be resolved", "tenant", tenant, "error", err)
+		// Fail open on purpose (pinned by TestPlanQuotasFollowWhatTheBillingDomainSays): a billing
+		// hiccup must not block onboarding. Logged at error level so it is seen and alerted on.
+		slog.Error("plan limit not checked: plans could not be resolved", "tenant", tenant, "error", err)
 		return nil
 	}
 	if !res.Enforced {
