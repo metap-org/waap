@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/httpx/router"
@@ -32,6 +31,7 @@ import (
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/testkit"
 	"github.com/metap-org/waap/m-management/scanning"
 	"github.com/metap-org/waap/m-management/scanning/entities"

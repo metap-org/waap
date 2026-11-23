@@ -22,12 +22,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/reconciler"
+	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/testkit"
 
 	"github.com/metap-org/waap/m-management/billing"
