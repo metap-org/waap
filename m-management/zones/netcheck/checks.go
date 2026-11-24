@@ -267,8 +267,11 @@ func txtProves(txt []string, expectedToken string) bool {
 // (originCheckedAt, originReachable) so onboarding can show how far a person got; a failed save of
 // that does not hide the answer.
 func TestZoneOrigin(cfg Config) action.Action {
-	return action.Record(model.Zones, model.ActionTestOrigin,
-		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (map[string]any, error) {
+	return action.Custom(model.Zones, model.ActionTestOrigin,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			if err := a.LoadRecord(ctx, nil); err != nil {
+				return nil, err
+			}
 			spec := OriginSpecOf(a.Current.Data)
 			if spec.Address == "" {
 				return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Zone has no origin address.")

@@ -20,13 +20,16 @@ import (
 	"github.com/metap-org/metap/pkg/secrets"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/metap-org/metap/pkg/auth/jwks"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
@@ -37,6 +40,7 @@ import (
 	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/alerting"
 	"github.com/metap-org/waap/m-management/alerting/entities"
+	"github.com/metap-org/waap/m-management/analytics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +98,10 @@ func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataR
 	mdPtr.Store(registry)
 	privPEM, pubKey := genRSAKeyPair(t)
 	state := web.NewState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
+	// The sweeps sign a read token for the Analytics API, so the state needs the issuer's signing key.
+	key, err := jwks.GenerateJwksKeyPair("kid-test")
+	require.NoError(t, err)
+	state.TokenSigner = &jwks.TokenSigner{Kind: jwks.SignerJwks, Key: key}
 	return state, privPEM
 }
 
@@ -245,7 +253,12 @@ func TestCorrelateIncidentsOpensOneIncidentAboveThresholdAndDedupes(t *testing.T
 	data := invoke(t, state, fa.url, correlate)
 	created := data["createdIncidents"].([]any)
 	require.Len(t, created, 1, "expected exactly 1 created incident (the out-of-window IP never counts), got %+v", data)
-	require.Equal(t, "Bearer caller-token", fa.tokens[0], "the caller's own token is forwarded to Analytics")
+	require.NotEqual(t, "Bearer caller-token", fa.tokens[0], "the caller's own login token is never what Analytics is sent")
+	claims := jwt.MapClaims{}
+	_, _, err := jwt.NewParser().ParseUnverified(strings.TrimPrefix(fa.tokens[0], "Bearer "), claims)
+	require.NoError(t, err)
+	require.Equal(t, analytics.ReadAudience, claims["aud"].([]any)[0], "a read token for the Analytics API")
+	require.Equal(t, analytics.ZoneAccessAll, claims["zoneAccess"], "a sweep reads the whole tenant")
 	require.WithinDuration(t, now.Add(-15*time.Minute), fa.lastSince, time.Minute, "the window is pushed into the query")
 
 	// A second run over the same events must not open a duplicate: the open incident with this

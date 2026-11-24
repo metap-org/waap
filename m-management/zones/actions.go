@@ -61,8 +61,13 @@ func registerActions(cfg Config, plans billing.PlanLookup, state *web.State, reg
 
 // SyncConfigState is the action waf.zones.syncConfigState: recompute hasConfig from the zone's records.
 func SyncConfigState() action.Action {
-	return action.Record(model.Zones, model.ActionSyncConfigState,
-		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (map[string]any, error) {
+	return action.Custom(model.Zones, model.ActionSyncConfigState,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			// The zone must exist and be readable: the sweep below lists by zone id and would say
+			// "no config" about a zone that is not there.
+			if err := a.LoadRecord(ctx, nil); err != nil {
+				return nil, err
+			}
 			return policy.SyncConfigState(ctx, a.Records, a.RC, a.ID)
 		})
 }
@@ -103,8 +108,11 @@ func ProbeOrigin(cfg Config) action.Action {
 // ValidatePolicy is the action waf.zones.validatePolicy: the zone's rules, policies and lists checked
 // for mistakes. Changes nothing.
 func ValidatePolicy() action.Action {
-	return action.Record(model.Zones, model.ActionValidatePolicy,
-		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (policy.ValidationReport, error) {
+	return action.Custom(model.Zones, model.ActionValidatePolicy,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			if err := a.LoadRecord(ctx, nil); err != nil { // the zone exists and the caller may read it
+				return nil, err
+			}
 			return policy.Validate(ctx, a.Records, a.ID, a.RC)
 		})
 }
@@ -129,8 +137,9 @@ func PlanUsage(plans billing.PlanLookup) action.Action {
 // IP lists equal to a version's snapshot. The whole restore is one step, so a failure part-way leaves
 // the zone as it was instead of half restored, and the rollback's own version is recorded with it.
 func RollbackVersion() action.Action {
-	return action.Record(model.PolicyVersions, model.ActionRollback,
-		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (versions.RollbackResult, error) {
+	return action.Custom(model.PolicyVersions, model.ActionRollback,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			// RollbackToVersion reads the version as the caller itself, so there is no LoadRecord here.
 			var result versions.RollbackResult
 			err := a.Step(ctx, "rollback", func(ctx context.Context) error {
 				var err error
@@ -150,8 +159,14 @@ type applyPresetIn struct {
 // all of them in one step: either the zone gets the whole preset and its single policy version, or
 // it gets nothing.
 func ApplyPreset(base crud.RecordBackend, plans billing.PlanLookup, locks guard.Locker) action.Action {
-	return action.Record(model.Zones, model.ActionApplyPreset,
-		func(ctx context.Context, a *action.Ctx, _ action.None, in applyPresetIn) (presets.Result, error) {
+	return action.Custom(model.Zones, model.ActionApplyPreset,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			var in applyPresetIn
+			if err := a.Decode(&in); err != nil {
+				return nil, err
+			}
+			// presets.Apply reads the zone through the guarded backend as the caller, so there is no
+			// LoadRecord here: a zone that is missing or unreadable is its error.
 			guarded := Guarded(base, plans, locks)
 			var out presets.Result
 			err := a.Step(ctx, "apply", func(ctx context.Context) error {

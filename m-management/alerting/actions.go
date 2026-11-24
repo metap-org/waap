@@ -73,8 +73,9 @@ func EvaluateAlerts(cfg Config, state *web.State) action.Action {
 
 // TestAlertPolicy is the action waf.alert_policies.test: the "Send test alert" button.
 func TestAlertPolicy(cfg Config, state *web.State) action.Action {
-	return action.Record(model.AlertPolicies, model.ActionTest,
-		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (map[string]any, error) {
+	return action.Custom(model.AlertPolicies, model.ActionTest,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			// testAlertPolicy reads the policy as the caller itself, so there is no LoadRecord here.
 			return testAlertPolicy(ctx, cfg, state, a.RC, a.ID)
 		})
 }
