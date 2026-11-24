@@ -15,6 +15,7 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/billing"
+	"github.com/metap-org/waap/m-management/zones/guard"
 	"github.com/metap-org/waap/m-management/zones/netcheck"
 	"github.com/metap-org/waap/m-management/zones/policy"
 	"github.com/metap-org/waap/m-management/zones/presets"
@@ -55,7 +56,7 @@ func registerActions(cfg Config, plans billing.PlanLookup, state *web.State, reg
 			return err
 		}
 	}
-	return ApplyPreset(state.Crud, plans).Register(reg, deps)
+	return ApplyPreset(state.Crud, plans, state.Router).Register(reg, deps)
 }
 
 // SyncConfigState is the action waf.zones.syncConfigState: recompute hasConfig from the zone's records.
@@ -148,10 +149,10 @@ type applyPresetIn struct {
 // backend (validation, plan limits, the zone's account, versions), as a person's own edits do, and
 // all of them in one step: either the zone gets the whole preset and its single policy version, or
 // it gets nothing.
-func ApplyPreset(base crud.RecordBackend, plans billing.PlanLookup) action.Action {
+func ApplyPreset(base crud.RecordBackend, plans billing.PlanLookup, locks guard.Locker) action.Action {
 	return action.Record(model.Zones, model.ActionApplyPreset,
 		func(ctx context.Context, a *action.Ctx, _ action.None, in applyPresetIn) (presets.Result, error) {
-			guarded := Guarded(base, plans)
+			guarded := Guarded(base, plans, locks)
 			var out presets.Result
 			err := a.Step(ctx, "apply", func(ctx context.Context) error {
 				var err error

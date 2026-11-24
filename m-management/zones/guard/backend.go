@@ -23,6 +23,8 @@ type Backend struct {
 	base crud.RecordBackend
 	// plans resolves what a tenant may use; nil means no quotas (see WithPlanLimits).
 	plans billing.PlanLookup
+	// locks serialises count-then-create for the quota guard; nil means the in-process default.
+	locks Locker
 }
 
 // New guards inner.
@@ -39,6 +41,14 @@ func (b *Backend) WithPlanLimits(p billing.PlanLookup) *Backend {
 	return b
 }
 
+// WithLocks gives the quota guard a lock that holds across processes (metap's tenancy router); without
+// it the guard serialises inside this process only.
+func (b *Backend) WithLocks(l Locker) *Backend {
+	b.locks = l
+	b.RecordBackend = b.chain()
+	return b
+}
+
 // chain is the one list of guards and the order they run in, outermost first.
 func (b *Backend) chain() crud.RecordBackend {
 	var c crud.RecordBackend = b.base
@@ -47,7 +57,7 @@ func (b *Backend) chain() crud.RecordBackend {
 	c = &domainGuard{passthrough{c}}
 	c = &validationGuard{passthrough{c}}
 	c = &referenceGuard{passthrough{c}}
-	c = &quotaGuard{passthrough: passthrough{c}, plans: b.plans}
+	c = &quotaGuard{passthrough: passthrough{c}, plans: b.plans, locks: b.locks}
 	return c
 }
 

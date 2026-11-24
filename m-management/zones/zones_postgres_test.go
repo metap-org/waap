@@ -21,6 +21,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -637,6 +638,73 @@ func TestConcurrentCreatesDoNotOvershootThePlan(t *testing.T) {
 	}
 	wg.Wait()
 	assert.EqualValues(t, allowed, created.Load(), "only the plan's allowance gets through")
+}
+
+// With the database lock the count-then-create also holds across callers that already hold a connection,
+// as a preset's step does: units that wait for the lock and plain creates that need one connection
+// to make progress must not starve a small pool. Eight callers share a pool of three; the old
+// in-process lock left the plain creates without a connection while the units waited for the mutex
+// one of them held, and the test hung.
+func TestPlanLimitLockDoesNotStarveASmallPool(t *testing.T) {
+	t.Setenv("METAP_TEST_POOL_MAX", "4") // the reconcile in setupRegistry needs 2; three callers share what is left
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+
+	const allowed = 3
+	plans := planLookupFunc(func(context.Context, uuid.UUID) (billing.Resolution, error) {
+		return billing.Resolution{Enforced: true, Plan: billing.Plan{Name: "Small", MaxZones: allowed, MaxRulesPerZone: 100}}, nil
+	})
+	backend := zones.Guarded(state.Crud, plans, state.Router)
+	newZone := func(ctx context.Context, name string) error {
+		_, err := backend.Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, name+"."+apex),
+			"originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+		return err
+	}
+
+	var wg sync.WaitGroup
+	var created atomic.Int32
+	// Some callers create inside a unit of work (they hold their connection while they wait for the lock)...
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			uctx, unit, err := state.Router.BeginUnit(ctx, tenantID)
+			if err != nil {
+				return
+			}
+			if err := newZone(uctx, fmt.Sprintf("u%d", i)); err != nil {
+				unit.Rollback(ctx)
+				return
+			}
+			if unit.Commit(ctx) == nil {
+				created.Add(1)
+			}
+		}(i)
+	}
+	// ...and others plainly, which need a connection to make progress.
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if newZone(ctx, fmt.Sprintf("p%d", i)) == nil {
+				created.Add(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	require.NoError(t, ctx.Err(), "the callers finished instead of waiting for each other's connections")
+	assert.EqualValues(t, allowed, created.Load(), "and the limit still holds")
 }
 
 func second(_ crud.RecordDto, err error) error { return err }
