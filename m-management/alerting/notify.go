@@ -13,11 +13,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/safehttp"
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -87,7 +87,7 @@ func (c Config) checkWebhookURL(raw string) error {
 // ensureCanRecord refuses before anything goes out when the caller could not record the delivery:
 // a notification is written after every attempt, so a caller who cannot write it must not be able to
 // make the attempt either.
-func ensureCanRecord(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext) error {
+func ensureCanRecord(ctx context.Context, state *web.State, rc *permission.RequestContext) error {
 	d, err := state.Permissions.CanCreateEntity(ctx, rc, model.AlertNotifications)
 	if err != nil {
 		return err
@@ -111,7 +111,7 @@ func channelName(channels json.RawMessage) string {
 
 // recordNotification writes the delivery-log row every firing produces, sent or failed alike —
 // an alert that failed to deliver is exactly the one an operator needs to find later.
-func recordNotification(ctx context.Context, state *httpserver.AppState, rc *permission.RequestContext, policy crud.RecordDto, channel string, delivered bool) (uuid.UUID, error) {
+func recordNotification(ctx context.Context, state *web.State, rc *permission.RequestContext, policy crud.RecordDto, channel string, delivered bool) (uuid.UUID, error) {
 	status := "failed"
 	if delivered {
 		status = "sent"

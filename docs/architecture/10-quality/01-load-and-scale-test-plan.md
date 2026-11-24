@@ -60,7 +60,7 @@ thay bằng số đo ở T2 (`pg_stat_statements`), không dùng làm kết lu�
 - Một instance hay nhiều instance sau load balancer? (đo cả hai: một instance để biết trần, 3 instance để biết DB có là nút thắt không)
 - Tải đến từ bao nhiêu IP/người dùng? Ảnh hưởng bộ giới hạn tốc độ (xem dưới).
 
-**Mỗi request tốn bao nhiêu truy vấn** (đọc từ `pkg/httpserver/auth.go` và `pkg/control/authcontext.go`, chưa đo):
+**Mỗi request tốn bao nhiêu truy vấn** (đọc từ `metap `internal/httpapi/auth.go`` và `pkg/control/authcontext.go`, chưa đo):
 
 | Bước | Truy vấn |
 |---|---|

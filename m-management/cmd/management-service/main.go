@@ -19,7 +19,7 @@ import (
 	"github.com/metap-org/metap/pkg/app"
 	"github.com/metap-org/metap/pkg/config"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/web"
 
 	"github.com/metap-org/waap/m-management/alerting"
 	"github.com/metap-org/waap/m-management/analytics"
@@ -43,11 +43,11 @@ func main() {
 		Name: "management-service",
 		// Every write to the REST record routes goes through the zones guard chain (it steps aside
 		// for entities it has no rule for). Plan limits are asked of the billing domain, in-process.
-		WrapBackend: func(state *httpserver.AppState) (crud.RecordBackend, error) {
-			return zones.Guarded(state.Crud, billingCfg.PlanSource(state.Crud)), nil
+		WrapBackend: func(state *web.State) (crud.RecordBackend, error) {
+			return zones.Guarded(state.Crud, billingCfg.PlanSource(state.Crud), state.Router), nil
 		},
-		Actions: func(state *httpserver.AppState, reg *crud.ActionRegistry) error {
-			for _, register := range []func(*httpserver.AppState, *crud.ActionRegistry) error{
+		Actions: func(state *web.State, reg *crud.ActionRegistry) error {
+			for _, register := range []func(*web.State, *crud.ActionRegistry) error{
 				zones.RegisterActions(zonesCfg, billingCfg.PlanSource(state.Crud)),
 				scanning.RegisterActions(scanningCfg),
 				alerting.RegisterActions(alertingCfg),
@@ -62,11 +62,11 @@ func main() {
 		// Only the scanner's callback is a route of its own; everything else is an entity or an action.
 		Routes: scanning.MountRoutes,
 		// waf.security_events: a read model over the Analytics plane (ClickHouse), served here with
-		// the caller's own token so the portal lists and aggregates it like any entity.
+		// a read token signed for the caller's own grant, so the portal lists and aggregates it like any entity.
 		ExternalEntities: []app.ExternalEntity{{
 			Definition: analytics.SecurityEventEntity(),
-			Backend: func(state *httpserver.AppState) (crud.RecordBackend, error) {
-				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL), Permissions: state.Permissions}, nil
+			Backend: func(state *web.State) (crud.RecordBackend, error) {
+				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL), Tokens: &analytics.ReadTokens{Signer: state.TokenSigner, Grants: state.Permissions}}, nil
 			},
 		}},
 	})

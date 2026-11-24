@@ -10,16 +10,21 @@ import (
 	"time"
 
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/analytics"
 )
 
 // recentEvents reads events since cutoff (newest first, at most eventScanLimit). An Analytics
 // error keeps its own status (401 stays 401, 503 stays 503) instead of turning into a generic 500.
-func recentEvents(ctx context.Context, cfg Config, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, error) {
-	events, err := cfg.analytics().Window(ctx, rc.ForwardedBearerToken, filters, cutoff, eventScanLimit)
+func recentEvents(ctx context.Context, cfg Config, state *web.State, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, error) {
+	tokens := &analytics.ReadTokens{Signer: state.TokenSigner}
+	token, err := tokens.TenantWide(rc)
+	if err != nil {
+		return nil, err
+	}
+	events, err := cfg.analytics().Window(ctx, token, filters, cutoff, eventScanLimit)
 	if err != nil {
 		var apiErr *analytics.APIError
 		if errors.As(err, &apiErr) {
@@ -66,7 +71,7 @@ func strField(record crud.RecordDto, field string) string {
 // result into a plain error — every caller here treats a permission/validation failure as "abort
 // the sweep", not as an empty set, because silently proceeding on an empty read would create
 // nothing and look exactly like "there was nothing to do".
-func listRecords(ctx context.Context, state *httpserver.AppState, entity string, filters [][2]string, limit int64, rc *permission.RequestContext) ([]crud.RecordDto, error) {
+func listRecords(ctx context.Context, state *web.State, entity string, filters [][2]string, limit int64, rc *permission.RequestContext) ([]crud.RecordDto, error) {
 	result, err := state.Crud.List(ctx, entity, query.ListInput{Limit: limit, Filters: filters}, rc)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", entity, err)

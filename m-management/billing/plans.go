@@ -17,9 +17,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -175,7 +175,7 @@ type customerTenant struct {
 
 // listCustomerTenants lists the platform's active tenants for the operator's admin to choose from.
 // It reads metap's tenant registry, read-only, and answers only the operator's own admin.
-func listCustomerTenants(ctx context.Context, cfg Config, state *httpserver.AppState, rc *permission.RequestContext) (map[string]any, error) {
+func listCustomerTenants(ctx context.Context, cfg Config, state *web.State, rc *permission.RequestContext) (map[string]any, error) {
 	src := cfg.PlanSource(state.Crud)
 	if !src.enforced() || rc.TenantID != src.Operator.String() || !rc.IsAdmin() {
 		return nil, crud.NewServiceErrorMsg(http.StatusForbidden, "forbidden", "Only the service provider's admin can list customers.")

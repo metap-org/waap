@@ -28,13 +28,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/metap/pkg/reconciler"
 	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/testkit"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/alerting"
 	"github.com/metap-org/waap/m-management/alerting/entities"
 	"github.com/stretchr/testify/assert"
@@ -86,14 +86,14 @@ func genRSAKeyPair(t *testing.T) (privatePEM string, publicKey *rsa.PublicKey) {
 	return string(privPEM), &key.PublicKey
 }
 
-func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*httpserver.AppState, string) {
+func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*web.State, string) {
 	tenantRegistry := tenancy.NewPostgresTenantRegistry(pool)
 	router := tenancy.NewRouter(pool, tenancy.NewRegistryCache(tenantRegistry), secrets.EnvStore{})
 	permissions := permission.NewPermissionService(policypg.NewPostgresPolicyStore(router))
 	var mdPtr atomic.Pointer[metadata.MetadataRegistry]
 	mdPtr.Store(registry)
 	privPEM, pubKey := genRSAKeyPair(t)
-	state := httpserver.NewAppState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
+	state := web.NewState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
 	return state, privPEM
 }
 
@@ -110,7 +110,7 @@ func jsonMarshal(t *testing.T, v any) json.RawMessage {
 
 // invoke runs a declared action through the action registry, as the portal's
 // POST /api/{entity}/actions/{action} does, and returns its result as plain JSON values.
-func invoke(t *testing.T, state *httpserver.AppState, analyticsURL string, call crud.ActionCall) map[string]any {
+func invoke(t *testing.T, state *web.State, analyticsURL string, call crud.ActionCall) map[string]any {
 	t.Helper()
 	actions := crud.NewActionRegistry()
 	require.NoError(t, alerting.RegisterActions(alerting.Config{AnalyticsURL: analyticsURL, AllowPrivateTargets: true})(state, actions))

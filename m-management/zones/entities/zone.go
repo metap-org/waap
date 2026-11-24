@@ -13,7 +13,7 @@
 //
 // verificationStatus gates activate alongside hasConfig — proves the customer controls the
 // hostname before edge-plane ever routes traffic for it. verificationStatus stays here as a
-// technical mirror field, kept in sync by routes.VerifyDomainDNS's cascade — see domain.go's own
+// technical mirror field, kept in sync by netcheck.VerifyDomain's cascade — see domain.go's own
 // doc comment. domainId is set automatically by guardedbackend.resolveDomainID at create time
 // from the hostname's apex — never chosen by hand.
 package entities

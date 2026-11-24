@@ -25,22 +25,50 @@ import (
 type quotaGuard struct {
 	passthrough
 	plans billing.PlanLookup
+	locks Locker
 }
 
-// quotaLocks serialises count-then-create for one quota scope (the tenant's zones, or one zone's
-// rules): without it N concurrent creates all read the same count and overshoot the limit by N-1.
-// It is in-process, which is what the management service is (one process); with replicas this needs
-// a database-side guard (advisory lock in the creating transaction) instead.
-var quotaLocks keyedMutex
+// Locker runs fn while holding a lock named key for tenant, so two callers with the same key run one
+// after the other. metap's *tenancy.Router is the production Locker: a database advisory lock on
+// the transaction fn's reads and writes join, so it holds across replicas and takes no second
+// connection while it waits.
+type Locker interface {
+	WithKeyLock(ctx context.Context, tenantID uuid.UUID, key string, fn func(ctx context.Context) error) error
+}
 
-type keyedMutex struct{ m sync.Map }
+// processLocks is the Locker a guard has until it is given a database one (tests, and anything that
+// runs with no router): a mutex per key, in this process only. It does not serialise across
+// replicas, and a caller that waits on it while holding a connection can starve a pool, which is
+// why the service passes the router instead.
+type processLocks struct{ m sync.Map }
 
-// lock takes the mutex for key and returns its release.
-func (k *keyedMutex) lock(key string) func() {
-	v, _ := k.m.LoadOrStore(key, &sync.Mutex{})
+func (p *processLocks) WithKeyLock(ctx context.Context, _ uuid.UUID, key string, fn func(ctx context.Context) error) error {
+	v, _ := p.m.LoadOrStore(key, &sync.Mutex{})
 	mu := v.(*sync.Mutex)
 	mu.Lock()
-	return mu.Unlock
+	defer mu.Unlock()
+	return fn(ctx)
+}
+
+// quotaLocks is what a guard locks with unless it is given another Locker.
+var quotaLocks Locker = &processLocks{}
+
+// locked runs fn holding the lock of the quota scope the create counts against: without it N
+// concurrent creates all read the same count and overshoot the limit by N-1. It is a plain call
+// when nothing is enforced or the entity has no quota.
+func (g *quotaGuard) locked(ctx context.Context, scope string, rc *permission.RequestContext, fn func(ctx context.Context) error) error {
+	if g.plans == nil || scope == "" {
+		return fn(ctx)
+	}
+	tenant, err := uuid.Parse(rc.TenantID)
+	if err != nil {
+		return err
+	}
+	locks := g.locks
+	if locks == nil {
+		locks = quotaLocks
+	}
+	return locks.WithKeyLock(ctx, tenant, scope, fn)
 }
 
 // quotaScope names what a create counts against, or "" when the entity has no quota.
@@ -57,15 +85,16 @@ func quotaScope(entity string, data crud.JsonObject, rc *permission.RequestConte
 }
 
 func (g *quotaGuard) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
-	if g.plans != nil {
-		if scope := quotaScope(entity, data, rc); scope != "" {
-			defer quotaLocks.lock(scope)()
+	var created crud.RecordDto
+	err := g.locked(ctx, quotaScope(entity, data, rc), rc, func(ctx context.Context) error {
+		if err := g.checkQuota(ctx, entity, data, rc); err != nil {
+			return err
 		}
-	}
-	if err := g.checkQuota(ctx, entity, data, rc); err != nil {
-		return crud.RecordDto{}, err
-	}
-	return g.inner.Create(ctx, entity, data, rc, reason)
+		var err error
+		created, err = g.inner.Create(ctx, entity, data, rc, reason)
+		return err
+	})
+	return created, err
 }
 
 // Update closes the one way around the per-zone rule limit: moving a rule to another zone is not a
@@ -78,12 +107,16 @@ func (g *quotaGuard) Update(ctx context.Context, entity string, id uuid.UUID, ex
 				return crud.RecordDto{}, err
 			}
 			if versions.ZoneOfRule(current.Record.Data) != to {
-				if g.plans != nil {
-					defer quotaLocks.lock(quotaScope(entity, data, rc))()
-				}
-				if err := g.checkQuota(ctx, entity, data, rc); err != nil {
-					return crud.RecordDto{}, err
-				}
+				var updated crud.RecordDto
+				err := g.locked(ctx, quotaScope(entity, data, rc), rc, func(ctx context.Context) error {
+					if err := g.checkQuota(ctx, entity, data, rc); err != nil {
+						return err
+					}
+					var err error
+					updated, err = g.inner.Update(ctx, entity, id, expectedVersion, data, rc, reason)
+					return err
+				})
+				return updated, err
 			}
 		}
 	}

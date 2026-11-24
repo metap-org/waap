@@ -14,7 +14,7 @@
 //     firing.
 //
 // SecurityEvents live in the Analytics plane (ClickHouse), not here: both sweeps read them
-// through its query API with the caller's own token (ANALYTICS_URL), with the time window pushed
+// through its query API with a tenant-wide read token signed for the run (ANALYTICS_URL), with the time window pushed
 // into the query. Retention is ClickHouse's table TTL, so the old Postgres cleanup sweep is gone.
 //
 // Both are written as endpoints rather than background loops so metap-cron can drive them
@@ -23,42 +23,58 @@ package alerting
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
 
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
-	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
 // RegisterActions registers the handlers for the actions declared on this service's entities.
-func RegisterActions(cfg Config) func(*httpserver.AppState, *crud.ActionRegistry) error {
-	return func(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+func RegisterActions(cfg Config) func(*web.State, *crud.ActionRegistry) error {
+	return func(state *web.State, reg *crud.ActionRegistry) error {
 		return registerActions(cfg, state, reg)
 	}
 }
 
-func registerActions(cfg Config, state *httpserver.AppState, reg *crud.ActionRegistry) error {
-	if err := reg.Register(model.Incidents, model.ActionCorrelate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-		raw, err := json.Marshal(c.Input)
-		if err != nil {
-			return nil, err
+func registerActions(cfg Config, state *web.State, reg *crud.ActionRegistry) error {
+	// Reads and writes through the service's own backend, as these actions always did.
+	deps := state.ActionDeps()
+	deps.Records = state.Crud
+	for _, x := range []action.Action{
+		CorrelateIncidents(cfg, state),
+		EvaluateAlerts(cfg, state),
+		TestAlertPolicy(cfg, state),
+	} {
+		if err := x.Register(reg, deps); err != nil {
+			return err
 		}
-		var body correlateBody
-		if err := json.Unmarshal(raw, &body); err != nil {
-			return nil, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Invalid correlate input.")
-		}
-		return crud.ToObject(correlateIncidents(ctx, cfg, state, c.RC, body))
-	}); err != nil {
-		return err
 	}
-	if err := reg.Register(model.AlertPolicies, model.ActionEvaluate, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-		return crud.ToObject(evaluateAlerts(ctx, cfg, state, c.RC))
-	}); err != nil {
-		return err
-	}
-	return reg.Register(model.AlertPolicies, model.ActionTest, func(ctx context.Context, c crud.ActionCall) (crud.JsonObject, error) {
-		return crud.ToObject(testAlertPolicy(ctx, cfg, state, c.RC, c.ID))
-	})
+	return nil
+}
+
+// CorrelateIncidents is the action waf.incidents.correlate: recent events into incidents.
+func CorrelateIncidents(cfg Config, state *web.State) action.Action {
+	return action.Entity(model.Incidents, model.ActionCorrelate,
+		func(ctx context.Context, a *action.Ctx, in correlateBody) (correlation, error) {
+			return correlateIncidents(ctx, a, cfg, state, in)
+		})
+}
+
+// EvaluateAlerts is the action waf.alert_policies.evaluate: every enabled policy against the recent
+// events, counted per zone. Each firing delivers a notification (a call out that cannot be undone)
+// and records it, so it is not one step.
+func EvaluateAlerts(cfg Config, state *web.State) action.Action {
+	return action.Entity(model.AlertPolicies, model.ActionEvaluate,
+		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
+			return evaluateAlerts(ctx, cfg, state, a.RC)
+		})
+}
+
+// TestAlertPolicy is the action waf.alert_policies.test: the "Send test alert" button.
+func TestAlertPolicy(cfg Config, state *web.State) action.Action {
+	return action.Record(model.AlertPolicies, model.ActionTest,
+		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (map[string]any, error) {
+			return testAlertPolicy(ctx, cfg, state, a.RC, a.ID)
+		})
 }

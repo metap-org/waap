@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/standard"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -33,18 +33,18 @@ type findingsBody struct {
 // SubmitFindings is POST /internal/scan-jobs/{id}/findings — scanner callback. Findings are
 // created before the job is completed, so a portal user who sees "completed" always sees the
 // findings that go with it.
-func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.AppState) {
-	rc, ok := httpserver.RequireAuth(w, r, state)
+func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
+	rc, ok := web.RequireAuth(w, r, state)
 	if !ok {
 		return
 	}
 	jobID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		httpserver.WriteServiceError(w, http.StatusBadRequest, errcode.ValidationFailed, "Invalid job id.", nil)
+		web.WriteServiceError(w, http.StatusBadRequest, errcode.ValidationFailed, "Invalid job id.", nil)
 		return
 	}
 	var body findingsBody
-	if !httpserver.DecodeJSONBody(w, r, &body) {
+	if !web.DecodeJSONBody(w, r, &body) {
 		return
 	}
 	succeeded := true
@@ -53,7 +53,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	}
 
 	if len(body.Findings) > maxFindingsPerCall {
-		httpserver.WriteServiceError(w, http.StatusRequestEntityTooLarge, model.ErrTooManyFindings,
+		web.WriteServiceError(w, http.StatusRequestEntityTooLarge, model.ErrTooManyFindings,
 			fmt.Sprintf("At most %d findings per call; send the rest in further calls.", maxFindingsPerCall), nil)
 		return
 	}
@@ -66,7 +66,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	// written: a repeated callback, or one for an idle/finished job, must not add findings and then
 	// fail on the transition.
 	if job.Status == nil || (*job.Status != model.ScanJobQueued && *job.Status != model.ScanJobRunning) {
-		httpserver.WriteServiceError(w, http.StatusConflict, model.ErrScanNotRunnable,
+		web.WriteServiceError(w, http.StatusConflict, model.ErrScanNotRunnable,
 			"This scan job is not waiting for results.", nil)
 		return
 	}
@@ -84,7 +84,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 		}
 		result, err := state.Crud.Create(r.Context(), model.ScanFindings, data, rc, nil)
 		if err != nil {
-			httpserver.WriteCrudError(w, err)
+			web.WriteCrudError(w, err)
 			return
 		}
 		created = append(created, result.ID)
@@ -96,7 +96,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	if current.Status != nil && *current.Status == model.ScanJobQueued {
 		current, err = doTransition(r.Context(), state, current, model.ScanJobStart, rc)
 		if err != nil {
-			httpserver.WriteInternalError(w, err)
+			web.WriteInternalError(w, err)
 			return
 		}
 	}
@@ -106,7 +106,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	}
 	finished, err := doTransition(r.Context(), state, current, finish, rc)
 	if err != nil {
-		httpserver.WriteInternalError(w, err)
+		web.WriteInternalError(w, err)
 		return
 	}
 
@@ -115,10 +115,10 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *httpserver.Ap
 	patch := crud.JsonObject{model.FieldLastRunAt: jsonStr(now)}
 	jobAfter, err := state.Crud.Update(r.Context(), model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
+		web.WriteCrudError(w, err)
 		return
 	}
-	httpserver.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+	web.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
 		"jobId": finished.ID, "job": jobAfter, "createdFindings": created,
 	}})
 }

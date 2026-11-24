@@ -17,11 +17,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/kit/scope"
 
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
@@ -32,6 +34,16 @@ const (
 	Issuer   = "metap"
 	Audience = "metap-api"
 
+	// ReadAudience is the audience of the short-lived token management signs for ONE read of the
+	// events (roadmap 121): it carries what the caller may see, so this service enforces it itself.
+	// Management mints it with the same names (m-management/analytics/readtoken.go); the two
+	// modules cannot share a package, so a test on each side pins the strings.
+	ReadAudience = "waap-analytics"
+	// ZoneAccessAll and ZoneAccessLimited are the values of the "zoneAccess" claim: every zone of the
+	// tenant, or only the ones in the "zones" claim (which may be none).
+	ZoneAccessAll     = "all"
+	ZoneAccessLimited = "limited"
+
 	minRefetch = 10 * time.Second
 	leeway     = 20 * time.Second
 )
@@ -41,6 +53,12 @@ type Identity struct {
 	TenantID uuid.UUID
 	Subject  string
 	Token    string // the raw bearer token, for forwarding
+
+	// Read is true for a read token (audience ReadAudience): the only kind that may read events. An
+	// ordinary platform token identifies a writer (the control plane's ingest) and reads nothing.
+	Read       bool
+	ZoneAccess string
+	Zones      []string
 }
 
 type jwk struct {
@@ -120,7 +138,9 @@ func (v *JWKSVerifier) keyFor(ctx context.Context, kid string) (ed25519.PublicKe
 
 type claims struct {
 	jwt.RegisteredClaims
-	TenantID string `json:"tenantId"`
+	TenantID   string   `json:"tenantId"`
+	ZoneAccess string   `json:"zoneAccess"`
+	Zones      []string `json:"zones"`
 }
 
 // Verify checks signature, issuer, audience and expiry, and returns the caller's identity.
@@ -135,7 +155,6 @@ func (v *JWKSVerifier) Verify(ctx context.Context, token string) (Identity, erro
 	},
 		jwt.WithValidMethods([]string{"EdDSA"}),
 		jwt.WithIssuer(Issuer),
-		jwt.WithAudience(Audience),
 		jwt.WithExpirationRequired(),
 		jwt.WithLeeway(leeway),
 	)
@@ -146,7 +165,18 @@ func (v *JWKSVerifier) Verify(ctx context.Context, token string) (Identity, erro
 	if err != nil {
 		return Identity{}, errors.New("token has no valid tenantId")
 	}
-	return Identity{TenantID: tenant, Subject: c.Subject, Token: token}, nil
+	id := Identity{TenantID: tenant, Subject: c.Subject, Token: token}
+	switch {
+	case slices.Contains(c.Audience, ReadAudience):
+		if c.ZoneAccess != ZoneAccessAll && c.ZoneAccess != ZoneAccessLimited {
+			return Identity{}, errors.New("read token has no zoneAccess")
+		}
+		id.Read, id.ZoneAccess, id.Zones = true, c.ZoneAccess, c.Zones
+	case slices.Contains(c.Audience, Audience):
+	default:
+		return Identity{}, errors.New("token is not for this service")
+	}
+	return id, nil
 }
 
 // Verifier is what the HTTP layer needs.
@@ -185,4 +215,17 @@ func Middleware(v Verifier, onError func(w http.ResponseWriter, status int, code
 			next.ServeHTTP(w, r.WithContext(WithIdentity(r.Context(), id)))
 		})
 	}
+}
+
+// Scope is what this caller may read, and false when they may read nothing: only a read token reads,
+// and its grant is the whole tenant or the zones it names (none named: nothing is visible).
+func (i Identity) Scope() (scope.Scope, bool) {
+	if !i.Read {
+		return scope.Scope{}, false
+	}
+	sc := scope.ForTenant(i.TenantID.String())
+	if i.ZoneAccess == ZoneAccessLimited {
+		sc = sc.Limit("zone", i.Zones...)
+	}
+	return sc, true
 }

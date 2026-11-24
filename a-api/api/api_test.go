@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/kit/scope"
 	"github.com/stretchr/testify/require"
 
 	"github.com/metap-org/waap/a-api/auth"
@@ -23,10 +24,19 @@ var tenantA = uuid.MustParse("2e87cf98-46a7-473f-bebc-20307e17d3b3")
 type fakeVerifier struct{}
 
 func (fakeVerifier) Verify(_ context.Context, token string) (auth.Identity, error) {
-	if token != "good" {
+	id := auth.Identity{TenantID: tenantA, Subject: "u1", Token: token}
+	switch token {
+	case "good": // an ordinary platform token: the control plane's ingest identity
+	case "reader":
+		id.Read, id.ZoneAccess = true, auth.ZoneAccessAll
+	case "reader-z1":
+		id.Read, id.ZoneAccess, id.Zones = true, auth.ZoneAccessLimited, []string{"z1"}
+	case "reader-none":
+		id.Read, id.ZoneAccess = true, auth.ZoneAccessLimited
+	default:
 		return auth.Identity{}, errors.New("bad token")
 	}
-	return auth.Identity{TenantID: tenantA, Subject: "u1", Token: token}, nil
+	return id, nil
 }
 
 type fakeStore struct {
@@ -45,14 +55,14 @@ func (f *fakeStore) Insert(_ context.Context, tenantID uuid.UUID, evs []events.E
 	f.inserted = append(f.inserted, evs...)
 	return nil
 }
-func (f *fakeStore) List(_ context.Context, tenantID uuid.UUID, q events.ListQuery) (store.Page, error) {
-	f.tenant, f.listQ = tenantID, q
-	if _, err := events.PlanList("t", tenantID, q); err != nil {
+func (f *fakeStore) List(_ context.Context, s scope.Scope, q events.ListQuery) (store.Page, error) {
+	f.tenant, f.listQ = uuid.MustParse(s.Tenant()), q
+	if _, err := events.PlanList("t", s, q); err != nil {
 		return store.Page{}, err
 	}
 	return store.Page{Records: f.inserted}, nil
 }
-func (f *fakeStore) Get(_ context.Context, _ uuid.UUID, id uuid.UUID) (events.Event, error) {
+func (f *fakeStore) Get(_ context.Context, _ scope.Scope, id uuid.UUID) (events.Event, error) {
 	for _, e := range f.inserted {
 		if e.ID == id {
 			return e, nil
@@ -60,9 +70,9 @@ func (f *fakeStore) Get(_ context.Context, _ uuid.UUID, id uuid.UUID) (events.Ev
 	}
 	return events.Event{}, store.ErrNotFound
 }
-func (f *fakeStore) Aggregate(_ context.Context, tenantID uuid.UUID, q events.AggregateQuery) ([]map[string]any, error) {
+func (f *fakeStore) Aggregate(_ context.Context, s scope.Scope, q events.AggregateQuery) ([]map[string]any, error) {
 	f.aggQ = q
-	if _, err := events.PlanAggregate("t", tenantID, q); err != nil {
+	if _, err := events.PlanAggregate("t", s, q); err != nil {
 		return nil, err
 	}
 	return []map[string]any{{"group": "blocked", "count": 2.0}}, nil
@@ -117,31 +127,31 @@ func TestIngestAndQuery(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
 	st.failNext = nil
 
-	rec, _ = do(t, h, "GET", "/v1/security-events?zoneId=z1&action=blocked&since=2026-11-01T00:00:00Z&limit=5&sort=occurredAt", "good", "")
+	rec, _ = do(t, h, "GET", "/v1/security-events?zoneId=z1&action=blocked&since=2026-11-01T00:00:00Z&limit=5&sort=occurredAt", "reader", "")
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, map[string]string{"zoneId": "z1", "action": "blocked"}, st.listQ.Filters)
 	require.True(t, st.listQ.Ascending)
 	require.Equal(t, 5, st.listQ.Limit)
 
-	rec, out = do(t, h, "GET", "/v1/security-events?tenant_id=other", "good", "")
+	rec, out = do(t, h, "GET", "/v1/security-events?tenant_id=other", "reader", "")
 	require.Equal(t, http.StatusBadRequest, rec.Code, "an unknown filter is an error, not ignored")
 	require.Equal(t, "invalid_query", out["error"].(map[string]any)["code"])
 
 	id := st.inserted[0].ID
-	rec, out = do(t, h, "GET", "/v1/security-events/"+id.String(), "good", "")
+	rec, out = do(t, h, "GET", "/v1/security-events/"+id.String(), "reader", "")
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, id.String(), out["data"].(map[string]any)["id"])
-	rec, _ = do(t, h, "GET", "/v1/security-events/"+uuid.NewString(), "good", "")
+	rec, _ = do(t, h, "GET", "/v1/security-events/"+uuid.NewString(), "reader", "")
 	require.Equal(t, http.StatusNotFound, rec.Code)
 
-	rec, out = do(t, h, "POST", "/v1/security-events/aggregate", "good", `{"groupBy":"action","timeField":"occurredAt","since":"2026-11-01T00:00:00Z","filters":{"zoneId":"z1"},"limit":10}`)
+	rec, out = do(t, h, "POST", "/v1/security-events/aggregate", "reader", `{"groupBy":"action","timeField":"occurredAt","since":"2026-11-01T00:00:00Z","filters":{"zoneId":"z1"},"limit":10}`)
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "action", st.aggQ.GroupBy)
 	require.Equal(t, []any{map[string]any{"group": "blocked", "count": 2.0}}, out["data"])
 
-	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "good", `{"groupBy":"action","sql":"DROP TABLE"}`)
+	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "reader", `{"groupBy":"action","sql":"DROP TABLE"}`)
 	require.Equal(t, http.StatusBadRequest, rec.Code, "unknown spec keys are refused")
-	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "good", `{"metrics":["sum:action"]}`)
+	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "reader", `{"metrics":["sum:action"]}`)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 
 	rec, _ = do(t, h, "GET", "/health", "", "")
@@ -155,19 +165,40 @@ func TestOversizedBodiesAreRefusedWith413(t *testing.T) {
 	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 	require.Contains(t, rec.Body.String(), `"code":"payload_too_large"`)
 
-	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "good", `{"groupBy":["`+strings.Repeat("x", 64<<10)+`"]}`)
+	rec, _ = do(t, h, "POST", "/v1/security-events/aggregate", "reader", `{"groupBy":["`+strings.Repeat("x", 64<<10)+`"]}`)
 	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 }
 
 func TestAPanicingStoreIsAJSON500NotADroppedConnection(t *testing.T) {
 	h := (&Server{Store: &panicStore{}, Verifier: fakeVerifier{}}).Handler()
-	rec, _ := do(t, h, "GET", "/v1/security-events", "good", "")
+	rec, _ := do(t, h, "GET", "/v1/security-events", "reader", "")
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Contains(t, rec.Body.String(), `"code":"internal_error"`)
 }
 
 type panicStore struct{ fakeStore }
 
-func (*panicStore) List(context.Context, uuid.UUID, events.ListQuery) (store.Page, error) {
+func (*panicStore) List(context.Context, scope.Scope, events.ListQuery) (store.Page, error) {
 	panic("boom")
+}
+
+func TestOnlyAReadTokenReadsAndALimitedOneSeesOnlyItsZones(t *testing.T) {
+	fs := &fakeStore{}
+	h := (&Server{Store: fs, Verifier: fakeVerifier{}}).Handler()
+
+	for _, path := range []string{"/v1/security-events", "/v1/security-events/" + uuid.NewString()} {
+		rec, _ := do(t, h, "GET", path, "good", "")
+		require.Equal(t, http.StatusForbidden, rec.Code, "an ordinary token reads nothing: %s", path)
+	}
+	rec, _ := do(t, h, "POST", "/v1/security-events/aggregate", "good", `{"groupBy":"action"}`)
+	require.Equal(t, http.StatusForbidden, rec.Code)
+
+	rec, _ = do(t, h, "POST", "/v1/security-events/ingest", "reader", `{"events":[]}`)
+	require.Equal(t, http.StatusForbidden, rec.Code, "a read token cannot write")
+
+	rec, _ = do(t, h, "GET", "/v1/security-events", "reader-z1", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	rec, _ = do(t, h, "GET", "/v1/security-events", "reader-none", "")
+	require.Equal(t, http.StatusOK, rec.Code, "a limit with no zone left answers empty, not an error")
 }

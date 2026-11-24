@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/metap-org/metap/pkg/kit/scope"
 )
 
 const (
@@ -75,8 +77,11 @@ func decodeCursor(c string) (int64, uuid.UUID, error) {
 	return n, u, nil
 }
 
-func PlanList(table string, tenantID uuid.UUID, q ListQuery) (ListPlan, error) {
-	w := newWhere(tenantID)
+func PlanList(table string, s scope.Scope, q ListQuery) (ListPlan, error) {
+	w, empty, err := newWhere(s)
+	if err != nil {
+		return ListPlan{}, err
+	}
 	if err := w.filters(q.Filters); err != nil {
 		return ListPlan{}, err
 	}
@@ -95,14 +100,20 @@ func PlanList(table string, tenantID uuid.UUID, q ListQuery) (ListPlan, error) {
 	limit := clamp(q.Limit, DefaultListLimit, MaxListLimit)
 	sql := "SELECT " + SelectColumns + " FROM " + table + " WHERE " + w.sql() +
 		" ORDER BY occurred_at " + dir + ", id " + dir + " LIMIT " + strconv.Itoa(limit+1)
-	return ListPlan{Statement: Statement{SQL: sql, Args: w.args}, Limit: limit}, nil
+	return ListPlan{Statement: Statement{SQL: sql, Args: w.args, Empty: empty}, Limit: limit}, nil
 }
 
-func PlanGet(table string, tenantID uuid.UUID, id uuid.UUID) Statement {
-	return Statement{
-		SQL:  "SELECT " + SelectColumns + " FROM " + table + " WHERE tenant_id = ? AND id = toUUID(?) LIMIT 1",
-		Args: []any{tenantID, id.String()},
+func PlanGet(table string, s scope.Scope, id uuid.UUID) (Statement, error) {
+	w, empty, err := newWhere(s)
+	if err != nil {
+		return Statement{}, err
 	}
+	w.add("id = toUUID(?)", id.String())
+	return Statement{
+		SQL:   "SELECT " + SelectColumns + " FROM " + table + " WHERE " + w.sql() + " LIMIT 1",
+		Args:  w.args,
+		Empty: empty,
+	}, nil
 }
 
 func (w *where) timeRangeMillis(r TimeRange) {
@@ -143,7 +154,7 @@ var bucketExpr = map[string]string{
 	"month": "toStartOfMonth(occurred_at)",
 }
 
-func PlanAggregate(table string, tenantID uuid.UUID, q AggregateQuery) (AggregatePlan, error) {
+func PlanAggregate(table string, s scope.Scope, q AggregateQuery) (AggregatePlan, error) {
 	if q.TimeField != "" && q.TimeField != "occurredAt" {
 		return AggregatePlan{}, invalid("timeField must be occurredAt")
 	}
@@ -196,7 +207,10 @@ func PlanAggregate(table string, tenantID uuid.UUID, q AggregateQuery) (Aggregat
 		}
 	}
 
-	w := newWhere(tenantID)
+	w, empty, err := newWhere(s)
+	if err != nil {
+		return AggregatePlan{}, err
+	}
 	if err := w.filters(q.Filters); err != nil {
 		return AggregatePlan{}, err
 	}
@@ -217,6 +231,6 @@ func PlanAggregate(table string, tenantID uuid.UUID, q AggregateQuery) (Aggregat
 		sql += " ORDER BY m0 DESC"
 	}
 	sql += " LIMIT " + strconv.Itoa(clamp(q.Limit, DefaultGroups, MaxGroups))
-	plan.Statement = Statement{SQL: sql, Args: w.args}
+	plan.Statement = Statement{SQL: sql, Args: w.args, Empty: empty}
 	return plan, nil
 }

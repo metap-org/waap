@@ -25,7 +25,9 @@ func LoadConfig() Config {
 }
 
 // Guarded is the backend every write goes through: validation, plan limits, accounts, versions and
-// the zone-delete check (package guard). The one place it is built. plans may be nil (no limits).
-func Guarded(inner crud.RecordBackend, plans billing.PlanLookup) *guard.Backend {
-	return guard.New(inner).WithPlanLimits(plans)
+// the zone-delete check (package guard). The one place it is built. plans may be nil (no limits); locks
+// is what serialises the plan-limit count-then-create (the tenant router in production, nil for the
+// in-process default).
+func Guarded(inner crud.RecordBackend, plans billing.PlanLookup, locks guard.Locker) *guard.Backend {
+	return guard.New(inner).WithPlanLimits(plans).WithLocks(locks)
 }

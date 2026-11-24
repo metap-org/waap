@@ -25,7 +25,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/httpx/router"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
@@ -33,6 +32,7 @@ import (
 	"github.com/metap-org/metap/pkg/reconciler"
 	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/testkit"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/scanning"
 	"github.com/metap-org/waap/m-management/scanning/entities"
 	"github.com/stretchr/testify/assert"
@@ -82,14 +82,14 @@ func genRSAKeyPair(t *testing.T) (privatePEM string, publicKey *rsa.PublicKey) {
 	return string(privPEM), &key.PublicKey
 }
 
-func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*httpserver.AppState, string) {
+func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*web.State, string) {
 	tenantRegistry := tenancy.NewPostgresTenantRegistry(pool)
 	router := tenancy.NewRouter(pool, tenancy.NewRegistryCache(tenantRegistry), secrets.EnvStore{})
 	permissions := permission.NewPermissionService(policypg.NewPostgresPolicyStore(router))
 	var mdPtr atomic.Pointer[metadata.MetadataRegistry]
 	mdPtr.Store(registry)
 	privPEM, pubKey := genRSAKeyPair(t)
-	state := httpserver.NewAppState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
+	state := web.NewState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
 	return state, privPEM
 }
 

@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/metap-org/metap/pkg/kit/scope"
 )
 
 // Event is one security event as stored and as returned by the query API. JSON names match the
@@ -161,6 +163,9 @@ func ParseTimeRange(since, until string) (TimeRange, error) {
 type Statement struct {
 	SQL  string
 	Args []any
+	// Empty: the scope matches nothing (a limit with no value left), so there is nothing to run and the
+	// answer is empty.
+	Empty bool
 }
 
 type where struct {
@@ -168,8 +173,28 @@ type where struct {
 	args  []any
 }
 
-func newWhere(tenantID uuid.UUID) *where {
-	return &where{parts: []string{"tenant_id = ?"}, args: []any{tenantID}}
+// scopeColumns are the dimensions of a scope.Scope this store can filter on, and the column of each.
+// A scope limited on any other dimension is refused (scope.Plan), never ignored.
+var scopeColumns = map[string]string{"zone": "zone_id"}
+
+// newWhere starts a statement's conditions from the scope every read must carry: the tenant, then
+// each limited dimension. empty is true when the scope matches nothing. The scope is mandatory: the
+// zero Scope is refused, so no read can forget to bound itself.
+func newWhere(s scope.Scope) (w *where, empty bool, err error) {
+	plan, err := s.Plan("tenant_id", scopeColumns)
+	if err != nil {
+		return nil, false, invalid("%s", err.Error())
+	}
+	tenant, err := uuid.Parse(s.Tenant())
+	if err != nil {
+		return nil, false, invalid("the scope's tenant is not a uuid")
+	}
+	w = &where{parts: []string{"tenant_id = ?"}, args: []any{tenant}}
+	for _, clause := range plan.Clauses[1:] {
+		cond, args := clause.SQL("?")
+		w.add(cond, args...)
+	}
+	return w, plan.None, nil
 }
 
 func (w *where) add(cond string, args ...any) {

@@ -21,17 +21,18 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/metadata"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/metap/pkg/reconciler"
 	"github.com/metap-org/metap/pkg/tenancy"
 	"github.com/metap-org/metap/pkg/testkit"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/billing"
 	"github.com/metap-org/waap/m-management/zones"
 	"github.com/metap-org/waap/m-management/zones/entities"
@@ -90,14 +91,14 @@ func genRSAKeyPair(t *testing.T) (privatePEM string, publicKey *rsa.PublicKey) {
 	return string(privPEM), &key.PublicKey
 }
 
-func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*httpserver.AppState, string) {
+func newTestState(t *testing.T, pool *pgxpool.Pool, registry *metadata.MetadataRegistry) (*web.State, string) {
 	tenantRegistry := tenancy.NewPostgresTenantRegistry(pool)
 	router := tenancy.NewRouter(pool, tenancy.NewRegistryCache(tenantRegistry), secrets.EnvStore{})
 	permissions := permission.NewPermissionService(policypg.NewPostgresPolicyStore(router))
 	var mdPtr atomic.Pointer[metadata.MetadataRegistry]
 	mdPtr.Store(registry)
 	privPEM, pubKey := genRSAKeyPair(t)
-	state := httpserver.NewAppState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
+	state := web.NewState(pool, registry, &mdPtr, permissions, privPEM, pubKey, router)
 	return state, privPEM
 }
 
@@ -215,7 +216,7 @@ func TestGuardedZonesBackendRejectsInvalidIPAccessListValue(t *testing.T) {
 	require.NotNil(t, se.FieldErrors["value"], "expected a 422 with a value field error, got status=%d fieldErrors=%v", se.Status, se.FieldErrors)
 }
 
-func mustCreateDomain(t *testing.T, state *httpserver.AppState, rc *permission.RequestContext, apex string) string {
+func mustCreateDomain(t *testing.T, state *web.State, rc *permission.RequestContext, apex string) string {
 	data := crud.JsonObject{
 		"apexDomain": jsonMarshal(t, apex), "verificationToken": jsonMarshal(t, "tok"),
 		"verificationMethod": jsonMarshal(t, "dnsTxt"), "verificationStatus": jsonMarshal(t, "unverified"),
@@ -639,6 +640,73 @@ func TestConcurrentCreatesDoNotOvershootThePlan(t *testing.T) {
 	assert.EqualValues(t, allowed, created.Load(), "only the plan's allowance gets through")
 }
 
+// With the database lock the count-then-create also holds across callers that already hold a connection,
+// as a preset's step does: units that wait for the lock and plain creates that need one connection
+// to make progress must not starve a small pool. Eight callers share a pool of three; the old
+// in-process lock left the plain creates without a connection while the units waited for the mutex
+// one of them held, and the test hung.
+func TestPlanLimitLockDoesNotStarveASmallPool(t *testing.T) {
+	t.Setenv("METAP_TEST_POOL_MAX", "4") // the reconcile in setupRegistry needs 2; three callers share what is left
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+
+	const allowed = 3
+	plans := planLookupFunc(func(context.Context, uuid.UUID) (billing.Resolution, error) {
+		return billing.Resolution{Enforced: true, Plan: billing.Plan{Name: "Small", MaxZones: allowed, MaxRulesPerZone: 100}}, nil
+	})
+	backend := zones.Guarded(state.Crud, plans, state.Router)
+	newZone := func(ctx context.Context, name string) error {
+		_, err := backend.Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, name+"."+apex),
+			"originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+		return err
+	}
+
+	var wg sync.WaitGroup
+	var created atomic.Int32
+	// Some callers create inside a unit of work (they hold their connection while they wait for the lock)...
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			uctx, unit, err := state.Router.BeginUnit(ctx, tenantID)
+			if err != nil {
+				return
+			}
+			if err := newZone(uctx, fmt.Sprintf("u%d", i)); err != nil {
+				unit.Rollback(ctx)
+				return
+			}
+			if unit.Commit(ctx) == nil {
+				created.Add(1)
+			}
+		}(i)
+	}
+	// ...and others plainly, which need a connection to make progress.
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if newZone(ctx, fmt.Sprintf("p%d", i)) == nil {
+				created.Add(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	require.NoError(t, ctx.Err(), "the callers finished instead of waiting for each other's connections")
+	assert.EqualValues(t, allowed, created.Load(), "and the limit still holds")
+}
+
 func second(_ crud.RecordDto, err error) error { return err }
 
 type lookupAnswer struct {
@@ -795,6 +863,50 @@ func TestApplyPresetIsOneVersionAndIdempotent(t *testing.T) {
 
 	_, err = actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "applyPreset", ID: zone.ID, RC: rc, Input: crud.JsonObject{"preset": jsonMarshal(t, "nope")}})
 	require.Error(t, err)
+}
+
+// A preset is applied as one unit: when its second rule is refused by the plan, the zone has
+// neither that rule nor the DDoS policy and the first rule the same call already created, and no
+// version was recorded (the earlier code left the partial preset behind).
+func TestApplyPresetThatHitsAPlanLimitLeavesNothingBehind(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	cleanupEntityRows(t, pool, tenantID)
+	state, _ := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+	apex := freshApex(t)
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "DELETE FROM waf.waf_domains WHERE data->>'apexDomain' = $1 OR apex_domain = $1", apex)
+	})
+
+	zone, err := guard.New(state.Crud).Create(ctx, "waf.zones", crud.JsonObject{"hostname": jsonMarshal(t, "a."+apex), "originAddress": jsonMarshal(t, "1.2.3.4"), "protectionMode": jsonMarshal(t, "monitor")}, rc, nil)
+	require.NoError(t, err)
+
+	// One rule per zone: the "api" preset wants two.
+	oneRule := planLookupFunc(func(context.Context, uuid.UUID) (billing.Resolution, error) {
+		return billing.Resolution{Enforced: true, Plan: billing.Plan{Name: "Tiny", MaxZones: billing.Unlimited, MaxRulesPerZone: 1}}, nil
+	})
+	actions := crud.NewActionRegistry()
+	require.NoError(t, zones.RegisterActions(zones.Config{}, oneRule)(state, actions))
+
+	count := func(entity string) int {
+		res, err := state.Crud.List(ctx, entity, query.ListInput{Limit: 50, Filters: [][2]string{{"zoneId", zone.ID.String()}}}, rc)
+		require.NoError(t, err)
+		return len(res.Data)
+	}
+	rulesBefore, policiesBefore, versionsBefore := count("waf.firewall_rules"), count("waf.ddos_policies"), count("waf.policy_versions")
+
+	_, err = actions.Invoke(ctx, crud.ActionCall{Entity: "waf.zones", Name: "applyPreset", ID: zone.ID, RC: rc, Input: crud.JsonObject{"preset": jsonMarshal(t, "api")}})
+	se, ok := crud.AsServiceError(err)
+	require.True(t, ok, "got %v", err)
+	assert.Equal(t, "plan_limit_reached", se.Code, "the plan's refusal reaches the caller with its own code")
+
+	assert.Equal(t, rulesBefore, count("waf.firewall_rules"), "the rule created before the refusal is gone")
+	assert.Equal(t, policiesBefore, count("waf.ddos_policies"), "so is the DDoS policy")
+	assert.Equal(t, versionsBefore, count("waf.policy_versions"), "and no version was recorded")
 }
 
 // Rule changes made at the same moment each get their own version number (audit 08): the number is

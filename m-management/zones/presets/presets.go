@@ -69,15 +69,22 @@ var presets = map[string]preset{
 // PresetKeys lists the presets that exist.
 func PresetKeys() []string { return []string{PresetEssential, PresetAPI, PresetStrict} }
 
+// Result is what applying a preset did: which one, and the names of what it added (nothing when the
+// zone already had it all).
+type Result struct {
+	Preset string   `json:"preset"`
+	Added  []string `json:"added"`
+}
+
 // Apply gives the zone the preset's protections through backend (the guarded one), as rc, and
 // returns what was added.
-func Apply(ctx context.Context, backend *guard.Backend, zoneID uuid.UUID, key string, rc *permission.RequestContext) (map[string]any, error) {
+func Apply(ctx context.Context, backend *guard.Backend, zoneID uuid.UUID, key string, rc *permission.RequestContext) (Result, error) {
 	p, ok := presets[key]
 	if !ok {
-		return nil, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{"preset": {"unknown preset"}})
+		return Result{}, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{"preset": {"unknown preset"}})
 	}
 	if _, err := backend.Get(ctx, model.Zones, zoneID, rc); err != nil {
-		return nil, err
+		return Result{}, err
 	}
 	versions.EnsureBaseline(ctx, backend.Base(), zoneID, rc)
 	quiet := versions.WithoutVersions(ctx)
@@ -86,7 +93,7 @@ func Apply(ctx context.Context, backend *guard.Backend, zoneID uuid.UUID, key st
 
 	policies, err := backend.List(ctx, model.DdosPolicies, query.ListInput{Limit: 1, Filters: [][2]string{{model.FieldZoneID, zoneID.String()}}}, rc)
 	if err != nil {
-		return nil, err
+		return Result{}, err
 	}
 	if len(policies.Data) == 0 {
 		_, err := backend.Create(quiet, model.DdosPolicies, crud.JsonObject{
@@ -95,14 +102,14 @@ func Apply(ctx context.Context, backend *guard.Backend, zoneID uuid.UUID, key st
 			model.FieldPriority: json.RawMessage("100"), model.FieldEnabled: jx.Bool(true),
 		}, rc, nil)
 		if err != nil {
-			return nil, err
+			return Result{}, err
 		}
 		added = append(added, "DDoS policy")
 	}
 
 	existing, _, err := versions.ReadZoneState(ctx, backend.Base(), zoneID, rc)
 	if err != nil {
-		return nil, err
+		return Result{}, err
 	}
 	have := map[string]bool{}
 	for _, r := range existing[model.FirewallRules] {
@@ -124,16 +131,16 @@ func Apply(ctx context.Context, backend *guard.Backend, zoneID uuid.UUID, key st
 			data[model.FieldRateLimitWindow] = json.RawMessage(fmt.Sprint(r.rateWindow))
 		}
 		if _, err := backend.Create(quiet, model.FirewallRules, data, rc, nil); err != nil {
-			return nil, err
+			return Result{}, err
 		}
 		added = append(added, r.name)
 	}
 
 	if len(added) > 0 {
 		if err := versions.SyncHasConfig(ctx, backend.Base(), zoneID, rc); err != nil {
-			return nil, err
+			return Result{}, err
 		}
 		versions.RecordChange(ctx, backend.Base(), zoneID, rc, "Applied the "+key+" preset:", fmt.Sprint(len(added), " items"))
 	}
-	return map[string]any{"preset": key, "added": added}, nil
+	return Result{Preset: key, Added: added}, nil
 }

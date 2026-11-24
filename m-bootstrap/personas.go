@@ -49,6 +49,11 @@ func Personas() bootstrap.Bootstrap {
 			{Role: RoleDeveloper, Entities: []string{model.ScanFindings}, Actions: []string{"read", "update", "transition"}},
 			{Role: RoleDeveloper, Entities: []string{model.ScanJobs}, Actions: []string{"read"}},
 
+			// The events of one zone, for a role held only on that zone (the entity grants above cover
+			// every zone); read by analytics.ReadTokens through PermissionService.ScopeFor.
+			{Role: RoleSecurityAnalyst, Resources: []string{analytics.EventsResource}, Actions: []string{"read"}},
+			{Role: RoleViewer, Resources: []string{analytics.EventsResource}, Actions: []string{"read"}},
+
 			// Viewer: read-only incidents, alert history and the security-event analytics.
 			{Role: RoleViewer, Entities: []string{model.Incidents, model.AlertNotifications, model.SecurityEvents}, Actions: []string{"read"}},
 		},

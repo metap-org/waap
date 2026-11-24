@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
-	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -57,6 +57,15 @@ type correlateBody struct {
 	ZoneID        *string `json:"zoneId"`
 }
 
+// correlation is what a correlate sweep answers.
+type correlation struct {
+	ScannedEvents    int         `json:"scannedEvents"`
+	CreatedIncidents []uuid.UUID `json:"createdIncidents"`
+	SkippedExisting  int         `json:"skippedExisting"`
+	WindowMinutes    int64       `json:"windowMinutes"`
+	Threshold        int         `json:"threshold"`
+}
+
 type zoneIPKey struct {
 	zoneID   string
 	sourceIP string
@@ -70,7 +79,8 @@ type zoneIPKey struct {
 // doesn't copy them), so the title carries the key. Crude but stable, and it keeps a re-run
 // idempotent — which matters because this is scheduled, so it WILL run again over the same
 // events.
-func correlateIncidents(ctx context.Context, cfg Config, state *httpserver.AppState, rc *permission.RequestContext, body correlateBody) (map[string]any, error) {
+func correlateIncidents(ctx context.Context, a *action.Ctx, cfg Config, state *web.State, body correlateBody) (correlation, error) {
+	rc := a.RC
 	windowMinutes := int64(defaultWindowMinutes)
 	if body.WindowMinutes != nil {
 		windowMinutes = *body.WindowMinutes
@@ -83,11 +93,11 @@ func correlateIncidents(ctx context.Context, cfg Config, state *httpserver.AppSt
 	// every address that sent one event, and a window under a minute or over a day is not the
 	// correlation this action is for.
 	if windowMinutes < minWindowMinutes || windowMinutes > maxWindowMinutes {
-		return nil, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{
+		return correlation{}, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{
 			"windowMinutes": {fmt.Sprintf("must be between %d and %d", minWindowMinutes, maxWindowMinutes)}})
 	}
 	if threshold < 1 {
-		return nil, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{"threshold": {"must be at least 1"}})
+		return correlation{}, crud.NewServiceErrorFields(422, errcode.ValidationFailed, map[string][]string{"threshold": {"must be at least 1"}})
 	}
 
 	filters := map[string]string{}
@@ -95,9 +105,9 @@ func correlateIncidents(ctx context.Context, cfg Config, state *httpserver.AppSt
 		filters[model.FieldZoneID] = *body.ZoneID
 	}
 	cutoff := time.Now().UTC().Add(-time.Duration(windowMinutes) * time.Minute)
-	events, err := recentEvents(ctx, cfg, rc, filters, cutoff)
+	events, err := recentEvents(ctx, cfg, state, rc, filters, cutoff)
 	if err != nil {
-		return nil, err
+		return correlation{}, err
 	}
 
 	// Grouped in memory rather than by SQL: the window is small and bounded by eventScanLimit,
@@ -118,45 +128,46 @@ func correlateIncidents(ctx context.Context, cfg Config, state *httpserver.AppSt
 
 	created := make([]uuid.UUID, 0)
 	skipped := 0
-	for key, count := range groups {
-		if count < threshold {
-			continue
-		}
-		existing, err := listRecords(ctx, state, model.Incidents,
-			[][2]string{{model.FieldZoneID, key.zoneID}, {model.FieldStatus, model.IncidentOpen}}, recordScanLimit, rc)
-		if err != nil {
-			return nil, err
-		}
-		alreadyOpen := false
-		for _, incident := range existing {
-			if incidentTitleNames(strField(incident, model.FieldTitle), key.sourceIP) {
-				alreadyOpen = true
-				break
+	// Reading the open incidents and opening the new ones is one step: a sweep that fails part-way
+	// opens none, instead of some of them (the events themselves were read above, outside it).
+	if err := a.Step(ctx, "open incidents", func(ctx context.Context) error {
+		for key, count := range groups {
+			if count < threshold {
+				continue
 			}
-		}
-		if alreadyOpen {
-			skipped++
-			continue
-		}
+			existing, err := listRecords(ctx, state, model.Incidents,
+				[][2]string{{model.FieldZoneID, key.zoneID}, {model.FieldStatus, model.IncidentOpen}}, recordScanLimit, rc)
+			if err != nil {
+				return err
+			}
+			alreadyOpen := false
+			for _, incident := range existing {
+				if incidentTitleNames(strField(incident, model.FieldTitle), key.sourceIP) {
+					alreadyOpen = true
+					break
+				}
+			}
+			if alreadyOpen {
+				skipped++
+				continue
+			}
 
-		data := crud.JsonObject{
-			model.FieldZoneID:     jsonStr(key.zoneID),
-			model.FieldTitle:      jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
-			model.FieldSeverity:   jsonStr(severityFor(count)),
-			model.FieldEventCount: json.RawMessage(fmt.Sprintf("%d", count)),
+			data := crud.JsonObject{
+				model.FieldZoneID:     jsonStr(key.zoneID),
+				model.FieldTitle:      jsonStr(fmt.Sprintf("%d events from %s in %dm", count, key.sourceIP, windowMinutes)),
+				model.FieldSeverity:   jsonStr(severityFor(count)),
+				model.FieldEventCount: json.RawMessage(fmt.Sprintf("%d", count)),
+			}
+			result, err := state.Crud.Create(ctx, model.Incidents, data, rc, nil)
+			if err != nil {
+				return err
+			}
+			created = append(created, result.ID)
 		}
-		result, err := state.Crud.Create(ctx, model.Incidents, data, rc, nil)
-		if err != nil {
-			return nil, err
-		}
-		created = append(created, result.ID)
+		return nil
+	}); err != nil {
+		return correlation{}, err
 	}
 
-	return map[string]any{
-		"scannedEvents":    len(events),
-		"createdIncidents": created,
-		"skippedExisting":  skipped,
-		"windowMinutes":    windowMinutes,
-		"threshold":        threshold,
-	}, nil
+	return correlation{ScannedEvents: len(events), CreatedIncidents: created, SkippedExisting: skipped, WindowMinutes: windowMinutes, Threshold: threshold}, nil
 }
