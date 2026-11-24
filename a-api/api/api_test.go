@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/kit/scope"
 	"github.com/stretchr/testify/require"
 
 	"github.com/metap-org/waap/a-api/auth"
@@ -45,14 +46,14 @@ func (f *fakeStore) Insert(_ context.Context, tenantID uuid.UUID, evs []events.E
 	f.inserted = append(f.inserted, evs...)
 	return nil
 }
-func (f *fakeStore) List(_ context.Context, tenantID uuid.UUID, q events.ListQuery) (store.Page, error) {
-	f.tenant, f.listQ = tenantID, q
-	if _, err := events.PlanList("t", tenantID, q); err != nil {
+func (f *fakeStore) List(_ context.Context, s scope.Scope, q events.ListQuery) (store.Page, error) {
+	f.tenant, f.listQ = uuid.MustParse(s.Tenant()), q
+	if _, err := events.PlanList("t", s, q); err != nil {
 		return store.Page{}, err
 	}
 	return store.Page{Records: f.inserted}, nil
 }
-func (f *fakeStore) Get(_ context.Context, _ uuid.UUID, id uuid.UUID) (events.Event, error) {
+func (f *fakeStore) Get(_ context.Context, _ scope.Scope, id uuid.UUID) (events.Event, error) {
 	for _, e := range f.inserted {
 		if e.ID == id {
 			return e, nil
@@ -60,9 +61,9 @@ func (f *fakeStore) Get(_ context.Context, _ uuid.UUID, id uuid.UUID) (events.Ev
 	}
 	return events.Event{}, store.ErrNotFound
 }
-func (f *fakeStore) Aggregate(_ context.Context, tenantID uuid.UUID, q events.AggregateQuery) ([]map[string]any, error) {
+func (f *fakeStore) Aggregate(_ context.Context, s scope.Scope, q events.AggregateQuery) ([]map[string]any, error) {
 	f.aggQ = q
-	if _, err := events.PlanAggregate("t", tenantID, q); err != nil {
+	if _, err := events.PlanAggregate("t", s, q); err != nil {
 		return nil, err
 	}
 	return []map[string]any{{"group": "blocked", "count": 2.0}}, nil
@@ -168,6 +169,6 @@ func TestAPanicingStoreIsAJSON500NotADroppedConnection(t *testing.T) {
 
 type panicStore struct{ fakeStore }
 
-func (*panicStore) List(context.Context, uuid.UUID, events.ListQuery) (store.Page, error) {
+func (*panicStore) List(context.Context, scope.Scope, events.ListQuery) (store.Page, error) {
 	panic("boom")
 }

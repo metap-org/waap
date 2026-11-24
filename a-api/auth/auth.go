@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/kit/scope"
 
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
@@ -186,3 +187,7 @@ func Middleware(v Verifier, onError func(w http.ResponseWriter, status int, code
 		})
 	}
 }
+
+// Scope is what this caller may read: their tenant's data. The token carries no narrower grant yet
+// (roadmap 121, section 4), so nothing is limited; a read still takes a Scope, never the bare tenant.
+func (i Identity) Scope() scope.Scope { return scope.ForTenant(i.TenantID.String()) }

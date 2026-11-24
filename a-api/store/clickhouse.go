@@ -18,6 +18,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/kit/scope"
 
 	"github.com/metap-org/waap/a-api/events"
 )
@@ -28,9 +29,11 @@ var ErrNotFound = errors.New("event not found")
 // Store is what the HTTP layer needs; ClickHouse implements it, tests fake it.
 type Store interface {
 	Insert(ctx context.Context, tenantID uuid.UUID, evs []events.Event) error
-	List(ctx context.Context, tenantID uuid.UUID, q events.ListQuery) (Page, error)
-	Get(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) (events.Event, error)
-	Aggregate(ctx context.Context, tenantID uuid.UUID, q events.AggregateQuery) ([]map[string]any, error)
+	// Reads take the scope of whoever reads (roadmap 121), never a bare tenant: the zero Scope is
+	// refused, and a scope limited to nothing answers empty without a query.
+	List(ctx context.Context, s scope.Scope, q events.ListQuery) (Page, error)
+	Get(ctx context.Context, s scope.Scope, id uuid.UUID) (events.Event, error)
+	Aggregate(ctx context.Context, s scope.Scope, q events.AggregateQuery) ([]map[string]any, error)
 	Ping(ctx context.Context) error
 }
 
@@ -142,10 +145,13 @@ func scanEvent(rows driver.Rows) (events.Event, error) {
 	return e, err
 }
 
-func (c *ClickHouse) List(ctx context.Context, tenantID uuid.UUID, q events.ListQuery) (Page, error) {
-	plan, err := events.PlanList(c.table, tenantID, q)
+func (c *ClickHouse) List(ctx context.Context, s scope.Scope, q events.ListQuery) (Page, error) {
+	plan, err := events.PlanList(c.table, s, q)
 	if err != nil {
 		return Page{}, err
+	}
+	if plan.Empty {
+		return Page{Records: []events.Event{}}, nil
 	}
 	rows, err := c.conn.Query(readCtx(ctx), plan.SQL, plan.Args...)
 	if err != nil {
@@ -172,8 +178,14 @@ func (c *ClickHouse) List(ctx context.Context, tenantID uuid.UUID, q events.List
 	return page, nil
 }
 
-func (c *ClickHouse) Get(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) (events.Event, error) {
-	stmt := events.PlanGet(c.table, tenantID, id)
+func (c *ClickHouse) Get(ctx context.Context, s scope.Scope, id uuid.UUID) (events.Event, error) {
+	stmt, err := events.PlanGet(c.table, s, id)
+	if err != nil {
+		return events.Event{}, err
+	}
+	if stmt.Empty {
+		return events.Event{}, ErrNotFound
+	}
 	rows, err := c.conn.Query(readCtx(ctx), stmt.SQL, stmt.Args...)
 	if err != nil {
 		return events.Event{}, err
@@ -190,10 +202,13 @@ func (c *ClickHouse) Get(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) 
 
 // Aggregate returns rows shaped like metap's aggregate output: {"bucket"?, "group"?, <metric>...},
 // bucket as an RFC 3339 string, every metric a float.
-func (c *ClickHouse) Aggregate(ctx context.Context, tenantID uuid.UUID, q events.AggregateQuery) ([]map[string]any, error) {
-	plan, err := events.PlanAggregate(c.table, tenantID, q)
+func (c *ClickHouse) Aggregate(ctx context.Context, s scope.Scope, q events.AggregateQuery) ([]map[string]any, error) {
+	plan, err := events.PlanAggregate(c.table, s, q)
 	if err != nil {
 		return nil, err
+	}
+	if plan.Empty {
+		return []map[string]any{}, nil
 	}
 	rows, err := c.conn.Query(readCtx(ctx), plan.SQL, plan.Args...)
 	if err != nil {

@@ -181,7 +181,7 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	page, err := s.Store.List(r.Context(), id.TenantID, q)
+	page, err := s.Store.List(r.Context(), id.Scope(), q)
 	if err != nil {
 		fail(w, err)
 		return
@@ -196,7 +196,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Security event not found.")
 		return
 	}
-	e, err := s.Store.Get(r.Context(), id.TenantID, eventID)
+	e, err := s.Store.Get(r.Context(), id.Scope(), eventID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -218,7 +218,7 @@ func (s *Server) aggregate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_query", "malformed aggregate spec: "+strings.TrimPrefix(err.Error(), "json: "))
 		return
 	}
-	rows, err := s.Store.Aggregate(r.Context(), id.TenantID, q)
+	rows, err := s.Store.Aggregate(r.Context(), id.Scope(), q)
 	if err != nil {
 		fail(w, err)
 		return
