@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
@@ -20,46 +19,16 @@ import (
 
 // Backend serves the read model as a crud.RecordBackend. Writes are refused: events arrive only
 // through Analytics' own ingest.
+//
+// A read signs a short-lived token for what the caller may see (see ReadTokens) and sends that, not
+// the caller's own token: the records live outside metap, so the Analytics API enforces the grant
+// itself from the signature.
 type Backend struct {
 	Client *Client
-	// Permissions decides who may read security events. The records live outside metap, so nothing
-	// else checks it: the routes only know the caller is signed in. Nil refuses every read.
-	Permissions ReadChecker
-}
-
-// ReadChecker answers whether the caller may read an entity (metap's PermissionService does).
-type ReadChecker interface {
-	CanReadEntity(ctx context.Context, rc *permission.RequestContext, entity string) (permission.PermissionDecision, error)
-}
-
-// canRead is the entity-level read check every read of the model goes through, so a role the
-// tenant did not grant waf.security_events cannot read the events by calling the generic route.
-func (b *Backend) canRead(ctx context.Context, rc *permission.RequestContext) error {
-	if b.Permissions == nil {
-		return crud.NewServiceErrorMsg(http.StatusForbidden, errcode.Forbidden, "Security events are not readable here.")
-	}
-	decision, err := b.Permissions.CanReadEntity(ctx, rc, SecurityEvents)
-	if err != nil {
-		return err
-	}
-	if !decision.Allowed {
-		reason := decision.Reason
-		if reason == "" {
-			reason = errcode.Forbidden
-		}
-		return crud.NewServiceError(http.StatusForbidden, reason)
-	}
-	return nil
+	Tokens *ReadTokens
 }
 
 var _ crud.RecordBackend = (*Backend)(nil)
-
-func token(rc *permission.RequestContext) string {
-	if rc == nil {
-		return ""
-	}
-	return rc.ForwardedBearerToken
-}
 
 // ToRecord renders an event in the generic record envelope the gateway and the portal read.
 func ToRecord(e Event) crud.RecordDto {
@@ -98,7 +67,8 @@ func readOnly() error {
 }
 
 func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc *permission.RequestContext) (crud.ListResult, error) {
-	if err := b.canRead(ctx, rc); err != nil {
+	tok, err := b.Tokens.ForCaller(ctx, rc)
+	if err != nil {
 		return crud.ListResult{}, err
 	}
 	if input.JQL != nil && strings.TrimSpace(*input.JQL) != "" {
@@ -116,7 +86,7 @@ func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc 
 	if input.Cursor != nil {
 		p.Cursor = *input.Cursor
 	}
-	page, err := b.Client.List(ctx, token(rc), p)
+	page, err := b.Client.List(ctx, tok, p)
 	if err != nil {
 		return crud.ListResult{}, failure(err)
 	}
@@ -128,10 +98,11 @@ func (b *Backend) List(ctx context.Context, _ string, input query.ListInput, rc 
 }
 
 func (b *Backend) Get(ctx context.Context, _ string, id uuid.UUID, rc *permission.RequestContext) (crud.GetResult, error) {
-	if err := b.canRead(ctx, rc); err != nil {
+	tok, err := b.Tokens.ForCaller(ctx, rc)
+	if err != nil {
 		return crud.GetResult{}, err
 	}
-	e, err := b.Client.Get(ctx, token(rc), id)
+	e, err := b.Client.Get(ctx, tok, id)
 	if err != nil {
 		return crud.GetResult{}, failure(err)
 	}
@@ -177,7 +148,8 @@ func deref(s *string) string {
 }
 
 func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateSpec, rc *permission.RequestContext) ([]json.RawMessage, error) {
-	if err := b.canRead(ctx, rc); err != nil {
+	tok, err := b.Tokens.ForCaller(ctx, rc)
+	if err != nil {
 		return nil, err
 	}
 	req := AggregateSpec{
@@ -187,7 +159,7 @@ func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateS
 	if spec.Limit != nil {
 		req.Limit = int(*spec.Limit)
 	}
-	rows, err := b.Client.Aggregate(ctx, token(rc), req)
+	rows, err := b.Client.Aggregate(ctx, tok, req)
 	if err != nil {
 		return nil, failure(err)
 	}

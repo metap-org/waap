@@ -26,7 +26,7 @@ func evaluateAlerts(ctx context.Context, cfg Config, state *web.State, rc *permi
 			widest = m
 		}
 	}
-	events, err := recentEvents(ctx, cfg, rc, nil, time.Now().UTC().Add(-time.Duration(widest)*time.Minute))
+	events, err := recentEvents(ctx, cfg, state, rc, nil, time.Now().UTC().Add(-time.Duration(widest)*time.Minute))
 	if err != nil {
 		return nil, err
 	}

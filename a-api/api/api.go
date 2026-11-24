@@ -21,6 +21,7 @@ import (
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/httpx"
 
+	"github.com/metap-org/metap/pkg/kit/scope"
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/a-api/auth"
 	"github.com/metap-org/waap/a-api/events"
@@ -99,6 +100,10 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := auth.FromContext(r.Context())
+	if id.Read {
+		writeError(w, http.StatusForbidden, errcode.Forbidden, "a read token cannot ingest")
+		return
+	}
 	var body struct {
 		Events []events.Incoming `json:"events"`
 	}
@@ -174,14 +179,30 @@ func listQuery(r *http.Request) (events.ListQuery, error) {
 	return q, nil
 }
 
-func (s *Server) list(w http.ResponseWriter, r *http.Request) {
+// readScope is what the caller may read, taken from their verified token. A token that is not a read
+// token (the control plane's ingest token, any ordinary platform token) reads nothing: there is no
+// default of "the whole tenant".
+func readScope(w http.ResponseWriter, r *http.Request) (scope.Scope, bool) {
 	id, _ := auth.FromContext(r.Context())
+	sc, ok := id.Scope()
+	if !ok {
+		writeError(w, http.StatusForbidden, errcode.Forbidden, "events are read with a read token issued by management")
+		return scope.Scope{}, false
+	}
+	return sc, true
+}
+
+func (s *Server) list(w http.ResponseWriter, r *http.Request) {
+	sc, ok := readScope(w, r)
+	if !ok {
+		return
+	}
 	q, err := listQuery(r)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	page, err := s.Store.List(r.Context(), id.Scope(), q)
+	page, err := s.Store.List(r.Context(), sc, q)
 	if err != nil {
 		fail(w, err)
 		return
@@ -190,13 +211,16 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
-	id, _ := auth.FromContext(r.Context())
+	sc, ok := readScope(w, r)
+	if !ok {
+		return
+	}
 	eventID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not_found", "Security event not found.")
 		return
 	}
-	e, err := s.Store.Get(r.Context(), id.Scope(), eventID)
+	e, err := s.Store.Get(r.Context(), sc, eventID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -205,7 +229,10 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) aggregate(w http.ResponseWriter, r *http.Request) {
-	id, _ := auth.FromContext(r.Context())
+	sc, ok := readScope(w, r)
+	if !ok {
+		return
+	}
 	var q events.AggregateQuery
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
@@ -218,7 +245,7 @@ func (s *Server) aggregate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_query", "malformed aggregate spec: "+strings.TrimPrefix(err.Error(), "json: "))
 		return
 	}
-	rows, err := s.Store.Aggregate(r.Context(), id.Scope(), q)
+	rows, err := s.Store.Aggregate(r.Context(), sc, q)
 	if err != nil {
 		fail(w, err)
 		return

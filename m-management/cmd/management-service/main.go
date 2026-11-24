@@ -62,11 +62,11 @@ func main() {
 		// Only the scanner's callback is a route of its own; everything else is an entity or an action.
 		Routes: scanning.MountRoutes,
 		// waf.security_events: a read model over the Analytics plane (ClickHouse), served here with
-		// the caller's own token so the portal lists and aggregates it like any entity.
+		// a read token signed for the caller's own grant, so the portal lists and aggregates it like any entity.
 		ExternalEntities: []app.ExternalEntity{{
 			Definition: analytics.SecurityEventEntity(),
 			Backend: func(state *web.State) (crud.RecordBackend, error) {
-				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL), Permissions: state.Permissions}, nil
+				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL), Tokens: &analytics.ReadTokens{Signer: state.TokenSigner, Grants: state.Permissions}}, nil
 			},
 		}},
 	})

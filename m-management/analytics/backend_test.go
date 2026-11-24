@@ -6,12 +6,17 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/metap-org/metap/pkg/auth/jwks"
 	"github.com/metap-org/metap/pkg/crud"
+	"github.com/metap-org/metap/pkg/kit/scope"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
 
@@ -46,8 +51,9 @@ func fakeAnalyticsAPI(t *testing.T) (*httptest.Server, *[]*http.Request, *[]stri
 
 func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	srv, reqs, bodies := fakeAnalyticsAPI(t)
-	backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Permissions: readers{allow: true}}
-	rc := &permission.RequestContext{ForwardedBearerToken: "caller-token"}
+	key, signer := newSigner(t)
+	backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Tokens: &analytics.ReadTokens{Signer: signer, Grants: grants{wide: true}}}
+	rc := callerRC()
 	ctx := context.Background()
 
 	// The portal's zone events list, as the REST list route hands it over.
@@ -62,7 +68,8 @@ func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	require.NotNil(t, res.Page.NextCursor)
 	require.Equal(t, "abc", *res.Page.NextCursor)
 	r0 := (*reqs)[0]
-	require.Equal(t, "Bearer caller-token", r0.Header.Get("Authorization"), "the caller's token goes to Analytics")
+	claims := readClaims(t, r0.Header.Get("Authorization"), key)
+	require.Equal(t, analytics.ZoneAccessAll, claims["zoneAccess"], "a read token for what this caller may see goes to Analytics")
 	require.Equal(t, "z1", r0.URL.Query().Get("zoneId"))
 	require.Equal(t, "blocked", r0.URL.Query().Get("action"))
 	require.Equal(t, "50", r0.URL.Query().Get("limit"))
@@ -91,25 +98,92 @@ func TestSecurityEventsComeFromAnalytics(t *testing.T) {
 	require.Equal(t, "invalid_query", se.Code)
 }
 
-// readers is the permission answer the tests choose.
-type readers struct{ allow bool }
+func newSigner(t *testing.T) (*jwks.JwksKeyPair, *jwks.TokenSigner) {
+	t.Helper()
+	key, err := jwks.GenerateJwksKeyPair("kid-test")
+	require.NoError(t, err)
+	return key, &jwks.TokenSigner{Kind: jwks.SignerJwks, Key: key}
+}
 
-func (r readers) CanReadEntity(context.Context, *permission.RequestContext, string) (permission.PermissionDecision, error) {
-	if r.allow {
+func callerRC() *permission.RequestContext {
+	return &permission.RequestContext{TenantID: uuid.NewString(), UserID: uuid.NewString(), ForwardedBearerToken: "login-token"}
+}
+
+// readClaims checks the bearer is a token for the Analytics API signed by key, and returns its claims.
+func readClaims(t *testing.T, header string, key *jwks.JwksKeyPair) jwt.MapClaims {
+	t.Helper()
+	raw := strings.TrimPrefix(header, "Bearer ")
+	require.NotEqual(t, "login-token", raw, "the caller's own login token is never what Analytics is sent")
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (any, error) { return key.PublicKey(), nil },
+		jwt.WithValidMethods([]string{"EdDSA"}), jwt.WithAudience(analytics.ReadAudience), jwt.WithExpirationRequired())
+	require.NoError(t, err)
+	return claims
+}
+
+// grants is the permission answer the tests choose: wide is the entity-level read (every zone),
+// scoped says the caller holds a granting role on some zones, zones being which.
+type grants struct {
+	wide   bool
+	scoped bool
+	zones  []string
+}
+
+func (g grants) CanReadEntity(context.Context, *permission.RequestContext, string) (permission.PermissionDecision, error) {
+	if g.wide {
 		return permission.Allowed(), nil
 	}
 	return permission.Forbidden(), nil
 }
 
-// The events live outside metap, so the read check is the backend's own: a role the tenant did not
-// grant waf.security_events (a Viewer, a Developer) gets a 403 from every read, and nothing is
-// asked of Analytics (audit 08).
+func (g grants) ScopeFor(_ context.Context, rc *permission.RequestContext, resource, action string) (scope.Scope, permission.PermissionDecision, error) {
+	if resource != analytics.EventsResource || action != "read" || !g.scoped {
+		return scope.Scope{}, permission.Forbidden(), nil
+	}
+	return scope.ForTenant(rc.TenantID).Limit("zone", g.zones...), permission.Allowed(), nil
+}
+
+func TestTheReadTokenSaysWhichZonesTheCallerMaySee(t *testing.T) {
+	srv, reqs, _ := fakeAnalyticsAPI(t)
+	key, signer := newSigner(t)
+	ctx := context.Background()
+	read := func(g analytics.Grants) jwt.MapClaims {
+		backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Tokens: &analytics.ReadTokens{Signer: signer, Grants: g}}
+		_, err := backend.List(ctx, analytics.SecurityEvents, query.ListInput{Limit: 10}, callerRC())
+		require.NoError(t, err)
+		return readClaims(t, (*reqs)[len(*reqs)-1].Header.Get("Authorization"), key)
+	}
+
+	c := read(grants{wide: true})
+	require.Equal(t, "all", c["zoneAccess"])
+	require.NotContains(t, c, "zones")
+
+	c = read(grants{scoped: true, zones: []string{"z1", "z2"}})
+	require.Equal(t, "limited", c["zoneAccess"])
+	require.Equal(t, []any{"z1", "z2"}, c["zones"])
+
+	c = read(grants{scoped: true})
+	require.Equal(t, "limited", c["zoneAccess"])
+	require.Equal(t, []any{}, c["zones"], "limited to none is sent as none, never left out")
+
+	exp, _ := c.GetExpirationTime()
+	require.WithinDuration(t, time.Now().Add(analytics.ReadTTL), exp.Time, 5*time.Second)
+}
+
+// The events live outside metap, so the read check is the backend's own: a role the tenant granted
+// neither the events entity nor the events resource on a zone gets a 403 from every read, and
+// nothing is asked of Analytics (audit 08).
 func TestSecurityEventsNeedTheReadPermission(t *testing.T) {
 	srv, reqs, _ := fakeAnalyticsAPI(t)
-	rc := &permission.RequestContext{ForwardedBearerToken: "caller-token"}
+	_, signer := newSigner(t)
 	ctx := context.Background()
-	for name, permissions := range map[string]analytics.ReadChecker{"denied": readers{}, "unwired": nil} {
-		backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Permissions: permissions}
+	for name, tokens := range map[string]*analytics.ReadTokens{
+		"denied":    {Signer: signer, Grants: grants{}},
+		"unwired":   {Signer: signer},
+		"no tokens": nil,
+	} {
+		backend := &analytics.Backend{Client: analytics.NewClient(srv.URL), Tokens: tokens}
+		rc := callerRC()
 		_, err := backend.List(ctx, analytics.SecurityEvents, query.ListInput{Limit: 10}, rc)
 		se, ok := crud.AsServiceError(err)
 		require.True(t, ok, name)
@@ -124,4 +198,19 @@ func TestSecurityEventsNeedTheReadPermission(t *testing.T) {
 		require.EqualValues(t, 403, se.Status, name)
 	}
 	require.Empty(t, *reqs, "a refused read never reaches Analytics")
+}
+
+func TestTheSweepsReadTheWholeTenantWithoutAPersonsGrant(t *testing.T) {
+	key, signer := newSigner(t)
+	token, err := (&analytics.ReadTokens{Signer: signer}).TenantWide(callerRC())
+	require.NoError(t, err)
+	require.Equal(t, "all", readClaims(t, "Bearer "+token, key)["zoneAccess"])
+}
+
+func TestTheNamesAnalyticsVerifiesAreTheOnesSigned(t *testing.T) {
+	require.Equal(t, "waap-analytics", analytics.ReadAudience)
+	require.Equal(t, "all", analytics.ZoneAccessAll)
+	require.Equal(t, "limited", analytics.ZoneAccessLimited)
+	require.Equal(t, "zoneAccess", analytics.ClaimZoneAccess)
+	require.Equal(t, "zones", analytics.ClaimZones)
 }

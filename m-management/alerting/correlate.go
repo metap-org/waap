@@ -105,7 +105,7 @@ func correlateIncidents(ctx context.Context, a *action.Ctx, cfg Config, state *w
 		filters[model.FieldZoneID] = *body.ZoneID
 	}
 	cutoff := time.Now().UTC().Add(-time.Duration(windowMinutes) * time.Minute)
-	events, err := recentEvents(ctx, cfg, rc, filters, cutoff)
+	events, err := recentEvents(ctx, cfg, state, rc, filters, cutoff)
 	if err != nil {
 		return correlation{}, err
 	}

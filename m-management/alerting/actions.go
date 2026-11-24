@@ -14,7 +14,7 @@
 //     firing.
 //
 // SecurityEvents live in the Analytics plane (ClickHouse), not here: both sweeps read them
-// through its query API with the caller's own token (ANALYTICS_URL), with the time window pushed
+// through its query API with a tenant-wide read token signed for the run (ANALYTICS_URL), with the time window pushed
 // into the query. Retention is ClickHouse's table TTL, so the old Postgres cleanup sweep is gone.
 //
 // Both are written as endpoints rather than background loops so metap-cron can drive them

@@ -18,8 +18,13 @@ import (
 
 // recentEvents reads events since cutoff (newest first, at most eventScanLimit). An Analytics
 // error keeps its own status (401 stays 401, 503 stays 503) instead of turning into a generic 500.
-func recentEvents(ctx context.Context, cfg Config, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, error) {
-	events, err := cfg.analytics().Window(ctx, rc.ForwardedBearerToken, filters, cutoff, eventScanLimit)
+func recentEvents(ctx context.Context, cfg Config, state *web.State, rc *permission.RequestContext, filters map[string]string, cutoff time.Time) ([]crud.RecordDto, error) {
+	tokens := &analytics.ReadTokens{Signer: state.TokenSigner}
+	token, err := tokens.TenantWide(rc)
+	if err != nil {
+		return nil, err
+	}
+	events, err := cfg.analytics().Window(ctx, token, filters, cutoff, eventScanLimit)
 	if err != nil {
 		var apiErr *analytics.APIError
 		if errors.As(err, &apiErr) {
