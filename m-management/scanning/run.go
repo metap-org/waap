@@ -53,8 +53,11 @@ type scanRun struct {
 // transaction (the call can be slow), then, only if the scanner refuses it, started and failed as
 // one step: a job is never left running because the second of those two moves did not happen.
 func RunScanJob(cfg Config, state *web.State) action.Action {
-	return action.Record(model.ScanJobs, model.ActionRun,
-		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (scanRun, error) {
+	return action.Custom(model.ScanJobs, model.ActionRun,
+		func(ctx context.Context, a *action.Ctx) (any, error) {
+			if err := a.LoadRecord(ctx, nil); err != nil {
+				return nil, err
+			}
 			job := a.Current
 
 			// run is valid from idle/completed/failed — a job already queued or running has nothing to
