@@ -1,11 +1,14 @@
 package bootstrap
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/metap-org/metap/pkg/metadata"
+
+	"github.com/metap-org/waap/m-management/analytics"
 
 	_ "github.com/metap-org/waap/m-management/alerting/entities"
 	_ "github.com/metap-org/waap/m-management/billing/entities"
@@ -51,4 +54,18 @@ func TestSecurityEventsCanBeGrantedToThePersonas(t *testing.T) {
 		}
 	}
 	require.True(t, viewer, "a Viewer reads the analytics")
+}
+
+// A role held only on one zone sees that zone's events through the events resource, not the entity.
+func TestScopedAnalystsAndViewersMaySeeTheirZonesEvents(t *testing.T) {
+	require.NoError(t, Personas().Validate())
+	for _, role := range []string{RoleSecurityAnalyst, RoleViewer} {
+		var granted bool
+		for _, g := range Personas().Grants {
+			if g.Role == role && slices.Contains(g.Resources, analytics.EventsResource) {
+				granted = true
+			}
+		}
+		require.True(t, granted, role)
+	}
 }
