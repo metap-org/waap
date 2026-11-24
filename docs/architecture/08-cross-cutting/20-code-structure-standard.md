@@ -14,7 +14,7 @@ Có ba tầng tái sử dụng, mỗi tầng một việc:
 | Tầng | Chứa gì | Ai được dùng |
 |---|---|---|
 | `metap/pkg/kit/*` (env, httpx, errcode, standard, shutdown), `pkg/runtime` | Tiện ích thuần, không biết nghiệp vụ, không biết metadata/DB | Mọi Go service, kể cả `e-edge`, `a-api` |
-| Nền tảng metap: `metadata`, `crud`, `permission`, `workflow`, `events`, `bootstrap`, `app`, `httpserver`, `recordclient` | Entity, router CRUD, workflow, phân quyền, outbox/event | Mọi service quản trị (`m-*`, `c-*`) |
+| Nền tảng metap: `metadata`, `crud`, `permission`, `workflow`, `events`, `bootstrap`, `app`, `web`, `recordclient` | Entity, router CRUD, workflow, phân quyền, outbox/event | Mọi service quản trị (`m-*`, `c-*`) |
 | Sản phẩm (waap): `entities/`, hành động, guard, logic thuần | **Chỉ khai báo và điền nghiệp vụ** vào các điểm mở của nền tảng | |
 
 Hệ quả: nghiệp vụ ngoài CRUD (onboarding, plan, rollback, export...) vẫn phải đi qua **cùng**

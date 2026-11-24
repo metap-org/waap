@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -79,7 +79,7 @@ type zoneIPKey struct {
 // doesn't copy them), so the title carries the key. Crude but stable, and it keeps a re-run
 // idempotent — which matters because this is scheduled, so it WILL run again over the same
 // events.
-func correlateIncidents(ctx context.Context, a *action.Ctx, cfg Config, state *httpserver.AppState, body correlateBody) (correlation, error) {
+func correlateIncidents(ctx context.Context, a *action.Ctx, cfg Config, state *web.State, body correlateBody) (correlation, error) {
 	rc := a.RC
 	windowMinutes := int64(defaultWindowMinutes)
 	if body.WindowMinutes != nil {

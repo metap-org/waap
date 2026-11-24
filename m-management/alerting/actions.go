@@ -26,18 +26,18 @@ import (
 
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
 // RegisterActions registers the handlers for the actions declared on this service's entities.
-func RegisterActions(cfg Config) func(*httpserver.AppState, *crud.ActionRegistry) error {
-	return func(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+func RegisterActions(cfg Config) func(*web.State, *crud.ActionRegistry) error {
+	return func(state *web.State, reg *crud.ActionRegistry) error {
 		return registerActions(cfg, state, reg)
 	}
 }
 
-func registerActions(cfg Config, state *httpserver.AppState, reg *crud.ActionRegistry) error {
+func registerActions(cfg Config, state *web.State, reg *crud.ActionRegistry) error {
 	// Reads and writes through the service's own backend, as these actions always did.
 	deps := state.ActionDeps()
 	deps.Records = state.Crud
@@ -54,7 +54,7 @@ func registerActions(cfg Config, state *httpserver.AppState, reg *crud.ActionReg
 }
 
 // CorrelateIncidents is the action waf.incidents.correlate: recent events into incidents.
-func CorrelateIncidents(cfg Config, state *httpserver.AppState) action.Action {
+func CorrelateIncidents(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.Incidents, model.ActionCorrelate,
 		func(ctx context.Context, a *action.Ctx, in correlateBody) (correlation, error) {
 			return correlateIncidents(ctx, a, cfg, state, in)
@@ -64,7 +64,7 @@ func CorrelateIncidents(cfg Config, state *httpserver.AppState) action.Action {
 // EvaluateAlerts is the action waf.alert_policies.evaluate: every enabled policy against the recent
 // events, counted per zone. Each firing delivers a notification (a call out that cannot be undone)
 // and records it, so it is not one step.
-func EvaluateAlerts(cfg Config, state *httpserver.AppState) action.Action {
+func EvaluateAlerts(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.AlertPolicies, model.ActionEvaluate,
 		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
 			return evaluateAlerts(ctx, cfg, state, a.RC)
@@ -72,7 +72,7 @@ func EvaluateAlerts(cfg Config, state *httpserver.AppState) action.Action {
 }
 
 // TestAlertPolicy is the action waf.alert_policies.test: the "Send test alert" button.
-func TestAlertPolicy(cfg Config, state *httpserver.AppState) action.Action {
+func TestAlertPolicy(cfg Config, state *web.State) action.Action {
 	return action.Record(model.AlertPolicies, model.ActionTest,
 		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (map[string]any, error) {
 			return testAlertPolicy(ctx, cfg, state, a.RC, a.ID)

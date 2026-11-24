@@ -13,7 +13,7 @@ import (
 
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/billing"
 	"github.com/metap-org/waap/m-management/zones/netcheck"
 	"github.com/metap-org/waap/m-management/zones/policy"
@@ -24,13 +24,13 @@ import (
 
 // RegisterActions registers the handlers for the actions declared on this service's
 // entities (see entities: Actions).
-func RegisterActions(cfg Config, plans billing.PlanLookup) func(*httpserver.AppState, *crud.ActionRegistry) error {
-	return func(state *httpserver.AppState, reg *crud.ActionRegistry) error {
+func RegisterActions(cfg Config, plans billing.PlanLookup) func(*web.State, *crud.ActionRegistry) error {
+	return func(state *web.State, reg *crud.ActionRegistry) error {
 		return registerActions(cfg, plans, state, reg)
 	}
 }
 
-func registerActions(cfg Config, plans billing.PlanLookup, state *httpserver.AppState, reg *crud.ActionRegistry) error {
+func registerActions(cfg Config, plans billing.PlanLookup, state *web.State, reg *crud.ActionRegistry) error {
 	deps := state.ActionDeps()
 
 	// Most actions read and write through the service's own backend, not the guard chain: what they

@@ -12,10 +12,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/httpx"
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -23,7 +23,7 @@ import (
 // error. Transition names come from entities.ScanJobEntity's workflow (run/start/complete/fail)
 // — this module never writes status directly, so guards, audit rows and outbox events all still
 // happen.
-func doTransition(ctx context.Context, state *httpserver.AppState, job crud.RecordDto, action string, rc *permission.RequestContext) (crud.RecordDto, error) {
+func doTransition(ctx context.Context, state *web.State, job crud.RecordDto, action string, rc *permission.RequestContext) (crud.RecordDto, error) {
 	result, err := state.Crud.Transition(ctx, model.ScanJobs, job.ID, action, job.Version, nil, rc, nil)
 	if err != nil {
 		return crud.RecordDto{}, fmt.Errorf("transition %s: %w", action, err)
@@ -31,10 +31,10 @@ func doTransition(ctx context.Context, state *httpserver.AppState, job crud.Reco
 	return result, nil
 }
 
-func loadJob(ctx context.Context, w http.ResponseWriter, state *httpserver.AppState, id uuid.UUID, rc *permission.RequestContext) (crud.RecordDto, bool) {
+func loadJob(ctx context.Context, w http.ResponseWriter, state *web.State, id uuid.UUID, rc *permission.RequestContext) (crud.RecordDto, bool) {
 	result, err := state.Crud.Get(ctx, model.ScanJobs, id, rc)
 	if err != nil {
-		httpserver.WriteCrudError(w, err)
+		web.WriteCrudError(w, err)
 		return crud.RecordDto{}, false
 	}
 	return result.Record, true
@@ -52,7 +52,7 @@ type scanRun struct {
 // The job is queued first (one workflow transition), then handed to the scanner outside any
 // transaction (the call can be slow), then, only if the scanner refuses it, started and failed as
 // one step: a job is never left running because the second of those two moves did not happen.
-func RunScanJob(cfg Config, state *httpserver.AppState) action.Action {
+func RunScanJob(cfg Config, state *web.State) action.Action {
 	return action.Record(model.ScanJobs, model.ActionRun,
 		func(ctx context.Context, a *action.Ctx, _ action.None, _ action.None) (scanRun, error) {
 			job := a.Current

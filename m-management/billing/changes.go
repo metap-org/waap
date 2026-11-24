@@ -22,10 +22,10 @@ import (
 
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
-	"github.com/metap-org/metap/pkg/httpserver"
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/query"
+	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
@@ -291,7 +291,7 @@ type requestPlanIn struct {
 }
 
 // RequestPlan is the action waf.plan_change_requests.requestPlan: a customer asks for a plan.
-func RequestPlan(cfg Config, state *httpserver.AppState) action.Action {
+func RequestPlan(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.PlanChanges, model.ActionRequestPlan,
 		func(ctx context.Context, a *action.Ctx, in requestPlanIn) (crud.JsonObject, error) {
 			// The name is read from the tenant registry, not taken from the caller.
@@ -302,7 +302,7 @@ func RequestPlan(cfg Config, state *httpserver.AppState) action.Action {
 }
 
 // MyPlanRequests is the action waf.plan_change_requests.myPlanRequests: the caller's own requests.
-func MyPlanRequests(cfg Config, state *httpserver.AppState) action.Action {
+func MyPlanRequests(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.PlanChanges, model.ActionMyPlanRequests,
 		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
 			list, err := cfg.PlanSource(state.Crud).MyPlanRequests(ctx, a.RC)
@@ -321,7 +321,7 @@ type decidePlanIn struct {
 // DecidePlan is the action waf.plan_change_requests.decidePlan: the operator approves or rejects.
 // It is declared on one record but reads that record itself, under the request's own lock, so it is
 // written as an entity action: the framework does not read the record first.
-func DecidePlan(cfg Config, state *httpserver.AppState) action.Action {
+func DecidePlan(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.PlanChanges, model.ActionDecidePlan,
 		func(ctx context.Context, a *action.Ctx, in decidePlanIn) (map[string]any, error) {
 			return cfg.PlanSource(state.Crud).DecidePlanChange(ctx, a.RC, a.ID, in.Approve, in.Note, time.Now())
