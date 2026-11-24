@@ -267,7 +267,7 @@ func TestConcurrentPlanRequestsAndDecisionsLetOneThrough(t *testing.T) {
 		require.NoError(t, err)
 		return r
 	}
-	_, big := mk("Small", 1, true), mk("Big", 10, false)
+	small, big := mk("Small", 1, true), mk("Big", 10, false)
 
 	const n = 6
 	var wg sync.WaitGroup
@@ -287,19 +287,26 @@ func TestConcurrentPlanRequestsAndDecisionsLetOneThrough(t *testing.T) {
 	require.EqualValues(t, 1, asked.Load(), "only one request waits per customer")
 
 	var decided atomic.Int32
+	var approved atomic.Bool // which decision won the race: it is not the same on every run
 	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(approve bool) {
 			defer wg.Done()
 			if _, err := src.DecidePlanChange(ctx, opRC, requestID.Load().(uuid.UUID), approve, "", time.Now()); err == nil {
 				decided.Add(1)
+				approved.Store(approve)
 			}
 		}(i%2 == 0)
 	}
 	wg.Wait()
 	assert.EqualValues(t, 1, decided.Load(), "only one decision is taken")
 
-	// Decided: the customer can ask again.
-	_, err := src.RequestPlanChange(ctx, custRC, big.ID.String(), "", "Acme")
+	// Decided: the customer can ask again, for a plan other than the one it is on now (asking for the
+	// plan it already has is refused, which is what happens when the approval won the race).
+	other := big
+	if approved.Load() {
+		other = small
+	}
+	_, err := src.RequestPlanChange(ctx, custRC, other.ID.String(), "", "Acme")
 	assert.NoError(t, err)
 }
