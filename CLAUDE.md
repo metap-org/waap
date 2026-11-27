@@ -139,14 +139,12 @@ carries the plane prefix (`m-`, `c-`, `e-`, `a-`):
 | `a-api/` | Telemetry: security events (later access logs, usage) — ingest, storage, query. **Not** built on `metap` (ADR-0009): only `pkg/kit/*`, depguard-enforced like `edge-plane` | `analytics-api` (2026-11-08, first cut): batch ingest from `control-plane` (`POST /v1/security-events/ingest`, ingest secret + platform token, tenant from the token), ClickHouse MergeTree with TTL retention (30 days), structured query API (allowlisted equality filters, keyset cursor, metap-shaped aggregate). Verifies platform tokens itself against zones-service's JWKS. Management reads it two ways, both with a short-lived READ token it signs (audience `waap-analytics`, 60s, claims `zoneAccess` all|limited and `zones`; `m-management/analytics/readtoken.go`; an ordinary login token reads no events): the portal's read model serves `waf.security_events` as a read-only read model (`m-analytics.Backend` as an `app.Options.ExternalEntities` entry, since 2026-11-21; before that the GraphQL gateway did), and alerting's correlate/evaluate sweeps read a time window with a tenant-wide read token. Not yet: Kafka/Vector/enricher/archiver/detection/exporter. Zone-level read limits: every read takes a `scope.Scope` (metap `pkg/kit/scope`, roadmap 121) and honours a limit on `zone`; the read token's grant (entity read = every zone, else the zones a `ScopedRole` is granted the `waf.security_events` resource on) becomes `Identity.Scope()`, so a-api enforces it itself, roadmap 121 §8 |
 | `e-edge/` | High-performance, low-latency mitigation engine: evaluates rules against real traffic, blocks/challenges/logs. Deliberately **not** built on `metap`/metadata-driven approach | `waf-edge` — hyper 1.x (now Go `net/http`), **no `metap` platform dependency** — only `metap`'s stdlib-only `pkg/kit/*` since 2026-11-07, depguard-enforced. `ArcSwap` rule snapshot (a request never touches Redis), DDoS budget → priority-ordered rules → block/challenge/log → proxy to origin |
 
-**`devtools/` is not a plane** (2026-11-08): dev/staging stand-ins for the outside world, each its
-own Go module with no `metap` dependency and never deployed to production. `devtools/dns-mock`
-plays every external DNS (customer DNS providers, public resolvers): real DNS on :5353 (host :15353 under compose), DoH on
-:8053, records/faults set via API or its UI. Both `management-plane` compose files run it, and point
-zones-service's `DOH_RESOLVER_URL` at it. Anything that needs "real" DNS in dev goes through it
-rather than a real domain. `devtools/mail-mock` (2026-11-16, roadmap 113 P2) plays the outside mail
-relay: SMTP on :1025, UI + API on :8025, accepts everything and delivers nothing; both compose files
-run it and point zones-service's `SMTP_HOST` at it (invitation and password-reset emails).
+**No dev stand-ins live in this repo** (2026-11-27): `devtools/dns-mock` and `devtools/mail-mock` were
+removed in favour of the sibling `../../mockhub` repo, run on the host: DNS (UDP/TCP), DoH JSON and a
+REST API on :8053, SMTP on :2525. `config/management.dev.yaml` points at it (`m-deploy/README.md` has
+the commands); its `docs/waap-mocks-status.md` lists what the removed mocks did that it still lacks
+(IMAP, POP3, mail UI, DoH wire format, query log, upstream forwarding, admin token). The old code is in git history (commit `c059e18`,
+`devtools/`). Every `dns-mock`/`mail-mock` mention elsewhere in this file is history.
 
 Key rule, stated repeatedly in the docs: **`edge-plane` never talks to `management-plane` directly.** It
 only reads config that `control-plane` has already computed into Redis/DragonflyDB.

@@ -14,7 +14,6 @@ mỗi service là một thư mục phẳng ở gốc repo, tên mang tiền tố
 | `c-config-distributor/` | Control | Lấy config từ management, compile thành rule-set, đẩy xuống Redis cho edge; nhận telemetry từ edge — worker nền, không UI |
 | `e-edge/` | Edge | Thực thi mitigation thật tại biên (evaluate rule, chặn/challenge) — module Go riêng, chỉ import `metap/pkg/kit` |
 | `a-api/` | Analytics | Nhận security event từ control, lưu ClickHouse, query API cho portal và alerting — module Go riêng, chỉ import `metap/pkg/kit` |
-| [`devtools/`](devtools/) | — | Không phải plane: thứ giả lập thế giới bên ngoài cho dev/staging (`dns-mock`) |
 
 Các service `m-*` và `c-*` chung một Go module ở gốc repo (`go build ./...`, `go test ./...` từ gốc);
 `e-edge` và `a-api` là module riêng.

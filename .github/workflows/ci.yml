@@ -103,52 +103,6 @@ jobs:
       - working-directory: waap
         run: govulncheck ./...
 
-  # Dev/staging DNS stand-in — its own module with no metap dependency, so no metap checkout.
-  dns-mock-go:
-    name: devtools/dns-mock — build, vet, unit tests, fmt
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: devtools/dns-mock
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: devtools/dns-mock/go.mod
-          cache-dependency-path: devtools/dns-mock/go.sum
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test ./...
-      - run: |
-          files=$(gofmt -l .)
-          if [ -n "$files" ]; then
-            echo "$files"
-            exit 1
-          fi
-
-  # Dev/staging mail stand-in (SMTP, IMAP, POP3) — its own module, standard library only.
-  mail-mock-go:
-    name: devtools/mail-mock — build, vet, unit tests, fmt
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: devtools/mail-mock
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: devtools/mail-mock/go.mod
-          cache: false
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test ./...
-      - run: |
-          files=$(gofmt -l .)
-          if [ -n "$files" ]; then
-            echo "$files"
-            exit 1
-          fi
-
   a-api-go:
     name: a-api (analytics plane) — build, vet, unit tests, fmt, metap-kit-only guard
     runs-on: ubuntu-latest
