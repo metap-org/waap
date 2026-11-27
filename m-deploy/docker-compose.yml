@@ -52,29 +52,6 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
-    depends_on:
-      dns-mock: { condition: service_started }
-      mail-mock: { condition: service_started }
-
-  # Stand-in for the outside world's mail relay (../devtools/mail-mock) — dev/staging only. SMTP on
-  # :1025, IMAP :1143, POP3 :1110, UI + API on :8025; accepts every message, delivers none.
-  mail-mock:
-    build: { context: ../devtools/mail-mock }
-    ports: ["1025:1025", "1143:1143", "1110:1110", "8025:8025"]
-
-  # Stand-in for the outside world's DNS (../devtools/dns-mock) — dev/staging only. Real DNS on
-  # host :15353 (udp+tcp, container :5353; host 5353 is usually taken by mDNS), DoH + admin API + UI on :8053. Set DNS_MOCK_ADMIN_TOKEN on a shared staging
-  # host so only the team can change records.
-  dns-mock:
-    build: { context: ../devtools/dns-mock }
-    ports: ["${DNS_MOCK_HOST_PORT:-15353}:5353/udp", "${DNS_MOCK_HOST_PORT:-15353}:5353/tcp", "8053:8053"]
-    environment:
-      DNS_MOCK_STATE_FILE: /var/lib/dns-mock/state.json
-      DNS_MOCK_SEED_FILE: /etc/dns-mock/seed.dev.json
-      DNS_MOCK_ADMIN_TOKEN: ${DNS_MOCK_ADMIN_TOKEN:-}
-      DNS_MOCK_UPSTREAM: ${DNS_MOCK_UPSTREAM:-}
-    volumes:
-      - dns-mock:/var/lib/dns-mock
 
   # --- Analytics plane (../../a-api) — separate plane, bundled here for local runs ---
   clickhouse:
@@ -124,5 +101,4 @@ services:
       start_period: 5s
 
 volumes:
-  dns-mock:
   clickhouse:

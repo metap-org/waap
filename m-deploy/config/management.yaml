@@ -16,16 +16,11 @@ jwks:
 
 # Where security events are read from (the Analytics plane).
 analytics_url: http://analytics-api:3030
-# Dev/staging: DNS checks go to dns-mock. A real deployment removes this (dns.google) or points it at
-# its own resolver.
-doh_resolver_url: http://dns-mock:8053/resolve
-
-# Invitation and password-reset emails. Dev/staging: mail-mock (UI on :8025). A real deployment sets
-# SMTP_HOST, SMTP_PORT, SMTP_FROM and PUBLIC_APP_URL (the portal's origin) in .env.
-smtp:
-  host: mail-mock
-  port: 1025
-  from: "WAF Portal <no-reply@waf.local>"
+# DNS checks use dns.google unless doh_resolver_url names another resolver. Invitation and
+# password-reset emails need SMTP_HOST, SMTP_PORT and SMTP_FROM (in .env); without them none are
+# sent. For a local run, mockhub (../../../mockhub) on the host serves both:
+# doh_resolver_url http://host.docker.internal:8053/resolve, SMTP host.docker.internal:2525.
+# A real deployment sets the SMTP_* values and PUBLIC_APP_URL (the portal's origin) in .env.
 public_app_url: http://localhost:8081
 
 # The tenant (uuid) that runs this service: it owns plans and subscriptions, is never limited, and

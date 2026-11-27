@@ -157,8 +157,7 @@ export RABBITMQ_URL=amqp://metap:metap@localhost:5672
 JWKS=http://localhost:3000/.well-known/jwks.json
 PORT=3000 JWKS_KEYS_DIR=m-deploy/keys/jwks ANALYTICS_URL=http://localhost:3030 \
   go run ./m-management/cmd/management-service     # :3000, issuer + mọi entity
-# 2c cần DNS mock riêng: (cd ../devtools/dns-mock && DNS_MOCK_SEED_FILE=seed.dev.json go run .)
-# rồi chạy management-service với DOH_RESOLVER_URL=http://localhost:8053/resolve
+# Không đặt DOH_RESOLVER_URL thì tra DNS qua dns.google (xem "DNS và email khi dev" bên dưới)
 ```
 
 **Analytics plane**: cả 2 compose chạy kèm `clickhouse` (:9000/:8123) và `analytics-api` (:3030,
@@ -166,10 +165,24 @@ PORT=3000 JWKS_KEYS_DIR=m-deploy/keys/jwks ANALYTICS_URL=http://localhost:3030 \
 và phục vụ chúng cho portal thành entity chỉ-đọc `waf.security_events` (`app.Options.ExternalEntities`). Chạy 2c
 trên host thì đặt `ANALYTICS_URL=http://localhost:3030` cho management-service.
 
-**DNS khi dev/staging**: cả 2 compose chạy kèm `dns-mock` (`../devtools/dns-mock`, xem README
-của nó). management-service tra mọi bản ghi xác minh domain (TXT) và định tuyến (CNAME) qua đó thay cho
-`dns.google`. Muốn khai báo bản ghi thì vào UI ở `http://localhost:8053`, tra thật bằng
-`dig @127.0.0.1 -p 15353` (cổng host; đổi bằng `DNS_MOCK_HOST_PORT`).
+**DNS và email khi dev** (2026-11-27): dùng `mockhub` (`../../../mockhub`), chạy trên host, thay cho
+`dns-mock` và `mail-mock` đã gỡ. `docker-compose.dev.yml` đã trỏ sẵn vào nó (`config/management.dev.yaml`):
+
+```bash
+cd ../../../mockhub
+MOCKHUB__DNS__PORT=15353 MOCKHUB__DNS__SEED_FILE=config/seed.example.json cargo run --release -p mockhub-server
+# DNS :15353 (udp+tcp), SMTP :2525, REST + DoH :8053. Seed có sẵn *.edge.waf.local (EDGE_CNAME_TARGET).
+```
+
+Xác minh một domain: lấy `verificationToken` của domain trên portal, rồi
+
+```bash
+curl -XPOST localhost:8053/v1/dns/records -H 'content-type: application/json' \
+  -d '{"name":"_waf-verify.shop.test","type":"TXT","value":"<token>","replace":true}'
+```
+
+Đọc thư mời / đặt lại mật khẩu: `curl 'localhost:8053/v1/mail/messages/latest?to=<email>'` (UI mail của
+mockhub chưa nối dữ liệu thật). Không chạy mockhub thì tra DNS thất bại và không gửi được thư.
 
 ### Token: một issuer duy nhất (JWKS)
 

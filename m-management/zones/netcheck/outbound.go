@@ -7,7 +7,7 @@
 // and test hostnames are on localhost or a mock).
 //
 // Names are resolved the way the rest of this service resolves them (DoH, Config.DoHURL), so a dev
-// run against dns-mock resolves test domains and production resolves what the world does.
+// run against a DNS mock resolves test domains and production resolves what the world does.
 package netcheck
 
 import (

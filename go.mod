@@ -2,8 +2,8 @@ module github.com/metap-org/waap
 
 go 1.26.11
 
-// Non-Go siblings of this module: keep `go ./...` from walking m-web/node_modules. e-edge,
-// a-api and devtools/dns-mock carry their own go.mod and are therefore separate modules.
+// Non-Go siblings of this module: keep `go ./...` from walking m-web/node_modules. e-edge and
+// a-api carry their own go.mod and are therefore separate modules.
 ignore (
 	./docs
 	./labs
