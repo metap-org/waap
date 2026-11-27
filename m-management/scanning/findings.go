@@ -3,11 +3,13 @@
 package scanning
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/kit/standard"
@@ -71,51 +73,65 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
 		return
 	}
 
-	now := standard.NowRFC3339()
-	created := make([]uuid.UUID, 0, len(body.Findings))
-	for _, finding := range body.Findings {
-		data := crud.JsonObject{
-			model.FieldScanJobID: jsonStr(job.ID.String()), model.FieldSeverity: jsonStr(finding.Severity),
-			model.FieldCategory: jsonStr(finding.Category), model.FieldEndpoint: jsonStr(finding.Endpoint),
-			model.FieldFirstSeenAt: jsonStr(now), model.FieldLastSeenAt: jsonStr(now),
-		}
-		if finding.Description != nil {
-			data[model.FieldDescription] = jsonStr(*finding.Description)
-		}
-		result, err := state.Crud.Create(r.Context(), model.ScanFindings, data, rc, nil)
-		if err != nil {
-			web.WriteCrudError(w, err)
-			return
-		}
-		created = append(created, result.ID)
-	}
-
-	// The job may still be "queued" if the scanner was quick — walk it through start first so
-	// the transition graph is respected rather than jumped over.
-	current := job
-	if current.Status != nil && *current.Status == model.ScanJobQueued {
-		current, err = doTransition(r.Context(), state, current, model.ScanJobStart, rc)
-		if err != nil {
-			web.WriteInternalError(w, err)
-			return
-		}
-	}
-	finish := model.ScanJobComplete
-	if !succeeded {
-		finish = model.ScanJobFail
-	}
-	finished, err := doTransition(r.Context(), state, current, finish, rc)
-	if err != nil {
-		web.WriteInternalError(w, err)
-		return
-	}
-
-	// lastRunAt isn't part of any transition's SetFields, so it's written here — the one field
-	// this flow owns that the workflow itself doesn't.
-	patch := crud.JsonObject{model.FieldLastRunAt: jsonStr(now)}
-	jobAfter, err := state.Crud.Update(r.Context(), model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
+	// The findings, the job's walk through its workflow and lastRunAt are one step: they commit together
+	// or not at all. Before this a failure half way (a finding refused, a stale version on the
+	// transition) left findings on a job that was still "queued", and a retry then added them again.
+	unit, err := action.NewUnit(state.ActionDeps().Sink, rc)
 	if err != nil {
 		web.WriteCrudError(w, err)
+		return
+	}
+	var created []uuid.UUID
+	var finished, jobAfter crud.RecordDto
+	err = unit.Step(r.Context(), "submit findings", func(ctx context.Context) error {
+		now := standard.NowRFC3339()
+		created = make([]uuid.UUID, 0, len(body.Findings))
+		for _, finding := range body.Findings {
+			data := crud.JsonObject{
+				model.FieldScanJobID: jsonStr(job.ID.String()), model.FieldSeverity: jsonStr(finding.Severity),
+				model.FieldCategory: jsonStr(finding.Category), model.FieldEndpoint: jsonStr(finding.Endpoint),
+				model.FieldFirstSeenAt: jsonStr(now), model.FieldLastSeenAt: jsonStr(now),
+			}
+			if finding.Description != nil {
+				data[model.FieldDescription] = jsonStr(*finding.Description)
+			}
+			result, err := state.Crud.Create(ctx, model.ScanFindings, data, rc, nil)
+			if err != nil {
+				return err
+			}
+			created = append(created, result.ID)
+		}
+
+		// The job may still be "queued" if the scanner was quick — walk it through start first so
+		// the transition graph is respected rather than jumped over.
+		current := job
+		if current.Status != nil && *current.Status == model.ScanJobQueued {
+			var err error
+			if current, err = doTransition(ctx, state, current, model.ScanJobStart, rc); err != nil {
+				return err
+			}
+		}
+		finish := model.ScanJobComplete
+		if !succeeded {
+			finish = model.ScanJobFail
+		}
+		var err error
+		if finished, err = doTransition(ctx, state, current, finish, rc); err != nil {
+			return err
+		}
+
+		// lastRunAt isn't part of any transition's SetFields, so it's written here — the one field
+		// this flow owns that the workflow itself doesn't.
+		patch := crud.JsonObject{model.FieldLastRunAt: jsonStr(now)}
+		jobAfter, err = state.Crud.Update(ctx, model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
+		return err
+	})
+	if err != nil {
+		web.WriteCrudError(w, err)
+		return
+	}
+	if err := unit.Close(r.Context()); err != nil {
+		web.WriteInternalError(w, err)
 		return
 	}
 	web.WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
