@@ -36,9 +36,12 @@ func RegisterActions(cfg Config) func(*web.State, *crud.ActionRegistry) error {
 }
 
 // MountRoutes serves the scanner's callback. Running a scan is a declared action (RegisterActions).
+// Every route says who may call it by the gate it is registered through (TestRoutesHaveAnAccessRule).
 func MountRoutes(r *router.Router, state *web.State) {
 	wrap := func(h func(http.ResponseWriter, *http.Request, *web.State)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { h(w, r, state) }
 	}
-	r.Post("/internal/scan-jobs/{id}/findings", wrap(SubmitFindings))
+	// The scanner posts as a signed-in caller (a service account); SubmitFindings still reads the job through
+	// the caller's own permissions.
+	web.Authenticated(r, state).Post("/internal/scan-jobs/{id}/findings", wrap(SubmitFindings))
 }
