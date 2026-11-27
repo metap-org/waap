@@ -266,3 +266,48 @@ func TestSubmitFindingsCompletesTheJobAndCreatesFindings(t *testing.T) {
 	big := doPost(t, baseURL+"/internal/scan-jobs/"+jobID.String()+"/findings", token, tooMany)
 	require.Equal(t, http.StatusRequestEntityTooLarge, big.StatusCode)
 }
+
+// The findings, the job's transitions and lastRunAt commit together: a finding the service refuses
+// half way leaves no earlier finding behind and the job where it was, so the scanner can retry.
+func TestSubmitFindingsIsAllOrNothing(t *testing.T) {
+	pool := testPool(t)
+	registry := setupRegistry(t, pool)
+	tenantID, userID := uuid.New(), uuid.New()
+	seedAdmin(t, pool, tenantID, userID)
+	t.Cleanup(func() { cleanupEntityRows(t, pool, tenantID) })
+	state, privPEM := newTestState(t, pool, registry)
+	rc := adminContext(tenantID, userID)
+	ctx := context.Background()
+
+	jobData := crud.JsonObject{"zoneId": jsonMarshal(t, "zone-"+uuid.New().String()), "scanType": jsonMarshal(t, "fullScan")}
+	job, err := state.Crud.Create(ctx, "waf.scan_jobs", jobData, rc, nil)
+	require.NoError(t, err)
+	_, err = state.Crud.Transition(ctx, "waf.scan_jobs", job.ID, "run", job.Version, nil, rc, nil)
+	require.NoError(t, err)
+
+	r := router.New()
+	scanning.MountRoutes(r, state)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	server := &http.Server{Handler: r}
+	go server.Serve(listener)
+	t.Cleanup(func() { server.Close() })
+	token, err := jwks.MintRSAJWT(privPEM, tenantID, userID, 3600)
+	require.NoError(t, err)
+
+	body, _ := json.Marshal(map[string]any{"findings": []map[string]any{
+		{"severity": "high", "category": "sqli", "endpoint": "/login"},
+		{"severity": "not-a-severity", "category": "headers", "endpoint": "/"},
+	}, "succeeded": true})
+	resp := doPost(t, "http://"+listener.Addr().String()+"/internal/scan-jobs/"+job.ID.String()+"/findings", token, body)
+	require.GreaterOrEqual(t, resp.StatusCode, 400)
+
+	findings, err := state.Crud.List(ctx, "waf.scan_findings",
+		query.ListInput{Limit: 10, Filters: [][2]string{{"scanJobId", job.ID.String()}}}, rc)
+	require.NoError(t, err)
+	assert.Empty(t, findings.Data, "the first finding was rolled back with the failed second one")
+	after, err := state.Crud.Get(ctx, "waf.scan_jobs", job.ID, rc)
+	require.NoError(t, err)
+	require.NotNil(t, after.Record.Status)
+	assert.Equal(t, "queued", *after.Record.Status, "the job is where the scanner found it")
+}
