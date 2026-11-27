@@ -88,11 +88,15 @@ func TestVerifyDomainNeverTrustsAnEmptyToken(t *testing.T) {
 	assert.Empty(t, res.Records.Writes)
 }
 
-func TestVerifyDomainAcceptsAnExpectedTokenOverrideForManualTesting(t *testing.T) {
+// The caller cannot say which token to look for: a TXT value already published under _waf-verify
+// would otherwise prove a domain.
+func TestVerifyDomainRefusesATokenFromTheCaller(t *testing.T) {
 	f := newDomain("tok-123")
-	res := f.run(dohAnswering(t, "override"), map[string]any{"expectedToken": "override"})
-	require.NoError(t, res.Err)
-	assert.JSONEq(t, `true`, string(res.Out["ownershipVerified"]))
+	res := f.run(dohAnswering(t, "someone-elses-token"), map[string]any{"expectedToken": "someone-elses-token"})
+	se, ok := crud.AsServiceError(res.Err)
+	require.True(t, ok)
+	assert.EqualValues(t, http.StatusBadRequest, se.Status)
+	assert.Empty(t, res.Records.Writes)
 }
 
 func TestVerifyDomainRefusesAMethodItDoesNotKnow(t *testing.T) {

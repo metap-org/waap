@@ -4,7 +4,6 @@ package guard
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/metap-org/metap/pkg/crud"
@@ -53,7 +52,7 @@ func (g *domainGuard) resolveDomainID(ctx context.Context, hostname string, rc *
 	}
 	created, err := g.inner.Create(ctx, model.Domains, crud.JsonObject{
 		model.FieldApexDomain:         jx.String(apex),
-		model.FieldVerificationToken:  jx.String(fmt.Sprintf("waf-verify-%s", uuid.New())),
+		model.FieldVerificationToken:  jx.String(newVerificationToken()),
 		model.FieldVerificationMethod: jx.String(model.VerificationMethodDNSTxt),
 		model.FieldVerificationStatus: jx.String(model.VerificationUnverified),
 	}, rc, nil)

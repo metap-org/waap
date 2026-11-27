@@ -55,6 +55,9 @@ func (b *Backend) chain() crud.RecordBackend {
 	c = &versionGuard{passthrough{c}}
 	c = &accountGuard{passthrough{c}}
 	c = &domainGuard{passthrough{c}}
+	// Above domainGuard, so it judges what the client sent, not the status domainGuard copies from a
+	// proved domain; below validationGuard, so a hostname arrives in its canonical form.
+	c = &ownershipGuard{passthrough{c}}
 	c = &validationGuard{passthrough{c}}
 	c = &referenceGuard{passthrough{c}}
 	c = &quotaGuard{passthrough: passthrough{c}, plans: b.plans, locks: b.locks}
