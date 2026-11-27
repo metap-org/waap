@@ -138,9 +138,6 @@ type VerifyDNSBody struct {
 	// from for httpFile (the domain itself, or a name under it).
 	Method string `json:"method"`
 	Host   string `json:"host"`
-	// ExpectedToken is an optional override for local/manual testing — normally the check reads
-	// the domain's own verificationToken and never trusts a caller-supplied value.
-	ExpectedToken *string `json:"expectedToken"`
 }
 
 // domainFields is what verifyDns reads of the domain record.
@@ -172,10 +169,8 @@ func VerifyDomain(cfg Config) action.Action {
 			if d.ApexDomain == "" {
 				return DomainVerification{}, crud.NewServiceErrorMsg(http.StatusBadRequest, errcode.ValidationFailed, "Domain has no apexDomain.")
 			}
+			// Only the domain's own token proves it: nothing the caller sends is compared.
 			expectedToken := d.VerificationToken
-			if in.ExpectedToken != nil {
-				expectedToken = *in.ExpectedToken
-			}
 			method := in.Method
 			if method == "" {
 				method = model.VerificationMethodDNSTxt
