@@ -11,6 +11,7 @@ import (
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/kit/errcode"
 	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/waap/m-management/zones/internal/jx"
 	"github.com/metap-org/waap/m-management/zones/versions"
 	"github.com/metap-org/waap/model"
@@ -31,14 +32,15 @@ func Publishing(ctx context.Context) context.Context {
 
 func isPublishing(ctx context.Context) bool { v, _ := ctx.Value(publishingKey{}).(bool); return v }
 
-// ChangeControl is how a change reaches the zone: its account's setting, off when the zone has no
-// account or does not exist (the write is then refused for its own reason). The zone and account are
+// ChangeControl is how a change reaches the zone: its account's setting. uuid.Nil asks about the
+// tenant-wide records, which reach every zone: the strictest setting of any open account. It is off
+// when the zone has no account or does not exist (the write is then refused for its own reason). The zone and account are
 // read as admin: the answer must not depend on what the caller may see.
 func ChangeControl(ctx context.Context, backend crud.RecordBackend, zoneID uuid.UUID, rc *permission.RequestContext) (string, error) {
-	if zoneID == uuid.Nil {
-		return model.ChangeControlOff, nil
-	}
 	admin := versions.AsAdmin(rc)
+	if zoneID == uuid.Nil {
+		return strictestControl(ctx, backend, admin)
+	}
 	zone, err := backend.Get(ctx, model.Zones, zoneID, admin)
 	if err != nil {
 		return offWhenMissing(err)
@@ -58,6 +60,31 @@ func ChangeControl(ctx context.Context, backend crud.RecordBackend, zoneID uuid.
 	return model.ChangeControlOff, nil
 }
 
+// strictness orders the settings, so the strictest of several accounts can be taken.
+var strictness = map[string]int{model.ChangeControlOff: 0, model.ChangeControlReview: 1, model.ChangeControlFourEyes: 2}
+
+func strictestControl(ctx context.Context, backend crud.RecordBackend, admin *permission.RequestContext) (string, error) {
+	strictest := model.ChangeControlOff
+	for offset := int64(0); ; offset += versions.SnapshotPage {
+		page, err := backend.List(ctx, model.Accounts, query.ListInput{Limit: versions.SnapshotPage, Offset: offset}, admin)
+		if err != nil {
+			return "", err
+		}
+		for _, account := range page.Data {
+			// A closed account has no running zone for a tenant-wide record to reach.
+			if status, _ := jx.AsString(account.Data[model.FieldStatus]); status == model.AccountClosed {
+				continue
+			}
+			if mode, _ := jx.AsString(account.Data[model.FieldChangeControl]); strictness[mode] > strictness[strictest] {
+				strictest = mode
+			}
+		}
+		if int64(len(page.Data)) < versions.SnapshotPage {
+			return strictest, nil
+		}
+	}
+}
+
 // offWhenMissing reads "not there" as off; any other failure stops the write.
 func offWhenMissing(err error) (string, error) {
 	if se, ok := crud.AsServiceError(err); ok && se.Status == http.StatusNotFound {
@@ -69,9 +96,10 @@ func offWhenMissing(err error) (string, error) {
 // changeControlGuard refuses (1) every client write to a change request, and (2) a direct write to the
 // policy of a zone whose account has change control on, except the emergency channel: creating a
 // temporary rule that only restricts, and removing a temporary one.
+// Tenant-wide records are under control as soon as any open account is.
 //
-// Not covered, on purpose for now: tenant-wide rules (they belong to no zone, so to no account),
-// zone settings such as protectionMode and origin, and rollback (it restores content that was live).
+// Not covered yet: zone settings such as protectionMode and origin, and rollback (it restores content
+// that was live).
 type changeControlGuard struct{ passthrough }
 
 func (g *changeControlGuard) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
@@ -144,8 +172,12 @@ func (g *changeControlGuard) require(ctx context.Context, zoneID uuid.UUID, rc *
 	if err != nil || mode == model.ChangeControlOff {
 		return err
 	}
+	why := "This zone's account requires a change request for this change."
+	if zoneID == uuid.Nil {
+		why = "An account of this tenant has change control on, so a tenant-wide rule needs a change request."
+	}
 	return crud.NewServiceErrorMsg(http.StatusConflict, model.ErrChangeRequestRequired,
-		"This zone's account requires a change request for this change. Only a temporary rule that blocks, challenges or logs (at most 72 hours) can be added directly.")
+		why+" Only a temporary rule that blocks, challenges or logs (at most 72 hours) can be added directly.")
 }
 
 // isEmergencyRule: a new rule that expires within MaxEmergencyRuleLife and cannot let more through.

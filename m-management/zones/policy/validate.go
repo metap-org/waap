@@ -9,6 +9,7 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -165,5 +166,10 @@ func Validate(ctx context.Context, backend crud.RecordBackend, zoneID uuid.UUID,
 	if err != nil {
 		return ValidationReport{}, err
 	}
-	return checkSnapshot(snap, time.Now()), nil
+	report := checkSnapshot(snap, time.Now())
+	if zoneID == uuid.Nil {
+		// "Nothing protects this" is a statement about a zone, not about the tenant-wide records.
+		report.Findings = slices.DeleteFunc(report.Findings, func(f Finding) bool { return f.Code == "noProtection" })
+	}
+	return report, nil
 }

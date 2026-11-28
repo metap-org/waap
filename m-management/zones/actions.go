@@ -66,7 +66,7 @@ func registerActions(cfg Config, plans billing.PlanLookup, state *web.State, reg
 }
 
 // ChangeActions are the actions of a change request's life (package changes): proposing one on a
-// zone, then revise, submit, approve, reject and cancel on it. The operations go through the guarded
+// zone or for the tenant-wide records, then revise, submit, approve, reject and cancel on it. The operations go through the guarded
 // backend; the change request rows through the service's own, since clients may not write them.
 func ChangeActions(state *web.State, plans billing.PlanLookup) []action.Action {
 	s := changes.Service{
@@ -75,6 +75,7 @@ func ChangeActions(state *web.State, plans billing.PlanLookup) []action.Action {
 	}
 	return []action.Action{
 		action.Custom(model.Zones, model.ActionCreateChange, s.Propose),
+		action.Custom(model.ChangeRequests, model.ActionCreateTenantChange, s.ProposeTenantWide),
 		action.Custom(model.ChangeRequests, model.ActionReviseChange, s.Revise),
 		action.Custom(model.ChangeRequests, model.ActionSubmitChange, s.Submit),
 		action.Custom(model.ChangeRequests, model.ActionApproveChange, s.Approve),

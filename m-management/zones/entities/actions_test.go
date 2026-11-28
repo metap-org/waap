@@ -31,6 +31,7 @@ func TestWhoMayRunTheZoneActions(t *testing.T) {
 	sort.Strings(got)
 	want := `waf.change_requests approve read
 waf.change_requests cancel read
+waf.change_requests createTenantChangeRequest read
 waf.change_requests reject read
 waf.change_requests revise read
 waf.change_requests submit read

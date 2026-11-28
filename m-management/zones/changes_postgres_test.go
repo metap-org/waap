@@ -398,3 +398,74 @@ func TestSecurityAnalystsRunAFourEyesChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, "true", string(zone.Record.Data["hasConfig"]))
 }
+
+// A tenant-wide rule reaches every zone, so one account with change control puts it under control,
+// and only an admin decides its change: someone else under four-eyes.
+func TestTenantWideRulesAreUnderTheStrictestAccount(t *testing.T) {
+	f := newChangeFixture(t)
+	entry := func(ip string) crud.JsonObject {
+		return crud.JsonObject{"type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, ip), "enabled": jsonMarshal(t, true)}
+	}
+	tenantWide := func() []crud.RecordDto {
+		res, err := f.backend.List(f.ctx, "waf.ip_access_lists", query.ListInput{Limit: 50, Filters: [][2]string{{"zoneId", ""}}}, f.admin)
+		require.NoError(t, err)
+		return res.Data
+	}
+	permanent, err := f.backend.Create(f.ctx, "waf.ip_access_lists", entry("198.51.100.1"), f.admin, nil)
+	require.NoError(t, err, "off: written directly")
+	f.control("fourEyes")
+
+	_, err = f.backend.Create(f.ctx, "waf.ip_access_lists", entry("198.51.100.2"), f.admin, nil)
+	assert.Equal(t, "change_request_required", code(t, err))
+	_, err = f.backend.Delete(f.ctx, "waf.ip_access_lists", permanent.ID, permanent.Version, f.admin, nil)
+	assert.Equal(t, "change_request_required", code(t, err))
+	// Nor by taking a zone's rule out of its zone.
+	zoned := entry("198.51.100.3")
+	zoned["zoneId"] = jsonMarshal(t, f.zone.ID.String())
+	zoned["expiresAt"] = jsonMarshal(t, time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
+	temporary, err := f.backend.Create(f.ctx, "waf.ip_access_lists", zoned, f.admin, nil)
+	require.NoError(t, err)
+	_, err = f.backend.Update(f.ctx, "waf.ip_access_lists", temporary.ID, temporary.Version, crud.JsonObject{"zoneId": json.RawMessage("null")}, f.admin, nil)
+	assert.Equal(t, "change_request_required", code(t, err))
+
+	propose := func(ops ...map[string]any) (changes.Outcome, error) {
+		return f.invoke("waf.change_requests", "createTenantChangeRequest", uuid.Nil, f.admin, map[string]any{"title": "Block everywhere", "operations": ops})
+	}
+	// A tenant-wide change cannot reach into a zone.
+	into := blockOp("198.51.100.4")
+	into["data"].(map[string]any)["zoneId"] = f.zone.ID.String()
+	bad, err := propose(into)
+	require.NoError(t, err)
+	assert.False(t, bad.Check.OK)
+
+	draft, err := propose(blockOp("198.51.100.5"), map[string]any{"op": "delete", "entity": "waf.ip_access_lists", "id": permanent.ID.String()})
+	require.NoError(t, err)
+	require.True(t, draft.Check.OK, "%+v %+v", draft.Check, draft.Check.Error)
+	assert.Empty(t, draft.Check.Findings)
+	require.Len(t, tenantWide(), 1, "the check rolls back")
+	_, err = f.act("submit", draft.ID, f.admin, nil)
+	require.NoError(t, err)
+
+	_, err = f.act("approve", draft.ID, f.admin, nil)
+	assert.Equal(t, "self_approval_refused", code(t, err))
+	analyst := &permission.RequestContext{TenantID: f.admin.TenantID, UserID: uuid.NewString(), Roles: []string{"security_analyst"}, HasRoles: true}
+	grants := []permission.RoleActionGrant{}
+	for _, a := range []string{"read", "create", "update", "delete"} {
+		grants = append(grants, permission.RoleActionGrant{Role: "security_analyst", HasRole: true, Action: a})
+	}
+	for _, entity := range []string{"waf.change_requests", "waf.ip_access_lists"} {
+		_, err = f.state.Permissions.SyncBasicPolicies(f.ctx, uuid.MustParse(f.admin.TenantID), entity, grants, nil)
+		require.NoError(t, err)
+	}
+	_, err = f.act("approve", draft.ID, analyst, nil)
+	assert.Equal(t, "forbidden", code(t, err), "write rights are not enough for a tenant-wide change")
+
+	before := len(f.records("waf.policy_versions"))
+	published, err := f.act("approve", draft.ID, f.second, nil)
+	require.NoError(t, err)
+	assert.Zero(t, published.PublishedVersion)
+	left := tenantWide()
+	require.Len(t, left, 1)
+	assert.Equal(t, "198.51.100.5", jsonString0(left[0].Data["value"]))
+	assert.Len(t, f.records("waf.policy_versions"), before, "versions belong to a zone")
+}

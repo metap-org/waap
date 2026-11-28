@@ -51,16 +51,22 @@ type SnapshotItem struct {
 type Snapshot map[string][]SnapshotItem
 
 // ReadZoneState lists everything a zone's snapshot holds, as rc may see it, plus each record's
-// lock version so a restore can update it.
+// lock version so a restore can update it. uuid.Nil reads the tenant-wide records, those with no
+// zone.
 func ReadZoneState(ctx context.Context, backend crud.RecordBackend, zoneID uuid.UUID, rc *permission.RequestContext) (Snapshot, map[string]int32, error) {
 	snap := Snapshot{}
 	versions := map[string]int32{}
+	zone := ""
+	if zoneID != uuid.Nil {
+		zone = zoneID.String()
+	}
 	for _, entity := range versionedEntities {
 		items := []SnapshotItem{}
 		for offset := int64(0); ; offset += SnapshotPage {
 			page, err := backend.List(ctx, entity, query.ListInput{
 				Limit: SnapshotPage, Offset: offset,
-				Filters: [][2]string{{model.FieldZoneID, zoneID.String()}},
+				// An empty value filters for "no zone".
+				Filters: [][2]string{{model.FieldZoneID, zone}},
 			}, rc)
 			if err != nil {
 				return nil, nil, err
