@@ -145,6 +145,12 @@ cp .env.example .env    # tuỳ chọn: SMTP/PUBLIC_APP_URL
 docker compose up -d --build                 # management-service + analytics-api + web (nginx, :8081)
 
 # 2b. Hoặc dev loop: `go run` từ source mount vào container + Vite dev server (:5173)
+#     Container nào mount mã nguồn đều chạy bằng user của bạn, không phải root, nên file chúng ghi ra
+#     (node_modules, design-system/dist) vẫn sửa/xoá được trên máy. Mặc định uid:gid là 1000:1000; nếu
+#     `id -u`, `id -g` khác thì thêm HOST_UID, HOST_GID vào .env. Cache Go và kho pnpm nằm trong volume,
+#     service `volume-owner` (chạy root, chỉ mount volume) giao chúng cho user đó trước khi service khác chạy.
+#     `web` dùng chung node_modules với máy nhưng khác kho pnpm: nếu chạy `pnpm install` trên máy,
+#     pnpm sẽ cài lại, và lần `up` sau container lại cài lại.
 docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml restart management-service   # sau khi sửa code Go
 # Stack không tự chạy migration: khi `git pull` ở ../../metap kéo về migration mới, chạy lại
