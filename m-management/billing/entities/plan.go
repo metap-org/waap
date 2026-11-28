@@ -67,6 +67,7 @@ func SubscriptionEntity() metadata.EntityDefinition {
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
 			Fields:   []string{"customerTenantId", "planId"},
+			Filters:  []string{model.FieldCustomerTenantID},
 			MaxLimit: model.LargeMaxListLimit,
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
@@ -101,7 +102,7 @@ func PlanChangeRequestEntity() metadata.EntityDefinition {
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
 			Fields:      []string{"customerName", "requestedPlanId", "status", "note"},
-			Filters:     []string{"status"},
+			Filters:     []string{"status", model.FieldCustomerTenantID},
 			DefaultSort: metadata.Ptr("-createdAt"),
 			MaxLimit:    model.DefaultMaxListLimit,
 		}},

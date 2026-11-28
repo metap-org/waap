@@ -35,7 +35,7 @@ func AccountEntity() metadata.EntityDefinition {
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
 			Fields:         []string{"name", "slug", "status"},
-			Filters:        []string{"status"},
+			Filters:        []string{"status", model.FieldSlug},
 			RequiredFields: []string{"name"},
 			DefaultSort:    metadata.Ptr("name"),
 			MaxLimit:       model.DefaultMaxListLimit,
