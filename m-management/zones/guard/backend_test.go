@@ -17,7 +17,7 @@ import (
 
 // Unit tests for Backend's create/update guards against metap's generated
 // crudmock.RecordBackend — no database, no sibling service. The real end-to-end behavior (real CrudService,
-// reconciled tables, signed JWT) stays in zonesservice_postgres_test.go.
+// reconciled tables, signed JWT) stays in ../zones_postgres_test.go.
 
 func newGuarded(t *testing.T) (*Backend, *crudmock.RecordBackend) {
 	t.Helper()

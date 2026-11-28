@@ -10,13 +10,10 @@
 // status: queued records and drives them through start/complete/fail via the generic transition
 // API.
 //
-// zoneId is a plain string, not Reference, since the pillar split: waf.zones is owned by
-// zones-service, a separate binary from this one, and Reference's ValidateReferences requires
-// the target EntityDefinition registered in the SAME MetadataRegistry — registering ZoneEntity
-// here just to satisfy that would also expose full CRUD for waf.zones on this service's generic
-// /api/:entity* route.
-// It is declared RefersTo(waf.zones) (roadmap 116): still a plain string column, but the API
-// gateway can expand it across services (`?expand=zoneId`).
+// zoneId is a plain string, not Reference. That dates from when waf.zones was served by another
+// service; the domains are one process now, and the field has not been changed since. It is declared
+// RefersTo(waf.zones) (roadmap 116), which says what it points at; `?expand=` was resolved by the
+// API gateway this product no longer runs.
 package entities
 
 import (

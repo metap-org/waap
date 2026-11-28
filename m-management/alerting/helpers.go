@@ -71,8 +71,8 @@ func strField(record crud.RecordDto, field string) string {
 // result into a plain error — every caller here treats a permission/validation failure as "abort
 // the sweep", not as an empty set, because silently proceeding on an empty read would create
 // nothing and look exactly like "there was nothing to do".
-func listRecords(ctx context.Context, state *web.State, entity string, filters [][2]string, limit int64, rc *permission.RequestContext) ([]crud.RecordDto, error) {
-	result, err := state.Crud.List(ctx, entity, query.ListInput{Limit: limit, Filters: filters}, rc)
+func listRecords(ctx context.Context, records crud.RecordBackend, entity string, filters [][2]string, limit int64, rc *permission.RequestContext) ([]crud.RecordDto, error) {
+	result, err := records.List(ctx, entity, query.ListInput{Limit: limit, Filters: filters}, rc)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", entity, err)
 	}

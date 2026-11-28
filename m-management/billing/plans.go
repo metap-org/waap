@@ -1,8 +1,8 @@
-// Layer: APP · declared-action logic. metap serves POST /api/{entity}[/{id}]/actions/{action} and calls the handler registered in routes.go.
+// Layer: APP · declared-action logic. metap serves POST /api/{entity}[/{id}]/actions/{action} and calls the handler registered in actions.go.
 
 // Package billing is the WAAP service's plans and subscriptions (UC-70, UC-74): the
-// operator defines plans, gives each customer tenant a subscription, and every other service asks
-// "what may this tenant use?" here, over REST, instead of reading plan rows itself.
+// operator defines plans, gives each customer tenant a subscription, and every other domain asks
+// "what may this tenant use?" here, in-process (PlanLookup), instead of reading plan rows itself.
 //
 // The rows (entities/plan.go) live in the operator's tenant, named by OPERATOR_TENANT_ID. A
 // customer's plan is its subscription's plan; else the operator's default plan; else FallbackPlan.
@@ -175,8 +175,8 @@ type customerTenant struct {
 
 // listCustomerTenants lists the platform's active tenants for the operator's admin to choose from.
 // It reads metap's tenant registry, read-only, and answers only the operator's own admin.
-func listCustomerTenants(ctx context.Context, cfg Config, state *web.State, rc *permission.RequestContext) (map[string]any, error) {
-	src := cfg.PlanSource(state.Crud)
+func listCustomerTenants(ctx context.Context, cfg Config, state *web.State, records crud.RecordBackend, rc *permission.RequestContext) (map[string]any, error) {
+	src := cfg.PlanSource(records)
 	if !src.enforced() || rc.TenantID != src.Operator.String() || !rc.IsAdmin() {
 		return nil, crud.NewServiceErrorMsg(http.StatusForbidden, "forbidden", "Only the service provider's admin can list customers.")
 	}

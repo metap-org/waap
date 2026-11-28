@@ -8,7 +8,7 @@ import (
 	"github.com/metap-org/metap/pkg/kit/env"
 )
 
-// Config is what scanning-service reads from its environment, once, in cmd/.
+// Config is what the scanning domain reads from its environment, once, in cmd/.
 type Config struct {
 	// ScannerURL is where a scan request is handed off. Empty (the default) means "no scanner
 	// deployed": the job still queues, which is the honest state: something asked for a scan and

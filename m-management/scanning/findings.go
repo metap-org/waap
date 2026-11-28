@@ -36,10 +36,8 @@ type findingsBody struct {
 // created before the job is completed, so a portal user who sees "completed" always sees the
 // findings that go with it.
 func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
-	rc, ok := web.RequireAuth(w, r, state)
-	if !ok {
-		return
-	}
+	rc := web.RC(r) // the route's gate resolved the caller (MountRoutes)
+	records := state.Crud
 	jobID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		web.WriteServiceError(w, http.StatusBadRequest, errcode.ValidationFailed, "Invalid job id.", nil)
@@ -60,7 +58,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
 		return
 	}
 
-	job, ok := loadJob(r.Context(), w, state, jobID, rc)
+	job, ok := loadJob(r.Context(), w, records, jobID, rc)
 	if !ok {
 		return
 	}
@@ -95,7 +93,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
 			if finding.Description != nil {
 				data[model.FieldDescription] = jsonStr(*finding.Description)
 			}
-			result, err := state.Crud.Create(ctx, model.ScanFindings, data, rc, nil)
+			result, err := records.Create(ctx, model.ScanFindings, data, rc, nil)
 			if err != nil {
 				return err
 			}
@@ -107,7 +105,7 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
 		current := job
 		if current.Status != nil && *current.Status == model.ScanJobQueued {
 			var err error
-			if current, err = doTransition(ctx, state, current, model.ScanJobStart, rc); err != nil {
+			if current, err = doTransition(ctx, records, current, model.ScanJobStart, rc); err != nil {
 				return err
 			}
 		}
@@ -116,14 +114,14 @@ func SubmitFindings(w http.ResponseWriter, r *http.Request, state *web.State) {
 			finish = model.ScanJobFail
 		}
 		var err error
-		if finished, err = doTransition(ctx, state, current, finish, rc); err != nil {
+		if finished, err = doTransition(ctx, records, current, finish, rc); err != nil {
 			return err
 		}
 
 		// lastRunAt isn't part of any transition's SetFields, so it's written here — the one field
 		// this flow owns that the workflow itself doesn't.
 		patch := crud.JsonObject{model.FieldLastRunAt: jsonStr(now)}
-		jobAfter, err = state.Crud.Update(ctx, model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
+		jobAfter, err = records.Update(ctx, model.ScanJobs, finished.ID, finished.Version, patch, rc, nil)
 		return err
 	})
 	if err != nil {

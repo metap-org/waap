@@ -30,7 +30,7 @@ type Backend struct {
 
 var _ crud.RecordBackend = (*Backend)(nil)
 
-// ToRecord renders an event in the generic record envelope the gateway and the portal read.
+// ToRecord renders an event in the generic record envelope the portal reads.
 func ToRecord(e Event) crud.RecordDto {
 	str := func(s string) json.RawMessage { raw, _ := json.Marshal(s); return raw }
 	data := crud.JsonObject{
@@ -166,8 +166,8 @@ func (b *Backend) Aggregate(ctx context.Context, _ string, spec query.AggregateS
 	return rows, nil
 }
 
-// Window lists events since a cutoff, newest first, up to limit — what alerting-service's
-// correlation and alert evaluation read. The time bound is pushed to Analytics rather than
+// Window lists events since a cutoff, newest first, up to limit — what the alerting
+// domain's correlation and alert evaluation read. The time bound is pushed to Analytics rather than
 // filtered after the fact, so a busy zone can't push in-window events past the limit with
 // out-of-window ones.
 func (c *Client) Window(ctx context.Context, token string, filters map[string]string, since time.Time, limit int) ([]crud.RecordDto, error) {

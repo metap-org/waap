@@ -2,8 +2,7 @@
 
 // Package guard is the backend every write to this service goes through: the chain of guards
 // in this package around the service's own CrudService. It is what app.Options.WrapBackend serves (the
-// REST record routes, /api/{entity}, which the portal reaches through the API gateway) and what
-// presets write through, so a person's edit and a preset get the same checks.
+// REST record routes, /api/{entity}) and what presets write through, so a person's edit and a preset get the same checks.
 //
 // The zone-delete check reads scan jobs and incidents (entities of this same service) as the caller.
 package guard

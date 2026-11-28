@@ -23,16 +23,16 @@ import (
 // error. Transition names come from entities.ScanJobEntity's workflow (run/start/complete/fail)
 // — this module never writes status directly, so guards, audit rows and outbox events all still
 // happen.
-func doTransition(ctx context.Context, state *web.State, job crud.RecordDto, action string, rc *permission.RequestContext) (crud.RecordDto, error) {
-	result, err := state.Crud.Transition(ctx, model.ScanJobs, job.ID, action, job.Version, nil, rc, nil)
+func doTransition(ctx context.Context, records crud.RecordBackend, job crud.RecordDto, action string, rc *permission.RequestContext) (crud.RecordDto, error) {
+	result, err := records.Transition(ctx, model.ScanJobs, job.ID, action, job.Version, nil, rc, nil)
 	if err != nil {
 		return crud.RecordDto{}, fmt.Errorf("transition %s: %w", action, err)
 	}
 	return result, nil
 }
 
-func loadJob(ctx context.Context, w http.ResponseWriter, state *web.State, id uuid.UUID, rc *permission.RequestContext) (crud.RecordDto, bool) {
-	result, err := state.Crud.Get(ctx, model.ScanJobs, id, rc)
+func loadJob(ctx context.Context, w http.ResponseWriter, records crud.RecordBackend, id uuid.UUID, rc *permission.RequestContext) (crud.RecordDto, bool) {
+	result, err := records.Get(ctx, model.ScanJobs, id, rc)
 	if err != nil {
 		web.WriteCrudError(w, err)
 		return crud.RecordDto{}, false
@@ -52,7 +52,7 @@ type scanRun struct {
 // The job is queued first (one workflow transition), then handed to the scanner outside any
 // transaction (the call can be slow), then, only if the scanner refuses it, started and failed as
 // one step: a job is never left running because the second of those two moves did not happen.
-func RunScanJob(cfg Config, state *web.State) action.Action {
+func RunScanJob(cfg Config) action.Action {
 	return action.Custom(model.ScanJobs, model.ActionRun,
 		func(ctx context.Context, a *action.Ctx) (any, error) {
 			if err := a.LoadRecord(ctx, nil); err != nil {
@@ -70,7 +70,7 @@ func RunScanJob(cfg Config, state *web.State) action.Action {
 				return scanRun{}, crud.NewServiceErrorMsg(http.StatusConflict, model.ErrScanAlreadyInProgress, "This scan job is already "+status+".")
 			}
 
-			queued, err := doTransition(ctx, state, job, model.ScanJobRun, a.RC)
+			queued, err := doTransition(ctx, a.Records, job, model.ScanJobRun, a.RC)
 			if err != nil {
 				return scanRun{}, err
 			}
@@ -99,11 +99,11 @@ func RunScanJob(cfg Config, state *web.State) action.Action {
 			detail := fmt.Sprintf("Scanner rejected the request (%d)", resp.StatusCode)
 			var failed crud.RecordDto
 			if err := a.Step(ctx, "mark failed", func(ctx context.Context) error {
-				running, err := doTransition(ctx, state, queued, model.ScanJobStart, a.RC)
+				running, err := doTransition(ctx, a.Records, queued, model.ScanJobStart, a.RC)
 				if err != nil {
 					return err
 				}
-				failed, err = doTransition(ctx, state, running, model.ScanJobFail, a.RC)
+				failed, err = doTransition(ctx, a.Records, running, model.ScanJobFail, a.RC)
 				return err
 			}); err != nil {
 				return scanRun{}, err

@@ -1,12 +1,12 @@
 // Package analytics is Management's side of the Analytics plane boundary (ADR-0001): a client
-// for its query API, and a read-only crud.RecordBackend that lets alerting-service serve
+// for its query API, and a read-only crud.RecordBackend that lets management-service serve
 // waf.security_events from it exactly as it serves any other entity — so the portal's existing
 // list/aggregate calls keep working with the data living in ClickHouse instead of Postgres.
 //
 // waf.security_events is a READ MODEL here, not a stored entity: no service reconciles a table
 // for it and nothing in Management can write one. Events are written by control-plane straight
 // into the Analytics plane. This definition only describes the shape (fields, labels, list view,
-// filters) for alerting-service's metadata (app.ExternalEntities) and the portal.
+// filters) for the service's metadata (app.ExternalEntities) and the portal.
 //
 // Every call forwards the caller's own token; Analytics re-verifies it and scopes by its tenant.
 package analytics

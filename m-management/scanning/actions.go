@@ -1,8 +1,8 @@
 // Layer: APP · wiring. Registers the declared action and mounts the scanner callback.
 
-// Custom (non-generic-CRUD) HTTP surface for scanning-service.
+// The scanning domain's operations beyond generic CRUD.
 //
-// Scope boundary first, because it is easy to get wrong: this service does not scan. Running a
+// Scope boundary first, because it is easy to get wrong: this product does not scan. Running a
 // DAST engine against a customer's site is a separate execution concern, the same way edge-plane
 // is separate from the portal. What lives here is the portal-side half:
 //
@@ -31,7 +31,7 @@ func RegisterActions(cfg Config) func(*web.State, *crud.ActionRegistry) error {
 		// Reads and writes through the service's own backend, as the scan job always did.
 		deps := state.ActionDeps()
 		deps.Records = state.Crud
-		return RunScanJob(cfg, state).Register(reg, deps)
+		return RunScanJob(cfg).Register(reg, deps)
 	}
 }
 
