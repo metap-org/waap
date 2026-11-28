@@ -1,0 +1,2977 @@
+{
+  "format": 1,
+  "tables": {
+    "waf.waf_accounts": {
+      "Table": "waf.waf_accounts",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "name": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "slug": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_accounts_name": {
+          "Expression": "\"tenant_id\", \"name\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_accounts_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "trgm_waf_accounts_name": {
+          "Expression": "\"name\" gin_trgm_ops",
+          "Unique": false,
+          "Using": "gin",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_accounts_slug": {
+          "Expression": "\"tenant_id\", \"slug\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_alert_notifications": {
+      "Table": "waf.waf_alert_notifications",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "alertPolicyId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "channel": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deliveryStatus": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "triggeredAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_alert_notifications_alertPolicyId": {
+          "Expression": "\"alertPolicyId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_alert_notifications_deliveryStatus": {
+          "Expression": "\"tenant_id\", \"deliveryStatus\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_alert_notifications_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_alert_notifications_triggeredAt": {
+          "Expression": "\"tenant_id\", \"triggeredAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_alert_notifications_alertPolicyId": {
+          "Column": "alertPolicyId",
+          "RefTable": "waf.waf_alert_policies",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_alert_policies": {
+      "Table": "waf.waf_alert_policies",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "channels": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "enabled": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "name": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "thresholdCount": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "windowMinutes": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_alert_policies_enabled": {
+          "Expression": "\"tenant_id\", \"enabled\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_alert_policies_name": {
+          "Expression": "\"tenant_id\", \"name\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_alert_policies_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_ddos_policies": {
+      "Table": "waf.waf_ddos_policies",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "accountId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "action": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "burstWindow": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "enabled": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "httpMethod": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "pathPrefix": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "priority": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "requestRateThreshold": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "sensitivity": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_ddos_policies_accountId": {
+          "Expression": "\"tenant_id\", \"accountId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ddos_policies_enabled": {
+          "Expression": "\"tenant_id\", \"enabled\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ddos_policies_priority": {
+          "Expression": "\"tenant_id\", \"priority\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ddos_policies_requestRateThreshold": {
+          "Expression": "\"tenant_id\", \"requestRateThreshold\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ddos_policies_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ddos_policies_zoneId": {
+          "Expression": "\"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_ddos_policies_zoneId": {
+          "Column": "zoneId",
+          "RefTable": "waf.waf_zones",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_domains": {
+      "Table": "waf.waf_domains",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "apexDomain": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "verificationMethod": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "verificationStatus": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "verificationToken": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_domains_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_domains_verificationMethod": {
+          "Expression": "\"tenant_id\", \"verificationMethod\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_domains_verificationStatus": {
+          "Expression": "\"tenant_id\", \"verificationStatus\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "trgm_waf_domains_apexDomain": {
+          "Expression": "\"apexDomain\" gin_trgm_ops",
+          "Unique": false,
+          "Using": "gin",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_domains_apexDomain": {
+          "Expression": "\"apexDomain\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_false_positive_reports": {
+      "Table": "waf.waf_false_positive_reports",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "description": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "exceptionEntryId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "reporterContact": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "requestId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "requestPath": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "resolutionNote": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "sourceIp": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_false_positive_reports_requestId": {
+          "Expression": "\"tenant_id\", \"requestId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_false_positive_reports_sourceIp": {
+          "Expression": "\"tenant_id\", \"sourceIp\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_false_positive_reports_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_false_positive_reports_zoneId": {
+          "Expression": "\"tenant_id\", \"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_firewall_rules": {
+      "Table": "waf.waf_firewall_rules",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "accountId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "action": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "enabled": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "expiresAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "matchCondition": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "name": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "priority": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "rateLimitThreshold": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "rateLimitWindow": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "ruleType": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_firewall_rules_accountId": {
+          "Expression": "\"tenant_id\", \"accountId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_enabled": {
+          "Expression": "\"tenant_id\", \"enabled\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_expiresAt": {
+          "Expression": "\"tenant_id\", \"expiresAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_name": {
+          "Expression": "\"tenant_id\", \"name\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_priority": {
+          "Expression": "\"tenant_id\", \"priority\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_ruleType": {
+          "Expression": "\"tenant_id\", \"ruleType\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_firewall_rules_zoneId": {
+          "Expression": "\"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_firewall_rules_zoneId": {
+          "Column": "zoneId",
+          "RefTable": "waf.waf_zones",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_incidents": {
+      "Table": "waf.waf_incidents",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "assignedTo": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "eventCount": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "severity": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "title": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_incidents_assignedTo": {
+          "Expression": "\"tenant_id\", \"assignedTo\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_incidents_eventCount": {
+          "Expression": "\"tenant_id\", \"eventCount\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_incidents_severity": {
+          "Expression": "\"tenant_id\", \"severity\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_incidents_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_incidents_title": {
+          "Expression": "\"tenant_id\", \"title\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_incidents_zoneId": {
+          "Expression": "\"tenant_id\", \"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_ip_access_lists": {
+      "Table": "waf.waf_ip_access_lists",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "accountId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "enabled": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "expiresAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "incidentId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "type": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "value": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_ip_access_lists_accountId": {
+          "Expression": "\"tenant_id\", \"accountId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ip_access_lists_enabled": {
+          "Expression": "\"tenant_id\", \"enabled\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ip_access_lists_expiresAt": {
+          "Expression": "\"tenant_id\", \"expiresAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ip_access_lists_incidentId": {
+          "Expression": "\"tenant_id\", \"incidentId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ip_access_lists_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ip_access_lists_type": {
+          "Expression": "\"tenant_id\", \"type\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_ip_access_lists_zoneId": {
+          "Expression": "\"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_ip_access_lists_zoneId": {
+          "Column": "zoneId",
+          "RefTable": "waf.waf_zones",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_plan_change_requests": {
+      "Table": "waf.waf_plan_change_requests",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "customerName": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "customerTenantId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "decisionNote": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "note": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "openRequestKey": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "requestedPlanId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_plan_change_requests_customerTenantId": {
+          "Expression": "\"tenant_id\", \"customerTenantId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_plan_change_requests_requestedPlanId": {
+          "Expression": "\"requestedPlanId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_plan_change_requests_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_plan_change_requests_openRequestKey": {
+          "Expression": "\"tenant_id\", \"openRequestKey\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_plan_change_requests_requestedPlanId": {
+          "Column": "requestedPlanId",
+          "RefTable": "waf.waf_plans",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_plans": {
+      "Table": "waf.waf_plans",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "enabled": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "isDefault": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "maxRulesPerZone": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "maxZones": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "name": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_plans_enabled": {
+          "Expression": "\"tenant_id\", \"enabled\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_plans_isDefault": {
+          "Expression": "\"tenant_id\", \"isDefault\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_plans_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_plans_name": {
+          "Expression": "\"tenant_id\", \"name\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_policy_versions": {
+      "Table": "waf.waf_policy_versions",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "accountId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "contentHash": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "number": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "restoredFrom": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "snapshot": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "source": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "summary": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_policy_versions_accountId": {
+          "Expression": "\"tenant_id\", \"accountId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_policy_versions_number": {
+          "Expression": "\"tenant_id\", \"number\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_policy_versions_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_policy_versions_zoneId": {
+          "Expression": "\"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_policy_versions_zoneId_number": {
+          "Expression": "\"tenant_id\", \"zoneId\", \"number\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_policy_versions_zoneId": {
+          "Column": "zoneId",
+          "RefTable": "waf.waf_zones",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_scan_findings": {
+      "Table": "waf.waf_scan_findings",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "category": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "description": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "endpoint": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "firstSeenAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "lastSeenAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "remediationStatus": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "scanJobId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "severity": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_scan_findings_category": {
+          "Expression": "\"tenant_id\", \"category\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_findings_firstSeenAt": {
+          "Expression": "\"tenant_id\", \"firstSeenAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_findings_lastSeenAt": {
+          "Expression": "\"tenant_id\", \"lastSeenAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_findings_remediationStatus": {
+          "Expression": "\"tenant_id\", \"remediationStatus\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_findings_scanJobId": {
+          "Expression": "\"scanJobId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_findings_severity": {
+          "Expression": "\"tenant_id\", \"severity\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_findings_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_scan_findings_scanJobId": {
+          "Column": "scanJobId",
+          "RefTable": "waf.waf_scan_jobs",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_scan_jobs": {
+      "Table": "waf.waf_scan_jobs",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "lastRunAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "scanType": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "schedule": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_scan_jobs_lastRunAt": {
+          "Expression": "\"tenant_id\", \"lastRunAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_jobs_scanType": {
+          "Expression": "\"tenant_id\", \"scanType\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_jobs_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_scan_jobs_zoneId": {
+          "Expression": "\"tenant_id\", \"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_subscriptions": {
+      "Table": "waf.waf_subscriptions",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "customerTenantId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "pendingFrom": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "pendingPlanId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "planId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_subscriptions_planId": {
+          "Expression": "\"planId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_subscriptions_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_subscriptions_customerTenantId": {
+          "Expression": "\"tenant_id\", \"customerTenantId\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_subscriptions_planId": {
+          "Column": "planId",
+          "RefTable": "waf.waf_plans",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    },
+    "waf.waf_zones": {
+      "Table": "waf.waf_zones",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "accountId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "configVersion": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "dnsRoutingStatus": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "domainId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "hasConfig": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "hostname": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "lastDnsCheckAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "originAddress": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "originCheckedAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "originHostHeader": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "originPort": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "originProtocol": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "originReachable": {
+          "SQLType": "boolean",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "protectionMode": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "tags": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "verificationStatus": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_zones_accountId": {
+          "Expression": "\"accountId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_zones_configVersion": {
+          "Expression": "\"tenant_id\", \"configVersion\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_zones_domainId": {
+          "Expression": "\"domainId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_zones_lastDnsCheckAt": {
+          "Expression": "\"tenant_id\", \"lastDnsCheckAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_zones_protectionMode": {
+          "Expression": "\"tenant_id\", \"protectionMode\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_zones_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_zones_verificationStatus": {
+          "Expression": "\"tenant_id\", \"verificationStatus\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "trgm_waf_zones_hostname": {
+          "Expression": "\"hostname\" gin_trgm_ops",
+          "Unique": false,
+          "Using": "gin",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "uniq_waf_zones_hostname": {
+          "Expression": "\"hostname\"",
+          "Unique": true,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": "deleted = false"
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_zones_accountId": {
+          "Column": "accountId",
+          "RefTable": "waf.waf_accounts",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        },
+        "fk_waf_zones_domainId": {
+          "Column": "domainId",
+          "RefTable": "waf.waf_domains",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
+      "Uniques": {}
+    }
+  }
+}

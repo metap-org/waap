@@ -123,6 +123,26 @@ admin, `Plan`/`Subscription`
 (`docs/12-billing-plans.md`, chưa build) — cùng Traefik/reverse-proxy thật cho production
 (`web/`'s dev-server routing chỉ dùng được lúc `pnpm dev`), Admin Portal backend riêng.
 
+## Migration DB (2026-11-28): chạy tay, theo file SQL, rollback được
+
+Hướng dẫn đầy đủ (lệnh, thứ tự deploy và rollback, review file, xử lý lỗi):
+`../../metap-docs/docs/migrations.md`. Tóm tắt, chạy từ gốc repo `waap`:
+
+```bash
+M="go run ./m-management/cmd/management-service migrate"
+$M status                 # còn thiếu gì (chỉ đọc)
+$M generate <tên>         # sau khi đổi entity: sinh SQL up/down, review rồi commit
+$M up --dry-run           # xem SQL sẽ chạy
+$M up                     # bảng nền + bảng entity
+$M down                   # chỉ in SQL rollback
+$M down --yes             # rollback 1 migration (mất dữ liệu của cột/bảng bị xoá)
+(cd a-api && go run ./cmd/analytics-api migrate status)   # ClickHouse
+```
+
+**DB đã có từ trước ngày 2026-11-28** (bảng do service tự tạo lúc boot), làm một lần trước khi chạy bản mới:
+`db-migrate up` (ở `../metap`) → `$M baseline` → `$M baseline --yes` → `$M status`; ClickHouse:
+`analytics-api migrate up`.
+
 ## Chạy local (Go, cập nhật 2026-11-08)
 
 Module Go là module gốc của repo (`../go.mod`, `github.com/metap-org/waap`) chung cho các service `m-*` và
@@ -135,14 +155,19 @@ export DATABASE_URL=postgres://metap:metap@localhost:5433/metap
 
 # 1. DB + key + tenant + user — chỉ 1 lần cho 1 DB mới (dev-tools nằm ở ../../metap)
 cd ../../metap
-go run ./cmd/db-migrate                                            # migrations nhúng sẵn trong binary
+go run ./cmd/db-migrate                                            # bảng nền (migrations nhúng sẵn trong binary)
+(cd ../waap && go run ./m-management/cmd/management-service migrate up)   # bảng entity
 go run ./cmd/dev-tools gen-jwks-key ../waap/m-deploy/keys/jwks   # key Ed25519 của issuer (gitignored)
 go run ./cmd/dev-tools provision-tenant <tenantId> schema admin@waap.local <password>   # user đăng nhập portal
 cd ../waap/m-deploy
 cp .env.example .env    # tuỳ chọn: SMTP/PUBLIC_APP_URL
 
 # 2a. Cả stack bằng Docker: image production (Dockerfile Go dùng chung, chọn binary bằng SERVICE)
-docker compose up -d --build                 # management-service + analytics-api + web (nginx, :8081)
+docker compose build
+docker compose run --rm management-service migrate up      # lần đầu và mỗi lần có migration mới
+docker compose up -d clickhouse management-service
+docker compose run --rm analytics-api migrate up
+docker compose up -d                                       # management-service + analytics-api + web (nginx, :8081)
 
 # 2b. Hoặc dev loop: `go run` từ source mount vào container + Vite dev server (:5173)
 #     Container nào mount mã nguồn đều chạy bằng user của bạn, không phải root, nên file chúng ghi ra
@@ -153,10 +178,10 @@ docker compose up -d --build                 # management-service + analytics-ap
 #     pnpm sẽ cài lại, và lần `up` sau container lại cài lại.
 docker compose -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.dev.yml restart management-service   # sau khi sửa code Go
-# Stack không tự chạy migration: khi `git pull` ở ../../metap kéo về migration mới, chạy lại
-# (idempotent) rồi restart service. Thiếu bước này, route dùng bảng mới trả 500
-# (vd. `relation "sso_domains" does not exist`).
-(cd ../../metap && go run ./cmd/db-migrate)
+# Service KHÔNG tự migrate: thiếu bảng/cột thì nó không khởi động (xem "Migration DB" bên dưới).
+# Dev loop:
+docker compose -f docker-compose.dev.yml run --rm management-service go run ./m-management/cmd/management-service migrate up
+docker compose -f docker-compose.dev.yml run --rm --no-deps analytics-api go run ./cmd/analytics-api migrate up   # cần clickhouse đang chạy
 
 # 2c. Hoặc chạy thẳng trên host (mỗi lệnh 1 terminal)
 export RABBITMQ_URL=amqp://metap:metap@localhost:5672
