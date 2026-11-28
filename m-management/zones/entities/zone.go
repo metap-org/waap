@@ -77,8 +77,10 @@ func ZoneEntity() metadata.EntityDefinition {
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",
-			Fields:  []string{"hostname", "status", "protectionMode", "verificationStatus", "dnsRoutingStatus", "hasConfig", "configVersion"},
-			Filters: []string{"hostname", "status", "protectionMode"},
+			Fields: []string{"hostname", "status", "protectionMode", "verificationStatus", "dnsRoutingStatus", "hasConfig", "configVersion"},
+			// domainId and accountId are filtered by code too (the verify cascade, closing an account):
+			// a filter that is not listed here is refused.
+			Filters: []string{"hostname", "status", "protectionMode", model.FieldDomainID, model.FieldAccountID},
 			// hostname (which zone) and status (is it even protecting anything) are the 2
 			// columns nobody should be able to hide from this list.
 			RequiredFields: []string{"hostname", "status"},
