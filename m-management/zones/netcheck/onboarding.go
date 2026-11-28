@@ -168,16 +168,18 @@ var verificationURL = func(host, token string) string {
 }
 
 // fetchVerificationFile reads http://<host>/.well-known/waf-verify/<token> and reports whether its
-// body is the token (UC-21, the HTTP-file way). The host must be the apex domain or a name under it,
-// so a customer cannot make this service fetch somewhere unrelated to the domain being proven.
+// body is the token (UC-21, the HTTP-file way). The host must be the apex domain itself: it is what
+// is being proved, and a customer cannot make this service fetch somewhere else.
 func (c Config) fetchVerificationFile(ctx context.Context, apex, host, token string) (found bool, detail string, err error) {
 	host = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(host, ".")))
 	if host == "" {
 		host = apex
 	}
-	if host != apex && !strings.HasSuffix(host, "."+apex) {
+	// The apex only: a name under it may be handed to somebody else (a hosted shop, a help desk), and
+	// whoever serves that name must not be able to prove the whole domain.
+	if host != apex {
 		return false, "", crud.NewServiceErrorFields(http.StatusUnprocessableEntity, errcode.ValidationFailed,
-			map[string][]string{"host": {"must be " + apex + " or a name under it"}})
+			map[string][]string{"host": {"must be " + apex + "; to prove it without a site there, use the DNS TXT record"}})
 	}
 	url := verificationURL(host, token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

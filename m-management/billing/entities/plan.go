@@ -16,6 +16,7 @@ package entities
 
 import (
 	"github.com/metap-org/metap/pkg/metadata"
+	"github.com/metap-org/metap/pkg/permission"
 	"github.com/metap-org/metap/pkg/reconciler"
 	"github.com/metap-org/waap/model"
 )
@@ -70,7 +71,7 @@ func SubscriptionEntity() metadata.EntityDefinition {
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: model.ActionListTenants, Label: "List customers", Description: "The tenants a plan can be given to.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionListTenants, Label: "List customers", Description: "The tenants a plan can be given to.", Scope: metadata.ActionScopeEntity, Roles: []string{permission.RoleAdmin}},
 		},
 	}
 }
@@ -106,9 +107,9 @@ func PlanChangeRequestEntity() metadata.EntityDefinition {
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: model.ActionRequestPlan, Label: "Request a plan", Description: "Ask the service provider for another plan.", Scope: metadata.ActionScopeEntity},
-			{Name: model.ActionMyPlanRequests, Label: "My requests", Description: "The plan change requests of the caller's own workspace.", Scope: metadata.ActionScopeEntity},
-			{Name: model.ActionDecidePlan, Label: "Decide", Description: "Approve or reject a plan change request.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionRequestPlan, Label: "Request a plan", Description: "Ask the service provider for another plan.", Scope: metadata.ActionScopeEntity, Roles: []string{permission.RoleAdmin}},
+			{Name: model.ActionMyPlanRequests, Label: "My requests", Description: "The plan change requests of the caller's own workspace.", Scope: metadata.ActionScopeEntity, Roles: []string{permission.RoleAdmin}},
+			{Name: model.ActionDecidePlan, Label: "Decide", Description: "Approve or reject a plan change request.", Scope: metadata.ActionScopeRecord, Roles: []string{permission.RoleAdmin}},
 		},
 	}
 }

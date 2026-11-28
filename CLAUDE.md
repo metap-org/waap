@@ -631,6 +631,14 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   what this live-Postgres pass found) is in the "Xác minh" / "Đã verify" sections of
   `../metap-docs/docs/roadmap/70-aggregate-api.md`, `71-waf-admin-portal.md`, and
   `72-control-edge-planes.md`.
+- **Every declared action says who may run it** (2026-11-28): `Requires` (an entity permission),
+  `Roles`, or `AnyMember` on purpose; `metap` refuses an action that says none. `Requires: "read"` is
+  for actions whose writes go through records (permission is checked there); anything that reaches
+  the network or changes a record by itself needs the matching write permission.
+- **What a client may not write** (`zones/guard/ownership.go`): `hasConfig` and the ownership proof.
+  Apex grouping uses the Public Suffix List (`zones/rules/apexdomain.go`); the HTTP-file proof is
+  read from the apex only. `e-edge` believes `CLIENT_IP_HEADER` only from `TRUSTED_PROXIES`.
+  Session cookies are `Secure` unless `COOKIE_SECURE=false` (dev config only).
 - Docs are the spec. If an implementation choice isn't settled in `docs/management/`, don't invent
   one silently — it's likely one of the explicitly-flagged open questions above.
 - **Current state (2026-11-08): single JWKS issuer.** `zones-service` is the only service holding a

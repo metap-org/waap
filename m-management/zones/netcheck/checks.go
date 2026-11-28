@@ -135,7 +135,7 @@ func hasSuffix(s, suffix string) bool {
 
 type VerifyDNSBody struct {
 	// Method is "dnsTxt" (the default) or "httpFile" (UC-21); Host is where the file is fetched
-	// from for httpFile (the domain itself, or a name under it).
+	// from for httpFile: empty, or the domain itself.
 	Method string `json:"method"`
 	Host   string `json:"host"`
 }

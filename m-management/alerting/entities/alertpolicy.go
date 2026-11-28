@@ -33,8 +33,8 @@ func AlertPolicyEntity() metadata.EntityDefinition {
 		}},
 		Audit: &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: model.ActionTest, Label: "Send test alert", Description: "Runs the real delivery path and records a notification.", Scope: metadata.ActionScopeRecord},
-			{Name: model.ActionEvaluate, Label: "Evaluate alert policies", Description: "Evaluates every enabled policy against recent events.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionTest, Label: "Send test alert", Description: "Runs the real delivery path and records a notification.", Scope: metadata.ActionScopeRecord, Requires: "update"},
+			{Name: model.ActionEvaluate, Label: "Evaluate alert policies", Description: "Evaluates every enabled policy against recent events.", Scope: metadata.ActionScopeEntity, Requires: "update"},
 		},
 	}
 }

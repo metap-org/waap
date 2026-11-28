@@ -22,6 +22,8 @@ analytics_url: http://analytics-api:3030
 # doh_resolver_url http://host.docker.internal:8053/resolve, SMTP host.docker.internal:2525.
 # A real deployment sets the SMTP_* values and PUBLIC_APP_URL (the portal's origin) in .env.
 public_app_url: http://localhost:8081
+# Session cookies are Secure: browsers keep them over https, and over http only on localhost (this
+# local run). Anything else needs https.
 
 # The tenant (uuid) that runs this service: it owns plans and subscriptions, is never limited, and
 # its admin manages them. Set OPERATOR_TENANT_ID in .env; empty means no plan limits at all.

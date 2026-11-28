@@ -188,3 +188,38 @@ func TestAZoneUnderAProvedDomainStartsVerified(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, model.VerificationVerified, text(second, model.FieldVerificationStatus))
 }
+
+// hasConfig is the other half of what activate checks: the server works it out from the zone's
+// rules, so a client cannot claim protection it does not have.
+func TestAClientCannotClaimAZoneHasProtection(t *testing.T) {
+	f := newOwnershipFixture(t)
+	apex := freshApex(t)
+	_, err := f.create(model.Zones, zoneData("a."+apex, map[string]any{model.FieldHasConfig: true}))
+	assertRefused(t, err, model.FieldHasConfig)
+
+	// The portal sends false when it creates a zone, and may send it back unchanged.
+	zone, err := f.create(model.Zones, zoneData("a."+apex, map[string]any{model.FieldHasConfig: false}))
+	require.NoError(t, err)
+	_, err = f.update(zone, model.Zones, map[string]any{model.FieldHasConfig: true})
+	assertRefused(t, err, model.FieldHasConfig)
+	_, err = f.update(zone, model.Zones, map[string]any{model.FieldHasConfig: nil})
+	require.NoError(t, err)
+}
+
+// Two customers under the same public suffix get a domain each, instead of sharing "com.vn".
+func TestZonesUnderAMultiLabelSuffixGetTheirOwnDomain(t *testing.T) {
+	f := newOwnershipFixture(t)
+	one, two := "c"+uuid.NewString()[:8]+".com.vn", "c"+uuid.NewString()[:8]+".com.vn"
+	first, err := f.create(model.Zones, zoneData("shop."+one, nil))
+	require.NoError(t, err)
+	second, err := f.create(model.Zones, zoneData("shop."+two, nil))
+	require.NoError(t, err)
+	assert.NotEqual(t, text(first, model.FieldDomainID), text(second, model.FieldDomainID))
+
+	domain, err := f.direct.Get(context.Background(), model.Domains, uuid.MustParse(text(first, model.FieldDomainID)), f.rc)
+	require.NoError(t, err)
+	assert.Equal(t, one, text(domain.Record, model.FieldApexDomain))
+	// And a zone cannot be renamed from one customer's domain to the other's.
+	_, err = f.update(first, model.Zones, map[string]any{model.FieldHostname: "www." + two})
+	assertRefused(t, err, model.FieldHostname)
+}

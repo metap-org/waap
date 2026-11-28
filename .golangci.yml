@@ -8,15 +8,16 @@ linters:
   settings:
     depguard:
       rules:
-        # The inner circle: business rules with no framework in them. Standard library only, so a
-        # rule can be read, tested and reused without metap, HTTP or a database
-        # (docs/architecture/08-cross-cutting/20-code-structure-standard.md).
+        # The inner circle: business rules with no framework in them. The standard library (and the
+        # Public Suffix List, which is data), so a rule can be read, tested and reused without
+        # metap, HTTP or a database (docs/architecture/08-cross-cutting/20-code-structure-standard.md).
         pure-rules:
           list-mode: strict
           files:
             - "**/m-management/*/rules/**"
           allow:
             - $gostd
+            - golang.org/x/net/publicsuffix
             - github.com/stretchr/testify # tests only; nothing else may be imported
         # An entity file only declares: metap reads the declaration to build the table, the routes,
         # the permission checks and the workflow. No logic, no I/O, no other layer of the service.

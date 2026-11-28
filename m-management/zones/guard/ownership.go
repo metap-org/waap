@@ -20,8 +20,9 @@ import (
 
 // ---- ownership ---------------------------------------------------------------------------------
 
-// ownershipGuard refuses a write that would make a domain or a zone count as verified, or carry a
-// proof over to a name nobody proved. The only way to "verified" is the verifyDns action, which
+// ownershipGuard keeps what activating a zone rests on out of a client's hands: hasConfig (computed
+// from the zone's rules) and the proof of ownership. It refuses a write that would make a domain or a
+// zone count as verified, or carry a proof over to a name nobody proved. The only way to "verified" is the verifyDns action, which
 // writes through the unguarded service; domainGuard, below this one, copies a proved domain's status
 // onto a new zone.
 //
@@ -31,6 +32,7 @@ type ownershipGuard struct{ passthrough }
 const (
 	msgOnlyVerification = "is set by domain verification only"
 	msgCannotChange     = "cannot be changed"
+	msgComputed         = "is worked out from the zone's rules (syncConfigState)"
 	msgOtherDomain      = "must stay under the zone's domain"
 )
 
@@ -40,6 +42,9 @@ func (g *ownershipGuard) Create(ctx context.Context, entity string, data crud.Js
 	}
 	if raw, ok := data[model.FieldVerificationStatus]; ok && !unverified(raw) {
 		return crud.RecordDto{}, refuse(map[string][]string{model.FieldVerificationStatus: {msgOnlyVerification}})
+	}
+	if raw, ok := data[model.FieldHasConfig]; ok && entity == model.Zones && !falsy(raw) {
+		return crud.RecordDto{}, refuse(map[string][]string{model.FieldHasConfig: {msgComputed}})
 	}
 	data = jx.Clone(data)
 	if entity == model.Domains {
@@ -70,7 +75,7 @@ func (g *ownershipGuard) Transition(ctx context.Context, entity string, id uuid.
 // protectedFields are the fields of each entity a change to which this guard judges.
 var protectedFields = map[string][]string{
 	model.Domains: {model.FieldVerificationStatus, model.FieldVerificationToken, model.FieldApexDomain},
-	model.Zones:   {model.FieldVerificationStatus, model.FieldDomainID, model.FieldHostname},
+	model.Zones:   {model.FieldVerificationStatus, model.FieldDomainID, model.FieldHostname, model.FieldHasConfig},
 }
 
 // check judges a change to an existing record. The record is read only when data names a protected
@@ -103,6 +108,12 @@ func (g *ownershipGuard) check(ctx context.Context, entity string, id uuid.UUID,
 				continue
 			}
 			fieldErrors[field] = []string{msgOnlyVerification}
+		case model.FieldHasConfig:
+			// The other half of what activate checks. Never computed reads as false.
+			if falsy(stored[field]) && falsy(next) {
+				continue
+			}
+			fieldErrors[field] = []string{msgComputed}
 		case model.FieldHostname:
 			// A zone may be renamed, but only to a name its own domain's proof covers.
 			before, _ := jx.AsString(stored[field])
@@ -129,6 +140,12 @@ func newVerificationToken() string { return fmt.Sprintf("waf-verify-%s", uuid.Ne
 // unverified reports whether a status a client sent on create claims nothing.
 func unverified(raw json.RawMessage) bool {
 	return isString(raw, model.VerificationUnverified) || string(bytes.TrimSpace(raw)) == "null"
+}
+
+// falsy reports whether a boolean field's value claims nothing: absent, null or false.
+func falsy(raw json.RawMessage) bool {
+	v := string(bytes.TrimSpace(raw))
+	return v == "" || v == "null" || v == "false"
 }
 
 func isString(raw json.RawMessage, want string) bool {

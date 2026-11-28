@@ -29,8 +29,10 @@ type Config struct {
 	// ClientIPHeader: header carrying the client's real IP when this node sits behind another
 	// proxy or an L4 load balancer. Unset by default, and that is the safe default: trusting a
 	// client-supplied header would let anyone spoof their source IP past every IP rule and every
-	// rate limit. Only set this when something in front is guaranteed to overwrite it.
+	// rate limit. It needs TrustedProxies, and is believed only from them (package clientip).
 	ClientIPHeader *string
+	// TrustedProxies: the CIDRs or addresses of the proxies in front of this node (TRUSTED_PROXIES).
+	TrustedProxies []string
 	// GeoCountryHeader: header carrying an already-resolved ISO-3166 country code. There is no
 	// GeoIP database in this build; country rules simply never match unless something upstream
 	// provides this.
@@ -58,6 +60,7 @@ func Load() Config {
 		TelemetryMaxBatch:      env.Int("TELEMETRY_MAX_BATCH", 100),
 		TelemetryFlushInterval: env.Millis("TELEMETRY_FLUSH_MS", 2_000*time.Millisecond),
 		ClientIPHeader:         env.Ptr("CLIENT_IP_HEADER"),
+		TrustedProxies:         env.List("TRUSTED_PROXIES"),
 		GeoCountryHeader:       env.Ptr("GEO_COUNTRY_HEADER"),
 		ClearanceCookie:        env.String("CLEARANCE_COOKIE", "waf_clearance"),
 		ClearanceTTL:           env.Seconds("CLEARANCE_TTL_SECONDS", 1_800*time.Second),
