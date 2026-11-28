@@ -199,6 +199,6 @@ func TestClickHouseSchemaIsChangedOnlyByMigrating(t *testing.T) {
 	require.Zero(t, days, "the table is gone and checking did not bring it back")
 	applied, err := st.Up(ctx, 7)
 	require.NoError(t, err)
-	require.Equal(t, []int{1}, applied)
+	require.Equal(t, []uint32{1}, applied)
 	require.NoError(t, st.CheckSchema(ctx, 7))
 }
