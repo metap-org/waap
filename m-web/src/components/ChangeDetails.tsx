@@ -13,6 +13,7 @@ const ENTITY_LABEL_KEY: Record<string, string> = {
   [ENTITIES.ddosPolicies]: "waf.zoneTabs.versions.entityDdos",
   [ENTITIES.firewallRules]: "waf.zoneTabs.versions.entityRules",
   [ENTITIES.ipAccessLists]: "waf.zoneTabs.versions.entityIpLists",
+  [ENTITIES.zones]: "waf.changes.entityZone",
 };
 
 const KIND_VARIANT = {

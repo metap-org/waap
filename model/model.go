@@ -79,6 +79,7 @@ const (
 	ErrChangeRequestState        = "change_request_state"
 	ErrChangeRequestNotReady     = "change_request_not_ready"
 	ErrSelfApproval              = "self_approval_refused"
+	ErrRollbackNotApproved       = "rollback_not_approved"
 )
 
 // List page sizes: the MaxLimit of an entity's list views. Most entities cap at DefaultMaxListLimit;

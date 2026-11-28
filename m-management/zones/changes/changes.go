@@ -16,10 +16,13 @@ package changes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -144,7 +147,11 @@ func validateShape(ops []Operation) error {
 	}
 	seen := map[string]bool{}
 	for i, op := range ops {
-		if !versions.IsVersioned(op.Entity) {
+		if op.Entity == model.Zones {
+			if err := validateZoneOperation(i, op); err != nil {
+				return err
+			}
+		} else if !versions.IsVersioned(op.Entity) {
 			return invalid("operation %d: %q is not part of a zone's policy", i, op.Entity)
 		}
 		switch op.Op {
@@ -175,6 +182,63 @@ func validateShape(ops []Operation) error {
 	return nil
 }
 
+// validateZoneOperation: of the zone itself, a change may only update the settings that change how
+// traffic is handled.
+func validateZoneOperation(i int, op Operation) error {
+	if op.Op != OpUpdate {
+		return invalid("operation %d: a change only updates its zone", i)
+	}
+	for field := range op.Data {
+		if !slices.Contains(guard.ZoneTrafficSettings, field) {
+			return invalid("operation %d: %q is not a setting a change request changes", i, field)
+		}
+	}
+	return nil
+}
+
+func touchesZone(ops []Operation) bool {
+	return slices.ContainsFunc(ops, func(op Operation) bool { return op.Entity == model.Zones })
+}
+
+// state is what a change can alter: the policy, and the zone's traffic settings when the change
+// touches them (nil otherwise, so that an unrelated edit of them does not make it stale).
+type state struct {
+	policy   versions.Snapshot
+	settings crud.JsonObject
+}
+
+func (st state) hash() (string, error) {
+	policy, err := versions.Hash(st.policy)
+	if err != nil || st.settings == nil {
+		return policy, err
+	}
+	settings, err := json.Marshal(st.settings)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(append([]byte(policy), settings...))
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// read is the state of the change's zone, and the lock version of each policy record.
+func (s Service) read(ctx context.Context, zoneID uuid.UUID, withZone bool, rc *permission.RequestContext) (state, map[string]int32, error) {
+	policy, lockVersions, err := versions.ReadZoneState(ctx, s.Records, zoneID, rc)
+	if err != nil || !withZone {
+		return state{policy: policy}, lockVersions, err
+	}
+	zone, err := s.Records.Get(ctx, model.Zones, zoneID, rc)
+	if err != nil {
+		return state{}, nil, err
+	}
+	settings := crud.JsonObject{}
+	for _, field := range guard.ZoneTrafficSettings {
+		if value, ok := zone.Record.Data[field]; ok {
+			settings[field] = value
+		}
+	}
+	return state{policy: policy, settings: settings}, lockVersions, nil
+}
+
 // operationError carries which operation failed.
 type operationError struct {
 	index int
@@ -186,13 +250,13 @@ func (e *operationError) Unwrap() error { return e.err }
 
 // apply runs ops on the zone as rc. ctx must be inside a Step. It returns the zone's policy before
 // and after.
-func (s Service) apply(ctx context.Context, zoneID uuid.UUID, ops []Operation, rc *permission.RequestContext) (before, after versions.Snapshot, err error) {
-	before, lockVersions, err := versions.ReadZoneState(ctx, s.Records, zoneID, rc)
+func (s Service) apply(ctx context.Context, zoneID uuid.UUID, ops []Operation, rc *permission.RequestContext) (before, after state, err error) {
+	before, lockVersions, err := s.read(ctx, zoneID, touchesZone(ops), rc)
 	if err != nil {
-		return nil, nil, err
+		return state{}, state{}, err
 	}
 	mine := map[string]string{}
-	for entity, items := range before {
+	for entity, items := range before.policy {
 		for _, it := range items {
 			mine[it.ID] = entity
 		}
@@ -200,8 +264,22 @@ func (s Service) apply(ctx context.Context, zoneID uuid.UUID, ops []Operation, r
 	// One version for the whole change, recorded by the caller of apply, not one per operation.
 	writes := guard.Publishing(versions.WithoutVersions(ctx))
 	for i, op := range ops {
-		fail := func(err error) (versions.Snapshot, versions.Snapshot, error) {
-			return nil, nil, &operationError{index: i, err: err}
+		fail := func(err error) (state, state, error) {
+			return state{}, state{}, &operationError{index: i, err: err}
+		}
+		if op.Entity == model.Zones {
+			if zoneID == uuid.Nil || op.ID != zoneID.String() {
+				return fail(invalid("a change stays in its own zone"))
+			}
+			// Read just before: other operations may have written the zone.
+			zone, err := s.Records.Get(ctx, model.Zones, zoneID, rc)
+			if err != nil {
+				return fail(err)
+			}
+			if _, err := s.Policy.Update(writes, model.Zones, zoneID, zone.Record.Version, op.Data, rc, nil); err != nil {
+				return fail(err)
+			}
+			continue
 		}
 		if raw, ok := op.Data[model.FieldZoneID]; ok && !sameZone(raw, zoneID) {
 			return fail(invalid("a change stays in its own zone"))
@@ -229,8 +307,15 @@ func (s Service) apply(ctx context.Context, zoneID uuid.UUID, ops []Operation, r
 			return fail(err)
 		}
 	}
-	after, _, err = versions.ReadZoneState(ctx, s.Records, zoneID, rc)
+	after, _, err = s.read(ctx, zoneID, before.settings != nil, rc)
 	return before, after, err
+}
+
+func orNull(value json.RawMessage) json.RawMessage {
+	if len(value) == 0 {
+		return json.RawMessage("null")
+	}
+	return value
 }
 
 // sameZone says whether a zoneId in an operation's data names the change's own zone; for a
@@ -243,8 +328,20 @@ func sameZone(raw json.RawMessage, zoneID uuid.UUID) bool {
 	return id == zoneID.String()
 }
 
-func diff(before, after versions.Snapshot) []DiffEntry {
+// diff lists what differs between two states of zone zoneID.
+func diff(zoneID uuid.UUID, from, to state) []DiffEntry {
 	out := []DiffEntry{}
+	was, is := crud.JsonObject{}, crud.JsonObject{}
+	for _, field := range guard.ZoneTrafficSettings {
+		a, b := orNull(from.settings[field]), orNull(to.settings[field])
+		if string(a) != string(b) {
+			was[field], is[field] = a, b
+		}
+	}
+	if len(is) > 0 {
+		out = append(out, DiffEntry{Kind: OpUpdate, Entity: model.Zones, ID: zoneID.String(), Before: was, After: is})
+	}
+	before, after := from.policy, to.policy
 	for _, entity := range []string{model.DdosPolicies, model.FirewallRules, model.IPAccessLists} {
 		old := map[string]crud.JsonObject{}
 		for _, it := range before[entity] {
@@ -291,10 +388,10 @@ func (s Service) check(ctx context.Context, a *action.Ctx, zoneID uuid.UUID, ops
 		if err != nil {
 			return err
 		}
-		if out.baseHash, err = versions.Hash(before); err != nil {
+		if out.baseHash, err = before.hash(); err != nil {
 			return err
 		}
-		out.diff = diff(before, after)
+		out.diff = diff(zoneID, before, after)
 		report, err := policy.Validate(ctx, s.Records, zoneID, a.RC)
 		if err != nil {
 			return err
@@ -598,14 +695,14 @@ func (s Service) Approve(ctx context.Context, a *action.Ctx) (any, error) {
 			if err != nil {
 				return err
 			}
-			hash, err := versions.Hash(before)
+			hash, err := before.hash()
 			if err != nil {
 				return err
 			}
 			if hash != r.baseHash {
 				return conflict(model.ErrChangeRequestStale, "The zone's policy changed since this was submitted. Its author must submit it again.")
 			}
-			applied = diff(before, after)
+			applied = diff(r.zoneID, before, after)
 			data := decision(a, model.ChangePublished, kind, in.Comment)
 			if r.zoneID != uuid.Nil {
 				// The zone's mirror of "has any configuration" is the system's to write.
@@ -616,7 +713,10 @@ func (s Service) Approve(ctx context.Context, a *action.Ctx) (any, error) {
 				if err != nil {
 					return err
 				}
-				data[model.FieldPublishedVersion] = raw(published)
+				// 0: the policy is as it was (the change was to the zone's settings only).
+				if published > 0 {
+					data[model.FieldPublishedVersion] = raw(published)
+				}
 			}
 			if err := s.store(ctx, a, data); err != nil {
 				return err

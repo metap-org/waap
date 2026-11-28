@@ -22,6 +22,8 @@ type Backend struct {
 	base crud.RecordBackend
 	// plans resolves what a tenant may use; nil means no quotas (see WithPlanLimits).
 	plans billing.PlanLookup
+	// approvers counts who could approve under four-eyes; nil skips that check (see WithApprovers).
+	approvers ApproverCounter
 	// locks serialises count-then-create for the quota guard; nil means the in-process default.
 	locks Locker
 }
@@ -48,6 +50,13 @@ func (b *Backend) WithLocks(l Locker) *Backend {
 	return b
 }
 
+// WithApprovers refuses to switch an account to four-eyes unless two people could approve.
+func (b *Backend) WithApprovers(c ApproverCounter) *Backend {
+	b.approvers = c
+	b.RecordBackend = b.chain()
+	return b
+}
+
 // chain is the one list of guards, innermost first: each wraps the ones before it, so the last runs first.
 func (b *Backend) chain() crud.RecordBackend {
 	var c crud.RecordBackend = b.base
@@ -55,6 +64,7 @@ func (b *Backend) chain() crud.RecordBackend {
 	// Just above versionGuard: bad data is refused for what is wrong with it first, and a write that
 	// needs a change request is refused before a version baseline is recorded.
 	c = &changeControlGuard{passthrough{c}}
+	c = &fourEyesGuard{passthrough: passthrough{c}, approvers: b.approvers}
 	c = &accountGuard{passthrough{c}}
 	c = &domainGuard{passthrough{c}}
 	// Above domainGuard, so it judges what the client sent, not the status domainGuard copies from a

@@ -54,7 +54,7 @@ func options() app.Options {
 		// Every write to the REST record routes goes through the zones guard chain (it steps aside
 		// for entities it has no rule for). Plan limits are asked of the billing domain, in-process.
 		WrapBackend: func(state *web.State) (crud.RecordBackend, error) {
-			return zones.Guarded(state.Crud, billingCfg.PlanSource(state.Crud), state.Router), nil
+			return zones.Guarded(state.Crud, billingCfg.PlanSource(state.Crud), state.Router).WithApprovers(zones.Approvers(state)), nil
 		},
 		Actions: func(state *web.State, reg *crud.ActionRegistry) error {
 			for _, register := range []func(*web.State, *crud.ActionRegistry) error{

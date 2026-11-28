@@ -649,7 +649,7 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
   (`off` default, `review`, `fourEyes`) decides whether its zones' rules may be written directly. A check is the
   operations applied in a `Step` and rolled back. `waf.change_requests` rows are written only by their actions.
   Server code that must write policy under control marks its context with `guard.Publishing`; the doc lists what
-  is not gated yet (tenant-wide rules first). Guard order in `guard/backend.go` is innermost first.
+  is not gated yet. Tenant-wide rules, zone traffic settings and rollback targets are gated. Guard order in `guard/backend.go` is innermost first.
 - **What a client may not write** (`zones/guard/ownership.go`): `hasConfig` and the ownership proof.
   Apex grouping uses the Public Suffix List (`zones/rules/apexdomain.go`); the HTTP-file proof is
   read from the apex only. `e-edge` believes `CLIENT_IP_HEADER` only from `TRUSTED_PROXIES`.
