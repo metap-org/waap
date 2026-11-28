@@ -535,7 +535,6 @@ function ConnectStep({
 }) {
   const { t } = useTranslation();
   const [method, setMethod] = useState<"dnsTxt" | "httpFile">("dnsTxt");
-  const [fileHost, setFileHost] = useState("");
   const [detail, setDetail] = useState<string | null>(null);
   const [routing, setRouting] = useState<{
     dnsRouted: boolean;
@@ -551,12 +550,7 @@ function ConnectStep({
   const checkOwnership = () =>
     guard(async () => {
       if (!domain) return;
-      const res = await verifyDomainDns(domain.id, {
-        method,
-        ...(method === "httpFile" && fileHost.trim()
-          ? { host: fileHost.trim() }
-          : {}),
-      });
+      const res = await verifyDomainDns(domain.id, { method });
       const checked = res.data.checked;
       setDetail(
         res.data.ownershipVerified
@@ -625,32 +619,16 @@ function ConnectStep({
                 copyValue={token}
               />
             ) : (
-              <>
-                <Record
-                  rows={[
-                    [
-                      t("waf.onboarding.filePath"),
-                      `http://${fileHost.trim() || apex}/.well-known/waf-verify/${token}`,
-                    ],
-                    [t("waf.onboarding.fileContent"), token],
-                  ]}
-                  copyValue={token}
-                />
-                <div className="mt-2 max-w-sm">
-                  <Label htmlFor="file-host">
-                    {t("waf.onboarding.fileHost")}
-                  </Label>
-                  <Input
-                    id="file-host"
-                    placeholder={apex}
-                    value={fileHost}
-                    onChange={(e) => setFileHost(e.target.value)}
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t("waf.onboarding.fileHostHint", { apex })}
-                  </p>
-                </div>
-              </>
+              <Record
+                rows={[
+                  [
+                    t("waf.onboarding.filePath"),
+                    `http://${apex}/.well-known/waf-verify/${token}`,
+                  ],
+                  [t("waf.onboarding.fileContent"), token],
+                ]}
+                copyValue={token}
+              />
             )}
             <div className="mt-3 flex items-center gap-3">
               <Button onClick={checkOwnership} disabled={busy}>

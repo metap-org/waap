@@ -45,7 +45,7 @@ func PolicyVersionEntity() metadata.EntityDefinition {
 			MaxLimit:    model.DefaultMaxListLimit,
 		}},
 		Actions: []metadata.EntityAction{
-			{Name: model.ActionRollback, Label: "Roll back to this version", Description: "Restores the zone's rules, DDoS policies and IP lists to this version.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionRollback, Label: "Roll back to this version", Description: "Restores the zone's rules, DDoS policies and IP lists to this version.", Scope: metadata.ActionScopeRecord, Requires: "read"},
 		},
 		// Two edits at once must not both become "version 5": the writer that loses retries with the
 		// next number (versions.RecordVersion).

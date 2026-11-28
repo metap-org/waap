@@ -104,15 +104,15 @@ func ZoneEntity() metadata.EntityDefinition {
 		Scopes: []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
 		Audit:  &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
-			{Name: model.ActionVerifyDNS, Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord},
-			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord},
-			{Name: model.ActionValidatePolicy, Label: "Check policy", Description: "Checks the zone's rules, DDoS policies and IP lists for mistakes. Changes nothing.", Scope: metadata.ActionScopeRecord},
-			{Name: model.ActionExportData, Label: "Export data", Description: "Everything this tenant has configured, as one document.", Scope: metadata.ActionScopeEntity},
+			{Name: model.ActionVerifyDNS, Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord, Requires: "update"},
+			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord, Requires: "update"},
+			{Name: model.ActionValidatePolicy, Label: "Check policy", Description: "Checks the zone's rules, DDoS policies and IP lists for mistakes. Changes nothing.", Scope: metadata.ActionScopeRecord, Requires: "read"},
+			{Name: model.ActionExportData, Label: "Export data", Description: "Everything this tenant has configured, as one document.", Scope: metadata.ActionScopeEntity, Requires: "read"},
 			{Name: model.ActionResolveHostname, Label: "Resolve hostname", Description: "What a hostname resolves to now, and a suggested origin.", Scope: metadata.ActionScopeEntity, Requires: "create"},
 			{Name: model.ActionProbeOrigin, Label: "Probe origin", Description: "Checks an origin can be reached, before a zone exists for it.", Scope: metadata.ActionScopeEntity, Requires: "create"},
-			{Name: model.ActionApplyPreset, Label: "Apply preset", Description: "Gives the zone a starting set of protections.", Scope: metadata.ActionScopeRecord},
-			{Name: model.ActionPlanUsage, Label: "Plan and usage", Description: "The tenant's plan, its limits and how much of them is used.", Scope: metadata.ActionScopeEntity},
-			{Name: model.ActionSyncConfigState, Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord},
+			{Name: model.ActionApplyPreset, Label: "Apply preset", Description: "Gives the zone a starting set of protections.", Scope: metadata.ActionScopeRecord, Requires: "read"},
+			{Name: model.ActionPlanUsage, Label: "Plan and usage", Description: "The tenant's plan, its limits and how much of them is used.", Scope: metadata.ActionScopeEntity, Requires: "read"},
+			{Name: model.ActionSyncConfigState, Label: "Sync config state", Description: "Recomputes hasConfig from the zone's policies and rules.", Scope: metadata.ActionScopeRecord, Requires: "read"},
 		},
 	}
 }

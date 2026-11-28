@@ -74,7 +74,10 @@ Each of these is a real gap, not a rough edge that will quietly work out:
 - **The challenge is demo-grade** — it proves the client runs JS and honours cookies, nothing
   more. Bot management proper is v2 (`../docs/management/01-product-vision.md`).
 - **`CLIENT_IP_HEADER` is unset by default.** Trusting a client-supplied IP header by default
-  would let anyone spoof past every IP rule and rate limit in the product.
+  would let anyone spoof past every IP rule and rate limit in the product. Setting it also needs
+  `TRUSTED_PROXIES` (the node refuses to start otherwise), and the header is believed only from
+  those addresses. `X-Forwarded-For` is read from the right, past the trusted proxies, so what a
+  caller puts at the front of the list is never used.
 
 ## Running it
 

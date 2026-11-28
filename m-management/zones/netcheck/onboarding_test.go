@@ -62,7 +62,7 @@ func TestProbeOriginRefusesPrivateAddressesByDefault(t *testing.T) {
 	assert.Equal(t, "shop.example.com", gotHost)
 }
 
-func TestVerificationFileMustContainTheTokenAndStayUnderTheDomain(t *testing.T) {
+func TestVerificationFileMustContainTheTokenAndBeAtTheApex(t *testing.T) {
 	cfg := Config{AllowPrivateTargets: true}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -79,7 +79,7 @@ func TestVerificationFileMustContainTheTokenAndStayUnderTheDomain(t *testing.T) 
 	verificationURL = func(_, token string) string { return srv.URL + "/.well-known/waf-verify/" + token }
 	t.Cleanup(func() { verificationURL = old })
 
-	ok, _, err := cfg.fetchVerificationFile(context.Background(), "example.com", "www.example.com", "good")
+	ok, _, err := cfg.fetchVerificationFile(context.Background(), "example.com", "Example.com.", "good")
 	require.NoError(t, err)
 	assert.True(t, ok)
 	ok, detail, _ := cfg.fetchVerificationFile(context.Background(), "example.com", "example.com", "other")
@@ -89,7 +89,10 @@ func TestVerificationFileMustContainTheTokenAndStayUnderTheDomain(t *testing.T) 
 	assert.False(t, ok)
 	assert.Contains(t, detail, "404")
 
-	// A host outside the domain is refused before anything is fetched.
+	// Any other host is refused before anything is fetched: outside the domain, or a name under it,
+	// which may be served by somebody the domain's owner handed it to.
+	_, _, err = cfg.fetchVerificationFile(context.Background(), "example.com", "www.example.com", "good")
+	assert.Error(t, err)
 	_, _, err = cfg.fetchVerificationFile(context.Background(), "example.com", "evil.test", "good")
 	assert.Error(t, err)
 	_, _, err = cfg.fetchVerificationFile(context.Background(), "example.com", "notexample.com", "good")

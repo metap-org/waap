@@ -55,12 +55,13 @@ export function PlanPage() {
   const [asking, setAsking] = useState<PlanLimits | null>(null);
   const [note, setNote] = useState("");
   const [askError, setAskError] = useState<Error | null>(null);
+  const isAdmin = Boolean(me.data?.roles.includes("admin"));
+  // Only the workspace's admin may ask about its plan change requests.
   const requests = useQuery({
     queryKey: ["records", "plan-requests"],
     queryFn: async () => (await myPlanRequests()).data.requests,
-    enabled: usage.data?.enforced === true && !usage.data.operator,
+    enabled: isAdmin && usage.data?.enforced === true && !usage.data.operator,
   });
-  const isAdmin = Boolean(me.data?.roles.includes("admin"));
   const waiting = (requests.data ?? []).some((r) => r.status === "pending");
 
   async function ask() {

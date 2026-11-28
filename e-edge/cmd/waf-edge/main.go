@@ -33,7 +33,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -43,6 +42,7 @@ import (
 	"github.com/metap-org/metap/pkg/kit/standard"
 	"github.com/metap-org/waap/e-edge/cache"
 	"github.com/metap-org/waap/e-edge/clearance"
+	"github.com/metap-org/waap/e-edge/clientip"
 	"github.com/metap-org/waap/e-edge/config"
 	"github.com/metap-org/waap/e-edge/evaluate"
 	"github.com/metap-org/waap/e-edge/pages"
@@ -61,11 +61,22 @@ type edge struct {
 	limiter   *ratelimit.RateLimiter
 	telemetry *telemetry.Telemetry
 	client    *http.Client
+	clientIPs clientip.Resolver
 }
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	cfg := config.Load()
+
+	header := ""
+	if cfg.ClientIPHeader != nil {
+		header = *cfg.ClientIPHeader
+	}
+	clientIPs, err := clientip.New(header, cfg.TrustedProxies)
+	if err != nil {
+		slog.Error("client address configuration", standard.LogError, err)
+		os.Exit(1)
+	}
 
 	ruleCache, err := cache.New(cfg.RedisURL)
 	if err != nil {
@@ -105,7 +116,7 @@ func main() {
 		}
 	}()
 
-	e := &edge{config: cfg, cache: ruleCache, limiter: limiter, telemetry: tel, client: proxy.BuildClient()}
+	e := &edge{config: cfg, cache: ruleCache, limiter: limiter, telemetry: tel, client: proxy.BuildClient(), clientIPs: clientIPs}
 
 	ctx, stop := shutdown.Context(bg)
 	defer stop()
@@ -123,34 +134,6 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("shut down cleanly")
-}
-
-// clientIP: the client's IP.
-//
-// The socket peer by default. config.ClientIPHeader overrides it only when explicitly
-// configured, because trusting a client-supplied header by default would let anyone spoof their
-// source address past every IP rule and every rate limit in the product.
-func (e *edge) clientIP(r *http.Request) net.IP {
-	peerIP := func() net.IP {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			return net.ParseIP(r.RemoteAddr)
-		}
-		return net.ParseIP(host)
-	}
-	if e.config.ClientIPHeader == nil {
-		return peerIP()
-	}
-	value := r.Header.Get(*e.config.ClientIPHeader)
-	if value == "" {
-		return peerIP()
-	}
-	// X-Forwarded-For is a list; the first entry is the original client.
-	first, _, _ := strings.Cut(value, ",")
-	if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
-		return ip
-	}
-	return peerIP()
 }
 
 func (e *edge) handle(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +159,7 @@ func (e *edge) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := e.clientIP(r)
+	ip := e.clientIPs.Of(r)
 	ipText := ip.String()
 	country := ""
 	if e.config.GeoCountryHeader != nil {

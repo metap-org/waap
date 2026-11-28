@@ -151,7 +151,7 @@ export type DomainVerifyResult = {
  *  `Zone` under it (each zone's own `verificationStatus` mirror gets updated server-side). */
 export function verifyDomainDns(
   domainId: string,
-  how: { method?: "dnsTxt" | "httpFile"; host?: string } = {},
+  how: { method?: "dnsTxt" | "httpFile" } = {},
 ) {
   return act<DomainVerifyResult["data"]>(ENTITIES.domains, "verifyDns", {
     id: domainId,

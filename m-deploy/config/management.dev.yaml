@@ -21,3 +21,6 @@ smtp:
   port: 2525
   from: "WAF Portal <no-reply@waf.local>"
 public_app_url: http://localhost:5173
+# The dev portal is plain http, also from other machines on the network, where a browser would drop
+# Secure cookies. Never set this in a deployment: without it the session cookies are Secure.
+cookie_secure: false

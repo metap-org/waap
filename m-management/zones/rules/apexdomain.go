@@ -1,19 +1,26 @@
-// Layer: APP · pure business rules (the inner circle). Standard library only: no metap, HTTP or database. Enforced by .golangci.yml.
+// Layer: APP · pure business rules (the inner circle). No metap, HTTP or database: the standard library
+// and the Public Suffix List (data compiled in). Enforced by .golangci.yml.
 
-// The apex-domain grouping algorithm: the last 2 labels of a hostname, split on "." — no Public
-// Suffix List, so a compound TLD like ".co.uk" groups on "co.uk" rather than the real apex.
-// Accepted trade-off at this scale, not a bug to fix later without a real PSL dependency.
+// The apex-domain grouping rule: the registrable domain, one label under the public suffix.
 package rules
 
-import "strings"
+import (
+	"strings"
 
-// ApexDomain: a hostname with fewer than 2 labels (a bare TLD, or already just 2 labels) returns
-// itself unchanged — there's nothing shorter to group on.
+	"golang.org/x/net/publicsuffix"
+)
+
+// ApexDomain is the domain somebody registers and can prove they own: "example.com" for
+// "api.shop.example.com", "abc.com.vn" for "shop.abc.com.vn". Grouping on the last two labels
+// instead would put every .com.vn customer under one "com.vn" domain, which nobody can prove and
+// only one tenant could hold. A name with nothing under a suffix (a single label, or a suffix
+// itself) comes back unchanged.
 func ApexDomain(hostname string) string {
 	hostname = strings.TrimPrefix(hostname, "*.") // a wildcard zone belongs to its domain
-	labels := strings.Split(strings.TrimRight(hostname, "."), ".")
-	if len(labels) <= 2 {
+	hostname = strings.TrimRight(hostname, ".")
+	apex, err := publicsuffix.EffectiveTLDPlusOne(strings.ToLower(hostname))
+	if err != nil || len(apex) > len(hostname) {
 		return hostname
 	}
-	return strings.Join(labels[len(labels)-2:], ".")
+	return hostname[len(hostname)-len(apex):] // keeps the caller's spelling
 }
