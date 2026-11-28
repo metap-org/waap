@@ -31,6 +31,8 @@ func AccountEntity() metadata.EntityDefinition {
 			name,
 			slug,
 			metadata.EnumField(model.FieldStatus, "Status", model.AccountActive, model.AccountClosed).Index(),
+			// Whether changes to the policy of this account's zones need a change request (guard/changecontrol.go).
+			metadata.EnumField(model.FieldChangeControl, "Change control", model.ChangeControlOff, model.ChangeControlReview, model.ChangeControlFourEyes),
 		},
 		ListViews: []metadata.EntityListView{{
 			Name: "default", Label: "Default",

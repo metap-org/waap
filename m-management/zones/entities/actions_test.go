@@ -22,15 +22,22 @@ func TestWhoMayRunTheZoneActions(t *testing.T) {
 		{model.Zones, describe(ZoneEntity().Actions)},
 		{model.Domains, describe(DomainEntity().Actions)},
 		{model.PolicyVersions, describe(PolicyVersionEntity().Actions)},
+		{model.ChangeRequests, describe(ChangeRequestEntity().Actions)},
 	} {
 		for _, a := range def.actions {
 			got = append(got, def.name+" "+a)
 		}
 	}
 	sort.Strings(got)
-	want := `waf.domains verifyDns update
+	want := `waf.change_requests approve read
+waf.change_requests cancel read
+waf.change_requests reject read
+waf.change_requests revise read
+waf.change_requests submit read
+waf.domains verifyDns update
 waf.policy_versions rollback read
 waf.zones applyPreset read
+waf.zones createChangeRequest read
 waf.zones exportData read
 waf.zones planUsage read
 waf.zones probeOrigin create

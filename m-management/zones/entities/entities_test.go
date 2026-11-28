@@ -20,7 +20,7 @@ func TestOwnsExactlyItsOwnEntities(t *testing.T) {
 	for _, e := range registry.ListEntities() {
 		names = append(names, e.Name)
 	}
-	expected := []string{"waf.domains", "waf.zones", "waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists", "waf.policy_versions", "waf.accounts"}
+	expected := []string{"waf.domains", "waf.zones", "waf.ddos_policies", "waf.firewall_rules", "waf.ip_access_lists", "waf.policy_versions", "waf.accounts", "waf.change_requests"}
 	for _, want := range expected {
 		found := false
 		for _, n := range names {

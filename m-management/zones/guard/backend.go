@@ -48,10 +48,13 @@ func (b *Backend) WithLocks(l Locker) *Backend {
 	return b
 }
 
-// chain is the one list of guards and the order they run in, outermost first.
+// chain is the one list of guards, innermost first: each wraps the ones before it, so the last runs first.
 func (b *Backend) chain() crud.RecordBackend {
 	var c crud.RecordBackend = b.base
 	c = &versionGuard{passthrough{c}}
+	// Just above versionGuard: bad data is refused for what is wrong with it first, and a write that
+	// needs a change request is refused before a version baseline is recorded.
+	c = &changeControlGuard{passthrough{c}}
 	c = &accountGuard{passthrough{c}}
 	c = &domainGuard{passthrough{c}}
 	// Above domainGuard, so it judges what the client sent, not the status domainGuard copies from a

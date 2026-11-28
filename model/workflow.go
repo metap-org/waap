@@ -67,6 +67,31 @@ const (
 	FalsePositiveResolve = "resolve"
 )
 
+// waf.change_requests status. Only the change request's own actions move it (no workflow: every
+// write to the entity from a client is refused).
+const (
+	ChangeDraft         = "draft"
+	ChangePendingReview = "pendingReview"
+	ChangePublished     = "published"
+	ChangeRejected      = "rejected"
+	ChangeCancelled     = "cancelled"
+)
+
+// waf.change_requests decision.
+const (
+	DecisionApproved      = "approved"
+	DecisionSelfConfirmed = "selfConfirmed"
+	DecisionRejected      = "rejected"
+)
+
+// waf.accounts changeControl: how a change that affects traffic reaches the account's zones. Empty
+// means off.
+const (
+	ChangeControlOff      = "off"
+	ChangeControlReview   = "review"   // through a change request; the author may confirm their own
+	ChangeControlFourEyes = "fourEyes" // through a change request that someone else approves
+)
+
 // waf.accounts (StateField "status"): closing is final.
 const (
 	AccountActive = "active"

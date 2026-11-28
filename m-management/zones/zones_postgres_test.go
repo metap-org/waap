@@ -56,6 +56,7 @@ func setupRegistry(t *testing.T, pool *pgxpool.Pool) *metadata.MetadataRegistry 
 	defs := []metadata.EntityDefinition{
 		entities.DomainEntity(), entities.AccountEntity(), entities.ZoneEntity(), entities.DdosPolicyEntity(),
 		entities.FirewallRuleEntity(), entities.IPAccessListEntity(), entities.PolicyVersionEntity(),
+		entities.ChangeRequestEntity(),
 	}
 	for _, def := range defs {
 		require.NoError(t, registry.Register(def), "register %s", def.Name)
@@ -77,7 +78,7 @@ func seedAdmin(t *testing.T, pool *pgxpool.Pool, tenantID, userID uuid.UUID) {
 func cleanupEntityRows(t *testing.T, pool *pgxpool.Pool, tenantID uuid.UUID) {
 	t.Cleanup(func() {
 		ctx := context.Background()
-		for _, table := range []string{"waf.waf_accounts", "waf.waf_policy_versions", "waf.waf_ip_access_lists", "waf.waf_firewall_rules", "waf.waf_ddos_policies", "waf.waf_zones", "waf.waf_domains"} {
+		for _, table := range []string{"waf.waf_change_requests", "waf.waf_accounts", "waf.waf_policy_versions", "waf.waf_ip_access_lists", "waf.waf_firewall_rules", "waf.waf_ddos_policies", "waf.waf_zones", "waf.waf_domains"} {
 			pool.Exec(ctx, "DELETE FROM "+table+" WHERE tenant_id = $1", tenantID)
 		}
 	})

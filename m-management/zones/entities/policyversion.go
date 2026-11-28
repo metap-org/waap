@@ -34,6 +34,9 @@ func PolicyVersionEntity() metadata.EntityDefinition {
 			// Set only on a rollback: the version whose content was restored.
 			metadata.NewField(model.FieldRestoredFrom, "Restored from", metadata.KindNumber),
 			metadata.NewField(model.FieldContentHash, "Content hash", metadata.KindString),
+			// Set only on a version published by a change request: which one, and who approved it.
+			metadata.NewField(model.FieldChangeRequestID, "Change request", metadata.KindString),
+			metadata.NewField(model.FieldApprovedBy, "Approved by", metadata.KindString),
 			metadata.NewField(model.FieldSnapshot, "Snapshot", metadata.KindJSON).Require(),
 		},
 		ListViews: []metadata.EntityListView{{
