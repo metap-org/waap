@@ -24,7 +24,7 @@ var ErrSchemaNotReady = errors.New("the ClickHouse schema is not ready for this 
 
 // Migration is one numbered change, its statements with the placeholders filled in.
 type Migration struct {
-	Version  int
+	Version  uint32 // the ledger column's type
 	Name     string
 	Up, Down []string
 }
@@ -62,16 +62,17 @@ func (c *ClickHouse) Migrations(retentionDays int) ([]Migration, error) {
 	if err != nil {
 		return nil, err
 	}
-	byVersion := map[int]*Migration{}
+	byVersion := map[uint32]*Migration{}
 	for _, e := range entries {
 		m := migrationFile.FindStringSubmatch(e.Name())
 		if m == nil {
 			return nil, fmt.Errorf("%s: a migration file is NNNN_name.up.sql or .down.sql", e.Name())
 		}
-		version, err := strconv.Atoi(m[1])
+		parsed, err := strconv.ParseUint(m[1], 10, 32)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: invalid version: %w", e.Name(), err)
 		}
+		version := uint32(parsed)
 		script, err := fs.ReadFile(migrations.FS, e.Name())
 		if err != nil {
 			return nil, err
@@ -116,8 +117,8 @@ func (c *ClickHouse) tableDDL(ctx context.Context, name string) (string, error) 
 }
 
 // applied is the versions recorded in the ledger; none when there is no ledger.
-func (c *ClickHouse) applied(ctx context.Context) (map[int]bool, error) {
-	out := map[int]bool{}
+func (c *ClickHouse) applied(ctx context.Context) (map[uint32]bool, error) {
+	out := map[uint32]bool{}
 	ddl, err := c.tableDDL(ctx, "schema_migrations")
 	if err != nil || ddl == "" {
 		return out, err
@@ -132,7 +133,7 @@ func (c *ClickHouse) applied(ctx context.Context) (map[int]bool, error) {
 		if err := rows.Scan(&v); err != nil {
 			return nil, err
 		}
-		out[int(v)] = true
+		out[v] = true
 	}
 	return out, rows.Err()
 }
@@ -212,7 +213,7 @@ func (c *ClickHouse) CheckSchema(ctx context.Context, retentionDays int) error {
 // Up applies the pending migrations in order, recording each after its last statement. ClickHouse
 // has no transaction around them, so statements tolerate running again (IF NOT EXISTS). Run one
 // at a time: nothing stops two concurrent runs.
-func (c *ClickHouse) Up(ctx context.Context, retentionDays int) ([]int, error) {
+func (c *ClickHouse) Up(ctx context.Context, retentionDays int) ([]uint32, error) {
 	pending, err := c.Pending(ctx, retentionDays)
 	if err != nil || len(pending) == 0 {
 		return nil, err
@@ -225,14 +226,14 @@ func (c *ClickHouse) Up(ctx context.Context, retentionDays int) ([]int, error) {
 			return nil, err
 		}
 	}
-	var done []int
+	var done []uint32
 	for _, m := range pending {
 		for i, s := range m.Up {
 			if err := c.conn.Exec(ctx, s); err != nil {
 				return done, fmt.Errorf("migration %04d_%s, statement %d: %w", m.Version, m.Name, i+1, err)
 			}
 		}
-		if err := c.conn.Exec(ctx, "INSERT INTO "+c.ledger()+" (version, name) VALUES (?, ?)", uint32(m.Version), m.Name); err != nil {
+		if err := c.conn.Exec(ctx, "INSERT INTO "+c.ledger()+" (version, name) VALUES (?, ?)", m.Version, m.Name); err != nil {
 			return done, err
 		}
 		done = append(done, m.Version)
@@ -278,7 +279,7 @@ func (c *ClickHouse) Down(ctx context.Context, targets []Migration) error {
 				return fmt.Errorf("rolling back %04d_%s, statement %d: %w", m.Version, m.Name, i+1, err)
 			}
 		}
-		if err := c.conn.Exec(ctx, "ALTER TABLE "+c.ledger()+" DELETE WHERE version = ? SETTINGS mutations_sync = 1", uint32(m.Version)); err != nil {
+		if err := c.conn.Exec(ctx, "ALTER TABLE "+c.ledger()+" DELETE WHERE version = ? SETTINGS mutations_sync = 1", m.Version); err != nil {
 			return err
 		}
 	}
