@@ -11,6 +11,7 @@
  * back to "not configured", not just adding the first one to "configured".
  */
 import { ConfirmAction } from "../../components/ConfirmAction";
+import { useChangeProposal } from "../../components/useChangeProposal";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -88,6 +89,7 @@ export function ZoneDdosTab({ zoneId }: { zoneId: string }) {
   const [draft, setDraft] = useState<DdosData>(EMPTY);
   const [open, setOpen] = useState(false);
   const { busy, run } = useAsyncAction();
+  const proposal = useChangeProposal(zoneId);
 
   const ordered = [...(policies.data ?? [])].sort(
     (a, b) => (a.data.priority ?? 0) - (b.data.priority ?? 0),
@@ -111,15 +113,37 @@ export function ZoneDdosTab({ zoneId }: { zoneId: string }) {
 
   async function save() {
     await run(async () => {
-      if (editing) {
-        await updateRecord(
-          ENTITIES.ddosPolicies,
-          editing.id,
-          editing.version,
-          draft,
-        );
-      } else {
-        await createRecord(ENTITIES.ddosPolicies, { ...draft, zoneId });
+      const written = editing
+        ? await proposal.write(
+            () =>
+              updateRecord(
+                ENTITIES.ddosPolicies,
+                editing.id,
+                editing.version,
+                draft,
+              ),
+            [
+              {
+                op: "update",
+                entity: ENTITIES.ddosPolicies,
+                id: editing.id,
+                data: draft,
+              },
+            ],
+          )
+        : await proposal.write(
+            () => createRecord(ENTITIES.ddosPolicies, { ...draft, zoneId }),
+            [
+              {
+                op: "create",
+                entity: ENTITIES.ddosPolicies,
+                data: { ...draft, zoneId },
+              },
+            ],
+          );
+      if (!written) {
+        setOpen(false);
+        return;
       }
       await syncConfigState(zoneId);
       invalidate();
@@ -130,7 +154,11 @@ export function ZoneDdosTab({ zoneId }: { zoneId: string }) {
 
   async function remove(policy: WafRecord<DdosData>) {
     await run(async () => {
-      await deleteRecord(ENTITIES.ddosPolicies, policy.id, policy.version);
+      const written = await proposal.write(
+        () => deleteRecord(ENTITIES.ddosPolicies, policy.id, policy.version),
+        [{ op: "delete", entity: ENTITIES.ddosPolicies, id: policy.id }],
+      );
+      if (!written) return;
       await syncConfigState(zoneId);
       invalidate();
       toast(t("waf.zoneTabs.ddos.toastRemoved"), { variant: "default" });
@@ -393,6 +421,7 @@ export function ZoneDdosTab({ zoneId }: { zoneId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {proposal.dialog}
     </div>
   );
 }

@@ -41,6 +41,7 @@ export const ENTITIES = {
   firewallRules: "waf.firewall_rules",
   ipAccessLists: "waf.ip_access_lists",
   policyVersions: "waf.policy_versions",
+  changeRequests: "waf.change_requests",
   scanJobs: "waf.scan_jobs",
   scanFindings: "waf.scan_findings",
   securityEvents: "waf.security_events",

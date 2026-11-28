@@ -1,6 +1,6 @@
 # Change request: đã làm gì, dùng thế nào
 
-> **Trạng thái (2026-11-28): backend xong, chưa có màn hình.** Phục vụ UC-40, 42 đến 46 ([use case](01-use-cases.md)),
+> **Trạng thái (2026-11-29): có backend và màn hình; màn hình chưa được kiểm trên trình duyệt.** Phục vụ UC-40, 42 đến 46 ([use case](01-use-cases.md)),
 > theo [phân tích 3.2](../../requirements/03-business-analysis/02-policy-change.md). Mã: `m-management/zones/changes/`,
 > `zones/guard/changecontrol.go`, `zones/entities/changerequest.go`.
 
@@ -16,6 +16,19 @@
 - **Người duyệt là người thực hiện thao tác**, nên cần quyền như khi sửa tay.
 - Không ai sửa trực tiếp được dòng change request qua REST, kể cả admin.
 - Chỉ người soạn được sửa và gửi nháp. Nhờ vậy người duyệt thứ hai không tự viết nội dung rồi tự duyệt.
+
+## Trên portal
+
+- **Không phải đổi cách làm.** Người dùng sửa rule, DDoS policy, IP list như cũ. Chỉ khi server trả
+  `change_request_required`, hộp thoại **"Thay đổi này cần được duyệt"** mới hiện, mang đúng các thao tác vừa định ghi:
+  đặt tiêu đề (hoặc thêm vào một yêu cầu của mình đang mở), rồi **Lưu nháp** hoặc **Gửi duyệt**. Áp dụng ở tab Rule,
+  Whitelist/Blacklist, DDoS, trang rule và IP list cho mọi zone, thêm hàng loạt, đổi thứ tự rule, chặn IP từ incident và
+  cho IP đi qua khi xử lý chặn nhầm (báo cáo vẫn mở cho tới khi thay đổi được phát hành).
+- **Xem và quyết:** tab **Thay đổi** của zone, và trang **Thay đổi policy** (gồm cả thay đổi cho mọi zone): diff, kết quả
+  kiểm, gửi, gửi lại, duyệt, tự xác nhận, từ chối, huỷ, bỏ bớt thao tác.
+- **Bật kiểm soát:** trang Account, nút Sửa, mục **Kiểm soát thay đổi**.
+- Chưa có: sửa nội dung một thao tác trong nháp (huỷ rồi soạn lại, hoặc bỏ thao tác đó rồi thêm lại); danh sách chỉ lấy
+  50 yêu cầu.
 
 ## Rule cho cả tenant
 
@@ -73,8 +86,8 @@ Trường `changeControl` của `waf.accounts` (chỉ người sửa được ac
 `log`; IP list `blacklist`) và được gỡ rule tạm. Sửa rule, kể cả gia hạn, phải qua change request. Bị từ chối thì API
 trả `409 change_request_required`.
 
-**Đừng bật cho account đang dùng portal hằng ngày cho tới khi có màn hình.** Khi bật, các thao tác sau trên portal sẽ
-bị từ chối: sửa rule, áp preset, chặn IP từ incident quá 72 giờ, whitelist khi xử lý chặn nhầm.
+**Áp preset chưa đi qua change request được:** khi bật, áp preset bị từ chối bằng thông báo lỗi. Nên áp preset lúc
+onboarding, trước khi bật.
 
 ## Chưa chặn
 
@@ -90,7 +103,7 @@ Với account đã bật, vẫn còn các đường đổi cách edge xử lý t
 
 ## Còn lại của S2
 
-Màn hình (soạn nháp, xem diff, duyệt); đóng các đường ở bảng trên; theo dõi phát hành (UC-47, cần edge báo ngược);
+Đóng các đường ở bảng trên; theo dõi phát hành (UC-47, cần edge báo ngược);
 Under Attack (UC-50, cần edge).
 
 ## Khi triển khai

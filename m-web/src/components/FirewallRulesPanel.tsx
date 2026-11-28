@@ -23,6 +23,7 @@
  * the shared hook is out of scope here (it would affect every other consumer app).
  */
 import { ConfirmAction } from "./ConfirmAction";
+import { useChangeProposal } from "./useChangeProposal";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -140,6 +141,7 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
   // "" = permanent, "keep" = leave an existing expiry as it is, else hours from now (UC-51).
   const [expiry, setExpiry] = useState("");
   const { busy, run } = useAsyncAction();
+  const proposal = useChangeProposal(zoneId);
 
   function loadCondition(condition: unknown) {
     setConditionText(JSON.stringify(condition ?? null, null, 2));
@@ -255,15 +257,31 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
       const payload = zoneId
         ? { ...draft, matchCondition, zoneId, expiresAt }
         : { ...draft, matchCondition, expiresAt };
-      if (editing) {
-        await updateRecord(
-          ENTITIES.firewallRules,
-          editing.id,
-          editing.version,
-          payload,
-        );
-      } else {
-        await createRecord(ENTITIES.firewallRules, payload);
+      const written = editing
+        ? await proposal.write(
+            () =>
+              updateRecord(
+                ENTITIES.firewallRules,
+                editing.id,
+                editing.version,
+                payload,
+              ),
+            [
+              {
+                op: "update",
+                entity: ENTITIES.firewallRules,
+                id: editing.id,
+                data: payload,
+              },
+            ],
+          )
+        : await proposal.write(
+            () => createRecord(ENTITIES.firewallRules, payload),
+            [{ op: "create", entity: ENTITIES.firewallRules, data: payload }],
+          );
+      if (!written) {
+        setOpen(false);
+        return;
       }
       // A global (tenant-wide) rule has no single zone to resync — the next periodic resync
       // picks it up, an accepted v1 trade-off (see `sync.rs`'s `zone_id_from_event`).
@@ -278,7 +296,11 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
 
   async function remove(rule: WafRecord<RuleData>) {
     await run(async () => {
-      await deleteRecord(ENTITIES.firewallRules, rule.id, rule.version);
+      const written = await proposal.write(
+        () => deleteRecord(ENTITIES.firewallRules, rule.id, rule.version),
+        [{ op: "delete", entity: ENTITIES.firewallRules, id: rule.id }],
+      );
+      if (!written) return;
       if (zoneId) {
         await syncConfigState(zoneId);
       }
@@ -294,14 +316,28 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
     const neighbour = ordered[index + direction];
     if (!neighbour) return;
     await run(async () => {
-      await updateRecord(ENTITIES.firewallRules, rule.id, rule.version, {
-        priority: neighbour.data.priority,
-      });
-      await updateRecord(
-        ENTITIES.firewallRules,
-        neighbour.id,
-        neighbour.version,
-        { priority: rule.data.priority },
+      const swap = [
+        { rule, priority: neighbour.data.priority },
+        { rule: neighbour, priority: rule.data.priority },
+      ];
+      // Change control refuses the first of the two, so neither is written and both are proposed.
+      await proposal.write(
+        async () => {
+          for (const { rule: target, priority } of swap) {
+            await updateRecord(
+              ENTITIES.firewallRules,
+              target.id,
+              target.version,
+              { priority },
+            );
+          }
+        },
+        swap.map(({ rule: target, priority }) => ({
+          op: "update" as const,
+          entity: ENTITIES.firewallRules,
+          id: target.id,
+          data: { name: target.data.name, priority },
+        })),
       );
       invalidate();
     });
@@ -797,6 +833,7 @@ export function FirewallRulesPanel({ zoneId }: { zoneId?: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {proposal.dialog}
     </div>
   );
 }

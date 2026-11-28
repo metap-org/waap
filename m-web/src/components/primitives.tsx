@@ -48,6 +48,12 @@ const TONES: Record<
   routed: "default",
   notRouted: "outline",
   sent: "default",
+  // Change request
+  draft: "outline",
+  pendingReview: "secondary",
+  published: "default",
+  rejected: "destructive",
+  cancelled: "outline",
 };
 
 export function StatusBadge({ value }: { value?: string | null }) {
