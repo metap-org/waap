@@ -6,6 +6,14 @@
       "HasLegacyData": false,
       "LegacySyncTriggers": null,
       "Columns": {
+        "changeControl": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
         "code": {
           "SQLType": "varchar(120)",
           "Nullable": true,
@@ -445,6 +453,267 @@
         }
       },
       "ForeignKeys": {},
+      "Uniques": {}
+    },
+    "waf.waf_change_requests": {
+      "Table": "waf.waf_change_requests",
+      "HasLegacyData": false,
+      "LegacySyncTriggers": null,
+      "Columns": {
+        "accountId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "authorId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "baseHash": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "checkResult": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "code": {
+          "SQLType": "varchar(120)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "created_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "decidedAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "decidedBy": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "decision": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "decisionComment": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "deleted": {
+          "SQLType": "boolean",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "description": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "diff": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "operations": {
+          "SQLType": "jsonb",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "publishedVersion": {
+          "SQLType": "double precision",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "status": {
+          "SQLType": "varchar(80)",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "submittedAt": {
+          "SQLType": "timestamptz",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "tenant_id": {
+          "SQLType": "uuid",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "title": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "updated_at": {
+          "SQLType": "timestamptz",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "updated_by": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "version": {
+          "SQLType": "integer",
+          "Nullable": false,
+          "Origin": {
+            "Kind": 0,
+            "Backfilled": false
+          }
+        },
+        "zoneId": {
+          "SQLType": "uuid",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        }
+      },
+      "Indexes": {
+        "idx_waf_change_requests_accountId": {
+          "Expression": "\"tenant_id\", \"accountId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_change_requests_authorId": {
+          "Expression": "\"tenant_id\", \"authorId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_change_requests_submittedAt": {
+          "Expression": "\"tenant_id\", \"submittedAt\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_change_requests_tenant_id": {
+          "Expression": "\"tenant_id\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_change_requests_title": {
+          "Expression": "\"tenant_id\", \"title\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        },
+        "idx_waf_change_requests_zoneId": {
+          "Expression": "\"zoneId\"",
+          "Unique": false,
+          "Using": "",
+          "Valid": true,
+          "WhereClause": ""
+        }
+      },
+      "ForeignKeys": {
+        "fk_waf_change_requests_zoneId": {
+          "Column": "zoneId",
+          "RefTable": "waf.waf_zones",
+          "RefColumn": "id",
+          "OnDelete": 0,
+          "Validated": true
+        }
+      },
       "Uniques": {}
     },
     "waf.waf_ddos_policies": {
@@ -1969,6 +2238,22 @@
       "LegacySyncTriggers": null,
       "Columns": {
         "accountId": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "approvedBy": {
+          "SQLType": "text",
+          "Nullable": true,
+          "Origin": {
+            "Kind": 1,
+            "Backfilled": true
+          }
+        },
+        "changeRequestId": {
           "SQLType": "text",
           "Nullable": true,
           "Origin": {

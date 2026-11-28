@@ -1,6 +1,6 @@
 # Kế hoạch thực thi Management plane
 
-> **Trạng thái (2026-11-21): đã làm một phần lớn S0 đến S3; xem [mục 7](#7-trạng-thái-thực-tế-2026-11-21).**
+> **Trạng thái (2026-11-21, S2 cập nhật 2026-11-28): đã làm một phần lớn S0 đến S3; xem [mục 7](#7-trạng-thái-thực-tế-2026-11-21).**
 > Bản đề xuất ban đầu (2026-11-18) ghi "chưa có dòng mã nào"; điều đó không còn đúng từ khi các lát cắt được làm theo `metap` Go (roadmap 106 đến 117 ở `metap-docs`).
 > [Use case](01-use-cases.md) và [thiết kế database](02-database.md) vẫn là đặc tả; mục 7 là đối chiếu use case với mã.
 
@@ -113,17 +113,17 @@ Cố định trước khi viết S1/S2, để hai bên làm song song. Chi tiế
 
 ### S2 Policy và thay đổi
 
-Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy được **ghi thẳng**, biên dịch và phát hành ngay (outbox rồi resync), không qua bản nháp hay duyệt.
+**Cập nhật 2026-11-28:** change request, duyệt và tự xác nhận đã có ở **backend, chưa có màn hình** ([chi tiết](03-change-requests.md)). Kiểm soát thay đổi bật theo account và **mặc định tắt**: khi tắt, rule và DDoS policy vẫn được **ghi thẳng** và phát hành ngay (outbox rồi resync). BR-39 (mọi thay đổi ảnh hưởng traffic qua change request) vì vậy mới đúng với account đã bật.
 
 | UC | Trạng thái | Ghi chú | Nguồn |
 |---|---|---|---|
-| 40 Soạn policy | Một phần | CRUD rule, DDoS policy, danh sách IP, có bật/tắt; chưa có bản nháp tách khỏi bản đang chạy | mã |
+| 40 Soạn policy | Một phần | CRUD rule, DDoS policy, danh sách IP; bản nháp là change request chứa danh sách thao tác, không đụng bản đang chạy (API, chưa có builder cho nháp trên portal) | mã |
 | 41 DDoS, managed ruleset | Một phần | DDoS policy có; managed ruleset nằm ngoài v1 | mã |
-| 42 Kiểm nháp | Một phần | nút Kiểm tra policy ở tab Phiên bản của zone: rule có điều kiện sai, rule trùng độ ưu tiên, rate limit thiếu ngưỡng, IP ở cả whitelist và blacklist, zone chưa có gì bảo vệ; chỉ đọc, không ghi. Chưa có bản nháp tách khỏi bản đang chạy để kiểm | mã |
-| 43 đến 45 Change request, duyệt, tự xác nhận | Chưa | không có entity hay luồng | mã |
-| 46 Phát hành | Một phần | phát hành ngay; `configVersion` là băm nội dung bộ rule, chưa có `PolicyVersion` bất biến kèm người duyệt | mã |
+| 42 Kiểm nháp | Một phần | kiểm nháp bằng cách áp thử rồi rollback: đúng kiểm tra, hạn mức, quyền và ràng buộc như lúc phát hành, kèm kết quả kiểm policy và diff; nút Kiểm tra policy ở tab Phiên bản vẫn kiểm bản đang chạy; chưa ước lượng chi phí, chưa dò rule không bao giờ khớp; chưa gọi biên dịch của Control | mã |
+| 43 đến 45 Change request, duyệt, tự xác nhận | Một phần | `waf.change_requests` với action submit, approve, reject, revise, cancel; account chọn `off`, `review` (tự xác nhận) hoặc `fourEyes` (người khác duyệt). Chưa có màn hình; bật 4-eyes chưa kiểm account có đủ hai người duyệt; [những chỗ chưa chặn](03-change-requests.md#chưa-chặn) | mã |
+| 46 Phát hành | Một phần | duyệt là phát hành, trong một transaction; từ chối nếu policy đã đổi từ lúc gửi; version ghi change request và người duyệt. Chưa có sự kiện `PolicyPublished` riêng (control-plane vẫn đi theo sự kiện của record) | mã |
 | 47 Theo dõi phát hành | Chưa | edge không báo tiến độ ngược lại | mã |
-| 48 Xem, so sánh version | Một phần | tab Phiên bản của zone: mỗi thay đổi rule, DDoS policy hay IP list ghi một snapshot bất biến (`waf.policy_versions`), xem khác biệt với bản trước; chưa ghi người duyệt (không có luồng duyệt); rule áp dụng cả tenant không nằm trong version của zone nào | mã |
+| 48 Xem, so sánh version | Một phần | tab Phiên bản của zone: mỗi thay đổi ghi một snapshot bất biến (`waf.policy_versions`), xem khác biệt với bản trước; version từ change request có người duyệt (màn hình chưa hiện); rule áp dụng cả tenant không nằm trong version của zone nào | mã |
 | 49 Rollback | Có | action `rollback` trên một version: khôi phục (tạo lại, sửa, xoá) rồi ghi một version mới; không nguyên tử, lỗi giữa chừng thì chạy lại cùng version để hoàn tất | mã |
 | 50 Under Attack | Chưa | là hành vi của edge (thách thức mọi request); phía management chưa có gì để làm khi edge chưa đọc cờ | mã |
 | 51 Rule tạm có hạn | Có | firewall rule có `expiresAt` (chọn 1 giờ đến 7 ngày khi tạo hoặc sửa); control-plane ngừng biên dịch rule hết hạn ở lần resync kế (tối đa 1 phút); kiểm tra policy báo rule đã hết hạn | mã |
@@ -162,6 +162,6 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 
 ### Ba chỗ lệch cần quyết (cập nhật 2026-11-22)
 
-1. **S2 đang làm ngược đặc tả.** Version và rollback (UC-48, 49) đã làm; draft tách khỏi bản chạy, duyệt (UC-43 đến 45) và theo dõi phát hành (UC-47) vẫn chưa. "Ghi thẳng" vẫn là MVP.
+1. **S2.** Version, rollback (UC-48, 49) và change request, duyệt (UC-43 đến 46, backend, 2026-11-28) đã làm. Còn: màn hình, đóng các chỗ chưa chặn, theo dõi phát hành (UC-47, cần edge). Kiểm soát thay đổi mặc định tắt cho tới khi có màn hình.
 2. **Account (UC-02)**: xong ở waap, không đổi `metap`.
 3. **S4**: chỉ làm gói, subscription và hạn mức (chủ dự án chọn bỏ thanh toán, hoá đơn). Làm tiếp khi có khách trả tiền và chốt cổng thanh toán.

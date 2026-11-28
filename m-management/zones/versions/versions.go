@@ -115,10 +115,21 @@ type Note struct {
 	source       string
 	summary      string
 	restoredFrom int
+	// changeRequestID and approvedBy are set when a change request published the content.
+	changeRequestID string
+	approvedBy      string
 	// force records the version even when the content equals the latest one (a rollback to the
 	// state already in place is still an event worth keeping).
 	force bool
 }
+
+// Published is the note of the version a change request produced.
+func Published(summary, changeRequestID, approvedBy string) Note {
+	return Note{source: versionSourceChange, summary: summary, changeRequestID: changeRequestID, approvedBy: approvedBy}
+}
+
+// Hash identifies a snapshot's content.
+func Hash(snap Snapshot) (string, error) { return hashSnapshot(snap) }
 
 // RecordVersion snapshots the zone as rc sees it and stores it as the next version. It returns the
 // version number, or 0 when nothing was recorded because the content has not changed.
@@ -168,6 +179,10 @@ func RecordVersion(ctx context.Context, backend crud.RecordBackend, zoneID uuid.
 		}
 		if note.restoredFrom > 0 {
 			data[model.FieldRestoredFrom] = json.RawMessage(fmt.Sprint(note.restoredFrom))
+		}
+		if note.changeRequestID != "" {
+			data[model.FieldChangeRequestID] = jx.String(note.changeRequestID)
+			data[model.FieldApprovedBy] = jx.String(note.approvedBy)
 		}
 		_, err = backend.Create(ctx, model.PolicyVersions, data, AsAdmin(rc), nil)
 		if err == nil {

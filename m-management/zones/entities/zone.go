@@ -106,6 +106,9 @@ func ZoneEntity() metadata.EntityDefinition {
 		Scopes: []permission.ScopeBinding{metadata.Scope(model.ScopeAccount, model.FieldAccountID)},
 		Audit:  &metadata.EntityAuditConfig{Enabled: true},
 		Actions: []metadata.EntityAction{
+			// Who may draft a change is decided by the operations in it: the handler refuses a caller
+			// who may not make those writes.
+			{Name: model.ActionCreateChange, Label: "Propose a policy change", Description: "Drafts a change to the zone's rules, DDoS policies and IP lists.", Scope: metadata.ActionScopeRecord, Requires: "read"},
 			{Name: model.ActionVerifyDNS, Label: "Verify DNS routing", Description: "Checks whether the zone hostname points at the edge.", Scope: metadata.ActionScopeRecord, Requires: "update"},
 			{Name: model.ActionTestOrigin, Label: "Test origin", Description: "One-shot connectivity check against the customer's origin.", Scope: metadata.ActionScopeRecord, Requires: "update"},
 			{Name: model.ActionValidatePolicy, Label: "Check policy", Description: "Checks the zone's rules, DDoS policies and IP lists for mistakes. Changes nothing.", Scope: metadata.ActionScopeRecord, Requires: "read"},
