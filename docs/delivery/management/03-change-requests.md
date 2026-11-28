@@ -17,6 +17,18 @@
 - Không ai sửa trực tiếp được dòng change request qua REST, kể cả admin.
 - Chỉ người soạn được sửa và gửi nháp. Nhờ vậy người duyệt thứ hai không tự viết nội dung rồi tự duyệt.
 
+## Rule cho cả tenant
+
+Rule và IP list có `zoneId` trống áp dụng cho **mọi zone**. Chúng chịu mức **chặt nhất** trong các account đang mở: chỉ
+cần một account bật kiểm soát là sửa chúng phải qua change request (kênh khẩn giữ như trên).
+
+- Tạo nháp bằng `POST /api/waf.change_requests/actions/createTenantChangeRequest`, cùng body như trên. Người soạn cần
+  quyền ghi các rule đó.
+- **Chỉ admin của tenant** duyệt hoặc từ chối. Có account bật `fourEyes` thì admin đó phải khác người soạn, nên tenant
+  chỉ có một admin sẽ kẹt cho tới khi có admin thứ hai.
+- Không ghi policy version (version thuộc về zone), nên **không rollback được** thay đổi cho cả tenant bằng một nút;
+  diff nằm trong change request.
+
 ## API
 
 `POST /api/waf.zones/{zoneId}/actions/createChangeRequest`
@@ -70,7 +82,6 @@ Với account đã bật, vẫn còn các đường đổi cách edge xử lý t
 
 | Đường | Ghi chú |
 |---|---|
-| Rule áp dụng cả tenant (`zoneId` trống) | Không thuộc zone nào nên không thuộc account nào. **Đây là đường lách lớn nhất** |
 | Cài đặt zone: `protectionMode`, origin, tạm dừng | Phân tích 3.2 yêu cầu đi cùng change request; chưa làm |
 | Rollback | BR-40 cho phép rollback về version **đã từng được duyệt**; hiện cho rollback về mọi version đã ghi, kể cả version ghi lúc kiểm soát còn tắt |
 | Kênh khẩn lặp lại | Hết 72 giờ có thể tạo lại rule mới; chưa chặn việc gia hạn kiểu này |

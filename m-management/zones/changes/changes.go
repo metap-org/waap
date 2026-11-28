@@ -3,7 +3,11 @@
 // Package changes is the life of a change request (UC-40, 42 to 46): draft, check, submit, then
 // approve and publish, reject or cancel.
 //
-// A change is a list of operations on one zone's policy. Checking it is applying it: the operations
+// A change is a list of operations on one zone's policy, or on the tenant-wide records (zone
+// uuid.Nil). A tenant-wide change reaches every zone, so only an admin decides it, and it records no
+// policy version: versions belong to a zone.
+//
+// Checking it is applying it: the operations
 // run through the guarded backend, as the caller, inside a transaction that is then rolled back, so
 // the check sees exactly the validation, plan limits, permissions and constraints publishing will
 // meet, and the diff is of what really happened. Publishing runs them again and commits, but only if
@@ -195,19 +199,18 @@ func (s Service) apply(ctx context.Context, zoneID uuid.UUID, ops []Operation, r
 	}
 	// One version for the whole change, recorded by the caller of apply, not one per operation.
 	writes := guard.Publishing(versions.WithoutVersions(ctx))
-	zone := jx.String(zoneID.String())
 	for i, op := range ops {
 		fail := func(err error) (versions.Snapshot, versions.Snapshot, error) {
 			return nil, nil, &operationError{index: i, err: err}
 		}
-		if raw, ok := op.Data[model.FieldZoneID]; ok {
-			if id, _ := jx.AsString(raw); id != zoneID.String() {
-				return fail(invalid("a change stays in its own zone"))
-			}
+		if raw, ok := op.Data[model.FieldZoneID]; ok && !sameZone(raw, zoneID) {
+			return fail(invalid("a change stays in its own zone"))
 		}
 		if op.Op == OpCreate {
 			data := jx.Clone(op.Data)
-			data[model.FieldZoneID] = zone
+			if zoneID != uuid.Nil {
+				data[model.FieldZoneID] = jx.String(zoneID.String())
+			}
 			if _, err := s.Policy.Create(writes, op.Entity, data, rc, nil); err != nil {
 				return fail(err)
 			}
@@ -228,6 +231,16 @@ func (s Service) apply(ctx context.Context, zoneID uuid.UUID, ops []Operation, r
 	}
 	after, _, err = versions.ReadZoneState(ctx, s.Records, zoneID, rc)
 	return before, after, err
+}
+
+// sameZone says whether a zoneId in an operation's data names the change's own zone; for a
+// tenant-wide change, whether it names none.
+func sameZone(raw json.RawMessage, zoneID uuid.UUID) bool {
+	id, isString := jx.AsString(raw)
+	if zoneID == uuid.Nil {
+		return string(raw) == "null" || (isString && id == "")
+	}
+	return id == zoneID.String()
 }
 
 func diff(before, after versions.Snapshot) []DiffEntry {
@@ -333,6 +346,15 @@ type ProposeInput struct {
 
 // Propose drafts a change to zone a.ID. A draft whose check fails is kept, with why.
 func (s Service) Propose(ctx context.Context, a *action.Ctx) (any, error) {
+	return s.propose(ctx, a, a.ID)
+}
+
+// ProposeTenantWide drafts a change to the tenant-wide records.
+func (s Service) ProposeTenantWide(ctx context.Context, a *action.Ctx) (any, error) {
+	return s.propose(ctx, a, uuid.Nil)
+}
+
+func (s Service) propose(ctx context.Context, a *action.Ctx, zoneID uuid.UUID) (any, error) {
 	var in ProposeInput
 	if err := a.Decode(&in); err != nil {
 		return nil, err
@@ -343,21 +365,24 @@ func (s Service) Propose(ctx context.Context, a *action.Ctx) (any, error) {
 	if err := validateShape(in.Operations); err != nil {
 		return nil, err
 	}
-	if err := a.LoadRecord(ctx, nil); err != nil { // the zone exists and the caller may read it
-		return nil, err
+	if zoneID != uuid.Nil {
+		if err := a.LoadRecord(ctx, nil); err != nil { // the zone exists and the caller may read it
+			return nil, err
+		}
 	}
 	if err := s.authorize(ctx, in.Operations, a.RC); err != nil {
 		return nil, err
 	}
-	zoneID := a.ID
 	result, err := s.check(ctx, a, zoneID, in.Operations)
 	if err != nil {
 		return nil, err
 	}
 	data := result.fields()
-	data[model.FieldZoneID] = jx.String(zoneID.String())
-	if account, ok := a.Current.Data[model.FieldAccountID]; ok {
-		data[model.FieldAccountID] = account
+	if zoneID != uuid.Nil {
+		data[model.FieldZoneID] = jx.String(zoneID.String())
+		if account, ok := a.Current.Data[model.FieldAccountID]; ok {
+			data[model.FieldAccountID] = account
+		}
 	}
 	data[model.FieldTitle] = jx.String(strings.TrimSpace(in.Title))
 	data[model.FieldDescription] = jx.String(in.Description)
@@ -519,6 +544,15 @@ func decision(a *action.Ctx, status, kind, comment string) crud.JsonObject {
 	}
 }
 
+// mayDecide refuses a caller who may not approve or reject r: they need the rights to make its
+// writes, and for a tenant-wide change they must be an admin.
+func (s Service) mayDecide(ctx context.Context, r request, rc *permission.RequestContext) error {
+	if r.zoneID == uuid.Nil && !rc.IsAdmin() {
+		return forbidden(errcode.Forbidden, "Only an admin decides a tenant-wide change.")
+	}
+	return s.authorize(ctx, r.ops, rc)
+}
+
 // Approve publishes the change: its operations, one new policy version naming who approved it, and
 // the change request marked published, all in one transaction. The approver makes the writes, so it
 // takes the rights to make them by hand.
@@ -534,7 +568,7 @@ func (s Service) Approve(ctx context.Context, a *action.Ctx) (any, error) {
 	if err := r.mustBe(model.ChangePendingReview); err != nil {
 		return nil, err
 	}
-	if err := s.authorize(ctx, r.ops, a.RC); err != nil {
+	if err := s.mayDecide(ctx, r, a.RC); err != nil {
 		return nil, err
 	}
 	kind := model.DecisionApproved
@@ -572,16 +606,18 @@ func (s Service) Approve(ctx context.Context, a *action.Ctx) (any, error) {
 				return conflict(model.ErrChangeRequestStale, "The zone's policy changed since this was submitted. Its author must submit it again.")
 			}
 			applied = diff(before, after)
-			// The zone's mirror of "has any configuration" is the system's to write.
-			if err := versions.SyncHasConfig(ctx, s.Records, r.zoneID, versions.AsAdmin(a.RC)); err != nil {
-				return err
-			}
-			published, err = versions.RecordVersion(ctx, s.Records, r.zoneID, a.RC, versions.Published(r.title, a.ID.String(), a.RC.UserID))
-			if err != nil {
-				return err
-			}
 			data := decision(a, model.ChangePublished, kind, in.Comment)
-			data[model.FieldPublishedVersion] = raw(published)
+			if r.zoneID != uuid.Nil {
+				// The zone's mirror of "has any configuration" is the system's to write.
+				if err := versions.SyncHasConfig(ctx, s.Records, r.zoneID, versions.AsAdmin(a.RC)); err != nil {
+					return err
+				}
+				published, err = versions.RecordVersion(ctx, s.Records, r.zoneID, a.RC, versions.Published(r.title, a.ID.String(), a.RC.UserID))
+				if err != nil {
+					return err
+				}
+				data[model.FieldPublishedVersion] = raw(published)
+			}
 			if err := s.store(ctx, a, data); err != nil {
 				return err
 			}
@@ -619,7 +655,7 @@ func (s Service) Reject(ctx context.Context, a *action.Ctx) (any, error) {
 	if r.author == a.RC.UserID {
 		return nil, forbidden(errcode.Forbidden, "Cancel your own change instead of rejecting it.")
 	}
-	if err := s.authorize(ctx, r.ops, a.RC); err != nil {
+	if err := s.mayDecide(ctx, r, a.RC); err != nil {
 		return nil, err
 	}
 	if err := s.storeStep(ctx, a, "reject", decision(a, model.ChangeRejected, model.DecisionRejected, in.Comment)); err != nil {

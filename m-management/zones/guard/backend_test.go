@@ -186,6 +186,8 @@ func TestValidIPAccessListValuePassesThroughUnchanged(t *testing.T) {
 	g, inner := newGuarded(t)
 	rc := testRC()
 	data := obj(t, map[string]any{"value": "10.0.0.0/8"})
+	// A record with no zone is tenant-wide, so change control looks at every account.
+	inner.EXPECT().List(mock.Anything, "waf.accounts", mock.Anything, mock.Anything).Return(crud.ListResult{}, nil)
 	inner.EXPECT().Create(mock.Anything, "waf.ip_access_lists", data, rc, (*string)(nil)).
 		Return(crud.RecordDto{ID: uuid.New()}, nil)
 
@@ -198,6 +200,8 @@ func TestUnguardedEntitiesPassStraightThrough(t *testing.T) {
 	rc := testRC()
 	data := obj(t, map[string]any{"threshold": 100})
 	id := uuid.New()
+	// No zone in the data, so change control looks at every account.
+	inner.EXPECT().List(mock.Anything, "waf.accounts", mock.Anything, mock.Anything).Return(crud.ListResult{}, nil)
 	inner.EXPECT().Create(mock.Anything, "waf.ddos_policies", data, rc, (*string)(nil)).
 		Return(crud.RecordDto{ID: id}, nil)
 	inner.EXPECT().Update(mock.Anything, "waf.zones", id, int32(3), data, rc, (*string)(nil)).

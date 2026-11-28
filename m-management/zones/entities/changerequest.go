@@ -1,6 +1,7 @@
 // Layer: APP · entity declaration. metap reads it to build the table, the REST routes, the permission checks and the workflow.
 
-// waf.change_requests: a proposed change to one zone's policy (UC-40, 43 to 46). It holds the
+// waf.change_requests: a proposed change to one zone's policy, or to the tenant-wide records (no
+// zone) (UC-40, 43 to 46). It holds the
 // operations to make, the diff and check of the last time they were tried, who wrote it and who
 // decided. Publishing it is the only way its operations reach the zone's records.
 //
@@ -26,7 +27,8 @@ func ChangeRequestEntity() metadata.EntityDefinition {
 		Label:     "Change Request",
 		TableName: reconciler.QualifiedTableNameIn(model.ChangeRequests, "waf"),
 		Fields: []metadata.EntityField{
-			metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Require().Index(),
+			// Empty: a change to the tenant-wide records, which only an admin may decide.
+			metadata.RefField(model.FieldZoneID, "Zone", model.Zones, "hostname").Index(),
 			// Copied from the zone, so a role held inside an account reaches it.
 			metadata.NewField(model.FieldAccountID, "Account", metadata.KindString).Index(),
 			metadata.NewField(model.FieldTitle, "Title", metadata.KindString).Require().Sort(),
@@ -53,6 +55,7 @@ func ChangeRequestEntity() metadata.EntityDefinition {
 			MaxLimit: model.DefaultMaxListLimit,
 		}},
 		Actions: []metadata.EntityAction{
+			{Name: model.ActionCreateTenantChange, Label: "Propose a tenant-wide change", Description: "Drafts a change to the rules and IP lists that apply to every zone.", Scope: metadata.ActionScopeEntity, Requires: "read"},
 			action(model.ActionReviseChange, "Revise", "The author replaces the operations; the change goes back to draft."),
 			action(model.ActionSubmitChange, "Submit", "The author asks for the diff to be approved."),
 			action(model.ActionApproveChange, "Approve and publish", "Publishes the approved diff. Confirming your own needs an account without four-eyes."),
