@@ -7,6 +7,7 @@
  * needs the edge to show a request id and a report form, which it does not yet.
  */
 import { ConfirmAction } from "../components/ConfirmAction";
+import { useChangeProposal } from "../components/useChangeProposal";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -312,6 +313,7 @@ function HandleDialog({
   const { t } = useTranslation();
   const invalidate = useInvalidateWaf();
   const { busy, run } = useAsyncAction();
+  const proposal = useChangeProposal(report.data.zoneId);
   const [note, setNote] = useState(report.data.resolutionNote ?? "");
   const open = (report.data.status ?? report.status) === "open";
   const ip = report.data.sourceIp?.trim() ?? "";
@@ -322,13 +324,18 @@ function HandleDialog({
       if (allowIp) {
         // The exception is an ordinary whitelist entry on this zone, so it is visible and
         // removable under Whitelist/Blacklist like any other.
-        const entry = await createRecord(ENTITIES.ipAccessLists, {
+        const exception = {
           zoneId: report.data.zoneId,
           type: "whitelist",
           value: ip,
           enabled: true,
-        });
-        exceptionEntryId = entry.data.id;
+        };
+        // Proposed instead of written: the report stays open until the change is published.
+        const written = await proposal.write(async () => {
+          const entry = await createRecord(ENTITIES.ipAccessLists, exception);
+          exceptionEntryId = entry.data.id;
+        }, [{ op: "create", entity: ENTITIES.ipAccessLists, data: exception }]);
+        if (!written) return;
       }
       await transitionRecord(
         ENTITIES.falsePositives,
@@ -435,6 +442,7 @@ function HandleDialog({
             value={report.data.resolutionNote || "—"}
           />
         )}
+        {proposal.dialog}
       </DialogContent>
     </Dialog>
   );

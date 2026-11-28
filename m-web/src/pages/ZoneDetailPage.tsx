@@ -51,6 +51,7 @@ import { ZoneScansTab } from "./zone/ZoneScansTab";
 import { ZoneEventsTab } from "./zone/ZoneEventsTab";
 import { ZoneAuditTab } from "./zone/ZoneAuditTab";
 import { ZoneVersionsTab } from "./zone/ZoneVersionsTab";
+import { ChangeRequestList } from "../components/ChangeRequestList";
 
 /** Which transitions are offered from each status — mirrors `zone_entity.rs`'s workflow. The
  *  backend is still the authority (it re-evaluates the `activate` guard and rejects anything
@@ -281,6 +282,9 @@ export function ZoneDetailPage() {
           <TabsTrigger value="events">
             {t("waf.zoneDetail.tabEvents")}
           </TabsTrigger>
+          <TabsTrigger value="changes">
+            {t("waf.zoneDetail.tabChanges")}
+          </TabsTrigger>
           <TabsTrigger value="versions">
             {t("waf.zoneDetail.tabVersions")}
           </TabsTrigger>
@@ -307,6 +311,9 @@ export function ZoneDetailPage() {
         </TabsContent>
         <TabsContent value="events">
           <ZoneEventsTab zoneId={record.id} />
+        </TabsContent>
+        <TabsContent value="changes">
+          <ChangeRequestList zoneId={record.id} />
         </TabsContent>
         <TabsContent value="versions">
           <ZoneVersionsTab zoneId={record.id} />

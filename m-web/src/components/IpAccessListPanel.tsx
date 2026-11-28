@@ -13,6 +13,8 @@
  *   `useRecords` empty-string-filter-stripping reason — see that component's file header.
  */
 import { ConfirmAction } from "./ConfirmAction";
+import { useChangeProposal } from "./useChangeProposal";
+import { needsChangeRequest } from "../api/changeRequests";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -77,6 +79,7 @@ export function IpAccessListPanel({ zoneId }: { zoneId?: string }) {
   const [bulkType, setBulkType] = useState<AccessListType>("whitelist");
   const [bulkText, setBulkText] = useState("");
   const { busy, run } = useAsyncAction();
+  const proposal = useChangeProposal(zoneId);
 
   const rows = entries.data ?? [];
 
@@ -88,16 +91,24 @@ export function IpAccessListPanel({ zoneId }: { zoneId?: string }) {
   async function save() {
     await run(async () => {
       const payload = zoneId ? { ...draft, zoneId } : { ...draft };
-      await createRecord(ENTITIES.ipAccessLists, payload);
-      invalidate();
+      const written = await proposal.write(
+        () => createRecord(ENTITIES.ipAccessLists, payload),
+        [{ op: "create", entity: ENTITIES.ipAccessLists, data: payload }],
+      );
       setOpen(false);
+      if (!written) return;
+      invalidate();
       toast(t("waf.accessLists.toastSaved"), { variant: "default" });
     });
   }
 
   async function remove(entry: WafRecord<AccessListData>) {
     await run(async () => {
-      await deleteRecord(ENTITIES.ipAccessLists, entry.id, entry.version);
+      const written = await proposal.write(
+        () => deleteRecord(ENTITIES.ipAccessLists, entry.id, entry.version),
+        [{ op: "delete", entity: ENTITIES.ipAccessLists, id: entry.id }],
+      );
+      if (!written) return;
       invalidate();
       toast(t("waf.accessLists.toastDeleted"), { variant: "default" });
     });
@@ -113,16 +124,32 @@ export function IpAccessListPanel({ zoneId }: { zoneId?: string }) {
       return;
     }
     await run(async () => {
+      const rows = values.map((value) => ({
+        ...(zoneId ? { zoneId } : {}),
+        type: bulkType,
+        value,
+        enabled: true,
+      }));
       const results = await Promise.allSettled(
-        values.map((value) =>
-          createRecord(ENTITIES.ipAccessLists, {
-            ...(zoneId ? { zoneId } : {}),
-            type: bulkType,
-            value,
-            enabled: true,
-          }),
-        ),
+        rows.map((row) => createRecord(ENTITIES.ipAccessLists, row)),
       );
+      // Under change control every one of them is refused: propose the whole list as one change.
+      if (
+        results.every(
+          (r) => r.status === "rejected" && needsChangeRequest(r.reason),
+        )
+      ) {
+        proposal.propose({
+          operations: rows.map((data) => ({
+            op: "create",
+            entity: ENTITIES.ipAccessLists,
+            data,
+          })),
+          onDone: () => setBulkText(""),
+        });
+        setBulkOpen(false);
+        return;
+      }
       const failed = results.filter((r) => r.status === "rejected").length;
       invalidate();
       setBulkText("");
@@ -326,6 +353,7 @@ export function IpAccessListPanel({ zoneId }: { zoneId?: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {proposal.dialog}
     </div>
   );
 }

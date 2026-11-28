@@ -94,6 +94,9 @@ const AlertingPage = lazy(() =>
 const AnalyticsPage = lazy(() =>
   import("./pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })),
 );
+const ChangesPage = lazy(() =>
+  import("./pages/ChangesPage").then((m) => ({ default: m.ChangesPage })),
+);
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -176,6 +179,13 @@ function RequireAuth() {
       group: protection,
       icon: navIcons.accessLists,
       entity: ENTITIES.ipAccessLists,
+    },
+    {
+      to: "/changes",
+      label: t("waf.nav.changes"),
+      group: protection,
+      icon: navIcons.rules,
+      entity: ENTITIES.changeRequests,
     },
     {
       to: "/incidents",
@@ -303,6 +313,7 @@ const PROTECTION_ENTITIES = new Set<string>([
   ENTITIES.ddosPolicies,
   ENTITIES.firewallRules,
   ENTITIES.ipAccessLists,
+  ENTITIES.changeRequests,
 ]);
 
 /** The permission editors group entities into the sidebar's own sections. */
@@ -389,6 +400,7 @@ export default function App() {
               path="/access-lists/global"
               element={<GlobalAccessListPage />}
             />
+            <Route path="/changes" element={<ChangesPage />} />
             <Route path="/incidents" element={<IncidentsPage />} />
             <Route
               path="/incidents/:incidentId"

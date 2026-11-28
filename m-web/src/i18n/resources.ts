@@ -33,6 +33,7 @@ export const wafEn = {
       alerting: "Alerting",
       analytics: "Analytics",
       settings: "Settings",
+      changes: "Policy changes",
     },
     navGroup: {
       overview: "Overview",
@@ -110,6 +111,11 @@ export const wafEn = {
       routed: "Routed",
       notRouted: "Not routed",
       sent: "Sent",
+      draft: "Draft",
+      pendingReview: "Waiting for approval",
+      published: "Published",
+      rejected: "Rejected",
+      cancelled: "Cancelled",
     },
     // Guard messages: the server sends a stable key with each blocked-action reason (`reasonKey`,
     // or `details.messageKey` on a rejected transition); the English text it also sends is the
@@ -195,6 +201,7 @@ export const wafEn = {
       toastPause: "Zone paused",
       toastResume: "Zone resumed",
       toastSuspend: "Zone suspended",
+      tabChanges: "Changes",
     },
     zoneTabs: {
       versions: {
@@ -464,12 +471,91 @@ export const wafEn = {
           "Scanned {{scanned}} events · {{created}} new incident(s)",
       },
     },
+    changes: {
+      pageTitle: "Policy changes",
+      pageDescription:
+        "Changes to rules, DDoS policies and IP lists that go through approval, tenant-wide ones included.",
+      listTitle: "Change requests",
+      listDescription:
+        "The live rules do not change until a request is approved.",
+      none: "No change requests",
+      noneDescription:
+        "When an account requires approval, saving a rule opens a change request.",
+      title: "Title",
+      scope: "Applies to",
+      tenantWide: "Every zone",
+      status: "Status",
+      author: "Author",
+      submittedAt: "Submitted",
+      open: "Open",
+      by: "Written by {{author}}",
+      version: "version {{version}}",
+      diff: "What changes",
+      noDiff: "No difference was recorded.",
+      operations: "Operations",
+      removeOperation: "Remove",
+      errorAt: "Operation {{number}}:",
+      noChange: "These operations change nothing.",
+      comment: "Comment (required to reject)",
+      close: "Close",
+      submit: "Submit for approval",
+      resubmit: "Submit again",
+      approve: "Approve and publish",
+      confirmOwn: "Confirm and publish",
+      approveBody:
+        "The change takes effect on the edge. It is refused if the rules changed since it was submitted.",
+      reject: "Reject",
+      cancel: "Cancel change",
+      cancelBody: "The change is closed and cannot be reopened.",
+      proposeTitle: "This change needs approval",
+      proposeZoneHint:
+        "This zone's account requires a change request. Nothing has been changed yet.",
+      proposeTenantHint:
+        "An account requires approval, so a rule for every zone needs a change request that an admin decides. Nothing has been changed yet.",
+      addTo: "Add to",
+      newChange: "A new change request",
+      saveDraft: "Save draft",
+      checkFailedSaved: "Saved as a draft, but the check did not pass.",
+      openList: "Open policy changes",
+      op: {
+        create: "Add",
+        update: "Change",
+        delete: "Remove",
+      },
+      decision: {
+        approved: "approved by {{who}}",
+        selfConfirmed: "confirmed by its author {{who}}",
+        rejected: "rejected by {{who}}",
+      },
+      toast: {
+        savedDraft: "Draft saved",
+        submitted: "Submitted for approval",
+        submit: "Submitted for approval",
+        approve: "Published",
+        reject: "Rejected",
+        cancel: "Change cancelled",
+        revise: "Draft updated",
+      },
+    },
     accounts: {
       title: "Accounts",
       description:
         "Group zones by team, project or customer, and give people a role only inside one account.",
       new: "New account",
-      rename: "Rename",
+      edit: "Edit",
+      colChangeControl: "Change control",
+      changeControl: {
+        off: "Off",
+        review: "Change request",
+        fourEyes: "Two people",
+      },
+      changeControlHint: {
+        off: "Rules are written and published directly.",
+        review:
+          "A change to rules needs a change request; its author may confirm it. Only temporary rules that restrict (at most 72 hours) can be added directly.",
+        fourEyes:
+          "Someone other than the author approves. Make sure two people may approve before switching this on.",
+      },
       save: "Save",
       close: "Close",
       done: "Done",
@@ -980,6 +1066,7 @@ export const wafVi = {
       alerting: "Cảnh báo",
       analytics: "Phân tích",
       settings: "Cài đặt",
+      changes: "Thay đổi policy",
     },
     navGroup: {
       overview: "Tổng quan",
@@ -1056,6 +1143,11 @@ export const wafVi = {
       routed: "Đã định tuyến",
       notRouted: "Chưa định tuyến",
       sent: "Đã gửi",
+      draft: "Nháp",
+      pendingReview: "Chờ duyệt",
+      published: "Đã phát hành",
+      rejected: "Bị từ chối",
+      cancelled: "Đã huỷ",
     },
     guards: {
       zoneDomainNotVerified:
@@ -1136,6 +1228,7 @@ export const wafVi = {
       toastPause: "Đã tạm dừng zone",
       toastResume: "Đã tiếp tục zone",
       toastSuspend: "Đã đình chỉ zone",
+      tabChanges: "Thay đổi",
     },
     zoneTabs: {
       versions: {
@@ -1402,12 +1495,91 @@ export const wafVi = {
         toastCorrelated: "Đã quét {{scanned}} sự kiện · {{created}} sự cố mới",
       },
     },
+    changes: {
+      pageTitle: "Thay đổi policy",
+      pageDescription:
+        "Các thay đổi rule, DDoS policy và IP list đi qua duyệt, gồm cả thay đổi cho mọi zone.",
+      listTitle: "Change request",
+      listDescription:
+        "Rule đang chạy không đổi cho tới khi yêu cầu được duyệt.",
+      none: "Chưa có change request",
+      noneDescription:
+        "Khi account yêu cầu duyệt, lưu một rule sẽ mở change request.",
+      title: "Tiêu đề",
+      scope: "Áp dụng cho",
+      tenantWide: "Mọi zone",
+      status: "Trạng thái",
+      author: "Người soạn",
+      submittedAt: "Gửi lúc",
+      open: "Mở",
+      by: "Người soạn: {{author}}",
+      version: "version {{version}}",
+      diff: "Nội dung thay đổi",
+      noDiff: "Không ghi nhận khác biệt.",
+      operations: "Thao tác",
+      removeOperation: "Bỏ",
+      errorAt: "Thao tác {{number}}:",
+      noChange: "Các thao tác này không thay đổi gì.",
+      comment: "Ghi chú (bắt buộc khi từ chối)",
+      close: "Đóng",
+      submit: "Gửi duyệt",
+      resubmit: "Gửi lại",
+      approve: "Duyệt và phát hành",
+      confirmOwn: "Xác nhận và phát hành",
+      approveBody:
+        "Thay đổi sẽ có hiệu lực trên edge. Bị từ chối nếu rule đã đổi từ lúc gửi.",
+      reject: "Từ chối",
+      cancel: "Huỷ thay đổi",
+      cancelBody: "Thay đổi được đóng lại và không mở lại được.",
+      proposeTitle: "Thay đổi này cần được duyệt",
+      proposeZoneHint:
+        "Account của zone yêu cầu change request. Chưa có gì bị thay đổi.",
+      proposeTenantHint:
+        "Có account yêu cầu duyệt, nên rule cho mọi zone phải qua change request do admin quyết. Chưa có gì bị thay đổi.",
+      addTo: "Thêm vào",
+      newChange: "Change request mới",
+      saveDraft: "Lưu nháp",
+      checkFailedSaved: "Đã lưu nháp, nhưng bước kiểm chưa đạt.",
+      openList: "Mở danh sách thay đổi",
+      op: {
+        create: "Thêm",
+        update: "Sửa",
+        delete: "Xoá",
+      },
+      decision: {
+        approved: "{{who}} đã duyệt",
+        selfConfirmed: "người soạn {{who}} tự xác nhận",
+        rejected: "{{who}} đã từ chối",
+      },
+      toast: {
+        savedDraft: "Đã lưu nháp",
+        submitted: "Đã gửi duyệt",
+        submit: "Đã gửi duyệt",
+        approve: "Đã phát hành",
+        reject: "Đã từ chối",
+        cancel: "Đã huỷ thay đổi",
+        revise: "Đã cập nhật nháp",
+      },
+    },
     accounts: {
       title: "Account",
       description:
         "Gom zone theo nhóm, dự án hoặc khách hàng, và gán vai trò cho người chỉ trong một account.",
       new: "Account mới",
-      rename: "Đổi tên",
+      edit: "Sửa",
+      colChangeControl: "Kiểm soát thay đổi",
+      changeControl: {
+        off: "Tắt",
+        review: "Qua change request",
+        fourEyes: "Hai người",
+      },
+      changeControlHint: {
+        off: "Rule được ghi và phát hành thẳng.",
+        review:
+          "Sửa rule phải qua change request; người soạn tự xác nhận được. Chỉ thêm thẳng được rule tạm có tác dụng siết chặt (tối đa 72 giờ).",
+        fourEyes:
+          "Người khác người soạn phải duyệt. Hãy chắc có ít nhất hai người duyệt được trước khi bật.",
+      },
       save: "Lưu",
       close: "Đóng",
       done: "Xong",

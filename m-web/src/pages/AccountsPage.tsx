@@ -44,7 +44,15 @@ import {
 } from "../api/waf";
 import { StatusBadge } from "../components/primitives";
 
-type AccountData = { name?: string; slug?: string; status?: string };
+type AccountData = {
+  name?: string;
+  slug?: string;
+  status?: string;
+  /** Empty means off. */
+  changeControl?: string;
+};
+
+const CHANGE_CONTROL = ["off", "review", "fourEyes"] as const;
 type Account = WafRecord<AccountData>;
 
 type ScopeMember = {
@@ -130,6 +138,7 @@ export function AccountsPage() {
               <TableHead>{t("waf.accounts.colName")}</TableHead>
               <TableHead>{t("waf.accounts.colSlug")}</TableHead>
               <TableHead>{t("waf.accounts.colZones")}</TableHead>
+              <TableHead>{t("waf.accounts.colChangeControl")}</TableHead>
               <TableHead>{t("waf.accounts.colStatus")}</TableHead>
               <TableHead />
             </TableRow>
@@ -147,6 +156,11 @@ export function AccountsPage() {
                   </TableCell>
                   <TableCell className="tabular-nums">
                     {zoneCount(account.id)}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {t(
+                      `waf.accounts.changeControl.${account.data.changeControl || "off"}`,
+                    )}
                   </TableCell>
                   <TableCell>
                     <StatusBadge
@@ -168,7 +182,7 @@ export function AccountsPage() {
                           variant="ghost"
                           onClick={() => setEditing(account)}
                         >
-                          {t("waf.accounts.rename")}
+                          {t("waf.accounts.edit")}
                         </Button>
                         <ConfirmAction
                           title={t("waf.accounts.close")}
@@ -214,6 +228,9 @@ function EditDialog({
   const invalidate = useInvalidateWaf();
   const { busy, run } = useAsyncAction();
   const [name, setName] = useState(account?.data.name ?? "");
+  const [changeControl, setChangeControl] = useState(
+    account?.data.changeControl || "off",
+  );
   const [error, setError] = useState<Error | null>(null);
 
   async function save() {
@@ -223,11 +240,13 @@ function EditDialog({
         if (account) {
           await updateRecord(ENTITIES.accounts, account.id, account.version, {
             name: name.trim(),
+            changeControl,
           });
         } else {
           await createRecord(ENTITIES.accounts, {
             name: name.trim(),
             slug: slugify(name),
+            changeControl,
           });
         }
         invalidate();
@@ -243,7 +262,7 @@ function EditDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {account ? t("waf.accounts.rename") : t("waf.accounts.new")}
+            {account ? t("waf.accounts.edit") : t("waf.accounts.new")}
           </DialogTitle>
         </DialogHeader>
         <div>
@@ -253,6 +272,23 @@ function EditDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </div>
+        <div>
+          <Label htmlFor="account-change-control">
+            {t("waf.accounts.colChangeControl")}
+          </Label>
+          <Select
+            id="account-change-control"
+            value={changeControl}
+            onValueChange={(value) => setChangeControl(String(value))}
+            options={CHANGE_CONTROL.map((mode) => ({
+              value: mode,
+              label: t(`waf.accounts.changeControl.${mode}`),
+            }))}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t(`waf.accounts.changeControlHint.${changeControl}`)}
+          </p>
         </div>
         {error ? (
           <Alert variant="destructive">

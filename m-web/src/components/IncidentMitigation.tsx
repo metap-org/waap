@@ -8,6 +8,7 @@
  * deletes it.
  */
 import { ConfirmAction } from "./ConfirmAction";
+import { useChangeProposal } from "./useChangeProposal";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -69,6 +70,7 @@ export function IncidentMitigation({
   const { t, i18n } = useTranslation();
   const invalidate = useInvalidateWaf();
   const { busy, run } = useAsyncAction();
+  const proposal = useChangeProposal(zoneId);
   const [ip, setIp] = useState(sourceIpFromTitle(title));
   const [hours, setHours] = useState<string>("24");
   const entries = useRecords<EntryData>(
@@ -84,14 +86,19 @@ export function IncidentMitigation({
       const expiresAt = new Date(
         Date.now() + Number(hours) * 3600 * 1000,
       ).toISOString();
-      await createRecord(ENTITIES.ipAccessLists, {
+      const entry = {
         zoneId,
         type: "blacklist",
         value: ip.trim(),
         enabled: true,
         expiresAt,
         incidentId,
-      });
+      };
+      const written = await proposal.write(
+        () => createRecord(ENTITIES.ipAccessLists, entry),
+        [{ op: "create", entity: ENTITIES.ipAccessLists, data: entry }],
+      );
+      if (!written) return;
       invalidate();
       toast(
         t("waf.incidentDetail.mitigation.toastBlocked", { ip: ip.trim() }),
@@ -191,13 +198,27 @@ export function IncidentMitigation({
                         confirmLabel={t("waf.incidentDetail.mitigation.keep")}
                         onConfirm={() =>
                           run(async () => {
-                            await updateRecord(
-                              ENTITIES.ipAccessLists,
-                              entry.id,
-                              entry.version,
-                              { expiresAt: null },
+                            const written = await proposal.write(
+                              () =>
+                                updateRecord(
+                                  ENTITIES.ipAccessLists,
+                                  entry.id,
+                                  entry.version,
+                                  { expiresAt: null },
+                                ),
+                              [
+                                {
+                                  op: "update",
+                                  entity: ENTITIES.ipAccessLists,
+                                  id: entry.id,
+                                  data: {
+                                    value: entry.data.value,
+                                    expiresAt: null,
+                                  },
+                                },
+                              ],
                             );
-                            invalidate();
+                            if (written) invalidate();
                           })
                         }
                       >
@@ -213,12 +234,22 @@ export function IncidentMitigation({
                       destructive
                       onConfirm={() =>
                         run(async () => {
-                          await deleteRecord(
-                            ENTITIES.ipAccessLists,
-                            entry.id,
-                            entry.version,
+                          const written = await proposal.write(
+                            () =>
+                              deleteRecord(
+                                ENTITIES.ipAccessLists,
+                                entry.id,
+                                entry.version,
+                              ),
+                            [
+                              {
+                                op: "delete",
+                                entity: ENTITIES.ipAccessLists,
+                                id: entry.id,
+                              },
+                            ],
                           );
-                          invalidate();
+                          if (written) invalidate();
                         })
                       }
                     >
@@ -233,6 +264,7 @@ export function IncidentMitigation({
           </TableBody>
         </Table>
       )}
+      {proposal.dialog}
     </SectionCard>
   );
 }
