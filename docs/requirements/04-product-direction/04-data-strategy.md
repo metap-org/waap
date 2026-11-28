@@ -112,3 +112,49 @@ xử lý dữ liệu cá nhân theo Nghị định 13.
 | OQ-140 | Ngưỡng k và cách khử nhận dạng IP (cắt hay băm khoá xoay) | k = 10; cắt /24, /48 cho TD4; băm khoá xoay cho TD3 |
 | OQ-141 | Có làm vùng nghiên cứu và vị trí data analyst từ MVP không? | Từ MR; MVP chỉ làm U2 (reputation) |
 | OQ-142 | Có xuất bản báo cáo xu hướng tấn công công khai không? | Có, hằng quý, từ khi đủ dữ liệu |
+
+> **Chủ dự án (2026-11-28), OQ-138: tuỳ loại dữ liệu, phải rà lại.** Chưa có quyết định. Phần dưới là kết quả rà
+> và đề xuất để duyệt.
+
+## Rà theo loại dữ liệu (2026-11-28)
+
+**Hiện trạng trong code.** Chưa thấy đường nào đưa dữ liệu từ tenant này sang tenant khác (không có reputation hay
+pipeline TD3). Security event có 8 trường do edge gửi: zone, loại luật, ID luật, tên luật, hành động, IP nguồn,
+path, thời điểm. Edge **không** ghi query string, header, cookie hay body. Lúc rà, path được lưu **nguyên văn**, dù
+nó có thể chứa email, mã đặt lại mật khẩu hoặc ID người dùng ([BR-44](../02-requirements.md)). **Đã sửa cùng ngày
+(chủ dự án đồng ý che ngay tại edge, kể cả log của chính khách):** edge che email, UUID, dãy số từ 8 chữ số, JWT,
+khoá API theo tiền tố, chuỗi ngẫu nhiên dài, mã đứng sau `reset`, `token`, `verify`…, và giá trị matrix parameter
+(`e-edge/telemetry/maskpath.go`). Nhận diện theo hình dạng nên không bảo đảm hết: mã ngắn hoặc toàn chữ ở chỗ lạ vẫn
+lọt. Rule và origin vẫn nhận path gốc. Event ghi trước đó không được sửa, hết hạn theo retention. Phạm vi rà: security event và các entity
+của scanning, alerting; chưa rà từng trường của zones, billing và dữ liệu tài khoản.
+
+**Đề xuất theo loại** (nhãn theo LC3):
+
+| Dữ liệu | Nhãn | Dùng chéo tenant (đề xuất) |
+|---|---|---|
+| Loại luật, hành động | Thấp | Được, U2–U6 |
+| Thời điểm | Thấp khi gộp | Được; từ TD4 chỉ theo khoảng thời gian |
+| IP nguồn | `personal` | Chỉ cho bảo vệ chung và threat research (U2, U4), băm khoá xoay ở TD3 (OQ-140); TD4 chỉ dạng cắt và đã gộp |
+| Path (đã che tại edge) | Vẫn có thể `personal` hoặc `secret` | **Chưa được** cho tới khi có bước đưa về mẫu (che tại edge chưa đủ cho TD3); sau đó chỉ dùng mẫu |
+| ID luật | `tenant_confidential` | Chỉ ID của rule do NCC phát hành (v1 chưa có); ID rule của khách thì bỏ |
+| Tên luật, tiêu đề sự cố, mô tả và ghi chú tự do | `tenant_confidential`, có thể `personal` | Không |
+| Zone, hostname, origin, nội dung rule, danh sách IP | `tenant_confidential` hoặc `secret` | Không dùng giá trị; chỉ đếm cho phân tích sản phẩm (U6) |
+| Báo chặn nhầm: liên hệ người báo, mô tả, phản hồi | `personal` | Không; chỉ thống kê gộp theo rule (BR-45) |
+| Kết quả quét: endpoint, mô tả | `secret` (lỗ hổng có thể chưa sửa) | Không; chỉ số đếm theo loại và mức độ, qua ngưỡng k |
+| Kênh cảnh báo: URL webhook, email | `secret`, `personal` | Không |
+| Người được giao, tài khoản, thanh toán | `personal` | Không; chỉ số đếm cho U6 |
+
+Nguyên tắc mặc định: **trường nào chưa được xếp loại thì không đi lên TD3.** U7 giữ nguyên đề xuất là không làm.
+
+> **Quyết định của chủ dự án (2026-11-28): IP nguồn được dùng chéo tenant cho bảo vệ chung (U2)** (một IP tấn
+> công khách A được dùng để bảo vệ khách B), với các điều kiện:
+>
+> - chỉ dùng cho bảo vệ và threat research (U2, U4);
+> - khách B chỉ biết "IP này đáng ngờ", không biết nó đã tấn công ai;
+> - đánh giá xấu tự hết hạn;
+> - ghi trong điều khoản dịch vụ; hỏi luật sư về Nghị định 13 và lập hồ sơ đánh giá tác động **trước khi** chạy pipeline.
+>
+> Chưa có code nào dùng dữ liệu chéo tenant. Quyết định này không duyệt các dòng khác của bảng.
+
+**Cần duyệt:** các dòng còn lại của bảng trên.
+

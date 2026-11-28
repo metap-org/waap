@@ -64,7 +64,7 @@ flowchart LR
 | Đánh giá canary | V3 → Control | So chỉ số zone trước và sau thay đổi, phát hiện lệch có ý nghĩa thống kê | MVP (thống kê), MR (mô hình) |
 | Trợ lý trên portal | V5 | LLM với công cụ: truy vấn event, giải thích rule, soạn nháp rule, tóm tắt | MR |
 | Rule khẩn từ CVE | V6 | LLM đọc công bố CVE, soạn nháp rule và bộ request kiểm thử; threat research duyệt | MR |
-| Bảo vệ ứng dụng LLM của khách | V1 (luật), V3 (phân loại) | Giới hạn kích thước và tần suất prompt, phát hiện mẫu prompt injection đã biết, quan sát token; phân loại nội dung sâu ở Analytics, không inline | MR (OQ-127) |
+| Bảo vệ ứng dụng LLM của khách (**backlog**, OQ-127 quyết 2026-11-28) | V1 (luật), V3 (phân loại) | Giới hạn kích thước và tần suất prompt, phát hiện mẫu prompt injection đã biết, quan sát token; phân loại nội dung sâu ở Analytics, không inline | MR (OQ-127) |
 
 ## Câu 4. Cần dữ liệu và hạ tầng gì?
 

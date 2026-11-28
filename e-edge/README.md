@@ -48,6 +48,10 @@ request → Host → zone snapshot (in-memory, no I/O)
 Monitor mode is applied at the very end: the decision still records what *would* have happened,
 and the request is passed through. That is what makes monitor mode useful rather than just "off".
 
+**Path trong telemetry được che** (BR-44, `telemetry/maskpath.go`): email, UUID, dãy số dài, token và khoá nhận ra
+được bị thay bằng `{email}`, `{uuid}`, `{number}`, `{token}` trước khi rời edge, nên lọc event theo path là lọc trên
+path đã che. Rule và origin vẫn nhận path gốc. Đây là nhận diện theo hình dạng, không bảo đảm bắt hết.
+
 ## Telemetry goes up through `control-plane`
 
 `POST` batches to `control-plane`'s ingest endpoint, never straight into `management-plane`. This

@@ -155,6 +155,11 @@ Lát này lệch xa nhất so với đặc tả: hiện rule và DDoS policy đ�
 | S6 UC-91 Khôi phục Owner | Có: yêu cầu, chờ, báo admin, hoàn tất (trang Tenants, hộp thoại Truy cập) |
 | S6 UC-92 NCC hỗ trợ | Một phần: tenant cấp quyền, platform admin mở phiên hỗ trợ; chưa duyệt từng phiên hay thông báo từng phiên |
 
+### Cập nhật 2026-11-28
+
+- **Che path ở edge** ([BR-44](../../requirements/02-requirements.md)): path trong security event được che trước khi rời edge (`e-edge/telemetry/maskpath.go`).
+- **Quyết định sản phẩm** ([§4](../../requirements/04-product-direction/00-index.md)): bảo vệ ứng dụng AI để backlog; SOC (AI cộng người, người ra quyết định) được đổi toàn bộ policy, nên change request và duyệt (UC-43 đến 45) là phần cần có; IP nguồn được dùng cho bảo vệ chung, có điều kiện, chưa có code.
+
 ### Ba chỗ lệch cần quyết (cập nhật 2026-11-22)
 
 1. **S2 đang làm ngược đặc tả.** Version và rollback (UC-48, 49) đã làm; draft tách khỏi bản chạy, duyệt (UC-43 đến 45) và theo dõi phát hành (UC-47) vẫn chưa. "Ghi thẳng" vẫn là MVP.

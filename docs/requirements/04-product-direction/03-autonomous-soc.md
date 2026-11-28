@@ -34,7 +34,7 @@ kiểm chứng → học**, để con người chỉ duyệt những việc có 
 | Tinh chỉnh rule, whitelist vì chặn nhầm | **TH2** | Đã quyết: đi qua change request (3.4) |
 | Nhận bản ruleset mới | TH3 theo đề xuất OQ-36 (log-only 7 ngày rồi tự chặn) | |
 | Thay đổi policy lâu dài khác | TH2 | UI là nguồn sự thật, cần người duyệt (3.2) |
-| TH4 | Không làm ở MVP và MR | Xem OQ-135 |
+| TH4 | Không làm: người ra quyết định (2026-11-28) | OQ-135 |
 
 ## Câu 3. Hàng rào an toàn cho mức TH3 là gì?
 
@@ -103,3 +103,14 @@ Với đội nhỏ chưa trực 24/7 (OQ-122), TH3 là cách để vẫn có ph�
 | OQ-135 | Có cho khách bật TH4 (hệ thống tự đổi policy lâu dài) không? | Không ở MVP và MR; xem lại khi tỉ lệ hành động bị gỡ ổn định dưới 1% |
 | OQ-136 | Mức tự hành mặc định cho khách không cấu hình gì | TH3 cho DDoS và tấn công rõ ràng, TH2 cho phần còn lại |
 | OQ-137 | SOC tự hành có là tính năng bán riêng (dịch vụ SOC được quản lý) không? | Có, dịch vụ cho khách không có SOC, đi kèm SOC của NCC |
+
+> **Quyết định của chủ dự án (2026-11-28), OQ-135.** SOC là **sự kết hợp của AI và người**. Trước khi có AI đây là
+> việc của nhân viên, rất đông người; AI làm giảm số người cần, còn **người mới là bên thật sự ra quyết định**.
+> SOC được thay đổi **toàn bộ** policy. Vậy hệ thống không tự quyết thay đổi lâu dài: AI phát hiện, điều tra, soạn
+> đề xuất; người quyết.
+
+Claude hiểu thêm, **chưa được xác nhận**:
+
+- Hành động tạm thời, có hạn, tự gỡ (TH3, ví dụ giảm thiểu DDoS) giữ như thiết kế trên.
+- Chưa rõ: người SOC **của nhà cung cấp** đổi policy của khách có cần người của khách duyệt không. Hiện
+  [BR-41](../02-requirements.md) yêu cầu có (trừ mitigation khi bị tấn công), và quyết định này chưa sửa BR-41.
