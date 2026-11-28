@@ -4,8 +4,8 @@
 // every read is tenant-scoped and most are zone-scoped and time-bounded, so that order lets
 // ClickHouse skip almost everything it doesn't need. Retention is the table's own TTL — expired
 // parts are dropped by the server, replacing the batched DELETE sweep the Postgres version
-// needed. The schema is applied at boot (idempotent), and the TTL is re-asserted each boot so a
-// changed ANALYTICS_RETENTION_DAYS takes effect without a manual ALTER.
+// needed. The schema is changed only by `analytics-api migrate` (migrate.go), never at boot; a
+// changed ANALYTICS_RETENTION_DAYS takes effect with `analytics-api migrate retention`.
 package store
 
 import (
@@ -73,41 +73,6 @@ func Open(ctx context.Context, dsn, database string) (*ClickHouse, error) {
 func (c *ClickHouse) Close() error { return c.conn.Close() }
 
 func (c *ClickHouse) Ping(ctx context.Context) error { return c.conn.Ping(ctx) }
-
-// Migrate creates the database and table if missing and sets the retention TTL.
-func (c *ClickHouse) Migrate(ctx context.Context, retentionDays int) error {
-	if retentionDays <= 0 {
-		return fmt.Errorf("retention must be at least 1 day, got %d", retentionDays)
-	}
-	db := c.table[:len(c.table)-len(".security_events")]
-	ttl := fmt.Sprintf("toDateTime(occurred_at) + INTERVAL %d DAY", retentionDays)
-	stmts := []string{
-		"CREATE DATABASE IF NOT EXISTS " + db,
-		`CREATE TABLE IF NOT EXISTS ` + c.table + ` (
-			tenant_id         UUID,
-			id                UUID,
-			zone_id           String,
-			triggered_by      LowCardinality(String),
-			triggered_by_id   String,
-			triggered_by_name String,
-			action            LowCardinality(String),
-			source_ip         String,
-			request_path      String,
-			occurred_at       DateTime64(3, 'UTC'),
-			ingested_at       DateTime64(3, 'UTC')
-		) ENGINE = MergeTree
-		PARTITION BY toYYYYMMDD(occurred_at)
-		ORDER BY (tenant_id, zone_id, occurred_at, id)
-		TTL ` + ttl,
-		"ALTER TABLE " + c.table + " MODIFY TTL " + ttl,
-	}
-	for _, s := range stmts {
-		if err := c.conn.Exec(ctx, s); err != nil {
-			return fmt.Errorf("migrating %s: %w", c.table, err)
-		}
-	}
-	return nil
-}
 
 // readCtx caps every read the query API runs (the cost guard of docs 5.8.9): a runaway query is
 // stopped by the server rather than left to tie up a connection.

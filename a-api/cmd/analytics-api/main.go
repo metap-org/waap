@@ -6,6 +6,9 @@
 // for the caller. The rest of docs/architecture 5.8.8–5.8.9 (ingest gateway with mTLS, Kafka topics,
 // enricher, archiver, detection, exporter) is later work.
 //
+// The service does not create or change its tables: run `analytics-api migrate up` first (and
+// `analytics-api migrate retention` after changing ANALYTICS_RETENTION_DAYS); see migrate.go.
+//
 // Env:
 //
 //	PORT                       HTTP port (default 3030)
@@ -41,14 +44,11 @@ func main() {
 }
 
 func run() error {
-	jwksURL, err := env.Require("JWKS_URL")
-	if err != nil {
-		return err
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	var st *store.ClickHouse
+	var err error
 	// ClickHouse often comes up a few seconds after this process in a fresh compose stack.
 	for attempt := 1; ; attempt++ {
 		st, err = store.Open(ctx, env.String("CLICKHOUSE_URL", "clickhouse://default:@localhost:9000"), env.String("ANALYTICS_DATABASE", "waf_analytics"))
@@ -62,10 +62,19 @@ func run() error {
 		time.Sleep(2 * time.Second)
 	}
 	defer st.Close()
-	if err := st.Migrate(ctx, env.Int("ANALYTICS_RETENTION_DAYS", 30)); err != nil {
+	retention := env.Int("ANALYTICS_RETENTION_DAYS", 30)
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		return migrateCommand(ctx, st, retention, os.Args[2:])
+	}
+	// Only a check: the schema is changed by `analytics-api migrate`, never by a booting service.
+	if err := st.CheckSchema(ctx, retention); err != nil {
 		return err
 	}
 
+	jwksURL, err := env.Require("JWKS_URL")
+	if err != nil {
+		return err
+	}
 	ingestToken := env.String("ANALYTICS_INGEST_TOKEN", "")
 	if ingestToken == "" {
 		slog.Warn("ANALYTICS_INGEST_TOKEN is not set: any valid platform token can write events for its own tenant")

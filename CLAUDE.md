@@ -404,6 +404,10 @@ flagged, undecided architecture question):
      separate always-on watchdog covering every code-authored entity across every service, which
      is a materially bigger feature (new scheduling infrastructure, not "add a check to an
      existing loop") than this bullet originally implied.
+   - **Update 2026-11-28: the manual escape hatch below is gone.** `enqueue-reconcile` only writes to the
+     orchestrator's queue, and the orchestrator belongs to the low-code layer, which is not in use; the command moved
+     with it (`../metap-lowcode/orchestrator`). To re-check a code-authored entity's schema, restart its service: boot
+     reconciles it.
    - **Net decision**: don't build that new watchdog right now. `introspect()`'s existing
      self-healing-on-next-reconcile behavior (item 1) is judged sufficient given zero repeat
      incidents since Phase 84 shipped it, and a code-authored entity already gets a fresh
@@ -560,6 +564,12 @@ Zone), Developer (owns ScanFinding remediation only, no DdosPolicy/FirewallRule 
 (read-only Analytics/Incident).
 
 ## Working conventions
+
+- **A service never changes the schema when it boots (2026-11-28, `../metap-docs/docs/migrations.md`, roadmap 126).** Entity
+  tables come from `m-management/migrations/` (generated with `management-service migrate generate <name>`, reviewed and
+  committed with `schema.snapshot.json`; applied files never change), applied with `migrate up`; `analytics-api` has its own
+  in `a-api/migrations/`. A database that lacks anything stops the boot. An entity change without its migration fails
+  `TestTheMigrationsCoverTheEntities`. Every statement below about services reconciling or migrating at boot is history.
 
 - **Entity values are native typed columns, no `data jsonb` (2026-11-14, `../metap-docs/docs/roadmap/106-native-entity-columns-no-data-jsonb.md`).**
   All 9 management-plane entities plus `waf.security_events` compile under it unchanged (checked). An existing

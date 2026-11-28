@@ -29,8 +29,8 @@ func openTest(t *testing.T) *ClickHouse {
 	db := "it_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	st, err := Open(ctx, dsn, db)
 	require.NoError(t, err)
-	require.NoError(t, st.Migrate(ctx, 30))
-	require.NoError(t, st.Migrate(ctx, 7), "migrate is idempotent and re-asserts the TTL")
+	_, err = st.Up(ctx, 30)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = st.conn.Exec(context.Background(), "DROP DATABASE IF EXISTS "+db)
 		_ = st.Close()
@@ -166,8 +166,39 @@ func TestAScopeLimitedToAZoneSeesOnlyThatZone(t *testing.T) {
 
 func TestTTLIsSet(t *testing.T) {
 	st := openTest(t)
+	require.NoError(t, st.SetRetention(context.Background(), 7))
 	var ddl string
 	row := st.conn.QueryRow(context.Background(), "SHOW CREATE TABLE "+st.table)
 	require.NoError(t, row.Scan(&ddl))
 	require.Contains(t, ddl, "TTL toDateTime(occurred_at) + toIntervalDay(7)")
+}
+
+// The boot check only reads; the schema moves with up, retention and down.
+func TestClickHouseSchemaIsChangedOnlyByMigrating(t *testing.T) {
+	st := openTest(t)
+	ctx := context.Background()
+	require.NoError(t, st.CheckSchema(ctx, 30))
+	again, err := st.Up(ctx, 30)
+	require.NoError(t, err)
+	require.Empty(t, again)
+
+	require.ErrorIs(t, st.CheckSchema(ctx, 7), ErrSchemaNotReady, "another retention is not applied by booting")
+	days, err := st.RetentionDays(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 30, days)
+	require.NoError(t, st.SetRetention(ctx, 7))
+	require.NoError(t, st.CheckSchema(ctx, 7))
+
+	targets, err := st.LastApplied(ctx, 7, 1)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+	require.NoError(t, st.Down(ctx, targets))
+	require.ErrorIs(t, st.CheckSchema(ctx, 7), ErrSchemaNotReady)
+	days, err = st.RetentionDays(ctx)
+	require.NoError(t, err)
+	require.Zero(t, days, "the table is gone and checking did not bring it back")
+	applied, err := st.Up(ctx, 7)
+	require.NoError(t, err)
+	require.Equal(t, []int{1}, applied)
+	require.NoError(t, st.CheckSchema(ctx, 7))
 }

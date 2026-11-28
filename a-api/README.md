@@ -46,8 +46,22 @@ Chạy riêng trên host:
 
 ```bash
 docker run -d --name clickhouse -p 9000:9000 -p 8123:8123 -e CLICKHOUSE_SKIP_USER_SETUP=1 clickhouse/clickhouse-server:25.8
+go run ./cmd/analytics-api migrate up      # bắt buộc trước lần chạy đầu và khi có migration mới
 JWKS_URL=http://localhost:3000/.well-known/jwks.json go run ./cmd/analytics-api
 ```
+
+Service **không** tạo bảng hay đổi TTL khi khởi động: chưa migrate, hoặc TTL của bảng khác `ANALYTICS_RETENTION_DAYS`,
+thì nó dừng và báo lệnh cần chạy. File SQL ở `migrations/` (mỗi số một `.up.sql` và `.down.sql`, các câu ngăn bằng
+`-- migrate:statement-break`, `{{database}}` và `{{retention_days}}` được điền lúc chạy; file đã áp dụng thì không sửa).
+
+| Lệnh | Việc làm |
+|---|---|
+| `migrate status` | còn gì chờ áp, TTL có khớp không (chỉ đọc) |
+| `migrate up [--dry-run]` | áp, hoặc chỉ in SQL |
+| `migrate down [--steps N] [--yes]` | không có `--yes` chỉ in SQL; rollback `0001` **xoá mọi sự kiện** |
+| `migrate retention [--yes]` | đổi TTL theo `ANALYTICS_RETENTION_DAYS`; giảm TTL làm **xoá** sự kiện cũ |
+
+ClickHouse không có khoá hay transaction cho việc này: chỉ chạy một nơi một lúc.
 
 | Env | Mặc định |
 |---|---|

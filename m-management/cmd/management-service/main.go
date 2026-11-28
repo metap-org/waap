@@ -24,6 +24,7 @@ import (
 	"github.com/metap-org/waap/m-management/alerting"
 	"github.com/metap-org/waap/m-management/analytics"
 	"github.com/metap-org/waap/m-management/billing"
+	"github.com/metap-org/waap/m-management/migrations"
 	"github.com/metap-org/waap/m-management/scanning"
 	"github.com/metap-org/waap/m-management/zones"
 
@@ -36,11 +37,20 @@ import (
 
 func main() {
 	config.MustLoadFileFromEnv() // before any setting is read
+	app.Main(options())
+}
+
+// options describes the service. `management-service migrate ...` reads it too.
+func options() app.Options {
 	zonesCfg, billingCfg := zones.LoadConfig(), billing.LoadConfig()
 	scanningCfg, alertingCfg := scanning.LoadConfig(), alerting.LoadConfig()
 
-	app.Main(app.Options{
+	return app.Options{
 		Name: "management-service",
+		// The entity tables come from these files, applied with `management-service migrate up`;
+		// the service never creates or alters them when it starts.
+		Migrations:    migrations.FS,
+		MigrationsDir: "m-management/migrations",
 		// Every write to the REST record routes goes through the zones guard chain (it steps aside
 		// for entities it has no rule for). Plan limits are asked of the billing domain, in-process.
 		WrapBackend: func(state *web.State) (crud.RecordBackend, error) {
@@ -69,5 +79,5 @@ func main() {
 				return &analytics.Backend{Client: analytics.NewClient(alertingCfg.AnalyticsURL), Tokens: &analytics.ReadTokens{Signer: state.TokenSigner, Grants: state.Permissions}}, nil
 			},
 		}},
-	})
+	}
 }
