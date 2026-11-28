@@ -2,10 +2,9 @@
 
 // waf.plans and waf.subscriptions — what each customer of the WAAP service may use (UC-70, 74).
 //
-// Owned by billing-service, a service of its own (zones-service asks it, over REST, what a customer
-// may use). These two entities live in the OPERATOR's tenant, the one that runs the service
+// Owned by the billing domain (the zones domain asks it, in-process, what a customer may use). These two entities live in the OPERATOR's tenant, the one that runs the service
 // (OPERATOR_TENANT_ID), and are edited by that tenant's admin. A customer is another tenant: its
-// subscription is a row here naming the customer's tenant id, and billing-service reads the limits
+// subscription is a row here naming the customer's tenant id, and billing reads the limits
 // from the operator's rows when that customer creates a zone or rule. A customer's own admin sees
 // its plan on the Plan page; it can write plan rows in its own tenant (an admin may do anything
 // there) but nothing reads them, so they change nothing.

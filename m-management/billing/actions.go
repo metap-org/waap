@@ -35,6 +35,6 @@ func RegisterActions(cfg Config) func(*web.State, *crud.ActionRegistry) error {
 func ListCustomerTenants(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.Subscriptions, model.ActionListTenants,
 		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
-			return listCustomerTenants(ctx, cfg, state, a.RC)
+			return listCustomerTenants(ctx, cfg, state, a.Records, a.RC)
 		})
 }

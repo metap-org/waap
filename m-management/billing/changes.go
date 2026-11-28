@@ -1,4 +1,4 @@
-// Layer: APP · declared-action logic. metap serves POST /api/{entity}[/{id}]/actions/{action} and calls the handler registered in routes.go.
+// Layer: APP · declared-action logic. metap serves POST /api/{entity}[/{id}]/actions/{action} and calls the handler registered in actions.go.
 
 // Changing plan (UC-71, UC-73). A customer cannot edit its own subscription, so it asks: a
 // plan change request in the operator's tenant. The operator's admin decides. Approving an upgrade
@@ -297,7 +297,7 @@ func RequestPlan(cfg Config, state *web.State) action.Action {
 			// The name is read from the tenant registry, not taken from the caller.
 			var name string
 			_ = state.Router.SharedPool().QueryRow(ctx, "SELECT name FROM control.tenants WHERE id::text = $1", a.RC.TenantID).Scan(&name)
-			return cfg.PlanSource(state.Crud).RequestPlanChange(ctx, a.RC, in.PlanID, in.Note, name)
+			return cfg.PlanSource(a.Records).RequestPlanChange(ctx, a.RC, in.PlanID, in.Note, name)
 		})
 }
 
@@ -305,7 +305,7 @@ func RequestPlan(cfg Config, state *web.State) action.Action {
 func MyPlanRequests(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.PlanChanges, model.ActionMyPlanRequests,
 		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
-			list, err := cfg.PlanSource(state.Crud).MyPlanRequests(ctx, a.RC)
+			list, err := cfg.PlanSource(a.Records).MyPlanRequests(ctx, a.RC)
 			if err != nil {
 				return nil, err
 			}
@@ -324,6 +324,6 @@ type decidePlanIn struct {
 func DecidePlan(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.PlanChanges, model.ActionDecidePlan,
 		func(ctx context.Context, a *action.Ctx, in decidePlanIn) (map[string]any, error) {
-			return cfg.PlanSource(state.Crud).DecidePlanChange(ctx, a.RC, a.ID, in.Approve, in.Note, time.Now())
+			return cfg.PlanSource(a.Records).DecidePlanChange(ctx, a.RC, a.ID, in.Approve, in.Note, time.Now())
 		})
 }

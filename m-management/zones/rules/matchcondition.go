@@ -6,7 +6,7 @@
 // Deliberately a second, independent copy of that vocabulary rather than a shared package — this
 // plane and control-plane are separate deploy cycles, and the wire shape is a JSON contract like
 // an HTTP API, not shared code. Unlike compile.go's own parser, this never builds a compiled
-// match expression — zones-service has no reason to depend on control-plane's types, it only
+// match expression — the management plane has no reason to depend on control-plane's types, it only
 // needs a yes/no answer at save time.
 //
 // Kept in sync with compile.go by hand. If the two ever drift, the effect is narrow and

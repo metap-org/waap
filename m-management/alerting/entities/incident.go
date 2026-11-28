@@ -6,9 +6,8 @@
 // EntityDefinition in this app's own MetadataRegistry, so ValidateReferences would reject a
 // Reference pointing at it.
 //
-// zoneId is a plain string for the same class of reason, since the pillar split: waf.zones now
-// lives in a separate binary (zones-service), and registering a zone entity here just to pass
-// ValidateReferences would leak full CRUD for waf.zones onto this service's route.
+// zoneId is a plain string too. That dates from when waf.zones was served by another service; the
+// domains are one process now, and the field has not been changed since.
 //
 // The correlation logic that actually creates an Incident from N SecurityEvents is out of this
 // entity's/portal's scope — real business logic, not CRUD. This entity is just where the result

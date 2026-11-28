@@ -111,7 +111,7 @@ func channelName(channels json.RawMessage) string {
 
 // recordNotification writes the delivery-log row every firing produces, sent or failed alike —
 // an alert that failed to deliver is exactly the one an operator needs to find later.
-func recordNotification(ctx context.Context, state *web.State, rc *permission.RequestContext, policy crud.RecordDto, channel string, delivered bool) (uuid.UUID, error) {
+func recordNotification(ctx context.Context, records crud.RecordBackend, rc *permission.RequestContext, policy crud.RecordDto, channel string, delivered bool) (uuid.UUID, error) {
 	status := "failed"
 	if delivered {
 		status = "sent"
@@ -122,7 +122,7 @@ func recordNotification(ctx context.Context, state *web.State, rc *permission.Re
 		model.FieldDeliveryStatus: jsonStr(status),
 		model.FieldTriggeredAt:    jsonStr(standard.NowRFC3339()),
 	}
-	result, err := state.Crud.Create(ctx, model.AlertNotifications, data, rc, nil)
+	result, err := records.Create(ctx, model.AlertNotifications, data, rc, nil)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("alert_notifications: %w", err)
 	}

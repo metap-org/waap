@@ -2,8 +2,8 @@
 // and the structured query API over them, backed by ClickHouse.
 //
 // v1 scope, on purpose: control-plane posts batches here directly (no Kafka/Vector/enricher yet);
-// Management's GraphQL gateway and alerting-service read through the query API with the caller's
-// own token. The rest of docs/architecture 5.8.8–5.8.9 (ingest gateway with mTLS, Kafka topics,
+// management-service reads through the query API with a short-lived read token it signs
+// for the caller. The rest of docs/architecture 5.8.8–5.8.9 (ingest gateway with mTLS, Kafka topics,
 // enricher, archiver, detection, exporter) is later work.
 //
 // Env:

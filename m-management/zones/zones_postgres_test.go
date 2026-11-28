@@ -512,9 +512,9 @@ func TestIPAccessListExpiryCanBeClearedAndMustParse(t *testing.T) {
 	assert.Contains(t, []string{"", "null"}, string(got.Record.Data["expiresAt"]), "expiry cleared: %s", got.Record.Data["expiresAt"])
 }
 
-// Plan quotas: what a tenant may create is whatever billing-service says its plan allows. A create
+// Plan quotas: what a tenant may create is whatever the billing domain says its plan allows. A create
 // past it is refused with plan_limit_reached and nothing is removed; an unlimited plan lifts it;
-// when nothing is enforced for the tenant, or billing cannot be reached, creates go through.
+// when nothing is enforced for the tenant, or the plan lookup fails, creates go through.
 func TestPlanQuotasFollowWhatTheBillingDomainSays(t *testing.T) {
 	pool := testPool(t)
 	registry := setupRegistry(t, pool)

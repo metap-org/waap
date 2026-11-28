@@ -1,7 +1,7 @@
 // Layer: APP · entity declaration. metap reads it to build the table, the REST routes, the permission checks and the workflow.
 
 // waf.policy_versions — an immutable snapshot of one zone's policy: its DDoS policies, firewall
-// rules and IP access lists as they stood right after a change. Rows are written by zones-service
+// rules and IP access lists as they stood right after a change. Rows are written by the zones domain
 // itself (every change to one of those three entities, and every rollback), never through the
 // portal: only the admin role may create one over REST, so a role that may edit rules cannot forge
 // history. Rolling back is an action on a version, and itself records a new version, so the

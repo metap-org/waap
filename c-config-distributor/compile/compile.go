@@ -128,8 +128,8 @@ func ParseMatch(raw json.RawMessage) (ruleset.MatchExpr, bool) {
 
 // Limits on one authored matchCondition. Every rule is evaluated against every request of its zone
 // on an edge shared by many tenants, so what a rule may cost is bounded where it is accepted: a
-// rule over a limit is dropped like any other condition the edge cannot represent. zones-service
-// applies the same numbers at save time (its own copy, rules/matchcondition.go), so an author hears
+// rule over a limit is dropped like any other condition the edge cannot represent. management-service
+// applies the same numbers at save time (its own copy, zones/rules/matchcondition.go), so an author hears
 // about it before the rule is silently left out.
 const (
 	MaxMatchBytes       = 32 << 10 // the whole condition, as authored
@@ -295,7 +295,7 @@ func parseMatch(raw json.RawMessage, depth int, budget *matchBudget) (ruleset.Ma
 
 	// Op::Regex is validated here, not just at authoring time — a pattern that fails to compile
 	// must never reach the edge (same "drop rather than publish broken" rule as every other
-	// unrepresentable condition in this function). zones-service's own save-time validation
+	// unrepresentable condition in this function). management-service's own save-time validation
 	// should already have caught this, but that is a best-effort UX nicety at a different layer,
 	// not something this function may rely on.
 	if op == ruleset.OpRegex {

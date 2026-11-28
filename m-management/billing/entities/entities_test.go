@@ -8,7 +8,7 @@ import (
 	"github.com/metap-org/metap/pkg/metadata"
 )
 
-// billing-service owns exactly the plan and subscription entities, and a subscription's plan
+// The billing package declares exactly the plan and subscription entities, and a subscription's plan
 // reference resolves inside it.
 func TestOwnsExactlyItsOwnEntities(t *testing.T) {
 	registry := metadata.NewMetadataRegistry()

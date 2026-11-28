@@ -1,15 +1,15 @@
 // Layer: APP · wiring. Registers the declared actions with metap; each handler calls the logic in correlate.go, evaluate.go.
 
-// Custom (non-generic-CRUD) HTTP surface for alerting-service.
+// The alerting domain's operations beyond generic CRUD.
 //
 // Two of the things the product spec lists as needing real code live here, and both for the
 // same reason: they are decisions over a SET of records, not a read or write of one record, so
 // no metadata-driven CRUD route can generate them.
 //
-//   - POST /internal/incidents/correlate — turns recent SecurityEvents into Incidents using the
+//   - the action waf.incidents.correlate — turns recent SecurityEvents into Incidents using the
 //     static v1 rule: same zoneId + same sourceIp inside a 15-minute window, threshold events or
 //     more. Static, not per-tenant configurable.
-//   - POST /internal/alerts/evaluate — the AlertPolicy side: "N events in M minutes on the same
+//   - the action waf.alert_policies.evaluate — the AlertPolicy side: "N events in M minutes on the same
 //     zone" (counted per zone, never summed across zones), producing an AlertNotification per
 //     firing.
 //
@@ -17,7 +17,7 @@
 // through its query API with a tenant-wide read token signed for the run (ANALYTICS_URL), with the time window pushed
 // into the query. Retention is ClickHouse's table TTL, so the old Postgres cleanup sweep is gone.
 //
-// Both are written as endpoints rather than background loops so metap-cron can drive them
+// Both are written as actions rather than background loops so metap-cron can drive them
 // on a schedule while a portal user/operator can also trigger one on demand.
 package alerting
 
@@ -67,7 +67,7 @@ func CorrelateIncidents(cfg Config, state *web.State) action.Action {
 func EvaluateAlerts(cfg Config, state *web.State) action.Action {
 	return action.Entity(model.AlertPolicies, model.ActionEvaluate,
 		func(ctx context.Context, a *action.Ctx, _ action.None) (map[string]any, error) {
-			return evaluateAlerts(ctx, cfg, state, a.RC)
+			return evaluateAlerts(ctx, a, cfg, state)
 		})
 }
 
@@ -76,6 +76,6 @@ func TestAlertPolicy(cfg Config, state *web.State) action.Action {
 	return action.Custom(model.AlertPolicies, model.ActionTest,
 		func(ctx context.Context, a *action.Ctx) (any, error) {
 			// testAlertPolicy reads the policy as the caller itself, so there is no LoadRecord here.
-			return testAlertPolicy(ctx, cfg, state, a.RC, a.ID)
+			return testAlertPolicy(ctx, a, cfg, state)
 		})
 }

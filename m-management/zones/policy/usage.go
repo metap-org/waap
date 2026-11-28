@@ -23,9 +23,9 @@ type UsageView struct {
 	Plans    []billing.Plan `json:"plans"`
 }
 
-// Usage is the plan billing-service resolves for the caller's tenant plus its zone count.
-// With no billing service, or when it cannot be reached, the plan part is empty (nothing enforced)
-// and the page says so.
+// Usage is the plan the billing domain resolves for the caller's tenant plus its zone count.
+// With no plan lookup, or when it fails, the plan part is empty (nothing enforced) and the page
+// says so.
 func Usage(ctx context.Context, backend crud.RecordBackend, plans billing.PlanLookup, rc *permission.RequestContext) (UsageView, error) {
 	tenant, err := uuid.Parse(rc.TenantID)
 	if err != nil {

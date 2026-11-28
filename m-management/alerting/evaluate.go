@@ -6,16 +6,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/model"
 )
 
-// evaluateAlerts is POST /internal/alerts/evaluate — every enabled AlertPolicy, evaluated against
+// evaluateAlerts is the action waf.alert_policies.evaluate — every enabled AlertPolicy, evaluated against
 // the recent event stream, counted PER ZONE (never summed across zones).
-func evaluateAlerts(ctx context.Context, cfg Config, state *web.State, rc *permission.RequestContext) (map[string]any, error) {
-	policies, err := listRecords(ctx, state, model.AlertPolicies, [][2]string{{model.FieldEnabled, "true"}}, recordScanLimit, rc)
+func evaluateAlerts(ctx context.Context, a *action.Ctx, cfg Config, state *web.State) (map[string]any, error) {
+	rc := a.RC
+	policies, err := listRecords(ctx, a.Records, model.AlertPolicies, [][2]string{{model.FieldEnabled, "true"}}, recordScanLimit, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func evaluateAlerts(ctx context.Context, cfg Config, state *web.State, rc *permi
 				return nil, err
 			}
 			delivered, detail := cfg.deliver(ctx, channels, payload)
-			notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
+			notificationID, err := recordNotification(ctx, a.Records, rc, policy, channelName(channels), delivered)
 			if err != nil {
 				return nil, err
 			}
@@ -84,8 +84,9 @@ func evaluateAlerts(ctx context.Context, cfg Config, state *web.State, rc *permi
 // testAlertPolicy is the action waf.alert_policies.test — the "Send test alert" button. Runs
 // the real delivery path and writes a real AlertNotification, because a test that takes a
 // different path than production proves nothing about production.
-func testAlertPolicy(ctx context.Context, cfg Config, state *web.State, rc *permission.RequestContext, policyID uuid.UUID) (map[string]any, error) {
-	getResult, err := state.Crud.Get(ctx, model.AlertPolicies, policyID, rc)
+func testAlertPolicy(ctx context.Context, a *action.Ctx, cfg Config, state *web.State) (map[string]any, error) {
+	rc := a.RC
+	getResult, err := a.Records.Get(ctx, model.AlertPolicies, a.ID, rc)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func testAlertPolicy(ctx context.Context, cfg Config, state *web.State, rc *perm
 		return nil, err
 	}
 	delivered, detail := cfg.deliver(ctx, channels, payload)
-	notificationID, err := recordNotification(ctx, state, rc, policy, channelName(channels), delivered)
+	notificationID, err := recordNotification(ctx, a.Records, rc, policy, channelName(channels), delivered)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,7 @@ const deliveryTimeout = 10 * time.Second
 // recordScanLimit is how many incidents or alert policies one sweep reads.
 const recordScanLimit = 50
 
-// Config is what alerting-service reads from its environment, once, in cmd/.
+// Config is what the alerting domain reads from its environment, once, in cmd/.
 type Config struct {
 	// AnalyticsURL is the Analytics plane's query API, where security events are read from.
 	AnalyticsURL string

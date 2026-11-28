@@ -1,7 +1,6 @@
 //go:build integration
 
-// Against a real Postgres: which plan billing-service resolves for a tenant, and its internal
-// route. The rows live in the operator's tenant; the asking tenant is a different one.
+// Against a real Postgres: which plan the billing domain resolves for a tenant. The rows live in the operator's tenant; the asking tenant is a different one.
 package billing_test
 
 import (

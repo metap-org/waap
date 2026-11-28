@@ -9,7 +9,7 @@ import (
 	"github.com/metap-org/metap/pkg/kit/env"
 )
 
-// Config is what billing-service reads from its environment, once, in cmd/ (code standard 2.10).
+// Config is what the billing domain reads from its environment, once, in cmd/ (code standard 2.10).
 type Config struct {
 	// OperatorTenant owns the plan rows; the zero value means no plans are enforced.
 	OperatorTenant uuid.UUID

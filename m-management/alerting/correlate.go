@@ -71,7 +71,7 @@ type zoneIPKey struct {
 	sourceIP string
 }
 
-// correlateIncidents is POST /internal/incidents/correlate — groups recent events by
+// correlateIncidents is the action waf.incidents.correlate — groups recent events by
 // (zoneId, sourceIp) and opens one Incident per group above the threshold.
 //
 // Deduplication is by "is there already an open incident for this zone with this source IP in
@@ -135,7 +135,7 @@ func correlateIncidents(ctx context.Context, a *action.Ctx, cfg Config, state *w
 			if count < threshold {
 				continue
 			}
-			existing, err := listRecords(ctx, state, model.Incidents,
+			existing, err := listRecords(ctx, a.Records, model.Incidents,
 				[][2]string{{model.FieldZoneID, key.zoneID}, {model.FieldStatus, model.IncidentOpen}}, recordScanLimit, rc)
 			if err != nil {
 				return err
@@ -158,7 +158,7 @@ func correlateIncidents(ctx context.Context, a *action.Ctx, cfg Config, state *w
 				model.FieldSeverity:   jsonStr(severityFor(count)),
 				model.FieldEventCount: json.RawMessage(fmt.Sprintf("%d", count)),
 			}
-			result, err := state.Crud.Create(ctx, model.Incidents, data, rc, nil)
+			result, err := a.Records.Create(ctx, model.Incidents, data, rc, nil)
 			if err != nil {
 				return err
 			}
