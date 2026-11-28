@@ -6,17 +6,33 @@
 # `docker compose -f docker-compose.dev.yml restart <service>` (seconds; the Go build cache lives in
 # the go-cache volume). There is no file-watching auto-reload. Don't run this and
 # docker-compose.yml at the same time — they publish the same host ports.
+#
+# Everything that mounts the source runs as YOUR user, never root, so what a container writes there
+# (node_modules, design-system/dist) stays yours. The default is 1000:1000; if `id -u` / `id -g` say
+# otherwise, put HOST_UID and HOST_GID in .env. The caches live in volumes, which `volume-owner`
+# hands to that user before the others start.
 name: waap-m-dev
+
+x-user: &user "${HOST_UID:-1000}:${HOST_GID:-1000}"
 
 x-go: &go
   image: golang:1.26
+  user: *user
   working_dir: /workspace/waap
   volumes:
     - ../../:/workspace
-    - go-cache:/root/.cache/go-build
-    - go-mod:/go/pkg/mod
+    - go-cache:/cache/go-build
+    - go-mod:/cache/go-mod
   extra_hosts:
     - "host.docker.internal:host-gateway"
+  depends_on:
+    volume-owner: { condition: service_completed_successfully }
+
+# The user has no home in the image, so HOME and Go's caches are named explicitly.
+x-go-env: &go-env
+  HOME: /tmp
+  GOCACHE: /cache/go-build
+  GOMODCACHE: /cache/go-mod
 
 x-service-env: &service-env
   DATABASE_URL: postgres://metap:metap@host.docker.internal:5433/metap
@@ -35,12 +51,31 @@ x-health: &health
   start_period: 20s
 
 services:
+  # The one thing that runs as root, and it mounts only Docker volumes, never the source. A new
+  # volume, or one filled by an earlier root run, is root's until this gives it to HOST_UID.
+  volume-owner:
+    image: golang:1.26
+    user: "0:0"
+    volumes:
+      - go-cache:/cache/go-build
+      - go-mod:/cache/go-mod
+      - pnpm-store:/cache/pnpm-store
+    environment:
+      OWNER: *user
+    command:
+      - sh
+      - -c
+      - |
+        for dir in /cache/*; do
+          [ "$$(stat -c %u:%g "$$dir")" = "$$OWNER" ] || chown -R "$$OWNER" "$$dir"
+        done
+
   management-service:
     <<: *go
     command: go run ./m-management/cmd/management-service
     ports: ["3000:3000"]
     environment:
-      <<: *service-env
+      <<: [*go-env, *service-env]
       # Everything that is not a secret is in config/management.dev.yaml; a variable set here wins.
       CONFIG_FILE: /workspace/waap/m-deploy/config/management.dev.yaml
       # The tenant that runs this service (plans, subscriptions, never limited). Unset = no limits.
@@ -73,6 +108,7 @@ services:
     command: go run ./cmd/analytics-api
     ports: ["3030:3030"]
     environment:
+      <<: *go-env
       PORT: "3030"
       CLICKHOUSE_URL: clickhouse://default:@clickhouse:9000
       JWKS_URL: http://management-service:3000/.well-known/jwks.json
@@ -81,6 +117,7 @@ services:
       <<: *health
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:3030/health"]
     depends_on:
+      volume-owner: { condition: service_completed_successfully }
       clickhouse: { condition: service_healthy }
       management-service: { condition: service_healthy }
 
@@ -90,12 +127,19 @@ services:
     extends:
       file: ../../docker-compose.dev.base.yml
       service: web-dev
+    user: *user
+    volumes:
+      # Out of the source tree: left to itself pnpm puts its store at the root of the mount.
+      - pnpm-store:/cache/pnpm-store
     working_dir: /workspace/waap/m-web
     environment:
+      HOME: /tmp
+      pnpm_config_store_dir: /cache/pnpm-store
       API_URL: http://management-service:3000
       VITE_USE_POLLING: "true"
     ports: ["5173:5173"]
     depends_on:
+      volume-owner: { condition: service_completed_successfully }
       management-service: { condition: service_healthy }
     command: >
       sh -c '
@@ -107,4 +151,5 @@ services:
 volumes:
   go-cache:
   go-mod:
+  pnpm-store:
   clickhouse:
