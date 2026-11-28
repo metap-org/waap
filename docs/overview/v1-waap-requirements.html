@@ -15136,7 +15136,7 @@ liên hệ bảo mật của account (đã có ở 5.8.11).</p>
 <section class="doc" id="f-04-product-direction-00-index"><div class="path">04-product-direction/00-index.md</div><h1 id="f-04-product-direction-00-index--4-định-hướng-sản-phẩm">4. Định hướng sản phẩm</h1>
 <blockquote>
 <p><strong>Trạng thái: đánh giá và đề xuất của Claude, chờ chủ dự án duyệt (2026-11-07).</strong> Viết theo yêu cầu &quot;tự đặt
-câu hỏi và tự trả lời&quot;. Không có gì ở đây là quyết định cho tới khi chủ dự án duyệt. Nhận định về thị trường
+câu hỏi và tự trả lời&quot;. Không có gì ở đây là quyết định cho tới khi chủ dự án duyệt (các câu đã quyết ghi ở mục &quot;Câu hỏi cần chủ dự án quyết&quot;). Nhận định về thị trường
 và đối thủ dựa trên hiểu biết chung tới giữa 2026, cần kiểm lại trước khi dùng cho tài liệu bán hàng.</p>
 </blockquote>
 <p>Mục này nhìn sản phẩm từ trên xuống, không theo từng nghiệp vụ như <a href="#f-03-business-analysis-00-index">§3</a>.
@@ -15163,7 +15163,7 @@ Câu hỏi chung của cả mục: <strong>sản phẩm đang đi đúng hướn
 <tr>
 <td><a href="#f-04-product-direction-03-autonomous-soc">4.3</a></td>
 <td>SOC tự hành thế nào để ít phụ thuộc con người?</td>
-<td>Chia 5 mức tự hành. Tự động hoàn toàn chỉ với hành động <strong>tạm thời, có hạn, tự gỡ khi có dấu hiệu sai</strong>; thay đổi lâu dài luôn thành change request cho người duyệt (khớp quyết định ở 3.2, 3.4)</td>
+<td>Chia 5 mức tự hành. Tự động hoàn toàn chỉ với hành động <strong>tạm thời, có hạn, tự gỡ khi có dấu hiệu sai</strong>; thay đổi lâu dài do người quyết (xác nhận 2026-11-28)</td>
 </tr>
 <tr>
 <td><a href="#f-04-product-direction-04-data-strategy">4.4</a></td>
@@ -15174,6 +15174,8 @@ Câu hỏi chung của cả mục: <strong>sản phẩm đang đi đúng hướn
 </table>
 <h2 id="f-04-product-direction-00-index--câu-hỏi-cần-chủ-dự-án-quyết">Câu hỏi cần chủ dự án quyết</h2>
 <p>Các câu cụ thể nằm ở cuối từng trang (OQ-127…OQ-142). Câu lớn nhất:</p>
+<p><strong>Trả lời của chủ dự án (2026-11-28):</strong> OQ-127 <strong>không</strong>, để backlog. OQ-135: SOC (AI cộng người, <strong>người ra
+quyết định</strong>) được đổi toàn bộ policy; hệ thống không tự quyết thay đổi lâu dài (<a href="#f-04-product-direction-03-autonomous-soc">4.3</a>). OQ-138 <strong>tuỳ loại dữ liệu</strong>, chưa quyết; bảng rà ở <a href="#f-04-product-direction-04-data-strategy">4.4</a>. Riêng IP nguồn: <strong>được</strong> dùng cho bảo vệ chung, có điều kiện.</p>
 <ol>
 <li>Có đưa <strong>bảo vệ ứng dụng AI</strong> (LLM, tác tử) vào lộ trình không, ở mức nào? (OQ-127)</li>
 <li>Mức tự hành tối đa của SOC: có cho hệ thống tự đổi policy lâu dài với khách bật &quot;tự động hoàn toàn&quot; không? (OQ-135)</li>
@@ -15471,6 +15473,11 @@ trong bundle chung, pipeline phát hành mô hình, Analytics có detection), n�
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Quyết định của chủ dự án (2026-11-28), OQ-127: không đưa vào lộ trình.</strong> Bảo vệ ứng dụng LLM và tác tử AI
+nằm ở backlog, chỉ xét lại sau khi làm xong hết phần còn lại. Đề xuất ở trên (làm ở MR) không áp dụng. Việc
+dùng LLM bên trong sản phẩm (trợ lý, soạn nháp rule, <a href="#f-04-product-direction-02-ai-ml">4.2</a>) là câu khác, quyết định này không đụng tới.</p>
+</blockquote>
 </section>
 <section class="doc" id="f-04-product-direction-02-ai-ml"><div class="path">04-product-direction/02-ai-ml.md</div><h1 id="f-04-product-direction-02-ai-ml--42-aiml-tích-hợp-vào-đâu">4.2 AI/ML tích hợp vào đâu</h1>
 <blockquote>
@@ -15677,7 +15684,7 @@ trong bundle chung, pipeline phát hành mô hình, Analytics có detection), n�
 <td>MR</td>
 </tr>
 <tr>
-<td>Bảo vệ ứng dụng LLM của khách</td>
+<td>Bảo vệ ứng dụng LLM của khách (<strong>backlog</strong>, OQ-127 quyết 2026-11-28)</td>
 <td>V1 (luật), V3 (phân loại)</td>
 <td>Giới hạn kích thước và tần suất prompt, phát hiện mẫu prompt injection đã biết, quan sát token; phân loại nội dung sâu ở Analytics, không inline</td>
 <td>MR (OQ-127)</td>
@@ -15884,8 +15891,8 @@ kiểm chứng → học</strong>, để con người chỉ duyệt những vi�
 </tr>
 <tr>
 <td>TH4</td>
-<td>Không làm ở MVP và MR</td>
-<td>Xem OQ-135</td>
+<td>Không làm: người ra quyết định (2026-11-28)</td>
+<td>OQ-135</td>
 </tr>
 </tbody>
 </table>
@@ -16056,6 +16063,18 @@ vì hàng trăm cảnh báo rời rạc.</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Quyết định của chủ dự án (2026-11-28), OQ-135.</strong> SOC là <strong>sự kết hợp của AI và người</strong>. Trước khi có AI đây là
+việc của nhân viên, rất đông người; AI làm giảm số người cần, còn <strong>người mới là bên thật sự ra quyết định</strong>.
+SOC được thay đổi <strong>toàn bộ</strong> policy. Vậy hệ thống không tự quyết thay đổi lâu dài: AI phát hiện, điều tra, soạn
+đề xuất; người quyết.</p>
+</blockquote>
+<p>Claude hiểu thêm, <strong>chưa được xác nhận</strong>:</p>
+<ul>
+<li>Hành động tạm thời, có hạn, tự gỡ (TH3, ví dụ giảm thiểu DDoS) giữ như thiết kế trên.</li>
+<li>Chưa rõ: người SOC <strong>của nhà cung cấp</strong> đổi policy của khách có cần người của khách duyệt không. Hiện
+<a href="#f-02-requirements">BR-41</a> yêu cầu có (trừ mitigation khi bị tấn công), và quyết định này chưa sửa BR-41.</li>
+</ul>
 </section>
 <section class="doc" id="f-04-product-direction-04-data-strategy"><div class="path">04-product-direction/04-data-strategy.md</div><h1 id="f-04-product-direction-04-data-strategy--44-chiến-lược-dữ-liệu-luồng-dữ-liệu-và-dùng-cho-phân-tích-chuyên-sâu">4.4 Chiến lược dữ liệu: luồng dữ liệu và dùng cho phân tích chuyên sâu</h1>
 <blockquote>
@@ -16399,6 +16418,100 @@ xử lý dữ liệu cá nhân theo Nghị định 13.</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Chủ dự án (2026-11-28), OQ-138: tuỳ loại dữ liệu, phải rà lại.</strong> Chưa có quyết định. Phần dưới là kết quả rà
+và đề xuất để duyệt.</p>
+</blockquote>
+<h2 id="f-04-product-direction-04-data-strategy--rà-theo-loại-dữ-liệu-2026-11-28">Rà theo loại dữ liệu (2026-11-28)</h2>
+<p><strong>Hiện trạng trong code.</strong> Chưa thấy đường nào đưa dữ liệu từ tenant này sang tenant khác (không có reputation hay
+pipeline TD3). Security event có 8 trường do edge gửi: zone, loại luật, ID luật, tên luật, hành động, IP nguồn,
+path, thời điểm. Edge <strong>không</strong> ghi query string, header, cookie hay body. Lúc rà, path được lưu <strong>nguyên văn</strong>, dù
+nó có thể chứa email, mã đặt lại mật khẩu hoặc ID người dùng (<a href="#f-02-requirements">BR-44</a>). <strong>Đã sửa cùng ngày
+(chủ dự án đồng ý che ngay tại edge, kể cả log của chính khách):</strong> edge che email, UUID, dãy số từ 8 chữ số, JWT,
+khoá API theo tiền tố, chuỗi ngẫu nhiên dài, mã đứng sau <code>reset</code>, <code>token</code>, <code>verify</code>…, và giá trị matrix parameter
+(<code>e-edge/telemetry/maskpath.go</code>). Nhận diện theo hình dạng nên không bảo đảm hết: mã ngắn hoặc toàn chữ ở chỗ lạ vẫn
+lọt. Rule và origin vẫn nhận path gốc. Event ghi trước đó không được sửa, hết hạn theo retention. Phạm vi rà: security event và các entity
+của scanning, alerting; chưa rà từng trường của zones, billing và dữ liệu tài khoản.</p>
+<p><strong>Đề xuất theo loại</strong> (nhãn theo LC3):</p>
+<table>
+<thead>
+<tr>
+<th>Dữ liệu</th>
+<th>Nhãn</th>
+<th>Dùng chéo tenant (đề xuất)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Loại luật, hành động</td>
+<td>Thấp</td>
+<td>Được, U2–U6</td>
+</tr>
+<tr>
+<td>Thời điểm</td>
+<td>Thấp khi gộp</td>
+<td>Được; từ TD4 chỉ theo khoảng thời gian</td>
+</tr>
+<tr>
+<td>IP nguồn</td>
+<td><code>personal</code></td>
+<td>Chỉ cho bảo vệ chung và threat research (U2, U4), băm khoá xoay ở TD3 (OQ-140); TD4 chỉ dạng cắt và đã gộp</td>
+</tr>
+<tr>
+<td>Path (đã che tại edge)</td>
+<td>Vẫn có thể <code>personal</code> hoặc <code>secret</code></td>
+<td><strong>Chưa được</strong> cho tới khi có bước đưa về mẫu (che tại edge chưa đủ cho TD3); sau đó chỉ dùng mẫu</td>
+</tr>
+<tr>
+<td>ID luật</td>
+<td><code>tenant_confidential</code></td>
+<td>Chỉ ID của rule do NCC phát hành (v1 chưa có); ID rule của khách thì bỏ</td>
+</tr>
+<tr>
+<td>Tên luật, tiêu đề sự cố, mô tả và ghi chú tự do</td>
+<td><code>tenant_confidential</code>, có thể <code>personal</code></td>
+<td>Không</td>
+</tr>
+<tr>
+<td>Zone, hostname, origin, nội dung rule, danh sách IP</td>
+<td><code>tenant_confidential</code> hoặc <code>secret</code></td>
+<td>Không dùng giá trị; chỉ đếm cho phân tích sản phẩm (U6)</td>
+</tr>
+<tr>
+<td>Báo chặn nhầm: liên hệ người báo, mô tả, phản hồi</td>
+<td><code>personal</code></td>
+<td>Không; chỉ thống kê gộp theo rule (BR-45)</td>
+</tr>
+<tr>
+<td>Kết quả quét: endpoint, mô tả</td>
+<td><code>secret</code> (lỗ hổng có thể chưa sửa)</td>
+<td>Không; chỉ số đếm theo loại và mức độ, qua ngưỡng k</td>
+</tr>
+<tr>
+<td>Kênh cảnh báo: URL webhook, email</td>
+<td><code>secret</code>, <code>personal</code></td>
+<td>Không</td>
+</tr>
+<tr>
+<td>Người được giao, tài khoản, thanh toán</td>
+<td><code>personal</code></td>
+<td>Không; chỉ số đếm cho U6</td>
+</tr>
+</tbody>
+</table>
+<p>Nguyên tắc mặc định: <strong>trường nào chưa được xếp loại thì không đi lên TD3.</strong> U7 giữ nguyên đề xuất là không làm.</p>
+<blockquote>
+<p><strong>Quyết định của chủ dự án (2026-11-28): IP nguồn được dùng chéo tenant cho bảo vệ chung (U2)</strong> (một IP tấn
+công khách A được dùng để bảo vệ khách B), với các điều kiện:</p>
+<ul>
+<li>chỉ dùng cho bảo vệ và threat research (U2, U4);</li>
+<li>khách B chỉ biết &quot;IP này đáng ngờ&quot;, không biết nó đã tấn công ai;</li>
+<li>đánh giá xấu tự hết hạn;</li>
+<li>ghi trong điều khoản dịch vụ; hỏi luật sư về Nghị định 13 và lập hồ sơ đánh giá tác động <strong>trước khi</strong> chạy pipeline.</li>
+</ul>
+<p>Chưa có code nào dùng dữ liệu chéo tenant. Quyết định này không duyệt các dòng khác của bảng.</p>
+</blockquote>
+<p><strong>Cần duyệt:</strong> các dòng còn lại của bảng trên.</p>
 </section>
   </main>
 </div>

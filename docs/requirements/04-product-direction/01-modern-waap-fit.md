@@ -86,3 +86,8 @@ trong bundle chung, pipeline phát hành mô hình, Analytics có detection), n�
 | OQ-128 | Có kéo mô hình bot và bảo vệ đăng nhập/OTP lên MR không? | Có |
 | OQ-129 | Bảo vệ phía trình duyệt (PCI DSS 4.0) có lên MR cho Business không? | Có |
 | OQ-130 | Thứ tự ưu tiên ở Câu 4 có đúng với kế hoạch bán hàng không? | Cần chủ dự án và sales xác nhận |
+
+> **Quyết định của chủ dự án (2026-11-28), OQ-127: không đưa vào lộ trình.** Bảo vệ ứng dụng LLM và tác tử AI
+> nằm ở backlog, chỉ xét lại sau khi làm xong hết phần còn lại. Đề xuất ở trên (làm ở MR) không áp dụng. Việc
+> dùng LLM bên trong sản phẩm (trợ lý, soạn nháp rule, [4.2](02-ai-ml.md)) là câu khác, quyết định này không đụng tới.
+

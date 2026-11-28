@@ -52,6 +52,8 @@ func New(capacity int) *Telemetry {
 
 // Record is non-blocking by construction — called from the request path.
 func (t *Telemetry) Record(event SecurityEvent) {
+	// Masked here, the only way in, so no caller can queue a raw path.
+	event.RequestPath = MaskPath(event.RequestPath)
 	select {
 	case t.queue <- event:
 	default:
