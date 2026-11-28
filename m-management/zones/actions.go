@@ -10,6 +10,7 @@ package zones
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/metap-org/metap/pkg/action"
 	"github.com/metap-org/metap/pkg/crud"
@@ -165,6 +166,9 @@ func RollbackVersion() action.Action {
 	return action.Custom(model.PolicyVersions, model.ActionRollback,
 		func(ctx context.Context, a *action.Ctx) (any, error) {
 			// RollbackToVersion reads the version as the caller itself, so there is no LoadRecord here.
+			if err := requireApprovedTarget(ctx, a); err != nil {
+				return nil, err
+			}
 			var result versions.RollbackResult
 			err := a.Step(ctx, "rollback", func(ctx context.Context) error {
 				var err error
@@ -173,6 +177,26 @@ func RollbackVersion() action.Action {
 			})
 			return result, err
 		})
+}
+
+// requireApprovedTarget: under change control a rollback needs no approval only because its target
+// was approved before (BR-40).
+func requireApprovedTarget(ctx context.Context, a *action.Ctx) error {
+	target, err := a.Records.Get(ctx, model.PolicyVersions, a.ID, a.RC)
+	if err != nil {
+		return err
+	}
+	zoneID := versions.ZoneOfRule(target.Record.Data)
+	mode, err := guard.ChangeControl(ctx, a.Records, zoneID, a.RC)
+	if err != nil || mode == model.ChangeControlOff {
+		return err
+	}
+	approved, err := versions.WasApproved(ctx, a.Records, zoneID, target.Record, a.RC)
+	if err != nil || approved {
+		return err
+	}
+	return crud.NewServiceErrorMsg(http.StatusConflict, model.ErrRollbackNotApproved,
+		"This zone's account requires approval, and this version never had it. Propose the change you want as a change request.")
 }
 
 type applyPresetIn struct {

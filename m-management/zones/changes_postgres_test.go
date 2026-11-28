@@ -9,8 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/metap-org/metap/pkg/auth/identity"
 	"github.com/metap-org/metap/pkg/crud"
 	"github.com/metap-org/metap/pkg/permission"
+	"github.com/metap-org/metap/pkg/permission/rolestore"
 	"github.com/metap-org/metap/pkg/query"
 	"github.com/metap-org/metap/pkg/web"
 	"github.com/metap-org/waap/m-management/zones"
@@ -26,6 +29,7 @@ type changeFixture struct {
 	backend *guard.Backend
 	actions *crud.ActionRegistry
 	state   *web.State
+	pool    *pgxpool.Pool
 	// admin and second are two tenant admins; viewer holds a role with no rights on the policy.
 	admin, second, viewer *permission.RequestContext
 	zone                  crud.RecordDto
@@ -42,7 +46,7 @@ func newChangeFixture(t *testing.T) *changeFixture {
 	state, _ := newTestState(t, pool, registry)
 
 	f := &changeFixture{
-		t: t, state: state, ctx: context.Background(), backend: zones.Guarded(state.Crud, nil, state.Router), actions: crud.NewActionRegistry(),
+		t: t, state: state, pool: pool, ctx: context.Background(), backend: zones.Guarded(state.Crud, nil, state.Router), actions: crud.NewActionRegistry(),
 		admin: adminContext(tenantID, userID), second: adminContext(tenantID, secondID),
 		viewer: &permission.RequestContext{TenantID: tenantID.String(), UserID: uuid.NewString(), Roles: []string{"viewer"}, HasRoles: true},
 	}
@@ -468,4 +472,176 @@ func TestTenantWideRulesAreUnderTheStrictestAccount(t *testing.T) {
 	require.Len(t, left, 1)
 	assert.Equal(t, "198.51.100.5", jsonString0(left[0].Data["value"]))
 	assert.Len(t, f.records("waf.policy_versions"), before, "versions belong to a zone")
+}
+
+// The settings that change what the edge does go through a change request; sending them back
+// unchanged, and editing anything else, does not.
+func TestZoneTrafficSettingsAreUnderChangeControl(t *testing.T) {
+	f := newChangeFixture(t)
+	f.control("review")
+	zone := func() crud.RecordDto {
+		got, err := f.backend.Get(f.ctx, "waf.zones", f.zone.ID, f.admin)
+		require.NoError(t, err)
+		return got.Record
+	}
+	update := func(data crud.JsonObject) error {
+		_, err := f.backend.Update(f.ctx, "waf.zones", f.zone.ID, zone().Version, data, f.admin, nil)
+		return err
+	}
+	setting := func(name string) string { return jsonString0(zone().Data[name]) }
+
+	err := update(crud.JsonObject{"originAddress": jsonMarshal(t, "5.6.7.8")})
+	assert.Equal(t, "change_request_required", code(t, err))
+	err = update(crud.JsonObject{"protectionMode": jsonMarshal(t, "enforce")})
+	assert.Equal(t, "change_request_required", code(t, err))
+	require.NoError(t, update(crud.JsonObject{"originAddress": jsonMarshal(t, "1.2.3.4"), "tags": jsonMarshal(t, []string{"web"})}))
+
+	op := func(data map[string]any) map[string]any {
+		return map[string]any{"op": "update", "entity": "waf.zones", "id": f.zone.ID.String(), "data": data}
+	}
+	_, err = f.propose(f.admin, op(map[string]any{"hasConfig": true}))
+	assert.Equal(t, "validation_failed", code(t, err), "only traffic settings")
+
+	draft, err := f.propose(f.admin, op(map[string]any{"protectionMode": "enforce", "originAddress": "5.6.7.8"}), blockOp("203.0.113.5"))
+	require.NoError(t, err)
+	require.True(t, draft.Check.OK, "%+v %+v", draft.Check, draft.Check.Error)
+	require.Len(t, draft.Diff, 2)
+	assert.Equal(t, "waf.zones", draft.Diff[0].Entity)
+	assert.Equal(t, "monitor", jsonString0(draft.Diff[0].Before["protectionMode"]))
+	assert.Equal(t, "monitor", setting("protectionMode"), "the check rolls back")
+	_, err = f.act("submit", draft.ID, f.admin, nil)
+	require.NoError(t, err)
+	_, err = f.act("approve", draft.ID, f.second, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "enforce", setting("protectionMode"))
+	assert.Equal(t, "5.6.7.8", setting("originAddress"))
+	assert.Len(t, f.records("waf.ip_access_lists"), 1)
+
+	// A change to the settings alone records no policy version, and is stale if they moved.
+	versions := len(f.records("waf.policy_versions"))
+	back, err := f.propose(f.admin, op(map[string]any{"protectionMode": "monitor"}))
+	require.NoError(t, err)
+	_, err = f.act("submit", back.ID, f.admin, nil)
+	require.NoError(t, err)
+	f.control("off")
+	require.NoError(t, update(crud.JsonObject{"originAddress": jsonMarshal(t, "9.9.9.9")}))
+	f.control("review")
+	_, err = f.act("approve", back.ID, f.second, nil)
+	assert.Equal(t, "change_request_stale", code(t, err))
+	_, err = f.act("submit", back.ID, f.admin, nil)
+	require.NoError(t, err)
+	published, err := f.act("approve", back.ID, f.second, nil)
+	require.NoError(t, err)
+	assert.Zero(t, published.PublishedVersion)
+	assert.Len(t, f.records("waf.policy_versions"), versions)
+
+	// Pausing is the emergency channel.
+	require.NoError(t, update(crud.JsonObject{"tags": jsonMarshal(t, []string{})}))
+}
+
+func TestUnderChangeControlRollbackOnlyReturnsToApprovedStates(t *testing.T) {
+	f := newChangeFixture(t)
+	add := func(ip string) {
+		_, err := f.backend.Create(f.ctx, "waf.ip_access_lists", crud.JsonObject{"zoneId": jsonMarshal(t, f.zone.ID.String()), "type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, ip), "enabled": jsonMarshal(t, true)}, f.admin, nil)
+		require.NoError(t, err)
+	}
+	// Versions 1 (empty), 2, 3 are written directly; 4 is published on top of 3.
+	add("203.0.113.1")
+	add("203.0.113.2")
+	f.control("review")
+	draft, err := f.propose(f.admin, blockOp("203.0.113.3"))
+	require.NoError(t, err)
+	_, err = f.act("submit", draft.ID, f.admin, nil)
+	require.NoError(t, err)
+	_, err = f.act("approve", draft.ID, f.second, nil)
+	require.NoError(t, err)
+
+	rollback := func(number int) error {
+		for _, v := range f.records("waf.policy_versions") {
+			var n int
+			require.NoError(t, json.Unmarshal(v.Data["number"], &n))
+			if n == number {
+				_, err := f.actions.Invoke(f.ctx, crud.ActionCall{Entity: "waf.policy_versions", Name: "rollback", ID: v.ID, RC: f.admin, Input: crud.JsonObject{}})
+				return err
+			}
+		}
+		t.Fatalf("no version %d", number)
+		return nil
+	}
+	assert.Equal(t, "rollback_not_approved", code(t, rollback(2)), "never approved")
+	require.NoError(t, rollback(3), "what the approved change was made on")
+	assert.Len(t, f.records("waf.ip_access_lists"), 2)
+	require.NoError(t, rollback(4), "what was approved")
+	assert.Len(t, f.records("waf.ip_access_lists"), 3)
+
+	f.control("off")
+	require.NoError(t, rollback(2), "off: any version, as before")
+}
+
+func TestTheEmergencyChannelDoesNotRenew(t *testing.T) {
+	f := newChangeFixture(t)
+	f.control("review")
+	temporary := func(ip string) (crud.RecordDto, error) {
+		return f.backend.Create(f.ctx, "waf.ip_access_lists", crud.JsonObject{
+			"zoneId": jsonMarshal(t, f.zone.ID.String()), "type": jsonMarshal(t, "blacklist"), "value": jsonMarshal(t, ip),
+			"enabled": jsonMarshal(t, true), "expiresAt": jsonMarshal(t, time.Now().Add(time.Hour).UTC().Format(time.RFC3339)),
+		}, f.admin, nil)
+	}
+	first, err := temporary("203.0.113.5")
+	require.NoError(t, err)
+	_, err = temporary("203.0.113.5")
+	assert.Equal(t, "change_request_required", code(t, err), "a second one next to the first")
+	_, err = f.backend.Delete(f.ctx, "waf.ip_access_lists", first.ID, first.Version, f.admin, nil)
+	require.NoError(t, err)
+	_, err = temporary("203.0.113.5")
+	assert.Equal(t, "change_request_required", code(t, err), "lifting it and adding it again")
+	_, err = temporary("203.0.113.6")
+	require.NoError(t, err, "another source is another emergency")
+
+	rule := func(name string, condition map[string]any) error {
+		_, err := f.backend.Create(f.ctx, "waf.firewall_rules", crud.JsonObject{
+			"zoneId": jsonMarshal(t, f.zone.ID.String()), "name": jsonMarshal(t, name), "priority": jsonMarshal(t, 10),
+			"ruleType": jsonMarshal(t, "waf"), "action": jsonMarshal(t, "block"), "enabled": jsonMarshal(t, true),
+			"matchCondition": jsonMarshal(t, condition), "expiresAt": jsonMarshal(t, time.Now().Add(time.Hour).UTC().Format(time.RFC3339)),
+		}, f.admin, nil)
+		return err
+	}
+	require.NoError(t, rule("one", map[string]any{"field": "uri.path", "op": "contains", "value": "/admin"}))
+	err = rule("renamed", map[string]any{"value": "/admin", "op": "contains", "field": "uri.path"})
+	assert.Equal(t, "change_request_required", code(t, err), "the same measure under another name")
+}
+
+func TestFourEyesNeedsTwoPeopleWhoCanApprove(t *testing.T) {
+	f := newChangeFixture(t)
+	tenant := uuid.MustParse(f.admin.TenantID)
+	f.backend.WithApprovers(zones.Approvers(f.state))
+	member := func(roles ...string) uuid.UUID {
+		m, _, err := identity.AddMember(f.ctx, f.pool, identity.NewMember{TenantID: tenant, Email: uuid.NewString() + "@example.test", Password: "A-long-test-password-1"})
+		require.NoError(t, err)
+		for _, role := range roles {
+			require.NoError(t, rolestore.AssignRole(f.ctx, f.pool, tenant, m.ID, role, nil))
+		}
+		return m.ID
+	}
+	setFourEyes := func() error {
+		got, err := f.backend.Get(f.ctx, "waf.accounts", f.account, f.admin)
+		require.NoError(t, err)
+		_, err = f.backend.Update(f.ctx, "waf.accounts", f.account, got.Record.Version, crud.JsonObject{"changeControl": jsonMarshal(t, "fourEyes")}, f.admin, nil)
+		return err
+	}
+	member("admin")
+	member("viewer") // may not change rules
+	assert.Equal(t, "validation_failed", code(t, setFourEyes()))
+
+	// A role held only in this account counts for it.
+	second := member()
+	_, err := f.state.Permissions.SyncBasicPolicies(f.ctx, tenant, "waf.firewall_rules", []permission.RoleActionGrant{{Role: "editor", HasRole: true, Action: "update"}}, nil)
+	require.NoError(t, err)
+	require.NoError(t, rolestore.AssignScopedRole(f.ctx, f.pool, tenant, second, "editor", "account", f.account.String(), nil))
+	require.NoError(t, setFourEyes())
+
+	got, err := f.backend.Get(f.ctx, "waf.accounts", f.account, f.admin)
+	require.NoError(t, err)
+	_, err = f.backend.Update(f.ctx, "waf.accounts", f.account, got.Record.Version, crud.JsonObject{"name": jsonMarshal(t, "Renamed"), "changeControl": jsonMarshal(t, "fourEyes")}, f.admin, nil)
+	require.NoError(t, err)
 }

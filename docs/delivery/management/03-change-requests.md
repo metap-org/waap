@@ -89,21 +89,38 @@ trả `409 change_request_required`.
 **Áp preset chưa đi qua change request được:** khi bật, áp preset bị từ chối bằng thông báo lỗi. Nên áp preset lúc
 onboarding, trước khi bật.
 
-## Chưa chặn
+## Cài đặt zone, rollback, kênh khẩn, 4-eyes
 
-Với account đã bật, vẫn còn các đường đổi cách edge xử lý traffic mà không cần duyệt:
+Với account đã bật:
+
+- **Cài đặt zone đổi cách xử lý traffic** (`protectionMode`, `originAddress`, `originProtocol`, `originPort`,
+  `originHostHeader`) phải qua change request: thao tác `{"op": "update", "entity": "waf.zones", "id": "<zone>",
+  "data": {…}}`, chỉ nhận các trường đó. Gửi lại giá trị cũ, sửa tên hay tag thì không cần. Thay đổi chỉ có cài đặt
+  zone **không ghi policy version**. Người soạn và duyệt cần quyền sửa zone (hiện là admin). Portal chưa có form sửa
+  các cài đặt này sau onboarding, nên hiện chỉ soạn được qua API.
+- **Tạm dừng zone không cần duyệt**: BR-6 xếp nó vào kênh khẩn.
+- **Rollback** (BR-40) chỉ về được trạng thái **đã được duyệt**: nội dung một change request đã phát hành, hoặc nội
+  dung ngay trước nó (người duyệt đã thấy ở phần "trước" của diff). So theo nội dung. Khác thì trả
+  `rollback_not_approved`. Lúc mới bật, chưa phát hành change request nào, thì chưa rollback được.
+- **Kênh khẩn không dùng để gia hạn:** không tạo thẳng được rule tạm **cùng tác dụng** (IP list: cùng loại và giá trị;
+  rule: cùng hành động và điều kiện, tên khác vẫn tính) với một rule tạm đang có, hoặc zone đã có trong 72 giờ qua,
+  kể cả đã gỡ. Rule cho cả tenant không có lịch sử, nên chỉ so với rule đang còn.
+- **Bật `fourEyes`** chỉ được khi có ít nhất **hai người đang hoạt động** sửa được firewall rule (role toàn tenant, hoặc
+  role trong chính account đó; không tính service account). Account tạo mới chỉ tính role toàn tenant.
+
+## Chưa chặn
 
 | Đường | Ghi chú |
 |---|---|
-| Cài đặt zone: `protectionMode`, origin, tạm dừng | Phân tích 3.2 yêu cầu đi cùng change request; chưa làm |
-| Rollback | BR-40 cho phép rollback về version **đã từng được duyệt**; hiện cho rollback về mọi version đã ghi, kể cả version ghi lúc kiểm soát còn tắt |
-| Kênh khẩn lặp lại | Hết 72 giờ có thể tạo lại rule mới; chưa chặn việc gia hạn kiểu này |
-| Tắt kiểm soát | Người sửa được account tắt được ngay, chỉ có audit |
-| 4-eyes khi chỉ có một người duyệt | Không bị từ chối lúc bật; change request sẽ kẹt cho tới khi có người thứ hai hoặc tắt |
+| Tắt kiểm soát | Người sửa được account (hiện là admin) tắt được ngay, chỉ có audit. Đặc tả chưa yêu cầu duyệt việc này |
+| Xoá zone, chuyển zone sang account khác | Cần quyền admin, có audit |
+| Người duyệt rời đi sau khi đã bật `fourEyes` | Không theo dõi; change request kẹt cho tới khi có người thứ hai hoặc tắt |
+| Kênh khẩn với tác dụng tương đương nhưng viết khác | Ví dụ thêm `/32` vào IP, hoặc viết lại điều kiện |
+| Kênh khẩn chặn quá rộng | Một rule `block` tạm có điều kiện rất rộng có thể chặn cả website; BR-6 cho phép, chỉ giới hạn bằng quyền và thời hạn |
 
 ## Còn lại của S2
 
-Đóng các đường ở bảng trên; theo dõi phát hành (UC-47, cần edge báo ngược);
+Theo dõi phát hành (UC-47, cần edge báo ngược);
 Under Attack (UC-50, cần edge).
 
 ## Khi triển khai

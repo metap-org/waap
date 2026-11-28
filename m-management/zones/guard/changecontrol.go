@@ -5,6 +5,8 @@ package guard
 import (
 	"context"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -96,18 +98,67 @@ func offWhenMissing(err error) (string, error) {
 // changeControlGuard refuses (1) every client write to a change request, and (2) a direct write to the
 // policy of a zone whose account has change control on, except the emergency channel: creating a
 // temporary rule that only restricts, and removing a temporary one.
-// Tenant-wide records are under control as soon as any open account is.
+// Tenant-wide records are under control as soon as any open account is. The zone settings that change
+// what the edge does (ZoneTrafficSettings) are under control too; pausing a zone is not, being part of
+// the emergency channel (BR-6). Rollback is checked by its action, which does not write through here.
 //
-// Not covered yet: zone settings such as protectionMode and origin, and rollback (it restores content
-// that was live).
+// Not covered: switching change control off, deleting a zone, and moving a zone to another account
+// (all need rights only an admin has, and are audited).
 type changeControlGuard struct{ passthrough }
+
+// ZoneTrafficSettings are the zone fields that change how traffic is handled.
+var ZoneTrafficSettings = []string{
+	model.FieldProtectionMode, model.FieldOriginAddress, model.FieldOriginProtocol,
+	model.FieldOriginPort, model.FieldOriginHostHeader,
+}
+
+// changedSettings lists the traffic settings data would set to something else than current has.
+// Sending a value back unchanged is not a change.
+func changedSettings(current, data crud.JsonObject) []string {
+	var out []string
+	for _, field := range ZoneTrafficSettings {
+		if next, sent := data[field]; sent && !sameValue(current[field], next) {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
+// requireForZone gates an update of a zone's traffic settings.
+func (g *changeControlGuard) requireForZone(ctx context.Context, id uuid.UUID, data crud.JsonObject, rc *permission.RequestContext) error {
+	if isPublishing(ctx) || !slices.ContainsFunc(ZoneTrafficSettings, func(f string) bool { _, ok := data[f]; return ok }) {
+		return nil
+	}
+	got, err := g.inner.Get(ctx, model.Zones, id, rc)
+	if err != nil {
+		return err
+	}
+	changed := changedSettings(got.Record.Data, data)
+	if len(changed) == 0 {
+		return nil
+	}
+	mode, err := ChangeControl(ctx, g.inner, id, rc)
+	if err != nil || mode == model.ChangeControlOff {
+		return err
+	}
+	return crud.NewServiceErrorMsg(http.StatusConflict, model.ErrChangeRequestRequired,
+		"This zone's account requires a change request to change "+strings.Join(changed, ", ")+". Pausing the zone does not need one.")
+}
 
 func (g *changeControlGuard) Create(ctx context.Context, entity string, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	if entity == model.ChangeRequests {
 		return crud.RecordDto{}, errChangeRequestReadOnly()
 	}
 	if versions.IsVersioned(entity) && !isPublishing(ctx) {
-		if err := g.require(ctx, versions.ZoneOfRule(data), rc, isEmergencyRule(entity, data, time.Now())); err != nil {
+		zoneID := versions.ZoneOfRule(data)
+		var emergency exemption
+		if isEmergencyRule(entity, data, time.Now()) {
+			emergency = func() (bool, error) {
+				renews, err := renewsTemporaryRule(ctx, g.inner, zoneID, entity, data, rc)
+				return !renews, err
+			}
+		}
+		if err := g.require(ctx, zoneID, rc, emergency); err != nil {
 			return crud.RecordDto{}, err
 		}
 	}
@@ -118,6 +169,11 @@ func (g *changeControlGuard) Update(ctx context.Context, entity string, id uuid.
 	if entity == model.ChangeRequests {
 		return crud.RecordDto{}, errChangeRequestReadOnly()
 	}
+	if entity == model.Zones {
+		if err := g.requireForZone(ctx, id, data, rc); err != nil {
+			return crud.RecordDto{}, err
+		}
+	}
 	if versions.IsVersioned(entity) && !isPublishing(ctx) {
 		got, err := g.inner.Get(ctx, entity, id, rc)
 		if err != nil {
@@ -126,12 +182,12 @@ func (g *changeControlGuard) Update(ctx context.Context, entity string, id uuid.
 		// Both ends: the zone the rule is in, and the one the update would move it to. Extending a
 		// temporary rule is not an emergency (BR-6), so no update is.
 		from := versions.ZoneOfRule(got.Record.Data)
-		if err := g.require(ctx, from, rc, false); err != nil {
+		if err := g.require(ctx, from, rc, nil); err != nil {
 			return crud.RecordDto{}, err
 		}
 		if _, moves := data[model.FieldZoneID]; moves {
 			if to := versions.ZoneOfRule(data); to != from {
-				if err := g.require(ctx, to, rc, false); err != nil {
+				if err := g.require(ctx, to, rc, nil); err != nil {
 					return crud.RecordDto{}, err
 				}
 			}
@@ -143,6 +199,12 @@ func (g *changeControlGuard) Update(ctx context.Context, entity string, id uuid.
 func (g *changeControlGuard) Transition(ctx context.Context, entity string, id uuid.UUID, action string, expectedVersion int32, data crud.JsonObject, rc *permission.RequestContext, reason *string) (crud.RecordDto, error) {
 	if entity == model.ChangeRequests {
 		return crud.RecordDto{}, errChangeRequestReadOnly()
+	}
+	// A transition can carry field values too.
+	if entity == model.Zones {
+		if err := g.requireForZone(ctx, id, data, rc); err != nil {
+			return crud.RecordDto{}, err
+		}
 	}
 	return g.inner.Transition(ctx, entity, id, action, expectedVersion, data, rc, reason)
 }
@@ -157,27 +219,36 @@ func (g *changeControlGuard) Delete(ctx context.Context, entity string, id uuid.
 			return crud.RecordDto{}, err
 		}
 		expires, _ := jx.AsString(got.Record.Data[model.FieldExpiresAt])
-		if err := g.require(ctx, versions.ZoneOfRule(got.Record.Data), rc, expires != ""); err != nil {
+		var lifting exemption
+		if expires != "" {
+			lifting = func() (bool, error) { return true, nil }
+		}
+		if err := g.require(ctx, versions.ZoneOfRule(got.Record.Data), rc, lifting); err != nil {
 			return crud.RecordDto{}, err
 		}
 	}
 	return g.inner.Delete(ctx, entity, id, expectedVersion, rc, reason)
 }
 
-func (g *changeControlGuard) require(ctx context.Context, zoneID uuid.UUID, rc *permission.RequestContext, emergency bool) error {
-	if emergency {
-		return nil
-	}
+// exemption says whether a write may skip the change request; asked only when control is on.
+type exemption func() (bool, error)
+
+func (g *changeControlGuard) require(ctx context.Context, zoneID uuid.UUID, rc *permission.RequestContext, exempt exemption) error {
 	mode, err := ChangeControl(ctx, g.inner, zoneID, rc)
 	if err != nil || mode == model.ChangeControlOff {
 		return err
+	}
+	if exempt != nil {
+		if ok, err := exempt(); err != nil || ok {
+			return err
+		}
 	}
 	why := "This zone's account requires a change request for this change."
 	if zoneID == uuid.Nil {
 		why = "An account of this tenant has change control on, so a tenant-wide rule needs a change request."
 	}
 	return crud.NewServiceErrorMsg(http.StatusConflict, model.ErrChangeRequestRequired,
-		why+" Only a temporary rule that blocks, challenges or logs (at most 72 hours) can be added directly.")
+		why+" Only a temporary rule that blocks, challenges or logs (at most 72 hours, and not one the zone had in the last 72) can be added directly.")
 }
 
 // isEmergencyRule: a new rule that expires within MaxEmergencyRuleLife and cannot let more through.

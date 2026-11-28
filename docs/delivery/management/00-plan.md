@@ -120,7 +120,7 @@ Cố định trước khi viết S1/S2, để hai bên làm song song. Chi tiế
 | 40 Soạn policy | Một phần | CRUD rule, DDoS policy, danh sách IP; bản nháp là change request chứa danh sách thao tác, không đụng bản đang chạy; trên portal nháp được tạo từ chính form sửa khi account yêu cầu duyệt, chưa sửa được nội dung một thao tác trong nháp | mã |
 | 41 DDoS, managed ruleset | Một phần | DDoS policy có; managed ruleset nằm ngoài v1 | mã |
 | 42 Kiểm nháp | Một phần | kiểm nháp bằng cách áp thử rồi rollback: đúng kiểm tra, hạn mức, quyền và ràng buộc như lúc phát hành, kèm kết quả kiểm policy và diff; nút Kiểm tra policy ở tab Phiên bản vẫn kiểm bản đang chạy; chưa ước lượng chi phí, chưa dò rule không bao giờ khớp; chưa gọi biên dịch của Control | mã |
-| 43 đến 45 Change request, duyệt, tự xác nhận | Một phần | `waf.change_requests` với action submit, approve, reject, revise, cancel; account chọn `off`, `review` (tự xác nhận) hoặc `fourEyes` (người khác duyệt). Có tab Thay đổi của zone, trang Thay đổi policy và cài đặt ở trang Account; bật 4-eyes chưa kiểm account có đủ hai người duyệt; [những chỗ chưa chặn](03-change-requests.md#chưa-chặn) | mã |
+| 43 đến 45 Change request, duyệt, tự xác nhận | Một phần | `waf.change_requests` với action submit, approve, reject, revise, cancel; account chọn `off`, `review` (tự xác nhận) hoặc `fourEyes` (người khác duyệt). Có tab Thay đổi của zone, trang Thay đổi policy và cài đặt ở trang Account; bật 4-eyes cần đủ hai người duyệt được; [những chỗ chưa chặn](03-change-requests.md#chưa-chặn) | mã |
 | 46 Phát hành | Một phần | duyệt là phát hành, trong một transaction; từ chối nếu policy đã đổi từ lúc gửi; version ghi change request và người duyệt. Chưa có sự kiện `PolicyPublished` riêng (control-plane vẫn đi theo sự kiện của record) | mã |
 | 47 Theo dõi phát hành | Chưa | edge không báo tiến độ ngược lại | mã |
 | 48 Xem, so sánh version | Một phần | tab Phiên bản của zone: mỗi thay đổi ghi một snapshot bất biến (`waf.policy_versions`), xem khác biệt với bản trước; version từ change request có người duyệt (màn hình chưa hiện); rule áp dụng cả tenant không nằm trong version của zone nào | mã |
@@ -162,6 +162,6 @@ Cố định trước khi viết S1/S2, để hai bên làm song song. Chi tiế
 
 ### Ba chỗ lệch cần quyết (cập nhật 2026-11-22)
 
-1. **S2.** Version, rollback (UC-48, 49) và change request, duyệt (UC-43 đến 46, backend, 2026-11-28) đã làm. Rule cho cả tenant và màn hình xong ngày 2026-11-29. Còn: đóng các chỗ chưa chặn, theo dõi phát hành (UC-47, cần edge). Kiểm soát thay đổi mặc định tắt.
+1. **S2.** Version, rollback (UC-48, 49) và change request, duyệt (UC-43 đến 46, backend, 2026-11-28) đã làm. Rule cho cả tenant, màn hình, cài đặt zone, giới hạn rollback, kênh khẩn và điều kiện bật 4-eyes xong ngày 2026-11-29. Còn: [vài chỗ chưa chặn](03-change-requests.md#chưa-chặn), theo dõi phát hành (UC-47, cần edge). Kiểm soát thay đổi mặc định tắt.
 2. **Account (UC-02)**: xong ở waap, không đổi `metap`.
 3. **S4**: chỉ làm gói, subscription và hạn mức (chủ dự án chọn bỏ thanh toán, hoá đơn). Làm tiếp khi có khách trả tiền và chốt cổng thanh toán.
